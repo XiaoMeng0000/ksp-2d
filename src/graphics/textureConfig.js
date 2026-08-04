@@ -20,13 +20,10 @@ export const textureConfig = {
     mod_test_ballast: 'assets/images/ships/test_ballast.png',
     mod_construction_package: 'assets/images/ships/construction_package.png',
 
-<<<<<<< HEAD
     // 飞船船体图标（飞行场景）
     ship_default_active: 'assets/images/ships/bodies/ship_default_active.png',
     ship_default_inactive: 'assets/images/ships/bodies/ship_default_inactive.png',
 
-=======
->>>>>>> 55f6279aebd46ce585c067f1d4da2d8791092413
     // 反馈渠道图标
     icon_qq: 'assets/images/menu/icon_qq.png',
     icon_email: 'assets/images/menu/icon_email.png',
