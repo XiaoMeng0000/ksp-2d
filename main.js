@@ -30,6 +30,7 @@ import { registerInfoScene } from './src/scenes/infoScene.js';
 import { registerMenuScene } from './src/scenes/menuScene.js';
 import { registerEncyclopediaScene } from './src/scenes/encyclopediaScene.js';
 import { registerCreditsScene } from './src/scenes/creditsScene.js';
+import { registerSettingsScene } from './src/scenes/settingsScene.js';
 
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
@@ -95,6 +96,7 @@ registerMenuScene({
 });
 registerEncyclopediaScene();
 registerCreditsScene();
+registerSettingsScene();
 
 // 注册飞行场景（注入 main.js 持有的模块级依赖）
 registerFlightScene({
@@ -174,9 +176,9 @@ window.trackingCollapsed = trackingCollapsed;
 // 场景就绪时重置 lastTime，防止读档后 dt 异常大
 eventBus.on(Events.SCENE_READY, () => { lastTime = 0; });
 
-// TEMP: 第二阶段-SceneManager - 设置功能占位
+// 设置场景入口
 window.openSettings = function() {
-    window.showNotification('设置功能暂不开放', 'info');
+    sceneManager.switchTo('settings');
 };
 
 // 层级存档 - 当前世界 ID

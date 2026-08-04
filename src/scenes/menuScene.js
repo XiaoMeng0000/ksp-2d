@@ -223,14 +223,29 @@ function registerMenuScene(options) {
         },
 
         render(ctx) {
-            // 背景：优先用背景图，加载失败则退回纯黑 + 星空
-            const bg = textureManager.get('menu_bg');
-            if (bg) {
-                ctx.drawImage(bg, 0, 0, _canvas.width, _canvas.height);
+            // 读取菜单背景设置
+            const menuBgMode = localStorage.getItem('ksp2d.menuBg') || 'stars';
+
+            if (menuBgMode === 'image') {
+                // 图片模式：优先用背景图，加载失败则退回星空
+                const bg = textureManager.get('menu_bg');
+                if (bg) {
+                    ctx.drawImage(bg, 0, 0, _canvas.width, _canvas.height);
+                } else {
+                    // 背景图未加载，fallback 到星空
+                    ctx.fillStyle = 'black';
+                    ctx.fillRect(0, 0, _canvas.width, _canvas.height);
+                    for (const star of _stars) {
+                        ctx.beginPath();
+                        ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
+                        ctx.fillStyle = 'rgba(255, 255, 255, ' + star.alpha + ')';
+                        ctx.fill();
+                    }
+                }
             } else {
+                // 星空模式：纯黑 + 星空
                 ctx.fillStyle = 'black';
                 ctx.fillRect(0, 0, _canvas.width, _canvas.height);
-                // 星空 — 仅在无背景图时绘制
                 for (const star of _stars) {
                     ctx.beginPath();
                     ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2);

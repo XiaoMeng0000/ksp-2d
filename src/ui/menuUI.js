@@ -42,6 +42,7 @@ function getEscButtons(scene) {
             { id: 'escSaveBtn', label: '存档', action: 'window.saveGame()' },
             { id: 'escLoadBtn', label: '读档', action: 'window.loadGame()' },
             { id: 'escBackBtn', label: '回到飞行器', action: 'window.backToFlight()' },
+            { id: 'escSettingsBtn', label: '设置', action: 'window.openSettings()' },
             { id: 'escQuitBtn', label: '退出到主菜单', action: 'window.quitToMenu()' }
         ];
     }
@@ -50,6 +51,7 @@ function getEscButtons(scene) {
         { id: 'escSaveBtn', label: '存档', action: 'window.saveGame()' },
         { id: 'escLoadBtn', label: '读档', action: 'window.loadGame()' },
         { id: 'escTrackingBtn', label: '追踪站', action: 'window.openTrackingStation()' },
+        { id: 'escSettingsBtn', label: '设置', action: 'window.openSettings()' },
         { id: 'escQuitBtn', label: '退出到主菜单', action: 'window.quitToMenu()' }
     ];
 }
@@ -68,6 +70,7 @@ function renderEscMenuButtons(scene) {
         'window.loadGame()': () => { if (typeof window.loadGame === 'function') window.loadGame(); },
         'window.openTrackingStation()': () => { if (typeof window.openTrackingStation === 'function') window.openTrackingStation(); },
         'window.backToFlight()': () => { if (typeof window.backToFlight === 'function') window.backToFlight(); },
+        'window.openSettings()': () => { if (typeof window.openSettings === 'function') window.openSettings(); },
         'window.quitToMenu()': () => { if (typeof window.quitToMenu === 'function') window.quitToMenu(); }
     };
     
