@@ -1,0 +1,41 @@
+export class CelestialBody {
+    constructor(options) {
+        const {
+            name = '',
+            gm = 0,
+            soiRadius = 0,
+            position = { x: 0, y: 0 },
+            color = '#888888',
+            displayRadius = 10,
+            // 天体驱动器 6.5步
+            type = 'planet',
+            orbitParent = null,
+            orbitA = 0,
+            orbitE = 0,
+            orbitOmega = 0,
+            orbitTheta0 = 0,
+            isHomeworld = false,
+            defaultOrbitAltitude = null
+        } = options;
+
+        this.name = name;
+        this.gm = gm;
+        this.soiRadius = soiRadius;
+        this.position = position;
+        this.color = color;
+        this.displayRadius = displayRadius;
+
+        // 天体驱动器 6.5步
+        this.type = type;
+        this.orbitParent = orbitParent;
+        this.orbitA = orbitA;
+        this.orbitE = orbitE;
+        this.orbitOmega = orbitOmega;
+        this.orbitTheta0 = orbitTheta0;
+        this.isHomeworld = isHomeworld;
+        this.defaultOrbitAltitude = defaultOrbitAltitude;
+
+        // 天体在星系参考系中的绝对速度
+        this.velocity = { x: 0, y: 0 };
+    }
+}
