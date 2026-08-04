@@ -3,45 +3,37 @@
 import { CelestialBody } from '../physics/celestialBody.js';
 
 // 天体驱动器 6.5步
-// 临时太阳系数据（6.5步）
+// Kerbol 系天体数据 — 真实 KSP 尺度（第一阶段：仅 Kerbol + Kerbin）
 export const solarSystemData = [
     new CelestialBody({
         name: 'Kerbol',
         type: 'star',
-        gm: 100000,
-        soiRadius: 2000,
-        displayRadius: 80,
+        gm: 1.1723328e18,
+        soiRadius: 1e13,
+        radius: 261600000,
+        atmosphereHeight: 600000,
+        hasAtmosphere: true,
         color: '#ffcc44',
-        position: { x: 0, y: 0 }
+        position: { x: 0, y: 0 },
+        textureKey: 'kerbol'
     }),
     new CelestialBody({
         name: 'Kerbin',
         type: 'planet',
-        gm: 10000,
-        soiRadius: 400,
-        displayRadius: 50,
+        gm: 3.5316e12,
+        soiRadius: 84159286,
+        radius: 600000,
+        atmosphereHeight: 70000,
+        hasAtmosphere: true,
         color: '#4488ff',
         orbitParent: 'Kerbol',
-        orbitA: 500,
+        orbitA: 13599840256,
         orbitE: 0,
         orbitOmega: 0,
         orbitTheta0: 0,
         isHomeworld: true,
-        defaultOrbitAltitude: 30,
-        presetOrbits: { low: 30, mid: 90, high: 200 }
-    }),
-    new CelestialBody({
-        name: 'Mun',
-        type: 'moon',
-        gm: 400,
-        soiRadius: 60,
-        displayRadius: 25,
-        color: '#aaaaaa',
-        orbitParent: 'Kerbin',
-        orbitA: 300,
-        orbitE: 0,
-        orbitOmega: 0,
-        orbitTheta0: 0,
-        presetOrbits: { low: 10, mid: 20, high: 30 }
+        defaultOrbitAltitude: 80000,
+        presetOrbits: { low: 80000, mid: 250000, high: 600000 },
+        textureKey: 'kerbin'
     })
 ];

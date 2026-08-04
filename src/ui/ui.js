@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { stateToKepler } from '../physics/orbitalMechanics.js';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { stateToKepler } from '../physics/orbitalMechanics.js';
 // 导入 uiManager（相对路径更新）
 import { uiManager } from './uiManager.js';
 // 导入事件总线
@@ -177,7 +177,7 @@ window.updateTrackingInfo = function(node) {
             html += '<hr style="border:none;border-top:1px solid #444;margin:6px 0;">';
             html += '<div style="color:#666;font-size:11px;margin-bottom:4px;">停靠飞船:</div>';
             for (const s of fac.dockedShips) {
-                html += '<div style="color:#ddd;font-size:10px;margin-bottom:2px;">🚀 ' + (s.displayName || s.id) + '</div>';
+                html += '<div style="color:#ddd;font-size:10px;margin-bottom:2px;">' + renderIconHtml('ship_default_active', '🚀', 12) + ' ' + (s.displayName || s.id) + '</div>';
             }
         } else {
             html += '<div style="color:#555;font-size:10px;margin-top:4px;">无停靠飞船</div>';
@@ -828,7 +828,7 @@ function buildBridgeContent(facility) {
         const ship = facility.dockedShips?.find(s => s.id === _controlledDockedShipId);
         if (ship) {
             html += '<hr style="border:none;border-top:1px solid #444;margin:12px 0;">';
-            html += `<div style="color:#88ccff;font-size:13px;margin-bottom:8px;">🚀 当前控制：${ship.displayName || ship.id}</div>`;
+            html += `<div style="color:#88ccff;font-size:13px;margin-bottom:8px;">${renderIconHtml('ship_default_active', '🚀', 12)} 当前控制：${ship.displayName || ship.id}</div>`;
             html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">';
             html += card('燃料', (ship.fuel ?? '-') + ' / ' + (ship.maxFuel ?? '-'));
             html += card('干质量', (ship.dryMass ?? '-') + ' t');
@@ -837,7 +837,7 @@ function buildBridgeContent(facility) {
             html += `<button onclick="window.__releaseShipControl()" style="
                 padding:5px 16px;background:#333;color:#ccc;border:1px solid #555;
                 border-radius:3px;cursor:pointer;font-family:monospace;font-size:12px;
-            ">⬅ 返回设施总览</button>`;
+            ">返回设施总览</button>`;
         }
     }
     return html;
@@ -854,7 +854,7 @@ function buildDockHubContent(facility) {
             + 'width:100%;padding:8px;background:rgba(68,136,255,0.15);color:#88ccff;'
             + 'border:1px solid #448;border-radius:3px;cursor:pointer;'
             + 'font-family:monospace;font-size:12px;margin-bottom:12px;'
-            + '">🔗 对接当前飞船：' + (activeShip.displayName || activeShip.id) + '（剩余 ' + freeDocks + ' 个对接口）</button>';
+            + '">对接当前飞船：' + (activeShip.displayName || activeShip.id) + '（剩余 ' + freeDocks + ' 个对接口）</button>';
     } else if (activeShip && freeDocks <= 0) {
         html += '<div style="color:#c44;font-size:12px;margin-bottom:12px;padding:6px 10px;'
             + 'background:rgba(170,68,68,0.1);border:1px solid #644;border-radius:3px;">'
@@ -872,7 +872,7 @@ function buildDockHubContent(facility) {
         for (const ship of dockedShips) {
             const fuelPct = ship.maxFuel > 0 ? (ship.fuel / ship.maxFuel * 100) : 0;
             html += '<div style="background:#333;border:1px solid #555;border-radius:3px;padding:10px 12px;">'
-                + '<div style="font-size:13px;color:#aaa;margin-bottom:6px;font-weight:bold;">🚀 ' + (ship.displayName || ship.id) + '</div>'
+                + '<div style="font-size:13px;color:#aaa;margin-bottom:6px;font-weight:bold;">' + renderIconHtml('ship_default_active', '🚀', 12) + ' ' + (ship.displayName || ship.id) + '</div>'
                 + '<div style="margin-bottom:6px;">'
                 + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">'
                 + '<span style="display:inline-block;width:80px;height:6px;background:#333;border-radius:3px;">'
@@ -929,7 +929,7 @@ function buildSupplyTerminalContent(facility) {
         for (const ship of dockedShips) {
             const fuelPct = ship.maxFuel > 0 ? (ship.fuel / ship.maxFuel * 100) : 0;
             html += '<div style="background:#333;border:1px solid #555;border-radius:3px;padding:10px 12px;">'
-                + '<div style="font-size:13px;color:#aaa;margin-bottom:6px;font-weight:bold;">🚀 ' + (ship.displayName || ship.id) + '</div>'
+                + '<div style="font-size:13px;color:#aaa;margin-bottom:6px;font-weight:bold;">' + renderIconHtml('ship_default_active', '🚀', 12) + ' ' + (ship.displayName || ship.id) + '</div>'
                 + '<div style="margin-bottom:8px;">'
                 + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">'
                 + '<span style="display:inline-block;width:80px;height:6px;background:#333;border-radius:3px;">'
@@ -942,7 +942,7 @@ function buildSupplyTerminalContent(facility) {
                 + '<button onclick="window.__facilityRefuelShip(\'' + ship.id + '\')" style="'
                 + 'width:100%;padding:6px 0;background:#333;color:#cc4;border:1px solid #554;'
                 + 'border-radius:3px;cursor:pointer;font-family:monospace;font-size:11px;'
-                + '">⛽ 补给燃料</button>'
+                + '">补给燃料</button>'
                 + '<div style="font-size:9px;color:#666;text-align:center;margin-top:4px;">消耗: 0 点数</div>'
                 + '</div>';
         }
@@ -1584,7 +1584,7 @@ function buildShip() {
         return;
     }
 
-    const defaultOrbitR = homeworld.displayRadius + (homeworld.defaultOrbitAltitude || 0);
+    const defaultOrbitR = homeworld.radius + (homeworld.defaultOrbitAltitude || 0);
 
     // 弹出轨道高度输入框
     window.__createInputDialog(

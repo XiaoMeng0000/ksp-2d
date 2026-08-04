@@ -37,40 +37,25 @@ class TextureManager {
     }
 
     _loadTexture(key, path) {
-        // 通过 fetch + Blob URL 加载，避免在 DevTools 元素面板中暴露原始文件路径
-        fetch(path)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-                return response.blob();
-            })
-            .then(blob => {
-                const blobUrl = URL.createObjectURL(blob);
-                const img = new Image();
+        const img = new Image();
 
-                img.onload = () => {
-                    this._textures.set(key, img);
-                    this._completed++;
-                    console.log(`[TextureManager] 已加载: ${key} (${this._completed}/${this._total})`);
-                    this._checkAllDone();
-                };
+        img.onload = () => {
+            this._textures.set(key, img);
+            eventBus.emit(Events.TEXTURE_PROGRESS, { key, loaded: this._completed + 1, total: this._total, success: true });
+            this._completed++;
+            console.log(`[TextureManager] 已加载: ${key} (${this._completed}/${this._total})`);
+            this._checkAllDone();
+        };
 
-                img.onerror = () => {
-                    this._completed++;
-                    console.error(`[TextureManager] 解码失败: ${key} → ${path} (${this._completed}/${this._total})`);
-                    eventBus.emit(Events.TEXTURE_LOAD_ERROR, { key, path });
-                    this._checkAllDone();
-                };
+        img.onerror = () => {
+            eventBus.emit(Events.TEXTURE_PROGRESS, { key, loaded: this._completed + 1, total: this._total, success: false });
+            this._completed++;
+            console.error(`[TextureManager] 加载失败: ${key} → ${path} (${this._completed}/${this._total})`);
+            eventBus.emit(Events.TEXTURE_LOAD_ERROR, { key, path });
+            this._checkAllDone();
+        };
 
-                img.src = blobUrl;
-            })
-            .catch(err => {
-                this._completed++;
-                console.error(`[TextureManager] 加载失败: ${key} → ${path} | ${err.message} (${this._completed}/${this._total})`);
-                eventBus.emit(Events.TEXTURE_LOAD_ERROR, { key, path });
-                this._checkAllDone();
-            });
+        img.src = path;
     }
 
     get(key) {

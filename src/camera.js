@@ -1,9 +1,9 @@
-const camera = { x: 0, y: 0, zoom: 1 };
+const camera = { x: 0, y: 0, zoom: 1e-4 };
 
 function handleWheel(e) {
     e.preventDefault();
     const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
-    camera.zoom = Math.max(0.1, Math.min(5, camera.zoom * zoomFactor));
+    camera.zoom = Math.max(1e-12, Math.min(10, camera.zoom * zoomFactor));
 }
 
 function initCamera() {

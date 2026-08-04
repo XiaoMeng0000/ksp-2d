@@ -2,7 +2,7 @@
 import { solarSystemData } from '../config/solarSystem.js';
 import { keplerPositionAtTime } from './orbitalMechanics.js';
 
-export const celestialBodies = JSON.parse(JSON.stringify(solarSystemData));
+export const celestialBodies = structuredClone(solarSystemData);
 
 // 获取飞船相对于宿主天体的位置（世界坐标 → 宿主参考系）
 export function getRelativePosition(pos, host) {
@@ -91,7 +91,7 @@ export function updateCelestialBodies(time) {
     }
 
     // 第二遍：累加父天体速度，得到绝对速度
-    // 依赖：celestialBodies 数组中父天体排在子天体之前（Kerbol → Kerbin → Mun）
+    // 依赖：celestialBodies 数组中父天体排在子天体之前（Kerbol → Kerbin）
     for (const body of celestialBodies) {
         if (!body.orbitParent) continue;
         if (!relVelocities[body.name]) continue;

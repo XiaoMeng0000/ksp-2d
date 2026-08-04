@@ -109,7 +109,7 @@ eventBus.on(Events.SHIP_COMMAND, ({ action, params }) => {
                 ship.vel.y = -Math.sqrt(10000 / 80);
                 ship.currentGM = 10000;
             } else {
-                const orbitR = homeworld.displayRadius + (homeworld.defaultOrbitAltitude || 0);
+                const orbitR = homeworld.radius + (homeworld.defaultOrbitAltitude || 0);
                 ship.pos.x = homeworld.position.x + orbitR;
                 ship.pos.y = homeworld.position.y;
                 ship.vel.x = 0;

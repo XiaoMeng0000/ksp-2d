@@ -7,7 +7,8 @@ import { textureManager } from './graphics/textureManager.js';
 
 let stars = [];
 const STAR_COUNT = 800;
-const WORLD_RANGE = 2000;
+const WORLD_RANGE = 6.8e10;  // Kerbin 轨道半径 × 5，适配真实 KSP 尺度
+const BODY_MIN_SCREEN_RADIUS = 3;  // 天体最低屏幕半径，防止远距离缩成一个像素以下
 
 function hexToRgba(hex, alpha) {
     const r = parseInt(hex.slice(1, 3), 16);
@@ -49,18 +50,22 @@ function render(ctx, canvas, activeShip, options = {}) {
 
     for (const body of celestialBodies) {
         const screen = worldToScreen(body.position.x, body.position.y, canvas);
-        const drawRadius = body.displayRadius * camera.zoom;
+        const drawRadius = Math.max(body.displayRadius * camera.zoom, BODY_MIN_SCREEN_RADIUS);
 
         ctx.beginPath();
         ctx.arc(screen.x, screen.y, drawRadius, 0, Math.PI * 2);
         ctx.fillStyle = body.color;
         ctx.fill();
 
-        ctx.beginPath();
-        ctx.arc(screen.x, screen.y, body.soiRadius * camera.zoom, 0, Math.PI * 2);
-        ctx.strokeStyle = 'rgba(100, 150, 255, 0.3)';
-        ctx.lineWidth = Math.max(1, 2 * camera.zoom);
-        ctx.stroke();
+        // SOI 边界圆（屏幕半径小于 1 时不绘制，避免画面混乱）
+        const soiScreenR = body.soiRadius * camera.zoom;
+        if (soiScreenR >= 1) {
+            ctx.beginPath();
+            ctx.arc(screen.x, screen.y, soiScreenR, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(100, 150, 255, 0.3)';
+            ctx.lineWidth = Math.max(1, 2 * camera.zoom);
+            ctx.stroke();
+        }
     }
 
     // 多飞船渲染 - 活动飞船始终渲染，非活动飞船根据 visibility.ships 控制
@@ -82,7 +87,6 @@ function render(ctx, canvas, activeShip, options = {}) {
         }
 
         const shipScreen = worldToScreen(s.pos.x, s.pos.y, canvas);
-        const shipSize = Math.max(6, (isActive ? 12 : 8) * camera.zoom);
 
         // 按飞船 heading 旋转绘制
         ctx.translate(shipScreen.x, shipScreen.y);
@@ -92,10 +96,11 @@ function render(ctx, canvas, activeShip, options = {}) {
         const shipTexKey = s.iconTextureKey || (isActive ? 'ship_default_active' : 'ship_default_inactive');
         const shipTex = textureManager.get(shipTexKey);
         if (shipTex) {
-            const halfSize = Math.max(3, 6 * camera.zoom);  // 与设施图标统一尺寸
+            const halfSize = isActive ? Math.max(14, 16 * camera.zoom) : Math.max(4, 8 * camera.zoom);
             ctx.drawImage(shipTex, -halfSize, -halfSize, halfSize * 2, halfSize * 2);
         } else {
             // Fallback: 程序化三角形
+            const shipSize = isActive ? Math.max(14, 16 * camera.zoom) : Math.max(4, 8 * camera.zoom);
             ctx.beginPath();
             ctx.moveTo(0, -shipSize);
             ctx.lineTo(-shipSize * 0.6, shipSize * 0.6);
@@ -143,7 +148,7 @@ function renderFacilities(ctx, canvas, facilities, selectedFacilityId, visibilit
 
     for (const f of facilities) {
         const screen = worldToScreen(f.pos.x, f.pos.y, canvas);
-        const halfSize = Math.max(3, 6 * camera.zoom);
+        const halfSize = Math.max(14, 16 * camera.zoom);
         const typeConfig = getFacilityType(f.typeId);
         const color = typeConfig ? typeConfig.color : '#888888';
 

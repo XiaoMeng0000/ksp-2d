@@ -38,9 +38,6 @@ const ctx = canvas.getContext('2d');
 // SOI边界诊断开关 — 发布前设为 false，供 renderer.js 及 physicsUpdate.js 使用
 window._soiDiag = false;
 
-// 全局禁用右键菜单 — 防止用户通过右键另存为获取纹理/图标素材
-document.addEventListener('contextmenu', e => e.preventDefault(), { capture: true });
-
 // 游戏时间（秒），模块级单例，唯一写入入口
 let _celestialTime = 0;
 

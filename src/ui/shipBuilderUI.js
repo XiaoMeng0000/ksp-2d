@@ -450,7 +450,7 @@ function buildShip() {
         return;
     }
 
-    const defaultOrbitR = homeworld.displayRadius + (homeworld.defaultOrbitAltitude || 0);
+    const defaultOrbitR = homeworld.radius + (homeworld.defaultOrbitAltitude || 0);
 
     // 弹出轨道高度输入框
     window.__createInputDialog(
