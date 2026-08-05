@@ -1,9 +1,10 @@
 import { camera, worldToScreen } from './camera.js';
-import { celestialBodies } from './physics/physics.js';
+import { celestialBodies, getAbsolutePosition } from './physics/physics.js';
 import { predictTrajectoryPatched, predictTrajectoryBurned } from './physics/orbitalPrediction.js';
 import { getFacilityType } from './facility/facilityTypes.js';
 import { renderableManager } from './graphics/renderable.js';
 import { textureManager } from './graphics/textureManager.js';
+import { drawStarGlow, drawStarBall } from './graphics/programEffects.js';
 
 let stars = [];
 const STAR_COUNT = 800;
@@ -15,6 +16,52 @@ function hexToRgba(hex, alpha) {
     const g = parseInt(hex.slice(3, 5), 16);
     const b = parseInt(hex.slice(5, 7), 16);
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+/**
+ * 渲染天体图层（贴图 + 程序效果）
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} cx, cy - 屏幕中心坐标
+ * @param {number} drawRadius - 天体基础屏幕半径
+ * @param {Array} layers - 图层数组（已按 LOD 选档/插值）
+ * @returns {boolean} 是否至少绘制了一个图层
+ */
+function renderBodyLayers(ctx, cx, cy, drawRadius, layers) {
+    let rendered = false;
+
+    for (const layer of layers) {
+        const alpha = layer.alpha !== undefined ? layer.alpha : 1.0;
+        const scale = layer.scale || 1;
+        const layerRadius = drawRadius * scale;
+
+        if (layer.texture) {
+            // 贴图层
+            const tex = textureManager.get(layer.texture);
+            if (!tex) continue;
+            if (alpha < 1.0) {
+                ctx.globalAlpha = alpha;
+            }
+            ctx.drawImage(tex, cx - layerRadius, cy - layerRadius, layerRadius * 2, layerRadius * 2);
+            if (alpha < 1.0) {
+                ctx.globalAlpha = 1.0;
+            }
+            rendered = true;
+        } else if (layer.program === 'star_ball') {
+            // 程序化纯色光球（普通合成，实心球体，与贴图同尺寸）
+            drawStarBall(ctx, cx, cy, layerRadius, layer.color, alpha);
+            rendered = true;
+        } else if (layer.program === 'star_glow') {
+            // 程序光晕层（additive 叠加）
+            const color = layer.color || '#ffffff';
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            drawStarGlow(ctx, cx, cy, drawRadius, color, scale, alpha);
+            ctx.restore();
+            rendered = true;
+        }
+    }
+
+    return rendered;
 }
 
 function createStars() {
@@ -50,12 +97,77 @@ function render(ctx, canvas, activeShip, options = {}) {
 
     for (const body of celestialBodies) {
         const screen = worldToScreen(body.position.x, body.position.y, canvas);
-        const drawRadius = Math.max(body.displayRadius * camera.zoom, BODY_MIN_SCREEN_RADIUS);
+        const physScreenR = body.displayRadius * camera.zoom;
+        // 恒星不套最小保护：光晕随物理尺寸等比缩小，极远时自然淡出（未来用图标方案接管）
+        // 行星保留最小屏幕保护，防止贴图缩成一个像素以下消失
+        const drawRadius = body.type === 'star'
+            ? physScreenR
+            : Math.max(physScreenR, BODY_MIN_SCREEN_RADIUS);
 
-        ctx.beginPath();
-        ctx.arc(screen.x, screen.y, drawRadius, 0, Math.PI * 2);
-        ctx.fillStyle = body.color;
-        ctx.fill();
+        // 图形驱动器：按 textureKey 渲染多层贴图/程序效果（星球贴图/恒星光晕），未配置或未加载时回退纯色圆
+        const config = renderableManager.get(body.textureKey);
+        let textured = false;
+
+        if (config && config.modes) {
+            // LOD 分级渲染（恒星用）
+            const { modes, nearScreenR, farScreenR } = config;
+            const nearLayers = modes.near?.layers || [];
+            const farLayers = modes.far?.layers || [];
+            let layersToRender = [];
+
+            if (drawRadius >= nearScreenR) {
+                // 近景档
+                layersToRender = nearLayers;
+            } else if (drawRadius <= farScreenR) {
+                // 远景档
+                layersToRender = farLayers;
+            } else {
+                // 过渡区：贴图渐隐 + 白色光球渐显（中心亮白覆盖贴图，避免半透明变灰）
+                // 光晕按 t 渐显，且大小从近景档光晕起步、平滑扩大到远景档完整大小
+                const t = 1 - (drawRadius - farScreenR) / (nearScreenR - farScreenR); // 0=near, 1=far
+                // easeInOut 曲线：过渡起止柔和、中间快
+                const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
+                // 光晕起始大小 = 近景档光晕的 scale（数据驱动，从 near 配置读取）
+                const nearGlow = nearLayers.find(l => l.program === 'star_glow');
+                const glowStartScale = nearGlow ? (nearGlow.scale || 1) : 1;
+
+                layersToRender = [];
+                // 贴图渐隐（其上方有白色光球覆盖提亮，不会透黑变灰）
+                for (const l of nearLayers) {
+                    layersToRender.push({
+                        ...l,
+                        alpha: (l.alpha !== undefined ? l.alpha : 1.0) * (1 - e)
+                    });
+                }
+                // 白色光球渐显 + 光晕渐显且大小收敛
+                for (const l of farLayers) {
+                    if (l.program === 'star_ball') {
+                        layersToRender.push({ ...l, alpha: l.alpha * e });
+                    } else {
+                        const fullScale = l.scale || 1;
+                        layersToRender.push({
+                            ...l,
+                            alpha: (l.alpha !== undefined ? l.alpha : 1.0) * e,
+                            scale: glowStartScale + (fullScale - glowStartScale) * e
+                        });
+                    }
+                }
+                layersToRender.sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
+            }
+
+            textured = renderBodyLayers(ctx, screen.x, screen.y, drawRadius, layersToRender);
+        } else if (config && config.layers) {
+            // 单模式渲染（行星用，如 Kerbin）
+            textured = renderBodyLayers(ctx, screen.x, screen.y, drawRadius, config.layers);
+        }
+
+        if (!textured) {
+            ctx.beginPath();
+            ctx.arc(screen.x, screen.y, drawRadius, 0, Math.PI * 2);
+            ctx.fillStyle = body.color;
+            ctx.fill();
+        }
 
         // SOI 边界圆（屏幕半径小于 1 时不绘制，避免画面混乱）
         const soiScreenR = body.soiRadius * camera.zoom;
@@ -86,7 +198,8 @@ function render(ctx, canvas, activeShip, options = {}) {
             ctx.globalAlpha = 0.5;
         }
 
-        const shipScreen = worldToScreen(s.pos.x, s.pos.y, canvas);
+        const absPos = getAbsolutePosition(s);
+        const shipScreen = worldToScreen(absPos.x, absPos.y, canvas);
 
         // 按飞船 heading 旋转绘制
         ctx.translate(shipScreen.x, shipScreen.y);
@@ -147,8 +260,10 @@ function renderFacilities(ctx, canvas, facilities, selectedFacilityId, visibilit
     if (!facilities || facilities.length === 0) return;
 
     for (const f of facilities) {
-        const screen = worldToScreen(f.pos.x, f.pos.y, canvas);
-        const halfSize = Math.max(14, 16 * camera.zoom);
+        const fAbsPos = getAbsolutePosition(f);
+        const screen = worldToScreen(fAbsPos.x, fAbsPos.y, canvas);
+        const isSelected = f.id === selectedFacilityId;
+        const halfSize = isSelected ? Math.max(14, 16 * camera.zoom) : Math.max(4, 8 * camera.zoom);
         const typeConfig = getFacilityType(f.typeId);
         const color = typeConfig ? typeConfig.color : '#888888';
 
@@ -353,7 +468,8 @@ function renderFlightHud(ctx, canvas, ship) {
 
     // === 推力方向箭头（仅在推力模式下绘制） ===
     if (ship.throttle > 0) {
-        const shipScreen = worldToScreen(ship.pos.x, ship.pos.y, canvas);
+        const absPos = getAbsolutePosition(ship);
+        const shipScreen = worldToScreen(absPos.x, absPos.y, canvas);
         const arrowLen = 30;
         // heading=0 → 世界+Y → 屏幕-Y（Canvas Y轴朝下）
         const endX = shipScreen.x + Math.sin(ship.heading) * arrowLen;

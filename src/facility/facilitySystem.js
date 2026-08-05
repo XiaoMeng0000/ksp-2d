@@ -60,13 +60,14 @@ class FacilitySystem {
             },
             kepler: keplerData,
             orbitTime: 0,
-            pos: { x: pos.x, y: pos.y },
+            // 设施 pos 存相对宿主坐标（与飞船统一），外部需要绝对坐标时用 getAbsolutePosition
+            pos: { x: relPos.x, y: relPos.y },
             vel: { x: vel.x, y: vel.y },
             currentSOI: hostName,
             mode: 'on_rails',
 
             // 交互
-            interactionRange: 15,
+            interactionRange: 5000,
 
             // 对接口
             maxDocks: typeConfig.baseDocks,
@@ -105,7 +106,7 @@ class FacilitySystem {
             // 从 kepler 反算设施相对速度（所有停靠飞船共用，提到循环外）
             const relState = keplerToState(facility.kepler, facility.currentGM, facility.orbitTime);
             for (const dockedShip of facility.dockedShips) {
-                // 位置 = 设施当前位置 + 随机偏移
+                // 位置 = 设施当前位置（相对宿主坐标）+ 随机偏移
                 dockedShip.pos = {
                     x: facility.pos.x + (Math.random() - 0.5) * 10,
                     y: facility.pos.y + (Math.random() - 0.5) * 10
@@ -217,9 +218,8 @@ class FacilitySystem {
 
         // 计算设施当前轨道速度
         const relState = keplerToState(facility.kepler, facility.currentGM, facility.orbitTime);
-        const host = celestialBodies.find(b => b.name === facility.hostSOI);
 
-        // 飞船位置 = 设施当前位置 + 偏移（防止起飞后立即触发交互检测）
+        // 飞船位置 = 设施当前位置 + 偏移（相对宿主坐标，防止起飞后立即触发交互检测）
         ship.pos = {
             x: facility.pos.x + 5,
             y: facility.pos.y + 5
@@ -367,9 +367,8 @@ class FacilitySystem {
 
         // 计算设施当前轨道速度
         const relState = keplerToState(facility.kepler, facility.currentGM, facility.orbitTime);
-        const host = celestialBodies.find(b => b.name === facility.hostSOI);
 
-        // 设置飞船位置和轨道属性，匹配设施
+        // 设置飞船位置和轨道属性，匹配设施（pos 为相对宿主坐标）
         newShip.pos = {
             x: facility.pos.x + 8,
             y: facility.pos.y + 8

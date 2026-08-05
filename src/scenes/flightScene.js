@@ -3,7 +3,7 @@ import { camera } from '../camera.js';
 import { inputManager } from '../input.js';
 import { eventBus, Events } from '../eventBus.js';
 import { updateShipPhysics } from '../physics/physicsUpdate.js';
-import { updateCelestialBodies, getSOIHost, getRelativePosition, convertVelocityFrame, celestialBodies } from '../physics/physics.js';
+import { updateCelestialBodies, getSOIHost, getAbsolutePosition, getRelativePosition, convertVelocityFrame, celestialBodies } from '../physics/physics.js';
 import { stateToKepler } from '../physics/orbitalMechanics.js';
 import { render, renderFlightHud } from '../renderer.js';
 import { sceneManager } from '../sceneManager.js';
@@ -43,19 +43,17 @@ eventBus.on(Events.SHIP_COMMAND, ({ action, params }) => {
 
     switch (action) {
         case 'circularize': {
-            const host = getSOIHost(ship.pos);
+            const host = getSOIHost(getAbsolutePosition(ship));
             if (!host) break;
-            const relPos = getRelativePosition(ship.pos, host);
-            const r = Math.sqrt(relPos.x * relPos.x + relPos.y * relPos.y);
+            const r = Math.sqrt(ship.pos.x * ship.pos.x + ship.pos.y * ship.pos.y);
             const v = Math.sqrt(host.gm / r);
-            const tangentX = -relPos.y / r;
-            const tangentY = relPos.x / r;
+            const tangentX = -ship.pos.y / r;
+            const tangentY = ship.pos.x / r;
             ship.vel.x = v * tangentX;
             ship.vel.y = v * tangentY;
             ship.currentSOI = host.name;
             ship.currentGM = host.gm;
-            ship.currentHostPos = { x: host.position.x, y: host.position.y };
-            ship.kepler = stateToKepler(relPos, ship.vel, host.gm);
+            ship.kepler = stateToKepler(ship.pos, ship.vel, host.gm);
             ship.orbitTime = 0;
             ship.mode = 'on_rails';
             ship.thrust = { ax: 0, ay: 0 };
@@ -63,18 +61,16 @@ eventBus.on(Events.SHIP_COMMAND, ({ action, params }) => {
         }
         case 'progradeThrust': {
             const dv = params.dv || 1;
-            const host = getSOIHost(ship.pos);
+            const host = getSOIHost(getAbsolutePosition(ship));
             if (!host) break;
-            const relPos = getRelativePosition(ship.pos, host);
-            const r = Math.sqrt(relPos.x * relPos.x + relPos.y * relPos.y);
-            const tangentX = -relPos.y / r;
-            const tangentY = relPos.x / r;
+            const r = Math.sqrt(ship.pos.x * ship.pos.x + ship.pos.y * ship.pos.y);
+            const tangentX = -ship.pos.y / r;
+            const tangentY = ship.pos.x / r;
             ship.vel.x += dv * tangentX;
             ship.vel.y += dv * tangentY;
             ship.currentSOI = host.name;
             ship.currentGM = host.gm;
-            ship.currentHostPos = { x: host.position.x, y: host.position.y };
-            ship.kepler = stateToKepler(relPos, ship.vel, host.gm);
+            ship.kepler = stateToKepler(ship.pos, ship.vel, host.gm);
             ship.orbitTime = 0;
             ship.mode = 'on_rails';
             ship.thrust = { ax: 0, ay: 0 };
@@ -82,18 +78,16 @@ eventBus.on(Events.SHIP_COMMAND, ({ action, params }) => {
         }
         case 'retrogradeThrust': {
             const dv = params.dv || 1;
-            const host = getSOIHost(ship.pos);
+            const host = getSOIHost(getAbsolutePosition(ship));
             if (!host) break;
-            const relPos = getRelativePosition(ship.pos, host);
-            const r = Math.sqrt(relPos.x * relPos.x + relPos.y * relPos.y);
-            const tangentX = -relPos.y / r;
-            const tangentY = relPos.x / r;
+            const r = Math.sqrt(ship.pos.x * ship.pos.x + ship.pos.y * ship.pos.y);
+            const tangentX = -ship.pos.y / r;
+            const tangentY = ship.pos.x / r;
             ship.vel.x -= dv * tangentX;
             ship.vel.y -= dv * tangentY;
             ship.currentSOI = host.name;
             ship.currentGM = host.gm;
-            ship.currentHostPos = { x: host.position.x, y: host.position.y };
-            ship.kepler = stateToKepler(relPos, ship.vel, host.gm);
+            ship.kepler = stateToKepler(ship.pos, ship.vel, host.gm);
             ship.orbitTime = 0;
             ship.mode = 'on_rails';
             ship.thrust = { ax: 0, ay: 0 };
@@ -108,22 +102,17 @@ eventBus.on(Events.SHIP_COMMAND, ({ action, params }) => {
                 ship.vel.x = 0;
                 ship.vel.y = -Math.sqrt(10000 / 80);
                 ship.currentGM = 10000;
+                ship.currentSOI = null;
             } else {
                 const orbitR = homeworld.radius + (homeworld.defaultOrbitAltitude || 0);
-                ship.pos.x = homeworld.position.x + orbitR;
-                ship.pos.y = homeworld.position.y;
+                ship.pos.x = orbitR;
+                ship.pos.y = 0;
                 ship.vel.x = 0;
                 ship.vel.y = -Math.sqrt(homeworld.gm / orbitR);
                 ship.currentGM = homeworld.gm;
+                ship.currentSOI = homeworld.name;
             }
-            const resetHost = getSOIHost(ship.pos);
-            ship.currentSOI = resetHost ? resetHost.name : null;
-            ship.currentHostPos = resetHost ? { x: resetHost.position.x, y: resetHost.position.y } : { x: 0, y: 0 };
-            const resetRelPos = {
-                x: ship.pos.x - ship.currentHostPos.x,
-                y: ship.pos.y - ship.currentHostPos.y
-            };
-            ship.kepler = stateToKepler(resetRelPos, ship.vel, ship.currentGM);
+            ship.kepler = stateToKepler(ship.pos, ship.vel, ship.currentGM);
             ship.orbitTime = 0;
             ship.mode = 'on_rails';
             ship.thrust = { ax: 0, ay: 0 };
@@ -135,14 +124,12 @@ eventBus.on(Events.SHIP_COMMAND, ({ action, params }) => {
             break;
         }
         case 'switchToOrbit': {
-            const host = getSOIHost(ship.pos);
+            const host = getSOIHost(getAbsolutePosition(ship));
             if (!host) break;
-            const relPos = getRelativePosition(ship.pos, host);
-            const newKepler = stateToKepler(relPos, ship.vel, host.gm);
+            const newKepler = stateToKepler(ship.pos, ship.vel, host.gm);
             if (newKepler) {
                 ship.currentSOI = host.name;
                 ship.currentGM = host.gm;
-                ship.currentHostPos = { x: host.position.x, y: host.position.y };
                 ship.kepler = newKepler;
                 ship.mode = 'on_rails';
                 ship.orbitTime = 0;
@@ -191,13 +178,14 @@ eventBus.on(Events.SHIP_COMMAND, ({ action, params }) => {
             }
             shipSystem.persistShip(ship);
 
-            // 创建设施（createFacility 期望 ship.vel 的相对速度，符合项目约定）
+            // 创建设施（createFacility 期望绝对世界坐标，需从相对坐标转换）
+            const absPos = getAbsolutePosition(ship);
             const typeCfg = getFacilityType(typeId);
             const facilityName = params?.facilityName || (typeCfg ? '新建' + typeCfg.name : '新建设施');
             const facility = facilitySystem.createFacility(
                 typeId,
                 facilityName,
-                { x: ship.pos.x, y: ship.pos.y },
+                { x: absPos.x, y: absPos.y },
                 { x: ship.vel.x, y: ship.vel.y },
                 ship.currentSOI
             );
@@ -215,22 +203,17 @@ eventBus.on(Events.SHIP_COMMAND, ({ action, params }) => {
                 window.showNotification('目标天体不存在', 'error');
                 break;
             }
-            const orbitR = targetBody.displayRadius + params.altitude;
+            const orbitR = targetBody.radius + params.altitude;
             if (orbitR >= targetBody.soiRadius) {
                 window.showNotification('轨道高度超出天体引力范围', 'error');
                 break;
             }
-            ship.pos = { x: targetBody.position.x + orbitR, y: targetBody.position.y };
+            ship.pos = { x: orbitR, y: 0 };
             const v = Math.sqrt(targetBody.gm / orbitR);
             ship.vel = { x: 0, y: -v };
             ship.currentSOI = targetBody.name;
             ship.currentGM = targetBody.gm;
-            ship.currentHostPos = { x: targetBody.position.x, y: targetBody.position.y };
-            const relPos = {
-                x: ship.pos.x - ship.currentHostPos.x,
-                y: ship.pos.y - ship.currentHostPos.y
-            };
-            ship.kepler = stateToKepler(relPos, ship.vel, targetBody.gm);
+            ship.kepler = stateToKepler(ship.pos, ship.vel, targetBody.gm);
             ship.orbitTime = 0;
             ship.mode = 'on_rails';
             ship.thrust = { ax: 0, ay: 0 };
@@ -265,8 +248,9 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 if (fac) {
                     _activeFacilityId = fac.id;
                     gameState.setState({ activeShipId: null, activeFacilityId: fac.id });
-                    camera.x = fac.pos.x;
-                    camera.y = fac.pos.y;
+                    const facAbsPos = getAbsolutePosition(fac);
+                    camera.x = facAbsPos.x;
+                    camera.y = facAbsPos.y;
                 }
                 delete window.__pendingFacilityId;
             }
@@ -293,15 +277,16 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 // 1. 检测是否点击了设施
                 const allFacilities = facilitySystem.getAllFacilities();
                 for (const f of allFacilities) {
-                    const screenX = _canvas.width / 2 + (f.pos.x - camera.x) * camera.zoom;
-                    const screenY = _canvas.height / 2 + (f.pos.y - camera.y) * camera.zoom;
+                    const fAbsPos = getAbsolutePosition(f);
+                    const screenX = _canvas.width / 2 + (fAbsPos.x - camera.x) * camera.zoom;
+                    const screenY = _canvas.height / 2 + (fAbsPos.y - camera.y) * camera.zoom;
                     const hitRadius = Math.max(6, 10 * camera.zoom);
                     if (Math.abs(canvasX - screenX) <= hitRadius && Math.abs(canvasY - screenY) <= hitRadius) {
                         // 清除活动飞船 + 设置设施焦点，防止下一帧被 activeShip 覆盖
                         gameState.setState({ activeShipId: null, activeFacilityId: f.id });
                         _activeFacilityId = f.id;
-                        camera.x = f.pos.x;
-                        camera.y = f.pos.y;
+                        camera.x = fAbsPos.x;
+                        camera.y = fAbsPos.y;
                         return;
                     }
                 }
@@ -421,7 +406,6 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             }
         },
         update: (dt) => {
-            // 宿主位移补偿法 — 天体先推进，补偿飞船位置后再做物理，使 SOI 检测时间差为零
             const activeShip = shipSystem.getActiveShip();
             const activeId = activeShip ? activeShip.id : null;
             const allShips = shipSystem.getAllShips();
@@ -430,48 +414,12 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             // SAS 集成 — 每帧记录上一帧按键状态（供 justPressed 使用）
             inputManager.update();
 
-            // 1. 保存所有天体旧位置
-            const oldBodyPos = {};
-            for (const b of celestialBodies) {
-                oldBodyPos[b.name] = { x: b.position.x, y: b.position.y };
-            }
-
-            // 2. 推进时间和天体
+            // 推进时间和天体（飞船/设施存相对宿主坐标，无需位置补偿）
             _setCelestialTime(_getCelestialTime() + dt);
             updateCelestialBodies(_getCelestialTime());
             eventBus.emit(Events.CELESTIAL_TIME_UPDATED, { time: _getCelestialTime(), dt });
 
-            // 3. 补偿飞船绝对位置：跟上宿主本帧位移
-            for (const s of allShips) {
-                if (s.currentSOI && oldBodyPos[s.currentSOI]) {
-                    const oldP = oldBodyPos[s.currentSOI];
-                    const hostBody = celestialBodies.find(b => b.name === s.currentSOI);
-                    if (hostBody) {
-                        const dHostX = hostBody.position.x - oldP.x;
-                        const dHostY = hostBody.position.y - oldP.y;
-                        s.pos.x += dHostX;
-                        s.pos.y += dHostY;
-                        s.currentHostPos = { x: hostBody.position.x, y: hostBody.position.y };
-                    }
-                }
-            }
-
-            // 3b. 补偿设施绝对位置（复用飞船的宿主位移补偿逻辑）
-            for (const f of allFacilities) {
-                if (f.hostSOI && oldBodyPos[f.hostSOI]) {
-                    const oldP = oldBodyPos[f.hostSOI];
-                    const hostBody = celestialBodies.find(b => b.name === f.hostSOI);
-                    if (hostBody) {
-                        const dHostX = hostBody.position.x - oldP.x;
-                        const dHostY = hostBody.position.y - oldP.y;
-                        f.pos.x += dHostX;
-                    f.pos.y += dHostY;
-                        f.currentHostPos = { x: hostBody.position.x, y: hostBody.position.y };
-                    }
-                }
-            }
-
-            // 4. 物理推进（此时 ship.pos 和 body.position 同处 T+dt，时间差为零）
+            // 物理推进
             for (const s of allShips) {
                 const isActive = s.id === activeId;
                 updateShipPhysics(s, dt, isActive);
@@ -486,9 +434,11 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             _nearFacility = null;
             if (activeShip) {
                 let nearestDist = Infinity;
+                const shipAbsPos = getAbsolutePosition(activeShip);
                 for (const f of allFacilities) {
-                    const dx = f.pos.x - activeShip.pos.x;
-                    const dy = f.pos.y - activeShip.pos.y;
+                    const fAbsPos = getAbsolutePosition(f);
+                    const dx = fAbsPos.x - shipAbsPos.x;
+                    const dy = fAbsPos.y - shipAbsPos.y;
                     const dist = Math.sqrt(dx * dx + dy * dy);
                     if (dist < f.interactionRange && dist < nearestDist) {
                         nearestDist = dist;
@@ -579,12 +529,12 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 }
 
                 // 构建 SAS 目标朝向计算所需的飞行上下文
-                const host = getSOIHost(activeShip.pos);
+                const host = getSOIHost(getAbsolutePosition(activeShip));
                 const sasContext = {
                     shipVx: activeShip.vel.x,
                     shipVy: activeShip.vel.y,
-                    shipX: activeShip.pos.x,
-                    shipY: activeShip.pos.y,
+                    shipX: getAbsolutePosition(activeShip).x,
+                    shipY: getAbsolutePosition(activeShip).y,
                     hostX: host ? host.position.x : undefined,
                     hostY: host ? host.position.y : undefined,
                     shipHeading: activeShip.heading
@@ -619,11 +569,9 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 }
                 if (activeShip.throttle === 0 && activeShip.mode === 'thrust') {
                     // 油门归零 → 熄火：从当前pos/vel重算kepler（SOI检测仍由physicsUpdate负责）
-                    const host = getSOIHost(activeShip.pos);
+                    const host = getSOIHost(getAbsolutePosition(activeShip));
                     if (host) {
-                        const relPos = getRelativePosition(activeShip.pos, host);
-                        const newKepler = stateToKepler(relPos, activeShip.vel, host.gm);
-                        activeShip.kepler = newKepler || null;
+                        activeShip.kepler = stateToKepler(activeShip.pos, activeShip.vel, host.gm) || null;
                         activeShip.orbitTime = 0;
                     } else {
                         activeShip.kepler = null;
@@ -658,15 +606,17 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
 
             // 相机跟随活动飞船，无活动飞船且选中设施时跟随设施
             if (activeShip) {
-                camera.x = activeShip.pos.x;
-                camera.y = activeShip.pos.y;
+                const shipAbs = getAbsolutePosition(activeShip);
+                camera.x = shipAbs.x;
+                camera.y = shipAbs.y;
                 _activeFacilityId = null;
                 gameState.setState({ activeFacilityId: null });
             } else if (_activeFacilityId) {
                 const focusedFacility = facilitySystem.getFacility(_activeFacilityId);
                 if (focusedFacility) {
-                    camera.x = focusedFacility.pos.x;
-                    camera.y = focusedFacility.pos.y;
+                    const facAbsPos = getAbsolutePosition(focusedFacility);
+                    camera.x = facAbsPos.x;
+                    camera.y = facAbsPos.y;
                 }
             }
 

@@ -28,9 +28,10 @@ export const textureConfig = {
     icon_qq: 'assets/images/menu/icon_qq.png',
     icon_email: 'assets/images/menu/icon_email.png',
 
+    // 天体贴图
+    kerbin_surface: 'assets/images/bodies/kerbin.png',
+    kerbol_surface: 'assets/images/bodies/kerbol.png',
+
     // TODO: 后续扩展
-    // ship_basic: 'assets/images/ship_basic.png',
-    // kerbin: 'assets/images/kerbin.png',
-    // kerbol: 'assets/images/kerbol.png',
     // mun: 'assets/images/mun.png',
 };

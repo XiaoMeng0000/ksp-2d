@@ -3,7 +3,7 @@ import { shipSystem } from '../ship/shipSystem.js';
 import { facilitySystem } from '../facility/facilitySystem.js';
 import { camera } from '../camera.js';
 import { updateShipPhysics } from '../physics/physicsUpdate.js';
-import { updateCelestialBodies, celestialBodies } from '../physics/physics.js';
+import { updateCelestialBodies, getAbsolutePosition, celestialBodies } from '../physics/physics.js';
 import { render } from '../renderer.js';
 import { eventBus, Events } from '../eventBus.js';
 import { gameState } from '../gameState.js';
@@ -171,12 +171,14 @@ export function renderTrackingNav(tree) {
                 // 用真实 ID 从 shipSystem 获取飞船位置
                 const focusedShip = shipSystem.getShip(node.id);
                 if (focusedShip) {
-                    trackingFocusPos = { x: focusedShip.pos.x, y: focusedShip.pos.y };
+                    const shipAbsPos = getAbsolutePosition(focusedShip);
+                    trackingFocusPos = { x: shipAbsPos.x, y: shipAbsPos.y };
                 }
             } else if (node.type === 'facility') {
                 const focusedFacility = facilitySystem.getFacility(node.id);
                 if (focusedFacility) {
-                    trackingFocusPos = { x: focusedFacility.pos.x, y: focusedFacility.pos.y };
+                    const fAbsPos = getAbsolutePosition(focusedFacility);
+                    trackingFocusPos = { x: fAbsPos.x, y: fAbsPos.y };
                 }
             }
             window.updateTrackingInfo(node);
@@ -225,7 +227,8 @@ export function registerTrackingScene({ getTime, setTime, canvas }) {
             // 默认选中飞船（使用真实 ID）
             if (activeShip) {
                 trackingSelectedId = activeShip.id;
-                trackingFocusPos = { x: activeShip.pos.x, y: activeShip.pos.y };
+                const absPos = getAbsolutePosition(activeShip);
+                trackingFocusPos = { x: absPos.x, y: absPos.y };
                 const shipName = activeShip.displayName || activeShip.id || '飞船';
                 window.updateTrackingInfo({
                     id: activeShip.id,
@@ -247,58 +250,23 @@ export function registerTrackingScene({ getTime, setTime, canvas }) {
             window.hideTrackingInfo && window.hideTrackingInfo();
         },
         update: (dt) => {
-            // 宿主位移补偿法 — 天体先推进，补偿飞船位置后再做物理
             const activeShip = shipSystem.getActiveShip();
             const activeId = activeShip ? activeShip.id : null;
             const allShips = shipSystem.getAllShips();
 
-            // 1. 保存天体旧位置
-            const oldBodyPos = {};
-            for (const b of celestialBodies) {
-                oldBodyPos[b.name] = { x: b.position.x, y: b.position.y };
-            }
-
-            // 2. 推进时间和天体
+            // 推进时间和天体（飞船/设施存相对宿主坐标，无需位置补偿）
             _setCelestialTime(_getCelestialTime() + dt);
             updateCelestialBodies(_getCelestialTime());
             eventBus.emit(Events.CELESTIAL_TIME_UPDATED, { time: _getCelestialTime(), dt });
 
-            // 3. 补偿飞船位置
-            for (const s of allShips) {
-                if (s.currentSOI && oldBodyPos[s.currentSOI]) {
-                    const oldP = oldBodyPos[s.currentSOI];
-                    const hostBody = celestialBodies.find(b => b.name === s.currentSOI);
-                    if (hostBody) {
-                        const dHostX = hostBody.position.x - oldP.x;
-                        const dHostY = hostBody.position.y - oldP.y;
-                        s.pos.x += dHostX;
-                        s.pos.y += dHostY;
-                        s.currentHostPos = { x: hostBody.position.x, y: hostBody.position.y };
-                    }
-                }
-            }
-
-            // 4. 物理推进（追踪站）
+            // 物理推进（追踪站）
             for (const s of allShips) {
                 const isActive = s.id === activeId;
                 updateShipPhysics(s, dt, isActive);
             }
 
-            // 4b. 设施位置补偿 + 物理推进
+            // 4b. 设施物理推进（设施同样存相对宿主坐标）
             const allFacilities = facilitySystem.getAllFacilities();
-            for (const f of allFacilities) {
-                if (f.hostSOI && oldBodyPos[f.hostSOI]) {
-                    const oldP = oldBodyPos[f.hostSOI];
-                    const hostBody = celestialBodies.find(b => b.name === f.hostSOI);
-                    if (hostBody) {
-                        const dHostX = hostBody.position.x - oldP.x;
-                        const dHostY = hostBody.position.y - oldP.y;
-                        f.pos.x += dHostX;
-                    f.pos.y += dHostY;
-                        f.currentHostPos = { x: hostBody.position.x, y: hostBody.position.y };
-                    }
-                }
-            }
             for (const f of allFacilities) {
                 updateShipPhysics(f, dt, false);
             }
@@ -310,17 +278,20 @@ export function registerTrackingScene({ getTime, setTime, canvas }) {
                 if (body) {
                     trackingFocusPos = { x: body.position.x, y: body.position.y };
                 } else if (activeShip && trackingSelectedId === activeShip.id) {
-                    trackingFocusPos = { x: activeShip.pos.x, y: activeShip.pos.y };
+                    const absPos = getAbsolutePosition(activeShip);
+                    trackingFocusPos = { x: absPos.x, y: absPos.y };
                 } else {
                     // 多飞船追踪 — 如果选中的是非活动飞船，从 shipSystem 获取位置
                     const focusedShip = shipSystem.getShip(trackingSelectedId);
                     if (focusedShip) {
-                        trackingFocusPos = { x: focusedShip.pos.x, y: focusedShip.pos.y };
+                        const focusedAbsPos = getAbsolutePosition(focusedShip);
+                        trackingFocusPos = { x: focusedAbsPos.x, y: focusedAbsPos.y };
                     } else {
                         // 设施追踪
                         const focusedFacility = facilitySystem.getFacility(trackingSelectedId);
                         if (focusedFacility) {
-                            trackingFocusPos = { x: focusedFacility.pos.x, y: focusedFacility.pos.y };
+                            const fAbsPos = getAbsolutePosition(focusedFacility);
+                            trackingFocusPos = { x: fAbsPos.x, y: fAbsPos.y };
                         }
                     }
                 }
@@ -345,7 +316,8 @@ export function registerTrackingScene({ getTime, setTime, canvas }) {
             if (trackingFocusPos) {
                 focusPos = trackingFocusPos;
             } else if (activeShip) {
-                focusPos = { x: activeShip.pos.x, y: activeShip.pos.y };
+                const absPos = getAbsolutePosition(activeShip);
+                focusPos = { x: absPos.x, y: absPos.y };
             }
             camera.x = focusPos.x;
             camera.y = focusPos.y;

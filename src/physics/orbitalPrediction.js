@@ -1,5 +1,5 @@
 import { eventBus, Events } from '../eventBus.js';
-import { celestialBodies } from './physics.js';
+import { celestialBodies, getAbsolutePosition } from './physics.js';
 import { rk4Integrate } from './integrator.js';
 import { stateToKepler, keplerPositionAtTime, keplerPositionAtTheta, findSOIIntersection } from './orbitalMechanics.js';
 
@@ -288,21 +288,24 @@ export function predictTrajectoryPatched(ship, maxSegments = 5) {
     const segments = [];
     const startTime = _cachedTime;
 
+    // ship.pos 现在是相对坐标，转绝对坐标用于预测
+    const absPos = getAbsolutePosition(ship);
+
     let host = null;
     if (ship.currentSOI) {
         host = celestialBodies.find(b => b.name === ship.currentSOI) || null;
     }
     if (!host) {
-        host = getSOIHostAtTime(ship.pos, startTime);
+        host = getSOIHostAtTime(absPos, startTime);
     }
 
     if (soiDiagEnabled()) {
-        console.log(`[DIAG-轨道] predictTrajectoryPatched host=${host?.name} startTime=${startTime.toFixed(2)} shipPos=(${ship.pos.x.toFixed(1)},${ship.pos.y.toFixed(1)}) shipVel=(${ship.vel.x.toFixed(2)},${ship.vel.y.toFixed(2)}) shipSOI=${ship.currentSOI} kepler=${ship.kepler ? '有' : 'null'} mode=${ship.mode}`);
+        console.log(`[DIAG-轨道] predictTrajectoryPatched host=${host?.name} startTime=${startTime.toFixed(2)} absPos=(${absPos.x.toFixed(1)},${absPos.y.toFixed(1)}) shipVel=(${ship.vel.x.toFixed(2)},${ship.vel.y.toFixed(2)}) shipSOI=${ship.currentSOI} kepler=${ship.kepler ? '有' : 'null'} mode=${ship.mode}`);
     }
 
     if (!host) return segments;  // predictTrajectoryPatched
 
-    patchedStep(ship.pos, ship.vel, host, startTime, 0, maxSegments, segments);
+    patchedStep(absPos, ship.vel, host, startTime, 0, maxSegments, segments);
     return segments;
 }
 
@@ -344,17 +347,19 @@ export function integrateThrustArc(relPos, relVel, gm, host, thrustAccel, burnDu
 // 推力模式：相对坐标系欧拉积分短预测（@deprecated — 内部改为调用 integrateThrustArc）
 export function predictThrustTrajectory(ship) {
     const startTime = _cachedTime;
+    const absPos = getAbsolutePosition(ship);
+
     let host = null;
     if (ship.currentSOI) {
         host = celestialBodies.find(b => b.name === ship.currentSOI) || null;
     }
     if (!host) {
-        host = getSOIHostAtTime(ship.pos, startTime);
+        host = getSOIHostAtTime(absPos, startTime);
     }
     if (!host) return [];
 
     const hostRefPos = bodyFuturePos(host, startTime);
-    const relPos = { x: ship.pos.x - hostRefPos.x, y: ship.pos.y - hostRefPos.y };
+    const relPos = { x: absPos.x - hostRefPos.x, y: absPos.y - hostRefPos.y };
     const relVel = { x: ship.vel.x, y: ship.vel.y };
     const thrust = ship.thrust || { ax: 0, ay: 0 };
     const dt = 0.05;
@@ -374,17 +379,19 @@ export function predictThrustTrajectory(ship) {
 export function predictTrajectoryBurned(ship, burnEnabled) {
     const segments = [];
     const startTime = _cachedTime;
+    const absPos = getAbsolutePosition(ship);
+
     let host = null;
     if (ship.currentSOI) {
         host = celestialBodies.find(b => b.name === ship.currentSOI) || null;
     }
     if (!host) {
-        host = getSOIHostAtTime(ship.pos, startTime);
+        host = getSOIHostAtTime(absPos, startTime);
     }
     if (!host) return segments;
 
     const hostRefPos = bodyFuturePos(host, startTime);
-    const relPos = { x: ship.pos.x - hostRefPos.x, y: ship.pos.y - hostRefPos.y };
+    const relPos = { x: absPos.x - hostRefPos.x, y: absPos.y - hostRefPos.y };
     const relVel = { x: ship.vel.x, y: ship.vel.y };
 
     if (burnEnabled) {
@@ -411,7 +418,7 @@ export function predictTrajectoryBurned(ship, burnEnabled) {
         patchedStep(postBurnAbsPos, result.finalRelVel, host, burnEndTime, 0, 5, segments);
     } else {
         // 模式 A：跳过燃烧段，直接走 patchedStep（等价 predictTrajectoryPatched）
-        patchedStep(ship.pos, ship.vel, host, startTime, 0, 5, segments);
+        patchedStep(absPos, ship.vel, host, startTime, 0, 5, segments);
     }
 
     return segments;

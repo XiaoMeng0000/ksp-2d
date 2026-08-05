@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { stateToKepler } from '../physics/orbitalMechanics.js';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { stateToKepler } from '../physics/orbitalMechanics.js';
 // 导入 uiManager（相对路径更新）
 import { uiManager } from './uiManager.js';
 // 导入事件总线
@@ -1598,8 +1598,7 @@ function buildShip() {
                 return;
             }
 
-            // 计算位置和速度（圆形轨道）
-            const pos = { x: homeworld.position.x + radius, y: homeworld.position.y };
+            // 计算速度（圆形轨道）
             const orbitalSpeed = Math.sqrt(homeworld.gm / radius);
             const vel = { x: 0, y: -orbitalSpeed };
 
@@ -1612,14 +1611,12 @@ function buildShip() {
                 return;
             }
 
-            // 设置初始轨道状态
-            newShip.pos = { x: pos.x, y: pos.y };
+            // 设置初始轨道状态（pos 为相对宿主坐标）
+            newShip.pos = { x: radius, y: 0 };
             newShip.vel = { x: vel.x, y: vel.y };
             newShip.currentSOI = homeworld.name;
             newShip.currentGM = homeworld.gm;
-            newShip.currentHostPos = { x: homeworld.position.x, y: homeworld.position.y };
-            const relPos = { x: pos.x - homeworld.position.x, y: pos.y - homeworld.position.y };
-            newShip.kepler = stateToKepler(relPos, vel, homeworld.gm);
+            newShip.kepler = stateToKepler(newShip.pos, vel, homeworld.gm);
             newShip.orbitTime = 0;
             newShip.mode = 'on_rails';
 

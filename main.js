@@ -17,6 +17,7 @@ import './src/ui/facilityDeployUI.js';
 import './src/ui/flightUI.js';
 // 图形系统 - 纹理管理器
 import { textureManager } from './src/graphics/textureManager.js';
+import { registerBodyRenderables } from './src/graphics/bodyRenderables.js';
 
 import { initCamera } from './src/camera.js';
 import { createStars } from './src/renderer.js';
@@ -82,6 +83,9 @@ function gameLoop(timestamp) {
 window.addEventListener('resize', resize);
 initCamera();
 resize();
+
+// 天体渲染配置（数据驱动）— 在任何场景渲染前注册到 RenderableManager
+registerBodyRenderables();
 
 // SceneManager - 注册 splash / info / menu / encyclopedia / credits 场景
 registerSplashScene();
@@ -203,24 +207,21 @@ window.startNewGame = function() {
                 return;
             }
 
-            // 飞船系统 - 设置初始位置和轨道
+            // 飞船系统 - 设置初始位置和轨道（pos 为相对宿主坐标）
             const homeworld = celestialBodies.find(b => b.isHomeworld);
             if (!homeworld) {
                 console.warn('[startNewGame] 找不到起始天体数据，使用硬编码默认值');
                 newShip.pos = { x: 580, y: 0 };
                 newShip.vel = { x: 0, y: -Math.sqrt(10000 / 80) };
                 newShip.currentGM = 10000;
-                newShip.currentHostPos = { x: 500, y: 0 };
                 newShip.kepler = stateToKepler({ x: 80, y: 0 }, newShip.vel, 10000);
             } else {
-                const orbitR = homeworld.displayRadius + (homeworld.defaultOrbitAltitude || 0);
-                newShip.pos = { x: homeworld.position.x + orbitR, y: homeworld.position.y };
+                const orbitR = homeworld.radius + (homeworld.defaultOrbitAltitude || 0);
+                newShip.pos = { x: orbitR, y: 0 };
                 const orbitalSpeed = Math.sqrt(homeworld.gm / orbitR);
                 newShip.vel = { x: 0, y: -orbitalSpeed };
                 newShip.currentGM = homeworld.gm;
-                newShip.currentHostPos = { x: homeworld.position.x, y: homeworld.position.y };
-                const relPos = { x: orbitR, y: 0 };
-                newShip.kepler = stateToKepler(relPos, newShip.vel, homeworld.gm);
+                newShip.kepler = stateToKepler(newShip.pos, newShip.vel, homeworld.gm);
             }
             newShip.currentSOI = homeworld ? homeworld.name : null;
             newShip.orbitTime = 0;
@@ -234,7 +235,7 @@ window.startNewGame = function() {
             // 预置 Kerbin 轨道船坞
             if (homeworld) {
                 // Bug修复 — 船坞与初始飞船使用同一轨道半径，避免旧硬编码 70m 使船坞埋在行星内部
-                const dockyardOrbitR = homeworld.displayRadius + (homeworld.defaultOrbitAltitude || 0);
+                const dockyardOrbitR = homeworld.radius + (homeworld.defaultOrbitAltitude || 0);
                 const dockyardPos = {
                     x: homeworld.position.x + dockyardOrbitR,
                     y: homeworld.position.y

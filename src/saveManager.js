@@ -7,7 +7,7 @@ import { sceneManager } from './sceneManager.js';
 import { shipSystem } from './ship/shipSystem.js';
 import { facilitySystem } from './facility/facilitySystem.js';
 import { stateToKepler } from './physics/orbitalMechanics.js';
-import { getSOIHost, getRelativePosition, celestialBodies } from './physics/physics.js';
+import { celestialBodies } from './physics/physics.js';
 import { eventBus, Events } from './eventBus.js';
 
 class SaveManager {
@@ -184,8 +184,8 @@ class SaveManager {
         if (ship && ship.currentSOI) {
             const hostBody = celestialBodies.find(b => b.name === ship.currentSOI);
             if (hostBody) {
-                const relPos = getRelativePosition(ship.pos, hostBody);
-                const freshKepler = stateToKepler(relPos, ship.vel, hostBody.gm);
+                // ship.pos 现在是相对宿主坐标，直接使用
+                const freshKepler = stateToKepler(ship.pos, ship.vel, hostBody.gm);
                 if (freshKepler) {
                     ship.kepler = freshKepler;
                     ship.orbitTime = 0;
@@ -318,20 +318,14 @@ class SaveManager {
             // 恢复 SOI 状态，避免 physicsUpdate 误判切换导致 vel 污染
             ship.currentSOI = checkpoint.shipCurrentSOI !== undefined ? checkpoint.shipCurrentSOI : null;
             ship.currentGM = checkpoint.shipCurrentGM !== undefined ? checkpoint.shipCurrentGM : 0;
-            if (ship.currentSOI) {
-                const hostBody = celestialBodies.find(b => b.name === ship.currentSOI);
-                ship.currentHostPos = hostBody ? { x: hostBody.position.x, y: hostBody.position.y } : { x: 0, y: 0 };
-            } else {
-                ship.currentHostPos = { x: 0, y: 0 };
-            }
         }
 
         // 根据恢复的 pos/vel 重算 kepler，消除与存档数据的不一致
         if (ship && ship.currentSOI && ship.mode === 'on_rails') {
             const hostBody = celestialBodies.find(b => b.name === ship.currentSOI);
             if (hostBody) {
-                const relPos = getRelativePosition(ship.pos, hostBody);
-                const newKepler = stateToKepler(relPos, ship.vel, hostBody.gm);
+                // ship.pos 现在是相对宿主坐标，直接使用
+                const newKepler = stateToKepler(ship.pos, ship.vel, hostBody.gm);
                 if (newKepler) {
                     ship.kepler = newKepler;
                     ship.orbitTime = 0;
