@@ -13,6 +13,17 @@ export function getRelativePosition(pos, host) {
     };
 }
 
+// 将飞船/设施的相对位置转换为绝对世界坐标
+export function getAbsolutePosition(entity) {
+    if (!entity.currentSOI) return entity.pos;
+    const host = celestialBodies.find(b => b.name === entity.currentSOI);
+    if (!host) return entity.pos;
+    return {
+        x: host.position.x + entity.pos.x,
+        y: host.position.y + entity.pos.y
+    };
+}
+
 // SOI 归属判定：判断 pos 属于哪个天体的 SOI
 export function getSOIHost(pos) {
     let starHost = null;

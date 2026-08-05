@@ -233,7 +233,8 @@ window.startNewGame = function() {
 
             // 预置 Kerbin 轨道船坞
             if (homeworld) {
-                const dockyardOrbitR = 70;
+                // Bug修复 — 船坞与初始飞船使用同一轨道半径，避免旧硬编码 70m 使船坞埋在行星内部
+                const dockyardOrbitR = homeworld.displayRadius + (homeworld.defaultOrbitAltitude || 0);
                 const dockyardPos = {
                     x: homeworld.position.x + dockyardOrbitR,
                     y: homeworld.position.y
