@@ -2,6 +2,7 @@
 
 import { sceneManager } from '../sceneManager.js';
 import { eventBus, Events } from '../eventBus.js';
+import { audioCore } from '../audio/audioCore.js';
 
 let _container = null;
 let _onKeyDown = null;
@@ -11,7 +12,7 @@ let _previousScene = 'menu';
 // 分类定义
 const CATEGORIES = [
     { id: 'display',   label: '显示',  enabled: true },
-    { id: 'audio',     label: '音频',  enabled: false },
+    { id: 'audio',     label: '音频',  enabled: true },
     { id: 'control',   label: '控制',  enabled: false },
     { id: 'game',      label: '游戏',  enabled: false },
 ];
@@ -19,7 +20,7 @@ const CATEGORIES = [
 // 每个分类的说明文字
 const CATEGORY_DESCRIPTIONS = {
     display: '选择菜单背景显示模式。星空模式会透出游戏星空背景，图片模式会加载自定义背景图。',
-    audio:   '调整音量、音效和音乐设置。（即将推出）',
+    audio:   '选择菜单背景音乐。KSP1 / KSP2 对应两首不同的菜单音乐。',
     control: '配置键盘映射、鼠标灵敏度等控制选项。（即将推出）',
     game:    '调整游戏难度、时间加速倍率等玩法参数。（即将推出）',
 };
@@ -120,6 +121,14 @@ function _setMenuBgSetting(value) {
     localStorage.setItem('ksp2d.menuBg', value);
 }
 
+function _getMenuMusicSetting() {
+    return localStorage.getItem('ksp2d.menuMusic') || 'ksp1';
+}
+
+function _setMenuMusicSetting(value) {
+    localStorage.setItem('ksp2d.menuMusic', value);
+}
+
 function _renderContent(content) {
     const cat = CATEGORIES.find(c => c.id === _currentCategory);
     if (!cat) return;
@@ -140,6 +149,18 @@ function _renderContent(content) {
                     { value: 'image', label: '图片' },
                 ], currentBg, 'ksp2d.menuBg')
             );
+        } else if (_currentCategory === 'audio') {
+            const currentMusic = _getMenuMusicSetting();
+
+            // 音乐分组
+            html += _renderGroupHeader('音乐');
+            html += _renderSettingRow(
+                '菜单音乐',
+                _renderButtonGroup('menuMusic', [
+                    { value: 'ksp1', label: 'KSP1' },
+                    { value: 'ksp2', label: 'KSP2' },
+                ], currentMusic, 'ksp2d.menuMusic')
+            );
         }
     } else {
         // 未启用的分类 — 灰色占位
@@ -158,6 +179,13 @@ function _renderContent(content) {
                 _setMenuBgSetting(value);
                 // 重新渲染以更新按钮高亮
                 _renderContent(contentEl);
+            } else if (group === 'menuMusic') {
+                _setMenuMusicSetting(value);
+                _renderContent(contentEl);
+                // 从菜单进入设置时立即试听新选择的菜单音乐
+                if (_previousScene === 'menu') {
+                    audioCore.playMusic('menu', value);
+                }
             }
         });
     });

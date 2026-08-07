@@ -18,6 +18,10 @@ export const Events = {
     TEXTURES_READY: 'textures:ready',         // 所有纹理加载完成
     TEXTURE_PROGRESS: 'texture:progress',     // 单张纹理加载完成或失败时广播
     TEXTURE_LOAD_ERROR: 'texture:loadError',  // 单张纹理加载失败
+    // 音频系统事件
+    AUDIO_READY: 'audio:ready',               // 所有音频资源加载完成
+    AUDIO_PROGRESS: 'audio:progress',         // 单个音频资源加载完成或失败时广播
+    AUDIO_LOAD_ERROR: 'audio:loadError',      // 单个音频资源加载失败
     // 设施系统事件
     FACILITY_CREATED: 'facility:created',
     FACILITY_DELETED: 'facility:deleted',

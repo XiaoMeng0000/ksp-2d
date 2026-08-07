@@ -35,6 +35,9 @@ import { registerMenuScene } from './src/scenes/menuScene.js';
 import { registerEncyclopediaScene } from './src/scenes/encyclopediaScene.js';
 import { registerCreditsScene } from './src/scenes/creditsScene.js';
 import { registerSettingsScene } from './src/scenes/settingsScene.js';
+// 音频系统 - 底层引擎与决策层（import 即完成事件订阅）
+import { audioCore } from './src/audio/audioCore.js';
+import { audioDirector } from './src/audio/audioDirector.js';
 
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
@@ -121,21 +124,40 @@ registerTrackingScene({
     canvas: canvas
 });
 
-// SceneManager - 启动加载画面：纹理就绪后才进入场景链
-if (textureManager.isReady()) {
-    // 纹理已缓存（二次访问），跳过加载画面
+// SceneManager - 启动加载画面：纹理与音频都就绪后才进入场景链
+const loadingScreen = document.getElementById('loadingScreen');
+const loadingLogContent = document.getElementById('loadingLogContent');
+const loadingLogBox = document.getElementById('loadingLogBox');
+const loadingProgressBarInner = document.getElementById('loadingProgressBarInner');
+const loadingProgressText = document.getElementById('loadingProgressText');
+const audioProgressBarInner = document.getElementById('loadingAudioProgressBarInner');
+const audioProgressText = document.getElementById('loadingAudioProgressText');
+
+// 加载完成状态标记（纹理 / 音频两路都就绪后才放行）
+// 已就绪的一路初始化为 true，避免缓存命中时该路事件不触发导致状态卡死
+const _loadState = {
+    textures: textureManager.isReady(),
+    audio: audioCore.isReady()
+};
+
+// 两路加载全部完成 → 隐藏加载画面并进入 splash
+function _finishLoading() {
+    if (_loadState.textures && _loadState.audio) {
+        setTimeout(() => {
+            loadingScreen.style.display = 'none';
+            sceneManager.switchTo('splash');
+        }, 300);
+    }
+}
+
+if (textureManager.isReady() && audioCore.isReady()) {
+    // 纹理与音频均已就绪（二次访问），跳过加载画面
     sceneManager.switchTo('splash');
 } else {
-    const loadingScreen = document.getElementById('loadingScreen');
-    const loadingLogContent = document.getElementById('loadingLogContent');
-    const loadingLogBox = document.getElementById('loadingLogBox');
-    const loadingProgressBarInner = document.getElementById('loadingProgressBarInner');
-    const loadingProgressText = document.getElementById('loadingProgressText');
-
     loadingScreen.style.display = 'flex';
 
-    // 注册进度事件处理
-    const onProgress = ({ key, loaded, total, success }) => {
+    // === 纹理加载进度与完成 ===
+    const onTextureProgress = ({ key, loaded, total, success }) => {
         const line = document.createElement('div');
         line.textContent = (success ? '[OK] ' : '[FAIL] ') + key + '.png';
         line.className = success ? 'loading-log-ok' : 'loading-log-fail';
@@ -147,16 +169,11 @@ if (textureManager.isReady()) {
 
         loadingLogBox.scrollTop = loadingLogBox.scrollHeight;
     };
-
-    // 注册完成事件处理
-    const onReady = ({ loaded, failed }) => {
-        eventBus.off(Events.TEXTURE_PROGRESS, onProgress);
-        eventBus.off(Events.TEXTURES_READY, onReady);
-
-        setTimeout(() => {
-            loadingScreen.style.display = 'none';
-            sceneManager.switchTo('splash');
-        }, 300);
+    const onTexturesReady = ({ loaded, failed }) => {
+        eventBus.off(Events.TEXTURE_PROGRESS, onTextureProgress);
+        eventBus.off(Events.TEXTURES_READY, onTexturesReady);
+        _loadState.textures = true;
+        _finishLoading();
 
         if (failed > 0) {
             if (typeof window.showNotification === 'function') {
@@ -165,10 +182,36 @@ if (textureManager.isReady()) {
         }
     };
 
-    eventBus.on(Events.TEXTURE_PROGRESS, onProgress);
-    eventBus.on(Events.TEXTURES_READY, onReady);
+    // === 音频加载进度与完成 ===
+    const onAudioProgress = ({ loaded, total }) => {
+        const pct = total > 0 ? Math.round(loaded / total * 100) : 100;
+        audioProgressBarInner.style.width = pct + '%';
+        audioProgressText.textContent = loaded + '/' + total + ' (' + pct + '%)';
+    };
+    const onAudioReady = ({ loaded, failed }) => {
+        eventBus.off(Events.AUDIO_PROGRESS, onAudioProgress);
+        eventBus.off(Events.AUDIO_READY, onAudioReady);
+        _loadState.audio = true;
+        _finishLoading();
 
-    textureManager.init();
+        if (failed > 0) {
+            if (typeof window.showNotification === 'function') {
+                window.showNotification(failed + ' 个音频加载失败，相关声音可能缺失', 'warning', 4000);
+            }
+        }
+    };
+
+    // 分别注册并启动未就绪的一路：纹理与音频并行加载，互不阻塞
+    if (!_loadState.textures) {
+        eventBus.on(Events.TEXTURE_PROGRESS, onTextureProgress);
+        eventBus.on(Events.TEXTURES_READY, onTexturesReady);
+        textureManager.init();
+    }
+    if (!_loadState.audio) {
+        eventBus.on(Events.AUDIO_PROGRESS, onAudioProgress);
+        eventBus.on(Events.AUDIO_READY, onAudioReady);
+        audioCore.init();
+    }
 }
 
 // 启动游戏循环

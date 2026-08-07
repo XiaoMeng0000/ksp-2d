@@ -64,6 +64,27 @@
             font-family: monospace;
             font-size: 14px;
         }
+        /* 音频加载进度条 */
+        #loadingAudioProgressBarOuter {
+            width: 500px;
+            height: 8px;
+            background: #222;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 12px;
+            margin-bottom: 8px;
+        }
+        #loadingAudioProgressBarInner {
+            height: 100%;
+            width: 0%;
+            background: #66ff88;
+            transition: width 0.15s ease;
+        }
+        #loadingAudioProgressText {
+            color: #fff;
+            font-family: monospace;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
@@ -71,7 +92,7 @@
 
     <!-- 启动加载画面 -->
     <div id="loadingScreen">
-        <div id="loadingTitle">首次启动 游戏正在加载图片 请耐心等待</div>
+        <div id="loadingTitle">首次启动 游戏正在加载图片与音频 请耐心等待</div>
         <div id="loadingLogBox">
             <div id="loadingLogContent"></div>
         </div>
@@ -79,6 +100,10 @@
             <div id="loadingProgressBarInner"></div>
         </div>
         <div id="loadingProgressText">0/0 (0%)</div>
+        <div id="loadingAudioProgressBarOuter">
+            <div id="loadingAudioProgressBarInner"></div>
+        </div>
+        <div id="loadingAudioProgressText">0/0 (0%)</div>
     </div>
 
     <script type="module" src="main.js"></script>
