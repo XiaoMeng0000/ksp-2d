@@ -12,15 +12,11 @@ const CREDITS = {
                         { role: '创意总监',  members: [{ name: 'XiaoMeng',       icon: null }] },
                         { role: '使用平台',  members: [{ name: 'TRAE CN',        icon: null }] },
                         { role: '使用API',   members: [
-                            { name: 'DEEPSEEK V4 PRO', icon: null },
-                            { name: 'KIMI K3',         icon: null },
-                            { name: 'QWEN 3.7 PLUS',   icon: null }
-                        ]}
-                    ]
-                },
-                {
-                    name: '美术',
-                    rows: [
+                            { name: 'DEEPSEEK V4 PRO',   icon: null },
+                            { name: 'DEEPSEEK V4 FLASH', icon: null },
+                            { name: 'KIMI K3',           icon: null },
+                            { name: 'QWEN 3.7 PLUS',     icon: null }
+                        ]},
                         { role: '美术设计',    members: [{ name: 'XiaoMeng', icon: null }, { name: '离川', icon: null }] },
                         { role: 'UI图标绘制',  members: [{ name: 'XiaoMeng', icon: null }] }
                     ]

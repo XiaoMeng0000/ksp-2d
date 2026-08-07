@@ -4,7 +4,7 @@ import { sceneManager } from '../sceneManager.js';
 import { textureManager } from '../graphics/textureManager.js';
 import { eventBus, Events } from '../eventBus.js';
 import { renderableManager } from '../graphics/renderable.js';
-import { MAIN_MENU, SUB_MENU, MENU_STYLE } from '../config/menuConfig.js';
+import { MENUS, MENU_STYLE } from '../config/menuConfig.js';
 
 let _canvas = null;
 let _currentMenu = 'main';
@@ -31,9 +31,13 @@ function _generateStars() {
     _stars = stars;
 }
 
+function _getMenu() {
+    return MENUS[_currentMenu] || MENUS.main;
+}
+
 function _buildButtonRects(buttonStartY) {
     const yStart = buttonStartY || MENU_STYLE.buttonStartY;
-    const menu = _currentMenu === 'main' ? MAIN_MENU : SUB_MENU;
+    const menu = _getMenu();
     const rects = [];
     for (let i = 0; i < menu.length; i++) {
         rects.push({
@@ -63,10 +67,13 @@ function _executeAction(action) {
         _currentMenu = 'main';
         _hoverIndex = -1;
         _buildButtonRects(MENU_STYLE.buttonStartY);
-    } else if (action === 'submenu') {
-        _currentMenu = 'sub';
-        _hoverIndex = -1;
-        _buildButtonRects(MENU_STYLE.buttonStartY);
+    } else if (action.startsWith('submenu:')) {
+        const subMenuId = action.slice(8);
+        if (MENUS[subMenuId]) {
+            _currentMenu = subMenuId;
+            _hoverIndex = -1;
+            _buildButtonRects(MENU_STYLE.buttonStartY);
+        }
     } else if (action.startsWith('scene:')) {
         const sceneId = action.slice(6);
         sceneManager.switchTo(sceneId);
@@ -119,7 +126,7 @@ function _drawVersion(ctx) {
 
 function _drawButtons(ctx, buttonStartY) {
     const yStart = buttonStartY || MENU_STYLE.buttonStartY;
-    const menu = _currentMenu === 'main' ? MAIN_MENU : SUB_MENU;
+    const menu = _getMenu();
 
     for (let i = 0; i < menu.length; i++) {
         const bx = MENU_STYLE.buttonX;
@@ -167,7 +174,7 @@ function _handleClick(event) {
 
 function _handleKeyDown(event) {
     if (event.key === 'Escape') {
-        if (_currentMenu === 'sub') {
+        if (_currentMenu !== 'main') {
             _currentMenu = 'main';
             _hoverIndex = -1;
             _buildButtonRects(MENU_STYLE.buttonStartY);
