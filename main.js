@@ -183,10 +183,18 @@ if (textureManager.isReady() && audioCore.isReady()) {
     };
 
     // === 音频加载进度与完成 ===
-    const onAudioProgress = ({ loaded, total }) => {
+    const onAudioProgress = ({ key, loaded, total, success }) => {
+        // 与纹理加载一致，在信息栏中逐行记录加载情况
+        const line = document.createElement('div');
+        line.textContent = (success ? '[OK] ' : '[FAIL] ') + key;
+        line.className = success ? 'loading-log-ok' : 'loading-log-fail';
+        loadingLogContent.appendChild(line);
+
         const pct = total > 0 ? Math.round(loaded / total * 100) : 100;
         audioProgressBarInner.style.width = pct + '%';
         audioProgressText.textContent = loaded + '/' + total + ' (' + pct + '%)';
+
+        loadingLogBox.scrollTop = loadingLogBox.scrollHeight;
     };
     const onAudioReady = ({ loaded, failed }) => {
         eventBus.off(Events.AUDIO_PROGRESS, onAudioProgress);
