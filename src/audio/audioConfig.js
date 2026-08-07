@@ -3,8 +3,9 @@
 // 音频资源配置模块 — 数据驱动，所有音频内容在此声明
 // 目录约定：音乐放 assets/audio/bgm/，音效放 assets/audio/sfx/
 
-// 音乐映射表：场景音乐标识 → { loop, variants }
+// 音乐映射表：场景音乐标识 → { loop, variants | byBodyType }
 // variants 为同一场景可选配的音乐变体（如菜单可切换 KSP1 / KSP2 两首）
+// byBodyType 为按宿主天体音乐分类选曲（飞行场景使用，key 与 CelestialBody.musicType 对应）
 export const musicMap = {
     menu: {
         loop: true,
@@ -12,8 +13,20 @@ export const musicMap = {
             ksp1: { path: 'assets/audio/bgm/menu1.ogg' },
             ksp2: { path: 'assets/audio/bgm/menu2.ogg' }
         }
+    },
+    // 飞行场景音乐：按宿主天体音乐分类选曲
+    // TODO: 素材就绪后补充 icy / rocky / gas / eve / duna / mun / star / deepSpace
+    flight: {
+        loop: true,
+        byBodyType: {
+            terrestrial: 'assets/audio/bgm/flight_terrestrial.ogg'
+        }
+    },
+    // 追踪站场景音乐
+    tracking: {
+        loop: true,
+        path: 'assets/audio/bgm/tracking.ogg'
     }
-    // TODO: 后续扩展飞行场景音乐，如 flight_star / flight_planet / deep_space 等
 };
 
 // 音效映射表：音效标识 → { path }
@@ -34,12 +47,21 @@ export function getMenuMusicVariant() {
 }
 
 // 将 musicMap / sfxMap 展平为"资源标识 → 路径"清单，供 audioCore 统一加载
-// 资源标识格式：'music:<sceneKey>_<variantKey>'（有变体）或 'music:<sceneKey>'（无变体）
+// 资源标识格式：'music:<sceneKey>_<variantKey>'（variants 或 byBodyType）或 'music:<sceneKey>'（无子项）
 export function buildAudioManifest() {
     const manifest = {};
     for (const sceneKey in musicMap) {
         const entry = musicMap[sceneKey];
-        if (entry.variants) {
+        if (entry.byBodyType) {
+            // 按天体音乐分类选曲（飞行场景）
+            for (const bodyType in entry.byBodyType) {
+                const path = entry.byBodyType[bodyType];
+                if (path) {
+                    manifest['music:' + sceneKey + '_' + bodyType] = path;
+                }
+            }
+        } else if (entry.variants) {
+            // 可选音乐变体（菜单等场景）
             for (const variantKey in entry.variants) {
                 manifest['music:' + sceneKey + '_' + variantKey] = entry.variants[variantKey].path;
             }

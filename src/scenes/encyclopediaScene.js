@@ -64,12 +64,17 @@ function registerEncyclopediaScene() {
             title.textContent = entry.title;
             title.style.cssText = 'color:#A04040;font-family:monospace;font-size:16px;margin:0 0 8px 0;';
 
-            const body = document.createElement('p');
-            body.textContent = entry.content;
-            body.style.cssText = 'color:#999;font-family:monospace;font-size:13px;line-height:1.8;margin:0;';
-
             entryDiv.appendChild(title);
-            entryDiv.appendChild(body);
+
+            // 按空行拆分段落，逐段渲染
+            const paragraphs = entry.content.split(/\r?\n\s*\r?\n/);
+            for (const para of paragraphs) {
+                const body = document.createElement('p');
+                body.textContent = para;
+                body.style.cssText = 'color:#999;font-family:monospace;font-size:13px;line-height:1.8;margin:0 0 12px 0;';
+                entryDiv.appendChild(body);
+            }
+
             contentEl.appendChild(entryDiv);
         }
     }

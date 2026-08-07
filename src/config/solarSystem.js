@@ -8,6 +8,7 @@ export const solarSystemData = [
     new CelestialBody({
         name: 'Kerbol',
         type: 'star',
+        musicType: 'star',
         gm: 1.1723328e18,
         soiRadius: 1e13,
         radius: 261600000,
@@ -20,6 +21,7 @@ export const solarSystemData = [
     new CelestialBody({
         name: 'Kerbin',
         type: 'planet',
+        musicType: 'terrestrial',
         gm: 3.5316e12,
         soiRadius: 84159286,
         radius: 600000,

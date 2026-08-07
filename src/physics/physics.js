@@ -49,6 +49,19 @@ export function getSOIHost(pos) {
     return closestNonStar || starHost;
 }
 
+// 获取指定 SOI 宿主天体的音乐分类（音频层使用）
+// 规则：深空（soiName 为空或找不到天体）→ 'deepSpace'；天体存在但未分类 → 兜底 'rocky'
+export function getMusicTypeForSOI(soiName) {
+    if (!soiName) {
+        return 'deepSpace';
+    }
+    const body = celestialBodies.find(b => b.name === soiName);
+    if (!body) {
+        return 'deepSpace';
+    }
+    return body.musicType || 'rocky';
+}
+
 // 将速度向量从一个天体参考系转换到另一个天体参考系，直接修改 vel 对象
 export function convertVelocityFrame(vel, fromHostName, toHostName) {
     const oldHost = fromHostName

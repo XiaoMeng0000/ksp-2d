@@ -3,6 +3,9 @@
 import { eventBus, Events } from '../eventBus.js';
 import { audioCore } from './audioCore.js';
 import { getMenuMusicVariant } from './audioConfig.js';
+import { getMusicTypeForSOI } from '../physics/physics.js';
+import { gameState } from '../gameState.js';
+import { sceneManager } from '../sceneManager.js';
 
 // AudioDirector 单例类 — 决策层
 // 职责：订阅事件总线，将游戏事件映射为音频播放动作
@@ -22,17 +25,42 @@ class AudioDirector {
         eventBus.on(Events.SCENE_CHANGED, ({ from, to }) => {
             this._handleSceneChanged(from, to);
         });
+
+        // SOI 变化 → 飞行中切换宿主天体音乐
+        eventBus.on(Events.SOI_CHANGED, ({ to }) => {
+            if (sceneManager.getCurrentScene() === 'flight') {
+                this._playFlightMusic();
+            }
+        });
     }
 
-    // 场景切换处理：进入菜单播 BGM，离开菜单停止
-    // TODO: 后续扩展其他场景/天体类型音乐，如 flight 场景按宿主天体 type 分曲
+    // 场景切换处理：进入菜单播 BGM，进入飞行按天体类型播，进入追踪站播追踪音乐
     _handleSceneChanged(from, to) {
         if (to === 'menu') {
             // 读取设置界面选择的菜单音乐变体（KSP1 / KSP2）
             audioCore.playMusic('menu', getMenuMusicVariant());
-        } else if (from === 'menu') {
+        } else if (to === 'flight') {
+            // 进入飞行：按宿主天体音乐分类播放
+            this._playFlightMusic();
+        } else if (to === 'tracking') {
+            // 进入追踪站：播放追踪站音乐
+            audioCore.playMusic('tracking');
+        } else if (from === 'menu' || from === 'flight' || from === 'tracking') {
+            // 离开需要音乐的场景 → 停止
             audioCore.stopMusic();
         }
+    }
+
+    // 飞行场景音乐：查询当前活动飞船宿主天体的音乐分类并播放
+    // 深空或暂无素材的分类会静默跳过（audioCore 已有容错）
+    _playFlightMusic() {
+        const ship = gameState.getActiveShip();
+        if (!ship) {
+            audioCore.stopMusic();
+            return;
+        }
+        const musicType = getMusicTypeForSOI(ship.currentSOI);
+        audioCore.playMusic('flight', musicType);
     }
 }
 

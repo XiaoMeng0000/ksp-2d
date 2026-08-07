@@ -11,6 +11,9 @@ export class CelestialBody {
             displayRadius = null,
             // 天体驱动器 6.5步
             type = 'planet',
+            // 音乐分类（音频层使用，与物理 type 解耦）
+            // 取值：terrestrial / icy / rocky / gas / eve / duna / mun / star 等，null 表示未分类
+            musicType = null,
             orbitParent = null,
             orbitA = 0,
             orbitE = 0,
@@ -36,6 +39,7 @@ export class CelestialBody {
 
         // 天体驱动器 6.5步
         this.type = type;
+        this.musicType = musicType;
         this.orbitParent = orbitParent;
         this.orbitA = orbitA;
         this.orbitE = orbitE;
