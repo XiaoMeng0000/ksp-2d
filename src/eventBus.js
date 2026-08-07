@@ -22,7 +22,9 @@ export const Events = {
     FACILITY_CREATED: 'facility:created',
     FACILITY_DELETED: 'facility:deleted',
     FACILITY_DOCKED: 'facility:docked',
-    FACILITY_UNDOCKED: 'facility:undocked'
+    FACILITY_UNDOCKED: 'facility:undocked',
+    // 时间加速事件
+    TIME_WARP_CHANGED: 'timeWarp:changed'       // 档位/暂停状态变化
 };
 
 // EventBus 单例类

@@ -14,6 +14,7 @@ import { sasUI } from '../ui/sasUI.js';
 import { facilitySystem } from '../facility/facilitySystem.js';
 import { getModuleDef } from '../ship/moduleTypes.js';
 import { getFacilityType } from '../facility/facilityTypes.js';
+import { timeWarp } from '../timeWarp.js';
 
 // 由 main.js 在注册时注入的依赖
 let _throttleRate = 1.0;
@@ -414,20 +415,30 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             // SAS 集成 — 每帧记录上一帧按键状态（供 justPressed 使用）
             inputManager.update();
 
+            // 时间加速 — 物理时间步长 = 真实帧长 × 倍率（交互/动画仍用真实 dt）
+            const warpRate = timeWarp.getRate();
+            const simDt = dt * warpRate;
+            // 点火时仅允许物理加速档（≤4x），未点火时放开全部档位
+            if (activeShip && activeShip.throttle > 0) {
+                timeWarp.setMaxIndex(timeWarp.getPhysicsMaxIndex());
+            } else {
+                timeWarp.setMaxIndex(timeWarp.getMaxIndex());
+            }
+
             // 推进时间和天体（飞船/设施存相对宿主坐标，无需位置补偿）
-            _setCelestialTime(_getCelestialTime() + dt);
+            _setCelestialTime(_getCelestialTime() + simDt);
             updateCelestialBodies(_getCelestialTime());
-            eventBus.emit(Events.CELESTIAL_TIME_UPDATED, { time: _getCelestialTime(), dt });
+            eventBus.emit(Events.CELESTIAL_TIME_UPDATED, { time: _getCelestialTime(), dt: simDt });
 
             // 物理推进
             for (const s of allShips) {
                 const isActive = s.id === activeId;
-                updateShipPhysics(s, dt, isActive);
+                updateShipPhysics(s, simDt, isActive);
             }
 
             // 4b. 设施物理推进（走飞船物理的 on_rails 路径，isActive=false 强制无推力）
             for (const f of allFacilities) {
-                updateShipPhysics(f, dt, false);
+                updateShipPhysics(f, simDt, false);
             }
 
             // 5. 设施交互检测（活动飞船进入设施交互范围）
@@ -492,8 +503,8 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 _dockPromptFacId = null;
             }
 
-            // 朝向控制（仅对活动飞船生效）
-            if (activeShip) {
+            // 朝向控制（仅对活动飞船生效；加速时锁输入，飞船保持朝向）
+            if (activeShip && warpRate <= 1) {
                 // 确保 SAS 控制器存在（兜底：新建飞船 / 切换飞船）
                 if (!activeShip._sasController) {
                     activeShip._sasController = new SASController(activeShip);
@@ -592,7 +603,7 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
 
                 // 燃料消耗（火箭方程：质量流量 = 推力 / (比冲 × g0)）
                 const massFlow = activeShip.throttle * activeShip.maxThrust / (activeShip.isp * 9.81);
-                activeShip.fuel -= massFlow * dt;
+                activeShip.fuel -= massFlow * simDt;
                 if (activeShip.fuel <= 0) {
                     activeShip.fuel = 0;
                     activeShip.throttle = 0;

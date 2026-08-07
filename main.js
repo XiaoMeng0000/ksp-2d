@@ -4,6 +4,9 @@ import { gameState } from './src/gameState.js';
 // SaveManager - 加载存档管理器
 import './src/saveManager.js';
 
+// TimeWarp - 时间加速/暂停（模块加载即安装全局按键监听）
+import './src/timeWarp.js';
+
 // SceneManager - 导入场景管理器
 import { sceneManager } from './src/sceneManager.js';
 // 飞船系统 - 导入飞船系统核心模块

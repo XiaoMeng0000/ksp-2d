@@ -7,6 +7,7 @@ import { updateCelestialBodies, getAbsolutePosition, celestialBodies } from '../
 import { render } from '../renderer.js';
 import { eventBus, Events } from '../eventBus.js';
 import { gameState } from '../gameState.js';
+import { timeWarp } from '../timeWarp.js';
 
 // 追踪站内部状态
 let trackingFocusPos = null;
@@ -254,21 +255,25 @@ export function registerTrackingScene({ getTime, setTime, canvas }) {
             const activeId = activeShip ? activeShip.id : null;
             const allShips = shipSystem.getAllShips();
 
+            // 时间加速 — 追踪站无推力，放开全部档位；物理时间步长 = 真实帧长 × 倍率
+            timeWarp.setMaxIndex(timeWarp.getMaxIndex());
+            const simDt = dt * timeWarp.getRate();
+
             // 推进时间和天体（飞船/设施存相对宿主坐标，无需位置补偿）
-            _setCelestialTime(_getCelestialTime() + dt);
+            _setCelestialTime(_getCelestialTime() + simDt);
             updateCelestialBodies(_getCelestialTime());
-            eventBus.emit(Events.CELESTIAL_TIME_UPDATED, { time: _getCelestialTime(), dt });
+            eventBus.emit(Events.CELESTIAL_TIME_UPDATED, { time: _getCelestialTime(), dt: simDt });
 
             // 物理推进（追踪站）
             for (const s of allShips) {
                 const isActive = s.id === activeId;
-                updateShipPhysics(s, dt, isActive);
+                updateShipPhysics(s, simDt, isActive);
             }
 
             // 4b. 设施物理推进（设施同样存相对宿主坐标）
             const allFacilities = facilitySystem.getAllFacilities();
             for (const f of allFacilities) {
-                updateShipPhysics(f, dt, false);
+                updateShipPhysics(f, simDt, false);
             }
 
             // 每帧更新聚焦位置（平滑跟随选中物体，用真实 ID 匹配）

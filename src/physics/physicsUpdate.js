@@ -102,10 +102,22 @@ export function updateShipPhysics(ship, dt, isActive = true) {
         }
     } else if (ship.mode === 'thrust' && isActive) {
         const thrustAccel = ship.thrust ? ship.thrust : { ax: 0, ay: 0 };
-        const state = rk4Integrate(ship.pos, ship.vel, dt, ship.currentGM, thrustAccel);
-        ship.pos.x = state.pos.x;
-        ship.pos.y = state.pos.y;
-        ship.vel.x = state.vel.x;
-        ship.vel.y = state.vel.y;
+        // 子步循环 — 每步 RK4 不超过 0.05s，保证物理加速（2x~4x）下推力轨道精度
+        // 逃逸轨道（无 kepler）分支暂不子步化：高倍率下步数过多，记为已知限制
+        const MAX_RK4_STEP = 0.05;
+        let remaining = dt;
+        let p = ship.pos;
+        let v = ship.vel;
+        while (remaining > 1e-9) {
+            const step = Math.min(remaining, MAX_RK4_STEP);
+            const state = rk4Integrate(p, v, step, ship.currentGM, thrustAccel);
+            p = state.pos;
+            v = state.vel;
+            remaining -= step;
+        }
+        ship.pos.x = p.x;
+        ship.pos.y = p.y;
+        ship.vel.x = v.x;
+        ship.vel.y = v.y;
     }
 }
