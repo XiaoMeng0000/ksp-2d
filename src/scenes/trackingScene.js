@@ -255,8 +255,20 @@ export function registerTrackingScene({ getTime, setTime, canvas }) {
             const activeId = activeShip ? activeShip.id : null;
             const allShips = shipSystem.getAllShips();
 
-            // 时间加速 — 追踪站无推力，放开全部档位；物理时间步长 = 真实帧长 × 倍率
-            timeWarp.setMaxIndex(timeWarp.getMaxIndex());
+            // 时间加速 — 追踪站无推力放开全部档位；任一飞船接近宿主 SOI 边界(≥95%半径)时限制到逃逸安全档
+            let warpMaxIndex = timeWarp.getMaxIndex();
+            for (const s of allShips) {
+                if (s.currentSOI) {
+                    const warpHost = celestialBodies.find(b => b.name === s.currentSOI);
+                    if (warpHost) {
+                        const distToHost = Math.sqrt(s.pos.x * s.pos.x + s.pos.y * s.pos.y);
+                        if (distToHost > warpHost.soiRadius * 0.95) {
+                            warpMaxIndex = Math.min(warpMaxIndex, timeWarp.getEscapeMaxIndex());
+                        }
+                    }
+                }
+            }
+            timeWarp.setMaxIndex(warpMaxIndex);
             const simDt = dt * timeWarp.getRate();
 
             // 推进时间和天体（飞船/设施存相对宿主坐标，无需位置补偿）

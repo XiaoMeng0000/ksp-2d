@@ -15,11 +15,13 @@ export const musicMap = {
         }
     },
     // 飞行场景音乐：按宿主天体音乐分类选曲
-    // TODO: 素材就绪后补充 icy / rocky / gas / eve / duna / mun / star / deepSpace
+    // TODO: 素材就绪后补充 icy / rocky / gas / eve / duna / deepSpace
     flight: {
         loop: true,
         byBodyType: {
-            terrestrial: 'assets/audio/bgm/flight_terrestrial.ogg'
+            terrestrial: 'assets/audio/bgm/flight_terrestrial.ogg',
+            mun: 'assets/audio/bgm/flight_mun.ogg',
+            star: 'assets/audio/bgm/flight_star.ogg'
         }
     },
     // 追踪站场景音乐

@@ -11,6 +11,10 @@ const WARP_RATES = [0, 1, 2, 3, 4, 10, 50, 100, 1000, 10000, 100000, 1000000, 10
 // 物理加速上限（thrust 模式允许的最大倍率）
 const PHYSICS_WARP_MAX = 4;
 
+// SOI 边界接近（≥95% 宿主 SOI 半径）时允许的最大倍率
+// 保证边界穿越帧步长小、位置连续、预测线平滑（KSP1 原版：SOI 边界前自动降档）
+const ESCAPE_WARP_MAX = 10;
+
 /**
  * 时间加速单例
  * - 暂停被建模为 0x 档位：0 档 = sceneManager 暂停，其余档位按倍率推进 simDt
@@ -47,6 +51,11 @@ class TimeWarp {
     // 物理加速档位上限索引（thrust 模式最高允许 4x）
     getPhysicsMaxIndex() {
         return WARP_RATES.indexOf(PHYSICS_WARP_MAX);
+    }
+
+    // SOI 边界接近安全档位上限索引（≥95% 宿主半径时最高允许 10x）
+    getEscapeMaxIndex() {
+        return WARP_RATES.indexOf(ESCAPE_WARP_MAX);
     }
 
     isPaused() {

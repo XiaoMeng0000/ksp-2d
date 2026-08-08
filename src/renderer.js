@@ -1,6 +1,7 @@
 import { camera, worldToScreen } from './camera.js';
 import { celestialBodies, getAbsolutePosition } from './physics/physics.js';
 import { predictTrajectoryPatched, predictTrajectoryBurned } from './physics/orbitalPrediction.js';
+import { getOrbitalInfo, stateToKepler } from './physics/orbitalMechanics.js';
 import { getFacilityType } from './facility/facilityTypes.js';
 import { renderableManager } from './graphics/renderable.js';
 import { textureManager } from './graphics/textureManager.js';
@@ -470,53 +471,116 @@ function renderManeuverOrbits(ship, ctx, canvas) {
     // TODO: 调用 predictManeuverTrajectories，对每个节点的结果段用红色虚线绘制
 }
 
-// 飞行HUD（速度显示 + 推力箭头）
+// ========== 飞行 HUD（顶部轨道数据 + 推力箭头） ==========
+
+// HUD 绿色系 — 呼应 getOrbitColor 中当前 SOI 轨道线颜色 rgba(64,224,80,0.85)
+const HUD_GREEN = '64, 224, 80';
+const HUD_LABEL = `rgba(${HUD_GREEN}, 0.45)`;
+const HUD_VALUE = `rgba(${HUD_GREEN}, 0.95)`;
+const HUD_WARN = 'rgba(255, 80, 80, 0.95)';
+const HUD_ESCAPE = 'rgba(255, 220, 80, 0.95)';
+
+// 轨道类型 → 显示文本
+const ORBIT_TYPE_TEXT = {
+    circular: '圆轨',
+    elliptical: '椭圆轨',
+    suborbital: '亚轨道',
+    escape: '逃逸',
+    deep_space: '深空'
+};
+
+// 高度格式化：≥1000m 显示 km，否则 m
+function formatAltitude(m) {
+    if (m === null || m === undefined || !isFinite(m)) return '--';
+    if (Math.abs(m) >= 1000) return (m / 1000).toFixed(1) + ' km';
+    return m.toFixed(0) + ' m';
+}
+
+// 速度格式化：≥1000m/s 显示 km/s
+function formatSpeed(mps) {
+    if (mps === null || mps === undefined || !isFinite(mps)) return '--';
+    if (Math.abs(mps) >= 1000) return (mps / 1000).toFixed(2) + ' km/s';
+    return mps.toFixed(1) + ' m/s';
+}
+
+// 时长格式化：1h 30m 00s / 12m 30s / 45s
+function formatDuration(sec) {
+    if (sec === null || sec === undefined || !isFinite(sec)) return '--';
+    sec = Math.max(0, Math.round(sec));
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    if (h > 0) return h + 'h ' + String(m).padStart(2, '0') + 'm ' + String(s).padStart(2, '0') + 's';
+    if (m > 0) return m + 'm ' + String(s).padStart(2, '0') + 's';
+    return s + 's';
+}
+
+// 顶部轨道数据 HUD：2 行 × 4 列纯文字，绿色系，以画布中轴中心对称
+function renderOrbitHud(ctx, canvas, ship) {
+    const body = ship.currentSOI ? celestialBodies.find(b => b.name === ship.currentSOI) : null;
+    // 用当前 pos/vel 实时反算瞬时轨道元素，而不是直接用 ship.kepler：
+    // 1) ship.kepler.theta 不随在轨推进更新，直接用会使 T+Ap/T+Pe 冻结；
+    // 2) 推力模式下 ship.kepler 是上一次在轨的值，直接用会使 Ap/Pe 滞后。
+    const liveKepler = (ship.currentGM > 0)
+        ? stateToKepler(ship.pos, ship.vel, ship.currentGM)
+        : null;
+    const info = getOrbitalInfo(liveKepler, ship.currentGM, body, ship.pos);
+    if (!info) return;
+
+    const soiText = (ship.currentSOI || '深空')
+        + (info.orbitType === 'deep_space' ? '' : ' · ' + (ORBIT_TYPE_TEXT[info.orbitType] || '--'));
+
+    const vel = Math.sqrt(ship.vel.x * ship.vel.x + ship.vel.y * ship.vel.y);
+
+    const typeColor = info.orbitType === 'suborbital' ? HUD_WARN
+        : info.orbitType === 'escape' ? HUD_ESCAPE
+        : HUD_VALUE;
+
+    const rows = [
+        [
+            { label: 'Ap', value: formatAltitude(info.apAlt), warn: info.apAlt !== null && info.apAlt < 0 },
+            { label: 'Pe', value: formatAltitude(info.peAlt), warn: info.peAlt !== null && info.peAlt < 0 },
+            { label: 'ALT', value: formatAltitude(info.currentAlt) },
+            { label: 'VEL', value: formatSpeed(vel) }
+        ],
+        [
+            { label: 'T+Ap', value: formatDuration(info.tToAp) },
+            { label: 'T+Pe', value: formatDuration(info.tToPe) },
+            { label: 'T', value: formatDuration(info.period) },
+            { label: 'SOI', value: soiText, color: typeColor, small: true }
+        ]
+    ];
+
+    const cols = 4;
+    const colW = 150;
+    const totalW = cols * colW;
+    const startX = (canvas.width - totalW) / 2;
+    const topY = 30;
+
+    ctx.textAlign = 'center';
+    for (let r = 0; r < rows.length; r++) {
+        for (let c = 0; c < cols; c++) {
+            const cell = rows[r][c];
+            const cx = startX + c * colW + colW / 2;
+            const cy = topY + r * 36;
+            // label 小字
+            ctx.fillStyle = cell.warn ? 'rgba(255, 80, 80, 0.6)' : HUD_LABEL;
+            ctx.font = '10px monospace';
+            ctx.fillText(cell.label, cx, cy);
+            // value 大字
+            ctx.fillStyle = cell.warn ? HUD_WARN : (cell.color || HUD_VALUE);
+            ctx.font = (cell.small ? '12px' : '14px') + ' monospace';
+            ctx.fillText(cell.value, cx, cy + 15);
+        }
+    }
+}
+
+// 飞行HUD（顶部轨道数据 + 推力箭头）
 function renderFlightHud(ctx, canvas, ship) {
     if (!ship) return;
 
-    // === 速度显示（屏幕中下方） ===
-    const speed = Math.sqrt(ship.vel.x * ship.vel.x + ship.vel.y * ship.vel.y);
-    let speedStr, unit;
-    if (speed >= 1000) {
-        speedStr = (speed / 1000).toFixed(2);
-        unit = 'km/s';
-    } else {
-        speedStr = speed.toFixed(1);
-        unit = 'm/s';
-    }
-
-    const speedBoxW = 130;
-    const speedBoxH = 40;
-    const speedBoxX = (canvas.width - speedBoxW) / 2;
-    const speedBoxY = canvas.height - speedBoxH - 40;
-    const radius = 4;
-
-    // 背景
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.beginPath();
-    ctx.moveTo(speedBoxX + radius, speedBoxY);
-    ctx.lineTo(speedBoxX + speedBoxW - radius, speedBoxY);
-    ctx.arcTo(speedBoxX + speedBoxW, speedBoxY, speedBoxX + speedBoxW, speedBoxY + radius, radius);
-    ctx.lineTo(speedBoxX + speedBoxW, speedBoxY + speedBoxH - radius);
-    ctx.arcTo(speedBoxX + speedBoxW, speedBoxY + speedBoxH, speedBoxX + speedBoxW - radius, speedBoxY + speedBoxH, radius);
-    ctx.lineTo(speedBoxX + radius, speedBoxY + speedBoxH);
-    ctx.arcTo(speedBoxX, speedBoxY + speedBoxH, speedBoxX, speedBoxY + speedBoxH - radius, radius);
-    ctx.lineTo(speedBoxX, speedBoxY + radius);
-    ctx.arcTo(speedBoxX, speedBoxY, speedBoxX + radius, speedBoxY, radius);
-    ctx.closePath();
-    ctx.fill();
-
-    // 速度值
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '20px monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(speedStr, speedBoxX + speedBoxW / 2 - 14, speedBoxY + 27);
-
-    // 单位
-    ctx.fillStyle = '#999999';
-    ctx.font = '12px monospace';
-    ctx.textAlign = 'left';
-    ctx.fillText(unit, speedBoxX + speedBoxW / 2 + 8, speedBoxY + 27);
+    // === 顶部轨道数据 HUD ===
+    renderOrbitHud(ctx, canvas, ship);
 
     // === 推力方向箭头（仅在推力模式下绘制） ===
     if (ship.throttle > 0) {

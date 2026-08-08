@@ -76,11 +76,92 @@ function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segment
     const relPos = { x: posAbs.x - hostPos.x, y: posAbs.y - hostPos.y };
     const kepler = stateToKepler(relPos, velRel, host.gm);
 
+    // 双曲线轨道（a<0）：解析推进到 SOI 边界交点（与椭圆"穿越 SOI"分支同构）
+    if (kepler && kepler.a < 0) {
+        const intersection = findSOIIntersection(kepler, host.gm, host.soiRadius);
+
+        if (!intersection) {
+            // 无交点兜底：时间采样推进（解析）直到出 SOI
+            const pts = [{ x: posAbs.x, y: posAbs.y }];
+            const aMag = -kepler.a;
+            const v0 = Math.sqrt(velRel.x * velRel.x + velRel.y * velRel.y);
+            const r0 = Math.sqrt(relPos.x * relPos.x + relPos.y * relPos.y);
+            const estT = (v0 > 0.01) ? (host.soiRadius - r0) / v0 : 300;
+            const stepT = Math.max(1, estT / 60);
+            const maxSteps = 600;
+            for (let i = 1; i <= maxSteps; i++) {
+                const t = i * stepT;
+                const hP = bodyFuturePos(host, stepStartTime + t);
+                const rP = keplerPositionAtTime(kepler, host.gm, t, kepler.omega);
+                const absP = { x: hP.x + rP.x, y: hP.y + rP.y };
+                if (i % 2 === 0) pts.push(absP);
+                if (Math.sqrt(rP.x * rP.x + rP.y * rP.y) > host.soiRadius) break;
+            }
+            segments.push({ points: pts, soiName: host.name, isCurrentSoi: depth === 0, isHyperbolic: true });
+            if (soiDiagEnabled()) {
+                console.log(`[DIAG-轨道] patchedStep depth=${depth} host=${host.name} 双曲线无交点采样出界 pts=${pts.length}`);
+            }
+            return;
+        }
+
+        const theta0 = kepler.theta;
+        const thetaEnd = intersection.theta;
+        const deltaTheta = thetaEnd - theta0;  // 双曲线 θ 沿运动方向单调增
+
+        // 到达交点时间：ΔM / n（双曲平近点角差，M 单调增无需 mod 2π）
+        const aMag = -kepler.a;
+        const n = Math.sqrt(host.gm / (aMag * aMag * aMag));
+        const F0 = 2 * Math.atanh(Math.max(-(1 - 1e-12), Math.min(1 - 1e-12,
+            Math.sqrt((kepler.e - 1) / (kepler.e + 1)) * Math.tan(theta0 / 2))));
+        const Fend = 2 * Math.atanh(Math.max(-(1 - 1e-12), Math.min(1 - 1e-12,
+            Math.sqrt((kepler.e - 1) / (kepler.e + 1)) * Math.tan(thetaEnd / 2))));
+        const deltaM = (kepler.e * Math.sinh(Fend) - Fend) - (kepler.e * Math.sinh(F0) - F0);
+        const deltaT = Math.max(deltaM / n, 0.01);
+
+        // 采样绘制（真近点角插值，双曲线兼容 keplerPositionAtTheta）
+        const N = Math.max(20, Math.min(Math.floor(deltaTheta / Math.PI * 100), 500));
+        const points = [];
+        const hP = bodyFuturePos(host, stepStartTime);
+        for (let i = 0; i <= N; i++) {
+            const frac = i / N;
+            const th = theta0 + frac * deltaTheta;
+            const rP = keplerPositionAtTheta({ a: kepler.a, e: kepler.e, omega: kepler.omega }, host.gm, th);
+            points.push({ x: hP.x + rP.x, y: hP.y + rP.y });
+        }
+        segments.push({ points, soiName: host.name, isCurrentSoi: depth === 0, isHyperbolic: true });
+
+        // 交点处切换参考系 → 递归（与椭圆穿越分支同构）
+        const intersectionTime = stepStartTime + deltaT;
+        const hostPosEnd = bodyFuturePos(host, intersectionTime);
+        const hostVelEnd = bodyFutureVel(host, intersectionTime);
+
+        const nextAbsPos = {
+            x: hostPosEnd.x + intersection.pos.x,
+            y: hostPosEnd.y + intersection.pos.y
+        };
+        const nextAbsVel = {
+            x: hostVelEnd.x + intersection.vel.x,
+            y: hostVelEnd.y + intersection.vel.y
+        };
+
+        const nextHost = getSOIHostAtTime(nextAbsPos, intersectionTime);
+        if (!nextHost || (nextHost.name === host.name)) return;
+
+        const nextHostVel = bodyFutureVel(nextHost, intersectionTime);
+        const nextRelVel = {
+            x: nextAbsVel.x - nextHostVel.x,
+            y: nextAbsVel.y - nextHostVel.y
+        };
+
+        patchedStep(nextAbsPos, nextRelVel, nextHost, intersectionTime, depth + 1, maxSeg, segments);
+        return;
+    }
+
     if (!kepler) {
         if (soiDiagEnabled()) {
             console.log(`[DIAG-轨道] patchedStep depth=${depth} host=${host.name} 双曲线/逃逸 startTime=${stepStartTime.toFixed(2)} posAbs=(${posAbs.x.toFixed(1)},${posAbs.y.toFixed(1)}) hostPos=(${hostPos.x.toFixed(1)},${hostPos.y.toFixed(1)})`);
         }
-        // 双曲线/逃逸：RK4 积分（相对坐标系），与物理引擎一致
+        // 深空/近抛物线（无轨道根数）：RK4 积分（相对坐标系），与物理引擎一致
         const hP0 = bodyFuturePos(host, stepStartTime);
         let relP = { x: posAbs.x - hP0.x, y: posAbs.y - hP0.y };
         let relV = { x: velRel.x, y: velRel.y };

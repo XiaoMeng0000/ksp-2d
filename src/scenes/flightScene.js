@@ -159,9 +159,8 @@ eventBus.on(Events.SHIP_COMMAND, ({ action, params }) => {
             }
 
             // 检查是否为稳定轨道（禁止逃逸轨道上部署，防止设施 SOI 切换 Bug）
-            // 逃逸/双曲线轨道下 stateToKepler 返回 null（e>=1 无椭圆解），
-            // 因此 ship.kepler === null 且 mode === on_rails 即表示逃逸轨道
-            if (!ship.kepler) {
+            // 双曲线轨道 kepler.a < 0（e>=1 无椭圆解），椭圆/圆轨道 a > 0
+            if (!ship.kepler || ship.kepler.a < 0) {
                 window.showNotification('逃逸轨道上无法部署设施，需在椭圆/圆轨道上进行', 'warning');
                 break;
             }
@@ -448,15 +447,25 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             const allShips = shipSystem.getAllShips();
             const allFacilities = facilitySystem.getAllFacilities();
 
-            // 时间加速 — 物理时间步长 = 真实帧长 × 倍率（交互/动画仍用真实 dt）
+            // 时间加速 — 档位上限：点火 → 物理加速档(≤4x)；SOI 边界接近(≥95%半径) → 逃逸安全档(≤10x)；否则放开全部档位
+            // 先设置档位上限再算 simDt：保证降档在本帧物理推进前生效（否则边界穿越帧会按旧高倍率大步长穿越导致位置跳变）
+            let warpMaxIndex = timeWarp.getMaxIndex();
+            if (activeShip && activeShip.throttle > 0) {
+                warpMaxIndex = timeWarp.getPhysicsMaxIndex();
+            } else if (activeShip && activeShip.currentSOI) {
+                const warpHost = celestialBodies.find(b => b.name === activeShip.currentSOI);
+                if (warpHost) {
+                    const distToHost = Math.sqrt(
+                        activeShip.pos.x * activeShip.pos.x + activeShip.pos.y * activeShip.pos.y
+                    );
+                    if (distToHost > warpHost.soiRadius * 0.95) {
+                        warpMaxIndex = Math.min(warpMaxIndex, timeWarp.getEscapeMaxIndex());
+                    }
+                }
+            }
+            timeWarp.setMaxIndex(warpMaxIndex);
             const warpRate = timeWarp.getRate();
             const simDt = dt * warpRate;
-            // 点火时仅允许物理加速档（≤4x），未点火时放开全部档位
-            if (activeShip && activeShip.throttle > 0) {
-                timeWarp.setMaxIndex(timeWarp.getPhysicsMaxIndex());
-            } else {
-                timeWarp.setMaxIndex(timeWarp.getMaxIndex());
-            }
 
             // 推进时间和天体（飞船/设施存相对宿主坐标，无需位置补偿）
             _setCelestialTime(_getCelestialTime() + simDt);

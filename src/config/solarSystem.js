@@ -41,7 +41,7 @@ export const solarSystemData = [
     new CelestialBody({
         name: 'Mun',
         type: 'moon',
-        musicType: 'rocky',
+        musicType: 'mun',
         gm: 6.5138398e10,
         soiRadius: 2429559.1,
         radius: 200000,

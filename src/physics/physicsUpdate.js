@@ -5,6 +5,9 @@ import { getSOIHost, getAbsolutePosition, getRelativePosition, convertVelocityFr
 import { rk4Integrate } from './integrator.js';
 import { stateToKepler, keplerToState } from './orbitalMechanics.js';
 
+// RK4 子步上限（秒）— 单次积分精度步长，倍率加速时按此拆分推进整个 simDt
+const MAX_RK4_STEP = 0.05;
+
 // SOI 边界诊断开关 — 运行时从 window 读取，支持控制台热切换
 function soiDiagEnabled() {
     return window._soiDiag === true;
@@ -85,12 +88,23 @@ export function updateShipPhysics(ship, dt, isActive = true) {
     // ship.pos 已经是相对坐标，直接传给积分器，积分结果也直接写回
     if (!isActive || ship.mode === 'on_rails') {
         if (!ship.kepler) {
-            // 无 kepler（双曲线/逃逸轨道）：RK4 纯引力积分推进，防止卡死
-            const state = rk4Integrate(ship.pos, ship.vel, dt, ship.currentGM, { ax: 0, ay: 0 });
-            ship.pos.x = state.pos.x;
-            ship.pos.y = state.pos.y;
-            ship.vel.x = state.vel.x;
-            ship.vel.y = state.vel.y;
+            // 无 kepler：深空（GM=0 无轨道根数）或近抛物线钳制 |a|>1e12
+            // 双曲线轨道（e≥1）已有解析解走上方开普勒分支，此分支仅为深空兜底：
+            // GM=0 时 RK4 即匀速直线（精确），保留子步循环统一处理
+            let remaining = dt;
+            let p = ship.pos;
+            let v = ship.vel;
+            while (remaining > 1e-9) {
+                const step = Math.min(remaining, MAX_RK4_STEP);
+                const state = rk4Integrate(p, v, step, ship.currentGM, { ax: 0, ay: 0 });
+                p = state.pos;
+                v = state.vel;
+                remaining -= step;
+            }
+            ship.pos.x = p.x;
+            ship.pos.y = p.y;
+            ship.vel.x = v.x;
+            ship.vel.y = v.y;
         } else {
             // 正常开普勒轨道
             ship.orbitTime += dt;
@@ -103,8 +117,6 @@ export function updateShipPhysics(ship, dt, isActive = true) {
     } else if (ship.mode === 'thrust' && isActive) {
         const thrustAccel = ship.thrust ? ship.thrust : { ax: 0, ay: 0 };
         // 子步循环 — 每步 RK4 不超过 0.05s，保证物理加速（2x~4x）下推力轨道精度
-        // 逃逸轨道（无 kepler）分支暂不子步化：高倍率下步数过多，记为已知限制
-        const MAX_RK4_STEP = 0.05;
         let remaining = dt;
         let p = ship.pos;
         let v = ship.vel;

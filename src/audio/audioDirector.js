@@ -51,15 +51,25 @@ class AudioDirector {
         }
     }
 
-    // 飞行场景音乐：查询当前活动飞船宿主天体的音乐分类并播放
+    // 飞行场景音乐：查询当前焦点物体（活动飞船优先，其次活动设施）宿主天体的音乐分类并播放
+    // 设施模式下 activeShipId 为 null，需回退到 activeFacilityId 的宿主天体
     // 深空或暂无素材的分类会静默跳过（audioCore 已有容错）
     _playFlightMusic() {
         const ship = gameState.getActiveShip();
-        if (!ship) {
+        let soiName = null;
+        if (ship) {
+            soiName = ship.currentSOI;
+        } else {
+            const fac = gameState.getActiveFacility();
+            if (fac) {
+                soiName = fac.currentSOI;
+            }
+        }
+        if (!soiName) {
             audioCore.stopMusic();
             return;
         }
-        const musicType = getMusicTypeForSOI(ship.currentSOI);
+        const musicType = getMusicTypeForSOI(soiName);
         audioCore.playMusic('flight', musicType);
     }
 }
