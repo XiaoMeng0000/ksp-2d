@@ -104,27 +104,31 @@ function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segment
             return;
         }
 
-        const theta0 = kepler.theta;
-        const thetaEnd = intersection.theta;
-        const deltaTheta = thetaEnd - theta0;  // 双曲线 θ 沿运动方向单调增
+        // dir 适配：解析推进在"运动坐标"θm=dir·θ 中求解（θm 沿运动方向单调增），
+        // 保证顺行（dir=+1）/逆行（dir=-1）轨道的交点时间与采样方向均正确。
+        // findSOIIntersection 返回的 intersection.theta 为真实角，映射回运动坐标后恒有 θm_end>θm_0
+        const dir = kepler.dir === undefined ? 1 : kepler.dir;
+        const theta0m = dir * kepler.theta;
+        const thetaEndm = dir * intersection.theta;
+        const deltaTheta = thetaEndm - theta0m;  // 运动坐标中沿运动方向单调增，恒为正
 
-        // 到达交点时间：ΔM / n（双曲平近点角差，M 单调增无需 mod 2π）
+        // 到达交点时间：ΔM / n（双曲平近点角差，θm 单调增 → M 单调增，无需 mod 2π）
         const aMag = -kepler.a;
         const n = Math.sqrt(host.gm / (aMag * aMag * aMag));
         const F0 = 2 * Math.atanh(Math.max(-(1 - 1e-12), Math.min(1 - 1e-12,
-            Math.sqrt((kepler.e - 1) / (kepler.e + 1)) * Math.tan(theta0 / 2))));
+            Math.sqrt((kepler.e - 1) / (kepler.e + 1)) * Math.tan(theta0m / 2))));
         const Fend = 2 * Math.atanh(Math.max(-(1 - 1e-12), Math.min(1 - 1e-12,
-            Math.sqrt((kepler.e - 1) / (kepler.e + 1)) * Math.tan(thetaEnd / 2))));
+            Math.sqrt((kepler.e - 1) / (kepler.e + 1)) * Math.tan(thetaEndm / 2))));
         const deltaM = (kepler.e * Math.sinh(Fend) - Fend) - (kepler.e * Math.sinh(F0) - F0);
         const deltaT = Math.max(deltaM / n, 0.01);
 
-        // 采样绘制（真近点角插值，双曲线兼容 keplerPositionAtTheta）
+        // 采样绘制（运动坐标插值 → 映射回真实真近点角，双曲线兼容 keplerPositionAtTheta）
         const N = Math.max(20, Math.min(Math.floor(deltaTheta / Math.PI * 100), 500));
         const points = [];
         const hP = bodyFuturePos(host, stepStartTime);
         for (let i = 0; i <= N; i++) {
             const frac = i / N;
-            const th = theta0 + frac * deltaTheta;
+            const th = dir * (theta0m + frac * deltaTheta);
             const rP = keplerPositionAtTheta({ a: kepler.a, e: kepler.e, omega: kepler.omega }, host.gm, th);
             points.push({ x: hP.x + rP.x, y: hP.y + rP.y });
         }
@@ -312,16 +316,17 @@ function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segment
         return;
     }
 
-    // 轨道穿越 SOI：采样到交点
-    const theta0 = kepler.theta;
-    const thetaEnd = intersection.theta;
-    const deltaTheta = (thetaEnd - theta0 + 2 * Math.PI) % (2 * Math.PI);
+    // 轨道穿越 SOI：采样到交点（运动坐标 θm=dir·θ 单调增，E/M 计算与插值均在其上进行）
+    const dir = kepler.dir === undefined ? 1 : kepler.dir;
+    const theta0m = dir * kepler.theta;
+    const thetaEndm = dir * intersection.theta;
+    const deltaTheta = (thetaEndm - theta0m + 2 * Math.PI) % (2 * Math.PI);
 
     // 到达交点的飞行时间
     const n = Math.sqrt(host.gm / (kepler.a * kepler.a * kepler.a));
-    const E0 = 2 * Math.atan(Math.sqrt((1 - kepler.e) / (1 + kepler.e)) * Math.tan(theta0 / 2));
+    const E0 = 2 * Math.atan(Math.sqrt((1 - kepler.e) / (1 + kepler.e)) * Math.tan(theta0m / 2));
     const M0 = E0 - kepler.e * Math.sin(E0);
-    const Eend = 2 * Math.atan(Math.sqrt((1 - kepler.e) / (1 + kepler.e)) * Math.tan(thetaEnd / 2));
+    const Eend = 2 * Math.atan(Math.sqrt((1 - kepler.e) / (1 + kepler.e)) * Math.tan(thetaEndm / 2));
     const Mend = Eend - kepler.e * Math.sin(Eend);
     let deltaM = Mend - M0;
     if (deltaM < 0) deltaM += 2 * Math.PI;
@@ -332,7 +337,7 @@ function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segment
     const hP = bodyFuturePos(host, stepStartTime);
     for (let i = 0; i <= N; i++) {
         const frac = i / N;
-        const th = theta0 + frac * deltaTheta;
+        const th = dir * (theta0m + frac * deltaTheta);
         const rP = keplerPositionAtTheta({ a: kepler.a, e: kepler.e, omega: kepler.omega }, host.gm, th);
         points.push({ x: hP.x + rP.x, y: hP.y + rP.y });
     }

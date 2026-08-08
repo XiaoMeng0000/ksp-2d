@@ -22,8 +22,64 @@ function soiDiagEnabled() {
 export function updateShipPhysics(ship, dt, isActive = true) {
     if (!ship) return;
 
-    // === 1. SOI 边界检测 ===
-    // ship.pos 现在是相对宿主位置，需要转绝对坐标用于 SOI 判定
+    // === 1. 物理推进（先推进后检测）===
+    // 先按当前宿主状态推进，再做 SOI 检测/切换。这保证检测时飞船位置与天体位置同帧，
+    // 消除"天体先推进、飞船用上一帧旧位置检测"的时序失配——
+    // 该失配在飞船持有绝对坐标（出 SOI 后 / 深空）时，会随高倍率放大导致误判重新落入 SOI。
+    if (!isActive || ship.mode === 'on_rails') {
+        if (!ship.kepler) {
+            if (ship.currentGM > 0) {
+                // 无解析轨道（近抛物线/径向病态回退）：RK4 子步积分
+                let remaining = dt;
+                let p = ship.pos;
+                let v = ship.vel;
+                while (remaining > 1e-9) {
+                    const step = Math.min(remaining, MAX_RK4_STEP);
+                    const state = rk4Integrate(p, v, step, ship.currentGM, { ax: 0, ay: 0 });
+                    p = state.pos;
+                    v = state.vel;
+                    remaining -= step;
+                }
+                ship.pos.x = p.x;
+                ship.pos.y = p.y;
+                ship.vel.x = v.x;
+                ship.vel.y = v.y;
+            } else {
+                // 深空（GM=0 无引力）：匀速直线，直接解析推进，
+                // 避免高倍率下子步循环空转（GM=0 无积分误差，子步切分无意义）
+                ship.pos.x += ship.vel.x * dt;
+                ship.pos.y += ship.vel.y * dt;
+            }
+        } else {
+            // 正常开普勒轨道
+            ship.orbitTime += dt;
+            const state = keplerToState(ship.kepler, ship.currentGM, ship.orbitTime);
+            ship.pos.x = state.pos.x;
+            ship.pos.y = state.pos.y;
+            ship.vel.x = state.vel.x;
+            ship.vel.y = state.vel.y;
+        }
+    } else if (ship.mode === 'thrust' && isActive) {
+        const thrustAccel = ship.thrust ? ship.thrust : { ax: 0, ay: 0 };
+        // 子步循环 — 每步 RK4 不超过 0.05s，保证物理加速（2x~4x）下推力轨道精度
+        let remaining = dt;
+        let p = ship.pos;
+        let v = ship.vel;
+        while (remaining > 1e-9) {
+            const step = Math.min(remaining, MAX_RK4_STEP);
+            const state = rk4Integrate(p, v, step, ship.currentGM, thrustAccel);
+            p = state.pos;
+            v = state.vel;
+            remaining -= step;
+        }
+        ship.pos.x = p.x;
+        ship.pos.y = p.y;
+        ship.vel.x = v.x;
+        ship.vel.y = v.y;
+    }
+
+    // === 2. 推进后 SOI 检测与切换 ===
+    // ship.pos 推进后与天体位置同帧，检测结果不再受时序失配影响
     const absPos = getAbsolutePosition(ship);
     const host = getSOIHost(absPos);
 
@@ -57,14 +113,10 @@ export function updateShipPhysics(ship, dt, isActive = true) {
             ship.currentGM = host.gm;
             eventBus.emit(Events.SOI_CHANGED, { from: oldSOI, to: host.name });
 
+            // 重拟合轨道根数；近抛物线/径向病态区间 stateToKepler 返回 null → 后续走 RK4 兜底
             const newKepler = stateToKepler(ship.pos, ship.vel, host.gm);
-            if (newKepler) {
-                ship.kepler = newKepler;
-                ship.orbitTime = 0;
-            } else {
-                ship.kepler = null;
-                ship.orbitTime = 0;
-            }
+            ship.kepler = newKepler;
+            ship.orbitTime = 0;
         }
         // same SOI: ship.pos 已经是相对坐标，不需要额外处理
     } else {
@@ -82,54 +134,5 @@ export function updateShipPhysics(ship, dt, isActive = true) {
             ship.currentGM = 0;
             ship.kepler = null;
         }
-    }
-
-    // === 2. 物理更新 ===
-    // ship.pos 已经是相对坐标，直接传给积分器，积分结果也直接写回
-    if (!isActive || ship.mode === 'on_rails') {
-        if (!ship.kepler) {
-            // 无 kepler：深空（GM=0 无轨道根数）或近抛物线钳制 |a|>1e12
-            // 双曲线轨道（e≥1）已有解析解走上方开普勒分支，此分支仅为深空兜底：
-            // GM=0 时 RK4 即匀速直线（精确），保留子步循环统一处理
-            let remaining = dt;
-            let p = ship.pos;
-            let v = ship.vel;
-            while (remaining > 1e-9) {
-                const step = Math.min(remaining, MAX_RK4_STEP);
-                const state = rk4Integrate(p, v, step, ship.currentGM, { ax: 0, ay: 0 });
-                p = state.pos;
-                v = state.vel;
-                remaining -= step;
-            }
-            ship.pos.x = p.x;
-            ship.pos.y = p.y;
-            ship.vel.x = v.x;
-            ship.vel.y = v.y;
-        } else {
-            // 正常开普勒轨道
-            ship.orbitTime += dt;
-            const state = keplerToState(ship.kepler, ship.currentGM, ship.orbitTime);
-            ship.pos.x = state.pos.x;
-            ship.pos.y = state.pos.y;
-            ship.vel.x = state.vel.x;
-            ship.vel.y = state.vel.y;
-        }
-    } else if (ship.mode === 'thrust' && isActive) {
-        const thrustAccel = ship.thrust ? ship.thrust : { ax: 0, ay: 0 };
-        // 子步循环 — 每步 RK4 不超过 0.05s，保证物理加速（2x~4x）下推力轨道精度
-        let remaining = dt;
-        let p = ship.pos;
-        let v = ship.vel;
-        while (remaining > 1e-9) {
-            const step = Math.min(remaining, MAX_RK4_STEP);
-            const state = rk4Integrate(p, v, step, ship.currentGM, thrustAccel);
-            p = state.pos;
-            v = state.vel;
-            remaining -= step;
-        }
-        ship.pos.x = p.x;
-        ship.pos.y = p.y;
-        ship.vel.x = v.x;
-        ship.vel.y = v.y;
     }
 }

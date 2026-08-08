@@ -204,7 +204,11 @@ class SaveManager {
                     ship.orbitTime = 0;
                     console.log(`[SaveManager] 存档前 kepler 已刷新: a=${freshKepler.a.toFixed(2)}, e=${freshKepler.e.toFixed(4)}`);
                 } else {
-                    console.warn('[SaveManager] 存档前 kepler 刷新失败：stateToKepler 返回 null');
+                    // 病态区间（径向/近抛物线）stateToKepler 返回 null：旧 kepler 可能为近抛物线
+                    // 病态值（e-1 精度下溢会在双曲线分支产生 NaN），必须清空走物理层 RK4 兜底
+                    ship.kepler = null;
+                    ship.orbitTime = 0;
+                    console.warn('[SaveManager] 存档前 kepler 刷新失败：stateToKepler 返回 null，已清空 kepler');
                 }
             }
         }
@@ -345,7 +349,10 @@ class SaveManager {
                     ship.orbitTime = 0;
                     console.log(`[SaveManager] kepler 已重算: a=${newKepler.a.toFixed(2)}, e=${newKepler.e.toFixed(4)}`);
                 } else {
-                    console.warn('[SaveManager] kepler 重算失败：stateToKepler 返回 null');
+                    // 同存档前刷新：清空病态 kepler，由物理层 RK4 兜底（配合时间加速限档 ≤50x）
+                    ship.kepler = null;
+                    ship.orbitTime = 0;
+                    console.warn('[SaveManager] kepler 重算失败：stateToKepler 返回 null，已清空 kepler');
                 }
             }
         }

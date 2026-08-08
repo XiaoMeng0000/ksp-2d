@@ -255,17 +255,26 @@ export function registerTrackingScene({ getTime, setTime, canvas }) {
             const activeId = activeShip ? activeShip.id : null;
             const allShips = shipSystem.getAllShips();
 
-            // 时间加速 — 追踪站无推力放开全部档位；任一飞船接近宿主 SOI 边界(≥95%半径)时限制到逃逸安全档
+            // 时间加速 — 追踪站无推力放开全部档位；任一飞船接近宿主 SOI 边界(≥99%半径)时限制到逃逸安全档
             let warpMaxIndex = timeWarp.getMaxIndex();
             for (const s of allShips) {
                 if (s.currentSOI) {
                     const warpHost = celestialBodies.find(b => b.name === s.currentSOI);
                     if (warpHost) {
                         const distToHost = Math.sqrt(s.pos.x * s.pos.x + s.pos.y * s.pos.y);
-                        if (distToHost > warpHost.soiRadius * 0.95) {
+                        if (distToHost > warpHost.soiRadius * 0.99) {
                             warpMaxIndex = Math.min(warpMaxIndex, timeWarp.getEscapeMaxIndex());
                         }
                     }
+                }
+            }
+            // 病态区间限档：任一飞船/设施处于"无解析轨道且受引力"（RK4 兜底积分）时限档 ≤50x。
+            // 与上方 SOI 边界限档叠加取更严，防止高倍率下 RK4 子步卡顿。
+            if (warpMaxIndex > timeWarp.getRk4FallbackMaxIndex()) {
+                const rk4Fallback = allShips.some(s => !s.kepler && s.currentGM > 0) ||
+                    facilitySystem.getAllFacilities().some(f => !f.kepler && f.currentGM > 0);
+                if (rk4Fallback) {
+                    warpMaxIndex = timeWarp.getRk4FallbackMaxIndex();
                 }
             }
             timeWarp.setMaxIndex(warpMaxIndex);

@@ -101,7 +101,7 @@ eventBus.on(Events.SHIP_COMMAND, ({ action, params }) => {
                 ship.pos.x = 580;
                 ship.pos.y = 0;
                 ship.vel.x = 0;
-                ship.vel.y = -Math.sqrt(10000 / 80);
+                ship.vel.y = Math.sqrt(10000 / 80);  // 顺行：pos 在 +x 时速度沿 +y
                 ship.currentGM = 10000;
                 ship.currentSOI = null;
             } else {
@@ -109,7 +109,7 @@ eventBus.on(Events.SHIP_COMMAND, ({ action, params }) => {
                 ship.pos.x = orbitR;
                 ship.pos.y = 0;
                 ship.vel.x = 0;
-                ship.vel.y = -Math.sqrt(homeworld.gm / orbitR);
+                ship.vel.y = Math.sqrt(homeworld.gm / orbitR);  // 顺行：pos 在 +x 时速度沿 +y
                 ship.currentGM = homeworld.gm;
                 ship.currentSOI = homeworld.name;
             }
@@ -447,7 +447,7 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             const allShips = shipSystem.getAllShips();
             const allFacilities = facilitySystem.getAllFacilities();
 
-            // 时间加速 — 档位上限：点火 → 物理加速档(≤4x)；SOI 边界接近(≥95%半径) → 逃逸安全档(≤10x)；否则放开全部档位
+            // 时间加速 — 档位上限：点火 → 物理加速档(≤4x)；SOI 边界接近(≥99%半径) → 逃逸安全档(≤100x)；否则放开全部档位
             // 先设置档位上限再算 simDt：保证降档在本帧物理推进前生效（否则边界穿越帧会按旧高倍率大步长穿越导致位置跳变）
             let warpMaxIndex = timeWarp.getMaxIndex();
             if (activeShip && activeShip.throttle > 0) {
@@ -458,9 +458,19 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                     const distToHost = Math.sqrt(
                         activeShip.pos.x * activeShip.pos.x + activeShip.pos.y * activeShip.pos.y
                     );
-                    if (distToHost > warpHost.soiRadius * 0.95) {
+                    if (distToHost > warpHost.soiRadius * 0.99) {
                         warpMaxIndex = Math.min(warpMaxIndex, timeWarp.getEscapeMaxIndex());
                     }
+                }
+            }
+            // 病态区间限档：任一飞船/设施处于"无解析轨道且受引力"（RK4 兜底积分）时，
+            // 限制到 RK4 安全档（≤50x）。高倍率下 RK4 子步数随倍率线性增长（1e6x 一帧约 33 万步
+            // → 明显卡顿），该状态由 stateToKepler 病态回退产生（径向/近抛物线），窗口有界。
+            if (warpMaxIndex > timeWarp.getRk4FallbackMaxIndex()) {
+                const rk4Fallback = allShips.some(s => !s.kepler && s.currentGM > 0) ||
+                    allFacilities.some(f => !f.kepler && f.currentGM > 0);
+                if (rk4Fallback) {
+                    warpMaxIndex = timeWarp.getRk4FallbackMaxIndex();
                 }
             }
             timeWarp.setMaxIndex(warpMaxIndex);

@@ -11,9 +11,15 @@ const WARP_RATES = [0, 1, 2, 3, 4, 10, 50, 100, 1000, 10000, 100000, 1000000, 10
 // 物理加速上限（thrust 模式允许的最大倍率）
 const PHYSICS_WARP_MAX = 4;
 
-// SOI 边界接近（≥95% 宿主 SOI 半径）时允许的最大倍率
+// SOI 边界接近（≥99% 宿主 SOI 半径）时允许的最大倍率
 // 保证边界穿越帧步长小、位置连续、预测线平滑（KSP1 原版：SOI 边界前自动降档）
-const ESCAPE_WARP_MAX = 10;
+const ESCAPE_WARP_MAX = 100;
+
+// 病态区间（无解析轨道、RK4 兜底积分）时允许的最大倍率
+// stateToKepler 返回 null 且 GM>0 时，物理层走 RK4 子步循环（每帧最多 simDt/0.05 步）。
+// 高倍率下子步数随倍率线性增长（1e6x 一帧约 33 万步 → 明显卡顿），限档 50x 保证流畅。
+// 该状态 RK4 窗口有界：逃逸则出 SOI 转深空 O(1)，回落则撞击/近天体后转为有效轨道，无需更高档。
+const RK4_FALLBACK_WARP_MAX = 50;
 
 /**
  * 时间加速单例
@@ -53,9 +59,14 @@ class TimeWarp {
         return WARP_RATES.indexOf(PHYSICS_WARP_MAX);
     }
 
-    // SOI 边界接近安全档位上限索引（≥95% 宿主半径时最高允许 10x）
+    // SOI 边界接近安全档位上限索引（≥99% 宿主半径时最高允许 100x）
     getEscapeMaxIndex() {
         return WARP_RATES.indexOf(ESCAPE_WARP_MAX);
+    }
+
+    // 病态区间安全档位上限索引（kepler=null 且 GM>0 时最高允许 50x，防 RK4 高倍率卡顿）
+    getRk4FallbackMaxIndex() {
+        return WARP_RATES.indexOf(RK4_FALLBACK_WARP_MAX);
     }
 
     isPaused() {

@@ -268,14 +268,15 @@ window.startNewGame = function() {
             if (!homeworld) {
                 console.warn('[startNewGame] 找不到起始天体数据，使用硬编码默认值');
                 newShip.pos = { x: 580, y: 0 };
-                newShip.vel = { x: 0, y: -Math.sqrt(10000 / 80) };
+                newShip.vel = { x: 0, y: Math.sqrt(10000 / 80) };  // 顺行：pos 在 +x 时速度沿 +y
                 newShip.currentGM = 10000;
                 newShip.kepler = stateToKepler({ x: 80, y: 0 }, newShip.vel, 10000);
             } else {
                 const orbitR = homeworld.radius + (homeworld.defaultOrbitAltitude || 0);
                 newShip.pos = { x: orbitR, y: 0 };
                 const orbitalSpeed = Math.sqrt(homeworld.gm / orbitR);
-                newShip.vel = { x: 0, y: -orbitalSpeed };
+                // 顺行（逆时针，与天体公转同向）：pos 在 +x 时速度应沿 +y
+                newShip.vel = { x: 0, y: orbitalSpeed };
                 newShip.currentGM = homeworld.gm;
                 newShip.kepler = stateToKepler(newShip.pos, newShip.vel, homeworld.gm);
             }
@@ -298,7 +299,7 @@ window.startNewGame = function() {
                 };
                 const dockyardVel = {
                     x: 0,
-                    y: -Math.sqrt(homeworld.gm / dockyardOrbitR)
+                    y: Math.sqrt(homeworld.gm / dockyardOrbitR)  // 顺行：pos 在 +x 时速度沿 +y
                 };
                 facilitySystem.createFacility(
                     'orbital_dockyard',

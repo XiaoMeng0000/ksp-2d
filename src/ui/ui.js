@@ -1600,7 +1600,8 @@ function buildShip() {
 
             // 计算速度（圆形轨道）
             const orbitalSpeed = Math.sqrt(homeworld.gm / radius);
-            const vel = { x: 0, y: -orbitalSpeed };
+            // 顺行（逆时针，与天体公转同向）：pos 在 +x 时速度应沿 +y
+            const vel = { x: 0, y: orbitalSpeed };
 
             // 创建飞船实例
             const shipName = selectedShip.name + '号';
