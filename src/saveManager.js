@@ -99,6 +99,18 @@ class SaveManager {
         }
     }
 
+    // 序列化前清洗飞船对象：剔除下划线开头的运行时对象引用（如 _sasController，
+    // 其内部持有 ship 回引形成循环引用，直接 JSON.stringify 会抛错），
+    // 其余数据字段全部保留；控制器读档后由飞行场景自动懒重建
+    _sanitizeShipForSave(ship) {
+        const clean = {};
+        for (const key of Object.keys(ship)) {
+            if (key.startsWith('_')) continue;
+            clean[key] = ship[key];
+        }
+        return clean;
+    }
+
     // 创建新世界
     createWorld(name) {
         // 名称冲突检测
@@ -124,7 +136,8 @@ class SaveManager {
             gameTime: gameTime,
             timeOffset: 0,
             timestamp: now,
-            ships: state.ships || [],
+            // 存入前清洗飞船对象，剔除运行时引用（_sasController），避免序列化循环引用
+            ships: (state.ships || []).map(s => this._sanitizeShipForSave(s)),
             missions: state.missions || [],
             facilities: state.facilities || [],
             activeShipId: state.activeShipId || null,
@@ -213,7 +226,8 @@ class SaveManager {
             shipPos: ship ? { x: ship.pos.x, y: ship.pos.y } : null,
             shipVel: ship ? { x: ship.vel.x, y: ship.vel.y } : null,
             timestamp: Date.now(),
-            ships: state.ships || [],
+            // 存入前清洗飞船对象，剔除运行时引用（_sasController），避免序列化循环引用
+            ships: (state.ships || []).map(s => this._sanitizeShipForSave(s)),
             missions: state.missions || [],
             facilities: state.facilities || [],
             activeShipId: state.activeShipId || null,

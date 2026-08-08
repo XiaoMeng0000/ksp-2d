@@ -3,7 +3,7 @@
 import { CelestialBody } from '../physics/celestialBody.js';
 
 // 天体驱动器 6.5步
-// Kerbol 系天体数据 — 真实 KSP 尺度（第一阶段：仅 Kerbol + Kerbin）
+// Kerbol 系天体数据 — 真实 KSP 尺度（第一阶段：仅 Kerbol + Kerbin + Mun）
 export const solarSystemData = [
     new CelestialBody({
         name: 'Kerbol',
@@ -37,5 +37,39 @@ export const solarSystemData = [
         defaultOrbitAltitude: 80000,
         presetOrbits: { low: 80000, mid: 250000, high: 600000 },
         textureKey: 'kerbin'
+    }),
+    new CelestialBody({
+        name: 'Mun',
+        type: 'moon',
+        musicType: 'rocky',
+        gm: 6.5138398e10,
+        soiRadius: 2429559.1,
+        radius: 200000,
+        atmosphereHeight: 0,
+        hasAtmosphere: false,
+        color: '#b4b4b4',
+        orbitParent: 'Kerbin',
+        orbitA: 12000000,
+        orbitE: 0,
+        orbitOmega: 0,
+        orbitTheta0: 1.7,
+        textureKey: 'mun'
+    }),
+    new CelestialBody({
+        name: 'Minmus',
+        type: 'moon',
+        musicType: 'rocky',
+        gm: 1.7658e9,
+        soiRadius: 2247428.3,
+        radius: 60000,
+        atmosphereHeight: 0,
+        hasAtmosphere: false,
+        color: '#aad7ff',
+        orbitParent: 'Kerbin',
+        orbitA: 47000000,
+        orbitE: 0,
+        orbitOmega: 38,    // 保留官方近点幅角数据（e=0 时无实际影响）
+        orbitTheta0: 0.9,  // 官方初始平近点角
+        textureKey: 'minmus'
     })
 ];

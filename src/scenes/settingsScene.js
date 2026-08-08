@@ -122,7 +122,7 @@ function _setMenuBgSetting(value) {
 }
 
 function _getMenuMusicSetting() {
-    return localStorage.getItem('ksp2d.menuMusic') || 'ksp1';
+    return localStorage.getItem('ksp2d.menuMusic') || 'ksp2';
 }
 
 function _setMenuMusicSetting(value) {

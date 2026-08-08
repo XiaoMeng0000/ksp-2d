@@ -78,8 +78,55 @@ function createStars() {
     }
 }
 
+/**
+ * 绘制天体轨道线（以天体自身代表色，数据驱动）
+ * 轨道圆心 = 父天体当前 position，形状参数来自 orbitA/orbitE/orbitOmega
+ * 用分段采样绘制，避免 canvas 大半径 arc 的精度问题
+ */
+function drawBodyOrbits(ctx, canvas) {
+    for (const body of celestialBodies) {
+        // 恒星无轨道
+        if (!body.orbitParent) continue;
+        const parent = celestialBodies.find(b => b.name === body.orbitParent);
+        if (!parent) continue;
+
+        const pixelR = body.orbitA * camera.zoom;
+        // 显示条件：屏幕半径过小（<10px）不可见；过大（>屏幕长边×2）无意义且开销大
+        const maxScreen = Math.max(canvas.width, canvas.height);
+        if (pixelR < 10 || pixelR > maxScreen * 2) continue;
+
+        const center = worldToScreen(parent.position.x, parent.position.y, canvas);
+        const e = body.orbitE || 0;
+        const omega = body.orbitOmega || 0;
+        const semiMinor = pixelR * Math.sqrt(1 - e * e);
+
+        // 采样密度：按屏幕周长每约 20px 一个点，限制在 [64, 256]
+        const points = Math.min(256, Math.max(64, Math.round(Math.PI * (pixelR + semiMinor) / 20)));
+        // Y 轴翻转补偿：屏幕坐标系下旋转角取反
+        const cosO = Math.cos(-omega);
+        const sinO = Math.sin(-omega);
+
+        ctx.beginPath();
+        for (let i = 0; i <= points; i++) {
+            const theta = (i / points) * Math.PI * 2;
+            const localX = pixelR * Math.cos(theta);
+            const localY = semiMinor * Math.sin(theta);
+            const sx = center.x + localX * cosO - localY * sinO;
+            const sy = center.y + localX * sinO + localY * cosO;
+            if (i === 0) {
+                ctx.moveTo(sx, sy);
+            } else {
+                ctx.lineTo(sx, sy);
+            }
+        }
+        ctx.strokeStyle = hexToRgba(body.color, 0.4);
+        ctx.lineWidth = Math.max(1, 2 * camera.zoom);
+        ctx.stroke();
+    }
+}
+
 function render(ctx, canvas, activeShip, options = {}) {
-    const { visibility = { ships: false, facilities: false }, facilities = [], selectedFacilityId = null } = options;
+    const { visibility = { ships: false, facilities: false, bodyOrbits: true }, facilities = [], selectedFacilityId = null } = options;
     ctx.fillStyle = 'black';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -93,6 +140,11 @@ function render(ctx, canvas, activeShip, options = {}) {
         ctx.arc(screen.x, screen.y, drawRadius, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(255, 255, 255, ${star.brightness})`;
         ctx.fill();
+    }
+
+    // 天体轨道线（以天体代表色绘制，右下角👁可开关）
+    if (visibility.bodyOrbits !== false) {
+        drawBodyOrbits(ctx, canvas);
     }
 
     for (const body of celestialBodies) {

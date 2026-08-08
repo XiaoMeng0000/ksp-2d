@@ -198,8 +198,9 @@ class TimeWarp {
                 return;
             }
 
-            // 顿号键（\ / 、）— 一键重置至 1x（0x 暂停除外，保持暂停）
-            if (!e.altKey && (e.code === 'Backslash' || e.key === '、')) {
+            // 一键重置至 1x 快捷键（\ / 、）— 0x 暂停除外，保持暂停
+            // 兼容三种按键：\（Backslash）、/（Slash）、、（顿号，中文输入法下按 \ 键产生的字符）
+            if (!e.altKey && (e.code === 'Backslash' || e.code === 'Slash' || e.key === '、')) {
                 e.preventDefault();
                 this.resetTo1x();
                 return;

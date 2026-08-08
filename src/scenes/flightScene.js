@@ -9,7 +9,7 @@ import { render, renderFlightHud } from '../renderer.js';
 import { sceneManager } from '../sceneManager.js';
 import { gameState } from '../gameState.js';
 import { SASController } from '../ship/sasController.js';
-import { SAS_CYCLE_ORDER, SAS_DIRECTION_ORDER } from '../ship/sasModes.js';
+import { SAS_CYCLE_ORDER, SAS_DIRECTION_ORDER, computeNavballDirections as computeSasDirections } from '../ship/sasModes.js';
 import { sasUI } from '../ui/sasUI.js';
 import { facilitySystem } from '../facility/facilitySystem.js';
 import { getModuleDef } from '../ship/moduleTypes.js';
@@ -29,7 +29,7 @@ let _lastToolbarMode = null;         // 统一工具栏脏检测：上一次的 
 let _lastToolbarFingerprint = null; // 统一工具栏脏检测：上一次的数据指纹（含模块列表）
 
 // 可见性筛选状态 — 控制飞行场景中非活动飞船/设施的显示
-let _visibilityState = { ships: true, facilities: true, facilityRange: true };
+let _visibilityState = { ships: true, facilities: true, facilityRange: true, bodyOrbits: true };
 
 // 暴露到全局供 sasUI 面板调用
 window.__visibilityState = _visibilityState;
@@ -224,6 +224,32 @@ eventBus.on(Events.SHIP_COMMAND, ({ action, params }) => {
     }
 });
 
+// ========== 导航球数据（Step1：重构数据层） ==========
+
+/**
+ * 计算导航球四方向实时角度（世界系，与 heading 同约定：0=世界+Y，顺时针，弧度）
+ * 核心数学统一委托 sasModes.computeNavballDirections，此处仅做 { angle } 结构包装
+ * @param {Object} ship - 飞船对象（含相对宿主的 vel/pos）
+ * @param {Object|null} host - 宿主天体对象（getSOIHost 返回值），无宿主时为 null
+ * @returns {Object} 四方向角度 { prograde, retrograde, radialIn, radialOut }，
+ *                   每项为 { angle }（弧度）或 null（速度过小 / 无宿主）
+ */
+export function computeNavballDirections(ship, host) {
+    const shipAbs = getAbsolutePosition(ship);
+    const dirs = computeSasDirections(
+        ship.vel.x, ship.vel.y,
+        shipAbs.x, shipAbs.y,
+        host ? host.position.x : undefined,
+        host ? host.position.y : undefined
+    );
+    return {
+        prograde: dirs.prograde !== null ? { angle: dirs.prograde } : null,
+        retrograde: dirs.retrograde !== null ? { angle: dirs.retrograde } : null,
+        radialIn: dirs.radialIn !== null ? { angle: dirs.radialIn } : null,
+        radialOut: dirs.radialOut !== null ? { angle: dirs.radialOut } : null
+    };
+}
+
 /**
  * 注册飞行场景
  * @param {Object} deps - 注入依赖
@@ -312,16 +338,18 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
 
             // SAS 集成 — Canvas 拖拽处理（节流阀）
             const onMouseDown = (e) => {
+                // 仅响应鼠标左键，避免右键等误触发拖拽
+                if (e.button !== 0) return;
                 const rect = _canvas.getBoundingClientRect();
                 const x = e.clientX - rect.left;
                 const y = e.clientY - rect.top;
-                const distCenter = Math.sqrt(
-                    (x - sasUI._centerPos.x) ** 2 + (y - sasUI._centerPos.y) ** 2
-                );
-                const scale = sasUI._scale;
-                // 仅当点击在节流阀弧附近区域时开始拖拽
-                if (distCenter >= (92 - 10) * scale && distCenter <= (105 + 10) * scale) {
+                // 仅当点击在节流阀弧形区域时开始拖拽
+                if (sasUI.isInThrottleArc(x, y)) {
                     sasUI._isDragging = true;
+                    // 立即应用按下位置的油门（避免拖动时跳变）
+                    const result = sasUI.handleDrag(x, y);
+                    const ship = shipSystem.getActiveShip();
+                    if (ship && result) ship.throttle = result.throttle;
                 }
             };
             const onMouseMove = (e) => {
@@ -331,6 +359,11 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
 
                 // 拖拽更新节流阀
                 if (sasUI._isDragging) {
+                    // 兜底：左键实际已松开（如拖出画布后松开导致 mouseup 丢失）→ 立即结束拖拽
+                    if ((e.buttons & 1) === 0) {
+                        sasUI._isDragging = false;
+                        return;
+                    }
                     const result = sasUI.handleDrag(x, y);
                     if (result) {
                         const ship = shipSystem.getActiveShip();
@@ -349,7 +382,8 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             };
             _canvas.addEventListener('mousedown', onMouseDown);
             _canvas.addEventListener('mousemove', onMouseMove);
-            _canvas.addEventListener('mouseup', onMouseUp);
+            // mouseup 绑定到 window：拖拽中鼠标移出画布松开也能清除拖拽态，防止 _isDragging 残留
+            window.addEventListener('mouseup', onMouseUp);
             _canvas._sasDragHandlers = { onMouseDown, onMouseMove, onMouseUp };
 
             // SAS 集成 — Canvas 右键处理（右键中心 → 回到 STABILITY）
@@ -369,9 +403,10 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             _canvas.addEventListener('contextmenu', onContextMenu);
             _canvas._sasContextMenuHandler = onContextMenu;
 
-            // SAS 集成 — 鼠标离开 canvas 时清除悬停状态
+            // SAS 集成 — 鼠标离开 canvas 时清除悬停状态与拖拽状态
             const onMouseLeave = () => {
                 sasUI.clearHover();
+                sasUI._isDragging = false;
             };
             _canvas.addEventListener('mouseleave', onMouseLeave);
             _canvas._sasMouseLeaveHandler = onMouseLeave;
@@ -394,7 +429,8 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             if (_canvas._sasDragHandlers) {
                 _canvas.removeEventListener('mousedown', _canvas._sasDragHandlers.onMouseDown);
                 _canvas.removeEventListener('mousemove', _canvas._sasDragHandlers.onMouseMove);
-                _canvas.removeEventListener('mouseup', _canvas._sasDragHandlers.onMouseUp);
+                // mouseup 已在 enter 内改绑到 window（防拖出画布后状态残留），此处同步解绑
+                window.removeEventListener('mouseup', _canvas._sasDragHandlers.onMouseUp);
                 delete _canvas._sasDragHandlers;
             }
             if (_canvas._sasContextMenuHandler) {
@@ -411,9 +447,6 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             const activeId = activeShip ? activeShip.id : null;
             const allShips = shipSystem.getAllShips();
             const allFacilities = facilitySystem.getAllFacilities();
-
-            // SAS 集成 — 每帧记录上一帧按键状态（供 justPressed 使用）
-            inputManager.update();
 
             // 时间加速 — 物理时间步长 = 真实帧长 × 倍率（交互/动画仍用真实 dt）
             const warpRate = timeWarp.getRate();
@@ -632,6 +665,11 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             }
 
             _lastDt = dt;
+
+            // SAS 集成 — 每帧帧末记录按键状态（供 justPressed 使用）
+            // 必须在帧末快照：浏览器按键事件只能在下一次 rAF 前派发，
+            // 若帧首快照会把本帧要触发的按键提前写入 _prevKeys，导致 justPressed 恒为 false
+            inputManager.update();
         },
         render: (ctx) => {
             const activeShip = shipSystem.getActiveShip();
@@ -680,6 +718,9 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             renderFlightHud(ctx, _canvas, activeShip);
 
             // 每帧广播飞船渲染数据给 UI 层
+            const directions = activeShip
+                ? computeNavballDirections(activeShip, getSOIHost(getAbsolutePosition(activeShip)))
+                : null;
             eventBus.emit(Events.RENDER_DATA, {
                 exists: !!activeShip,
                 mode: activeShip?.mode ?? null,
@@ -697,8 +738,18 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 controlsLocked: activeShip?.controlsLocked ?? false,
                 displayName: activeShip?.displayName ?? '',
                 nearFacilityId: _nearFacility?.id ?? null,
-                activeFacilityId: _activeFacilityId ?? null
+                activeFacilityId: _activeFacilityId ?? null,
+                // 导航球四方向实时角度（Step1：数据层广播），无活动飞船时为 null
+                directions: directions
             });
+
+            // TEMP: 导航球调试 — 每帧打印 prograde / radialIn 角度（核对完删除）
+            if (directions) {
+                const fmt = (d) => (d ? (d.angle * 180 / Math.PI).toFixed(1) + '°' : 'null');
+                console.log('[NavballDebug]',
+                    'prograde=' + fmt(directions.prograde),
+                    'radialIn=' + fmt(directions.radialIn));
+            }
         }
     });
 }

@@ -58,6 +58,41 @@ function wrapAngle(angle) {
 const LOW_SPEED_THRESHOLD = 0.1;
 
 /**
+ * 计算导航球四方向实时角度（世界系，与 heading 同约定：0=世界+Y，顺时针，弧度）
+ * 供 UI 层（导航球方向标记）与控制层（SAS 目标朝向）共用，消除两套重复数学
+ * @param {number} shipVx - 飞船速度 X
+ * @param {number} shipVy - 飞船速度 Y
+ * @param {number} shipX - 飞船位置 X（世界/宿主相对系）
+ * @param {number} shipY - 飞船位置 Y
+ * @param {number|undefined} hostX - SOI 中心天体位置 X
+ * @param {number|undefined} hostY - SOI 中心天体位置 Y
+ * @returns {{ prograde: number|null, retrograde: number|null, radialIn: number|null, radialOut: number|null }}
+ *         各方向角度（弧度），速度过小或无宿主时为 null
+ */
+export function computeNavballDirections(shipVx, shipVy, shipX, shipY, hostX, hostY) {
+    const speed = Math.sqrt(shipVx * shipVx + shipVy * shipVy);
+
+    // 顺向 = 速度方向；速度过小时方向无意义 → null（UI 层据此淡出标记）
+    let prograde = null;
+    if (speed >= LOW_SPEED_THRESHOLD) {
+        prograde = Math.atan2(shipVx, shipVy);
+    }
+
+    // 径向内 = 指向宿主中心（世界系坐标差）
+    let radialIn = null;
+    if (hostX !== undefined && hostY !== undefined) {
+        radialIn = Math.atan2(hostX - shipX, hostY - shipY);
+    }
+
+    return {
+        prograde: prograde,
+        retrograde: prograde !== null ? wrapAngle(prograde + Math.PI) : null,
+        radialIn: radialIn,
+        radialOut: radialIn !== null ? wrapAngle(radialIn + Math.PI) : null
+    };
+}
+
+/**
  * 根据 SAS 模式计算目标朝向
  * @param {string} mode - SASMode 枚举值
  * @param {object} context - 当前飞行上下文
@@ -81,14 +116,17 @@ export function computeTargetHeading(mode, context, state) {
 
         // ---- 顺向 ----
         case SASMode.PROGRADE: {
-            const speed = Math.sqrt(context.shipVx ** 2 + context.shipVy ** 2);
-            if (speed < LOW_SPEED_THRESHOLD) {
+            // 复用统一方向数学：prograde 为 null（速度过小）时保持上一有效指向
+            const dirs = computeNavballDirections(
+                context.shipVx, context.shipVy,
+                context.shipX, context.shipY,
+                context.hostX, context.hostY
+            );
+            if (dirs.prograde === null) {
                 return state.lastValidProgradeHeading ?? context.shipHeading;
             }
-            // heading=0 = 世界+Y = 屏幕上方向，atan2(vx, vy) 对应速度在世界坐标系的方向
-            const heading = Math.atan2(context.shipVx, context.shipVy);
-            state.lastValidProgradeHeading = heading;
-            return heading;
+            state.lastValidProgradeHeading = dirs.prograde;
+            return dirs.prograde;
         }
 
         // ---- 逆向 ----
@@ -99,12 +137,13 @@ export function computeTargetHeading(mode, context, state) {
 
         // ---- 径向向内（指向宿主天体） ----
         case SASMode.RADIAL_IN: {
-            if (context.hostX === undefined || context.hostY === undefined) {
-                return context.shipHeading;
-            }
-            const dx = context.hostX - context.shipX;
-            const dy = context.hostY - context.shipY;
-            return Math.atan2(dx, dy);
+            // 复用统一方向数学：无宿主时回退当前朝向
+            const dirs = computeNavballDirections(
+                context.shipVx, context.shipVy,
+                context.shipX, context.shipY,
+                context.hostX, context.hostY
+            );
+            return dirs.radialIn !== null ? dirs.radialIn : context.shipHeading;
         }
 
         // ---- 径向向外（背离宿主天体） ----

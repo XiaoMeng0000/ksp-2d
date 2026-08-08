@@ -23,6 +23,20 @@ export const bodyRenderableConfigs = {
         ]
     },
 
+    // Mun：单模式，表面贴图，无 LOD
+    mun: {
+        layers: [
+            { texture: 'mun_surface', zIndex: 0 }
+        ]
+    },
+
+    // Minmus：单模式，表面贴图，无 LOD
+    minmus: {
+        layers: [
+            { texture: 'minmus_surface', zIndex: 0 }
+        ]
+    },
+
     // Kerbol：LOD 分级渲染
     // nearScreenR / farScreenR 定义两档的阈值（像素），中间为过渡区
     kerbol: {

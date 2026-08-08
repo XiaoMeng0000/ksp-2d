@@ -31,7 +31,6 @@ export const textureConfig = {
     // 天体贴图
     kerbin_surface: 'assets/images/bodies/kerbin.png',
     kerbol_surface: 'assets/images/bodies/kerbol.png',
-
-    // TODO: 后续扩展
-    // mun: 'assets/images/mun.png',
+    mun_surface: 'assets/images/bodies/mun.png',
+    minmus_surface: 'assets/images/bodies/minmus.png',
 };

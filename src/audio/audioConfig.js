@@ -38,12 +38,12 @@ export const sfxMap = {
 // 菜单音乐选择的 localStorage 存储键（设置界面写入）
 export const MENU_MUSIC_STORAGE_KEY = 'ksp2d.menuMusic';
 
-// 读取当前菜单音乐变体（默认 ksp1，与 menu1.ogg 对应）
+// 读取当前菜单音乐变体（默认 ksp2，与 menu2.ogg 对应）
 export function getMenuMusicVariant() {
     if (typeof localStorage === 'undefined') {
-        return 'ksp1';
+        return 'ksp2';
     }
-    return localStorage.getItem(MENU_MUSIC_STORAGE_KEY) || 'ksp1';
+    return localStorage.getItem(MENU_MUSIC_STORAGE_KEY) || 'ksp2';
 }
 
 // 将 musicMap / sfxMap 展平为"资源标识 → 路径"清单，供 audioCore 统一加载

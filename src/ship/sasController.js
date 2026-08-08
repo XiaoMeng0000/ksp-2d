@@ -1,6 +1,12 @@
 // SAS系统 —姿态稳定系统 级联控制器（位置环 + 速度环）
 
 import { SASMode, computeTargetHeading } from './sasModes.js';
+import { SAS_CONTROL } from '../config/sasConfig.js';
+
+// 级联控制器参数（统一从配置文件读取，避免硬编码）
+// 外环（位置 → 期望角速度）：限制最大旋转速度，从根源杜绝刹车不及导致的震荡
+const MAX_ANG_VEL = SAS_CONTROL.maxAngularVelocity;                 // 最大目标角速度（rad/s，约 115°/s）
+const KP_POS = MAX_ANG_VEL / SAS_CONTROL.positionErrorFullSpeed;    // 角度误差达到全速阈值（rad，约 46°）时驱动全速
 
 /**
  * SAS PD 控制器
@@ -118,8 +124,6 @@ export class SASController {
 
         // ---- 3. 级联控制（外环位置 + 内环速度） ----
         // 外环（位置 → 期望角速度）：限制最大旋转速度，从根源杜绝刹车不及导致的震荡
-        const MAX_ANG_VEL = 2.0;                       // rad/s（约 115°/s）
-        const KP_POS = MAX_ANG_VEL / 0.8;              // 角度误差 0.8 rad（~46°）时驱动全速
         const desiredAngVel = Math.max(-MAX_ANG_VEL,
             Math.min(MAX_ANG_VEL, KP_POS * angleError));
 

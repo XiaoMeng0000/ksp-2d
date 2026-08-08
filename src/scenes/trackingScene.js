@@ -334,7 +334,7 @@ export function registerTrackingScene({ getTime, setTime, canvas }) {
                 selectedFacId = trackingSelectedId;
             }
             render(ctx, _canvas, activeShip, {
-                visibility: { ships: true, facilities: true },
+                visibility: { ships: true, facilities: true, bodyOrbits: true },
                 facilities: renderFacilities,
                 selectedFacilityId: selectedFacId
             });
