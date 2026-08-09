@@ -8,6 +8,10 @@ import { eventBus, Events } from './eventBus.js';
 // 其中 4x 为物理加速档（点火时最高允许档位）
 const WARP_RATES = [0, 1, 2, 3, 4, 10, 50, 100, 1000, 10000, 100000, 1000000, 10000000];
 
+// 面板档位表（时间加速 UI 的 11 格）— 从完整档位表派生，禁止手写第二份常量
+// 过滤掉 0x 暂停档与 4x 物理档（4x 仅 Alt+ 微调可达，不占面板格）
+export const PANEL_RATES = WARP_RATES.filter((r) => r !== 0 && r !== 4);
+
 // 物理加速上限（thrust 模式允许的最大倍率）
 const PHYSICS_WARP_MAX = 4;
 
@@ -52,6 +56,17 @@ class TimeWarp {
     // 最大档位索引（未点火时放开全部档位）
     getMaxIndex() {
         return WARP_RATES.length - 1;
+    }
+
+    // 当前生效档位上限索引（场景每帧 setMaxIndex 设置，UI 灰显不可达档位用）
+    // 与 getMaxIndex() 的区别：getMaxIndex 是固定放开上限，此处是实际生效上限
+    getCurrentMaxIndex() {
+        return this._maxIndex;
+    }
+
+    // 当前生效档位上限对应的倍率值（UI 按"格子倍率 > 该值"判定灰显，避免 UI 持有完整档位表）
+    getCurrentMaxRate() {
+        return WARP_RATES[this._maxIndex];
     }
 
     // 物理加速档位上限索引（thrust 模式最高允许 4x）
