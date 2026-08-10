@@ -5,7 +5,7 @@ import { stateToKepler, keplerPositionAtTime, keplerPositionAtTheta, keplerToSta
 import { rk4Integrate } from './src/physics/integrator.js';
 import { updateShipPhysics } from './src/physics/physicsUpdate.js';
 import { updateCelestialBodies, getAbsolutePosition, celestialBodies } from './src/physics/physics.js';
-import { predictTrajectoryPatched } from './src/physics/orbitalPrediction.js';
+import { predictTrajectoryPatched, bodyFuturePos } from './src/physics/orbitalPrediction.js';
 
 let pass = 0, fail = 0;
 function ok(cond, label, detail) {
@@ -196,6 +196,33 @@ function predictShip(startR, vInf, betaDeg) {
         kepler: stateToKepler(pos, vel, gmK), orbitTime: 0, mode: 'on_rails', thrust: { ax: 0, ay: 0 }
     };
 }
+// 检查段数组：无 NaN、非空、anchor 字段齐全；
+// 当前 SOI 段必须为相对坐标（量级 < 1e9，测试场景起始宿主为 Kerbin），
+// 下游段可相对 Kerbol（深空大尺度 1e10 属正常）。
+// 同时验证"锚点绝对位置 + relPoints"须达到绝对尺度（> 1e9）——
+// 若绘制层漏加锚点直接把 relPoints 当绝对坐标，则轨道线会画到屏幕外（历史 bug）
+function checkSegs(segs) {
+    let nPts = 0, nNaN = 0, relOk = true, absOk = true;
+    for (const seg of segs) {
+        for (const p of seg.relPoints) {
+            nPts++;
+            if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) nNaN++;
+        }
+        if (seg.anchorBody === undefined || seg.anchorTime === undefined) relOk = false;
+        if (seg.isCurrentSoi) {
+            for (const p of seg.relPoints) {
+                if (Math.hypot(p.x, p.y) > 1e9) relOk = false;
+            }
+        }
+        const body = celestialBodies.find(b => b.name === seg.anchorBody);
+        const anchor = body ? bodyFuturePos(body, seg.anchorTime) : { x: 0, y: 0 };
+        if (seg.relPoints[0]) {
+            const abs0 = Math.hypot(seg.relPoints[0].x + anchor.x, seg.relPoints[0].y + anchor.y);
+            if (abs0 < 1e9) absOk = false;
+        }
+    }
+    return { nPts, nNaN, relOk, absOk };
+}
 for (const [label, startR, vInf, betaDeg] of [
     ['双曲顺行 F1', 40000000, 80, 30],
     ['双曲逆行', 40000000, 80, 30 + 180],
@@ -204,9 +231,10 @@ for (const [label, startR, vInf, betaDeg] of [
 ]) {
     const ship = predictShip(startR, vInf, betaDeg);
     const segs = predictTrajectoryPatched(ship, 5);
-    let nPts = 0, nNaN = 0;
-    for (const seg of segs) for (const p of seg.points) { nPts++; if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) nNaN++; }
+    const { nPts, nNaN, relOk, absOk } = checkSegs(segs);
     ok(nNaN === 0 && nPts > 0, `[${label}] 预测段=${segs.length} 点数=${nPts} NaN=${nNaN}`, '预测线无 NaN 且非空');
+    ok(relOk, `[${label}] relPoints 相对坐标量级 OK（<1e9 且含 anchorBody/anchorTime）`, '浮动原点字段缺失或量级异常');
+    ok(absOk, `[${label}] 锚点+relPoints 达绝对尺度（绘制不消失）`, 'abs0 < 1e9，轨道线会画到屏幕外');
 }
 // 椭圆穿越 SOI（顺行/逆行）：apoapsis 86M > SOI 84.16M
 for (const [label, dirV] of [['椭圆穿越SOI 顺行', vEll], ['椭圆穿越SOI 逆行', -vEll]]) {
@@ -214,9 +242,10 @@ for (const [label, dirV] of [['椭圆穿越SOI 顺行', vEll], ['椭圆穿越SOI
     ship.vel = { x: 0, y: dirV };
     ship.kepler = stateToKepler(ship.pos, ship.vel, gmK);
     const segs = predictTrajectoryPatched(ship, 5);
-    let nNaN = 0, nPts = 0;
-    for (const seg of segs) for (const p of seg.points) { nPts++; if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) nNaN++; }
+    const { nPts, nNaN, relOk, absOk } = checkSegs(segs);
     ok(nNaN === 0 && nPts > 0, `[${label}] 预测段=${segs.length} 点数=${nPts} NaN=${nNaN}`, '椭圆穿越 SOI 预测无 NaN 且非空');
+    ok(relOk, `[${label}] relPoints 相对坐标量级 OK（<1e9 且含 anchorBody/anchorTime）`, '浮动原点字段缺失或量级异常');
+    ok(absOk, `[${label}] 锚点+relPoints 达绝对尺度（绘制不消失）`, 'abs0 < 1e9，轨道线会画到屏幕外');
 }
 
 console.log('===== 7. keplerToState 逆行速度方向 =====');

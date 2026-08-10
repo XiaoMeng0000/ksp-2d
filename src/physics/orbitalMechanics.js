@@ -4,6 +4,9 @@ function stateToKepler(pos, vel, gm) {
 
     const h = pos.x * vel.y - pos.y * vel.x;
     const r = Math.sqrt(pos.x * pos.x + pos.y * pos.y);
+    // 位置退化防御：r≈0（与宿主重合，如预测起始点异常/切换点定位错误）时
+    // 真近点角与角动量定义病态，直接返回 null 走 RK4 兜底，避免 NaN 根数污染后续计算
+    if (!(r > 1)) return null;
     const v = Math.sqrt(vel.x * vel.x + vel.y * vel.y);
 
     const a = 1 / (2 / r - (v * v) / gm);
@@ -23,13 +26,14 @@ function stateToKepler(pos, vel, gm) {
     // 数值病态回退：解析解在以下区间数值失稳（F 求解爆炸/NaN/方向失真），
     // 返回 null 由物理层 RK4 子步兜底（physicsUpdate.js 无 kepler 分支）：
     // 1) 径向/直线弹道（|h| 过小）：真近点角定义病态，e 失真（近抛物线时 e-1 精度丢失）
-    // 2) 极近抛物线双曲线（a<0 且 e-1 < 1e-4）：双曲开普勒方程 M=e·sinhF−F 数值失稳。
+    // 2) 极近抛物线双曲线（a<0 且 e-1 < 3e-5）：双曲开普勒方程 M=e·sinhF−F 数值失稳。
     //    阈值经实测校准（2026-08-08，检查点15 案例）：e-1=7e-5 时解析推进 vs RK4 误差 <1m，
     //    e-1=1.8e-5 时误差 0.18%，e-1=3.5e-7（超逃逸 0.0001m/s）才真正爆炸。
-    //    因此取 1e-4 为安全下界：覆盖所有现实可达逃逸轨道，仅拦截真正病态区间
+    //    原取 1e-4 保守拦截；但 RK4 兜底对近抛物线逃逸步数需求爆炸（出 SOI 需数千秒、
+    //    近点附近数值失真），故放宽到 3e-5：覆盖 e-1≥7e-5 的校准安全区，1.8e-5 以下仍回退。
     const aMag = Math.abs(a);
     const hMin = 1e-4 * Math.sqrt(gm * aMag);
-    if (Math.abs(h) < hMin || (a < 0 && e - 1 < 1e-4)) {
+    if (Math.abs(h) < hMin || (a < 0 && e - 1 < 3e-5)) {
         return null;
     }
 

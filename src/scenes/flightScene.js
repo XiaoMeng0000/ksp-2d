@@ -761,14 +761,6 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 // 导航球四方向实时角度（Step1：数据层广播），无活动飞船时为 null
                 directions: directions
             });
-
-            // TEMP: 导航球调试 — 每帧打印 prograde / radialIn 角度（核对完删除）
-            if (directions) {
-                const fmt = (d) => (d ? (d.angle * 180 / Math.PI).toFixed(1) + '°' : 'null');
-                console.log('[NavballDebug]',
-                    'prograde=' + fmt(directions.prograde),
-                    'radialIn=' + fmt(directions.radialIn));
-            }
         }
     });
 }

@@ -1,6 +1,6 @@
 import { camera, worldToScreen } from './camera.js';
 import { celestialBodies, getAbsolutePosition } from './physics/physics.js';
-import { predictTrajectoryPatched, predictTrajectoryBurned } from './physics/orbitalPrediction.js';
+import { predictTrajectoryPatched, predictTrajectoryBurned, bodyFuturePos, getCachedTime } from './physics/orbitalPrediction.js';
 import { getOrbitalInfo, stateToKepler } from './physics/orbitalMechanics.js';
 import { getFacilityType } from './facility/facilityTypes.js';
 import { renderableManager } from './graphics/renderable.js';
@@ -392,7 +392,16 @@ function getSOIDirection(fromName, toName) {
     return null;
 }
 
+// 段锚点：anchorBody 在当前游戏时刻的绝对世界位置（返回原点兜底 = 深空段）。
+// 锚定"当前时刻"而非段起始时刻 → 每段以自身宿主为参考系并跟随宿主移动（KSP 语义）；
+// 锚点不同的两段在 SOI 边界处会有断层，由跨 SOI 衔接虚线接线。
+function getSegmentAnchor(seg) {
+    const anchorBody = celestialBodies.find(b => b.name === seg.anchorBody);
+    return anchorBody ? bodyFuturePos(anchorBody, getCachedTime()) : { x: 0, y: 0 };
+}
+
 // 轨道线渲染主入口
+// 绘制点 = 锚点绝对位置 + 相对坐标（worldToScreen 期望绝对世界坐标）
 function renderOrbit(ship, ctx, canvas, isActive = true) {
     if (!ship) return;
 
@@ -410,22 +419,24 @@ function renderOrbit(ship, ctx, canvas, isActive = true) {
 
     for (let si = 0; si <= maxSegIdx; si++) {
         const seg = segments[si];
-        if (seg.points.length < 2) continue;
+        if (!seg.relPoints || seg.relPoints.length < 2) continue;
 
+        // 锚点绝对位置只算一次
+        const anchor = getSegmentAnchor(seg);
         const color = isActive ? getOrbitColor(seg.soiName, false, seg.isCurrentSoi) : '#888888';
 
         ctx.beginPath();
-        const p0 = worldToScreen(seg.points[0].x, seg.points[0].y, canvas);
+        const p0 = worldToScreen(seg.relPoints[0].x + anchor.x, seg.relPoints[0].y + anchor.y, canvas);
         ctx.moveTo(p0.x, p0.y);
 
-        for (let i = 1; i < seg.points.length; i++) {
-            const p = worldToScreen(seg.points[i].x, seg.points[i].y, canvas);
+        for (let i = 1; i < seg.relPoints.length; i++) {
+            const p = worldToScreen(seg.relPoints[i].x + anchor.x, seg.relPoints[i].y + anchor.y, canvas);
             ctx.lineTo(p.x, p.y);
         }
 
         ctx.strokeStyle = color;
         ctx.lineWidth = isActive ? 2 : 1;
-        ctx.setLineDash(seg.isCurrentSoi ? [] : [8, 4]);
+        ctx.setLineDash([]);
         ctx.stroke();
         ctx.setLineDash([]);
     }
@@ -436,15 +447,18 @@ function renderOrbit(ship, ctx, canvas, isActive = true) {
     for (let si = 0; si < segments.length - 1; si++) {
         const seg = segments[si];
         const nextSeg = segments[si + 1];
-        if (seg.points.length < 2 || nextSeg.points.length < 2) continue;
+        if (!seg.relPoints || seg.relPoints.length < 2) continue;
+        if (!nextSeg.relPoints || nextSeg.relPoints.length < 2) continue;
         if (getSOIDirection(seg.soiName, nextSeg.soiName) !== 'up') continue;
 
-        const lastP = seg.points[seg.points.length - 1];
-        const firstP = nextSeg.points[0];
+        const anchorA = getSegmentAnchor(seg);
+        const anchorB = getSegmentAnchor(nextSeg);
+        const lastP = seg.relPoints[seg.relPoints.length - 1];
+        const firstP = nextSeg.relPoints[0];
         const nextColor = getOrbitColor(nextSeg.soiName, false, nextSeg.isCurrentSoi);
         ctx.beginPath();
-        const s0 = worldToScreen(lastP.x, lastP.y, canvas);
-        const s1 = worldToScreen(firstP.x, firstP.y, canvas);
+        const s0 = worldToScreen(lastP.x + anchorA.x, lastP.y + anchorA.y, canvas);
+        const s1 = worldToScreen(firstP.x + anchorB.x, firstP.y + anchorB.y, canvas);
         ctx.moveTo(s0.x, s0.y);
         ctx.lineTo(s1.x, s1.y);
         ctx.strokeStyle = nextColor;
