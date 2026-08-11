@@ -4,6 +4,7 @@ import { eventBus, Events } from '../eventBus.js';
 import { getSOIHost, getAbsolutePosition, getRelativePosition, convertVelocityFrame, celestialBodies } from './physics.js';
 import { rk4Integrate } from './integrator.js';
 import { stateToKepler, keplerToState } from './orbitalMechanics.js';
+import { checkAtmosphereDanger } from './atmosphere.js';
 
 // RK4 子步上限（秒）— 单次积分精度步长，倍率加速时按此拆分推进整个 simDt
 const MAX_RK4_STEP = 0.05;
@@ -135,4 +136,8 @@ export function updateShipPhysics(ship, dt, isActive = true) {
             ship.kepler = null;
         }
     }
+
+    // === 3. 环境危害检测（大气引爆倒计时 / 表面危险边界） ===
+    // 设施不参与检测（atmosphere.js 内部跳过 typeId），此处对所有飞船统一执行
+    checkAtmosphereDanger(ship, dt);
 }

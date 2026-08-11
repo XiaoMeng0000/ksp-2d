@@ -231,6 +231,29 @@ function render(ctx, canvas, activeShip, options = {}) {
             ctx.lineWidth = Math.max(1, 2 * camera.zoom);
             ctx.stroke();
         }
+
+        // 危险边界警示环（飞船接近时显示）：
+        // 有大气天体 → 浅蓝虚线大气边界；无大气天体 → 红色虚线表面边界
+        if (activeShip) {
+            const shipAbs = getAbsolutePosition(activeShip);
+            const bdx = body.position.x - shipAbs.x;
+            const bdy = body.position.y - shipAbs.y;
+            const shipDist = Math.sqrt(bdx * bdx + bdy * bdy);
+            const hasAtmo = body.hasAtmosphere && body.atmosphereHeight > 0;
+            const hazardBoundary = hasAtmo ? body.radius + body.atmosphereHeight : body.radius;
+            if (shipDist < hazardBoundary * 2) {
+                const hazardScreenR = hazardBoundary * camera.zoom;
+                if (hazardScreenR >= 1) {
+                    ctx.beginPath();
+                    ctx.arc(screen.x, screen.y, hazardScreenR, 0, Math.PI * 2);
+                    ctx.setLineDash([6, 4]);
+                    ctx.strokeStyle = hasAtmo ? 'rgba(120, 200, 255, 0.5)' : 'rgba(255, 80, 80, 0.6)';
+                    ctx.lineWidth = Math.max(1, 2 * camera.zoom);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+            }
+        }
     }
 
     // 多飞船渲染 - 活动飞船始终渲染，非活动飞船根据 visibility.ships 控制
@@ -595,6 +618,25 @@ function renderFlightHud(ctx, canvas, ship) {
 
     // === 顶部轨道数据 HUD ===
     renderOrbitHud(ctx, canvas, ship);
+
+    // === 大气进入警告（倒计时） ===
+    if (ship._atmoDanger) {
+        const danger = ship._atmoDanger;
+        const remaining = Math.max(0, danger.remaining);
+        // 闪烁：约 4Hz 交替背景色
+        const blink = Math.floor(performance.now() / 250) % 2 === 0;
+        ctx.save();
+        ctx.fillStyle = blink ? 'rgba(255, 40, 40, 0.95)' : 'rgba(180, 30, 30, 0.95)';
+        const bannerText = `⚠ 警告：进入 ${danger.bodyName} 大气层！剩余 ${remaining.toFixed(1)}s`;
+        ctx.font = 'bold 20px monospace';
+        const textWidth = ctx.measureText(bannerText).width;
+        const bx = (canvas.width - textWidth) / 2;
+        const by = 40;
+        ctx.fillRect(bx - 12, by - 22, textWidth + 24, 30);
+        ctx.fillStyle = '#fff';
+        ctx.fillText(bannerText, bx, by);
+        ctx.restore();
+    }
 
     // === 推力方向箭头（仅在推力模式下绘制） ===
     if (ship.throttle > 0) {

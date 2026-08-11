@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 
 // 一级菜单按钮列表
 const MAIN_MENU = [
@@ -20,6 +20,7 @@ const GAME_SUB_MENU = [
 
 // 二级菜单（额外内容子菜单）
 const EXTRA_MENU = [
+    { id: 'galaxies', label: '已加载星系',  action: 'scene:galaxies' },
     { id: 'credits',  label: '制作人员',  action: 'scene:credits' },
     { id: 'license',  label: '版权声明',  action: 'scene:license' },
     { id: 'back',     label: '返回',      action: 'back' },

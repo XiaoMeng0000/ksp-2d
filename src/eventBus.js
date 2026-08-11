@@ -27,6 +27,8 @@ export const Events = {
     FACILITY_DELETED: 'facility:deleted',
     FACILITY_DOCKED: 'facility:docked',
     FACILITY_UNDOCKED: 'facility:undocked',
+    // 环境危害事件
+    SHIP_DESTROYED: 'ship:destroyed',    // 飞船被摧毁（大气引爆/表面撞击），payload: { shipId, reason: 'atmosphere' | 'surface' }
     // 时间加速事件
     TIME_WARP_CHANGED: 'timeWarp:changed'       // 档位/暂停状态变化
 };

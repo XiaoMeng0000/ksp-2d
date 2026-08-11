@@ -165,6 +165,22 @@ eventBus.on(Events.SHIP_COMMAND, ({ action, params }) => {
                 break;
             }
 
+            // 检查是否处于危险边界内（大气边界 / 表面边界），禁止向危险区域部署设施
+            const hostBody = celestialBodies.find(b => b.name === ship.currentSOI);
+            if (hostBody) {
+                const shipAbs = getAbsolutePosition(ship);
+                const hdx = shipAbs.x - hostBody.position.x;
+                const hdy = shipAbs.y - hostBody.position.y;
+                const shipDist = Math.sqrt(hdx * hdx + hdy * hdy);
+                const hazardBoundary = hostBody.hasAtmosphere && hostBody.atmosphereHeight > 0
+                    ? hostBody.radius + hostBody.atmosphereHeight
+                    : hostBody.radius;
+                if (shipDist < hazardBoundary) {
+                    window.showNotification('无法在危险区域内部署设施（大气层/表面范围内）', 'warning');
+                    break;
+                }
+            }
+
             // 消耗建设模块（移除第一个匹配的）
             const modIndex = ship.modules.findIndex(m => {
                 const def = getModuleDef(m.type);
@@ -471,6 +487,23 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                     allFacilities.some(f => !f.kepler && f.currentGM > 0);
                 if (rk4Fallback) {
                     warpMaxIndex = timeWarp.getRk4FallbackMaxIndex();
+                }
+            }
+            // 接近危险区域（大气/表面边界 ×2 范围内）时限档到物理加速档（≤4x），
+            // 禁止高倍率大步长穿越危险区（防止一步跳过警告/触发时机），暂停与降档仍可用。
+            // 与警示环显示阈值一致：警示环出现 = 加速被锁到 4x。
+            if (warpMaxIndex > timeWarp.getPhysicsMaxIndex() && activeShip && activeShip.currentSOI) {
+                const hazardHost = celestialBodies.find(b => b.name === activeShip.currentSOI);
+                if (hazardHost) {
+                    const distToHost = Math.sqrt(
+                        activeShip.pos.x * activeShip.pos.x + activeShip.pos.y * activeShip.pos.y
+                    );
+                    const hazardBoundary = hazardHost.hasAtmosphere && hazardHost.atmosphereHeight > 0
+                        ? hazardHost.radius + hazardHost.atmosphereHeight
+                        : hazardHost.radius;
+                    if (distToHost < hazardBoundary * 2) {
+                        warpMaxIndex = timeWarp.getPhysicsMaxIndex();
+                    }
                 }
             }
             timeWarp.setMaxIndex(warpMaxIndex);

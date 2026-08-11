@@ -20,6 +20,7 @@ import './src/ui/menuUI.js';
 import './src/ui/shipBuilderUI.js';
 import './src/ui/facilityDeployUI.js';
 import './src/ui/flightUI.js';
+import './src/ui/shipDestroyedUI.js';
 // 图形系统 - 纹理管理器
 import { textureManager } from './src/graphics/textureManager.js';
 import { registerBodyRenderables } from './src/graphics/bodyRenderables.js';
@@ -37,6 +38,7 @@ import { registerMenuScene } from './src/scenes/menuScene.js';
 import { registerEncyclopediaScene } from './src/scenes/encyclopediaScene.js';
 import { registerCreditsScene } from './src/scenes/creditsScene.js';
 import { registerLicenseScene } from './src/scenes/licenseScene.js';
+import { registerGalaxiesScene } from './src/scenes/galaxiesScene.js';
 import { registerSettingsScene } from './src/scenes/settingsScene.js';
 // 音频系统 - 底层引擎与决策层（import 即完成事件订阅）
 import { audioCore } from './src/audio/audioCore.js';
@@ -110,6 +112,7 @@ registerMenuScene({
 registerEncyclopediaScene();
 registerCreditsScene();
 registerLicenseScene();
+registerGalaxiesScene();
 registerSettingsScene();
 
 // 注册飞行场景（注入 main.js 持有的模块级依赖）
