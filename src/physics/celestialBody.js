@@ -21,6 +21,8 @@ export class CelestialBody {
             orbitTheta0 = 0,
             isHomeworld = false,
             defaultOrbitAltitude = null,
+            // 预设轨道高度档位（debugUI 部署窗口使用，如 { low, mid, high }）
+            presetOrbits = null,
             // 第一阶段：大气引爆与纹理支持
             radius = 0,
             atmosphereHeight = 0,
@@ -47,6 +49,7 @@ export class CelestialBody {
         this.orbitTheta0 = orbitTheta0;
         this.isHomeworld = isHomeworld;
         this.defaultOrbitAltitude = defaultOrbitAltitude;
+        this.presetOrbits = presetOrbits;
 
         // 第一阶段：大气引爆与纹理支持
         this.radius = radius;

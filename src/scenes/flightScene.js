@@ -489,19 +489,18 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                     warpMaxIndex = timeWarp.getRk4FallbackMaxIndex();
                 }
             }
-            // 接近危险区域（大气/表面边界 ×2 范围内）时限档到物理加速档（≤4x），
-            // 禁止高倍率大步长穿越危险区（防止一步跳过警告/触发时机），暂停与降档仍可用。
-            // 与警示环显示阈值一致：警示环出现 = 加速被锁到 4x。
+            // 存在撞击点（预测轨道近拱点低于危险边界）时限档到物理加速档（≤4x）。
+            // 仅当轨道会真正进入大气/表面危险区时限制——稳定轨道即使接近危险区也不限档。
+            // 与轨道线截断逻辑一致：预测线被引爆层截断的轨道才视为有撞击点。
             if (warpMaxIndex > timeWarp.getPhysicsMaxIndex() && activeShip && activeShip.currentSOI) {
                 const hazardHost = celestialBodies.find(b => b.name === activeShip.currentSOI);
-                if (hazardHost) {
-                    const distToHost = Math.sqrt(
-                        activeShip.pos.x * activeShip.pos.x + activeShip.pos.y * activeShip.pos.y
-                    );
+                if (hazardHost && activeShip.kepler && activeShip.kepler.a > 0) {
                     const hazardBoundary = hazardHost.hasAtmosphere && hazardHost.atmosphereHeight > 0
                         ? hazardHost.radius + hazardHost.atmosphereHeight
                         : hazardHost.radius;
-                    if (distToHost < hazardBoundary * 2) {
+                    // 近拱点半径 = a(1-e)，低于危险边界即存在撞击点
+                    const periapsisR = activeShip.kepler.a * (1 - activeShip.kepler.e);
+                    if (periapsisR < hazardBoundary) {
                         warpMaxIndex = timeWarp.getPhysicsMaxIndex();
                     }
                 }

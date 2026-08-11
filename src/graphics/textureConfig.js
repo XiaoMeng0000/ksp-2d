@@ -33,6 +33,8 @@ export const textureConfig = {
     kerbol_surface: 'assets/images/bodies/kerbol.png',
     mun_surface: 'assets/images/bodies/mun.png',
     minmus_surface: 'assets/images/bodies/minmus.png',
+    duna_surface: 'assets/images/bodies/duna.png',
+    ike_surface: 'assets/images/bodies/ike.png',
 
     // 时间加速 UI
     timewarp_pause: 'assets/images/ui/timewarp_pause.png',

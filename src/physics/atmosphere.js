@@ -4,7 +4,7 @@
 //
 // 两类危险边界（圆形，数据驱动）：
 //   1. 大气边界 = radius + atmosphereHeight（有大气天体）：
-//      进入后启动 3 秒倒计时警告，归零仍在内 → 销毁；拉出边界 → 警告取消
+//      进入后启动 10 秒倒计时警告，归零仍在内 → 销毁；拉出边界 → 警告取消
 //   2. 表面边界 = radius（无大气天体）：
 //      进入即立即销毁（无缓冲，硬碰硬）
 //
@@ -16,7 +16,7 @@ import { getAbsolutePosition, celestialBodies } from './physics.js';
 import { shipSystem } from '../ship/shipSystem.js';
 
 // 大气进入倒计时（秒）
-const ATMO_WARNING_TIME = 3;
+const ATMO_WARNING_TIME = 10;
 
 // 大气倒计时警告状态字段（挂在 ship 上，随飞船序列化/生命周期）
 const DANGER_FLAG = '_atmoDanger';  // { bodyName, remaining, boundaryType }

@@ -81,7 +81,7 @@ function createStars() {
 
 /**
  * 绘制天体轨道线（以天体自身代表色，数据驱动）
- * 轨道圆心 = 父天体当前 position，形状参数来自 orbitA/orbitE/orbitOmega
+ * 轨道焦点 = 父天体当前 position，形状参数来自 orbitA/orbitE/orbitOmega
  * 用分段采样绘制，避免 canvas 大半径 arc 的精度问题
  */
 function drawBodyOrbits(ctx, canvas) {
@@ -107,11 +107,18 @@ function drawBodyOrbits(ctx, canvas) {
         const cosO = Math.cos(-omega);
         const sinO = Math.sin(-omega);
 
+        // 焦点极坐标参数方程：r = a(1-e²)/(1+e·cosθ)，以父天体（焦点）为原点。
+        // 与 keplerPositionAtTime 的位置计算一致（orbitalMechanics.js），
+        // 远拱点距焦点 a(1+e)、近拱点 a(1-e)。旧版用中心参数方程 (a·cosθ, b·sinθ)，
+        // 对 e>0 的天体（如 Duna）椭圆中心与焦点不重合，天体位置会跑出轨道线。
+        const semiLatusRectum = pixelR * (1 - e * e);
+
         ctx.beginPath();
         for (let i = 0; i <= points; i++) {
             const theta = (i / points) * Math.PI * 2;
-            const localX = pixelR * Math.cos(theta);
-            const localY = semiMinor * Math.sin(theta);
+            const r = semiLatusRectum / (1 + e * Math.cos(theta));
+            const localX = r * Math.cos(theta);
+            const localY = r * Math.sin(theta);
             const sx = center.x + localX * cosO - localY * sinO;
             const sy = center.y + localX * sinO + localY * cosO;
             if (i === 0) {
@@ -626,13 +633,16 @@ function renderFlightHud(ctx, canvas, ship) {
         // 闪烁：约 4Hz 交替背景色
         const blink = Math.floor(performance.now() / 250) % 2 === 0;
         ctx.save();
+        // 显式居中绘制（renderOrbitHud 残留的 textAlign 不会影响：这里重新设置）
+        ctx.textAlign = 'center';
         ctx.fillStyle = blink ? 'rgba(255, 40, 40, 0.95)' : 'rgba(180, 30, 30, 0.95)';
         const bannerText = `⚠ 警告：进入 ${danger.bodyName} 大气层！剩余 ${remaining.toFixed(1)}s`;
-        ctx.font = 'bold 20px monospace';
+        ctx.font = 'bold 18px monospace';
         const textWidth = ctx.measureText(bannerText).width;
-        const bx = (canvas.width - textWidth) / 2;
-        const by = 40;
-        ctx.fillRect(bx - 12, by - 22, textWidth + 24, 30);
+        // 位置在轨道数据 HUD（y 30~81）下方，避免重叠
+        const bx = canvas.width / 2;
+        const by = 120;
+        ctx.fillRect(bx - textWidth / 2 - 12, by - 22, textWidth + 24, 30);
         ctx.fillStyle = '#fff';
         ctx.fillText(bannerText, bx, by);
         ctx.restore();
