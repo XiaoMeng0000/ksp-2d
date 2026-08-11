@@ -22,14 +22,15 @@ const SCENE_SHOW = ['flight', 'tracking'];
 // ==== 图标尺寸 ====
 const CELL_SIZE = 22;     // 档位格边长（11 格紧凑排列）
 
-// ==== 配色（KSP2 风格：深蓝黑底 + 亮绿/红状态色，简洁无特效） ====
-const COLOR_RUN = '#66ff66';                // 运行绿
-const COLOR_PAUSE = '#ff5050';              // 暂停红
-const COLOR_PANEL_BG = 'rgba(12, 16, 28, 0.92)'; // 深蓝黑半透明底
-const COLOR_CELL_BG = 'rgba(38, 44, 60, 0.85)';  // 档位格底色（深）
-const COLOR_CELL_ACTIVE_BG = 'rgba(102, 255, 102, 0.22)'; // 档位格高亮底（淡绿）
+// ==== 配色（KSP2 风格：游戏面板标准黑底 + HUD 蓝/红状态色，简洁无特效） ====
+// HUD 蓝与项目主色 #88ccff（flightUI/SAS 等）一致，保证与 HUD 数据同色
+const COLOR_RUN = '#88ccff';                // 运行蓝（HUD 数据同色）
+const COLOR_PAUSE = '#ff5050';              // 暂停红（不变）
+const COLOR_PANEL_BG = 'rgba(0,0,0,0.85)';  // 面板底色（与全项目 HUD 面板统一）
+const COLOR_CELL_BG = 'rgba(0,0,0,0.55)';   // 档位格底色（半透明黑，与面板一体）
+const COLOR_CELL_ACTIVE_BG = 'rgba(136, 204, 255, 0.25)'; // 档位格高亮底（淡 HUD 蓝）
 const COLOR_UT = '#9ecbff';                 // UT 时间浅蓝
-const COLOR_UT_BADGE_BG = 'rgba(20, 30, 50, 0.95)'; // UT 标签底
+const COLOR_UT_BADGE_BG = 'rgba(0,0,0,0.6)'; // UT 标签底
 const COLOR_FOOTER = '#bbbbbb';             // 底部倍率文字
 const COLOR_HEADER_BORDER = 'rgba(120, 140, 180, 0.25)'; // 顶栏分隔线
 
@@ -97,7 +98,7 @@ class TimeWarpUI {
         const right = document.createElement('div');
         right.style.cssText = `
             display:flex;flex-direction:column;
-            background:${COLOR_PANEL_BG};border:2px solid ${COLOR_RUN};
+            background:${COLOR_PANEL_BG};border:1px solid ${COLOR_RUN};
             border-radius:6px;
             padding:0;min-width:280px;
         `;
@@ -274,11 +275,13 @@ class TimeWarpUI {
         const maxRate = timeWarp.getCurrentMaxRate();
         const savedRate = paused ? timeWarp.getSavedRate() : rate;
 
-        // 顶栏文字 + 面板边框色
-        const headerKey = paused ? 'p' : 'r';
+        // 顶栏文字 + 面板边框色（三态：暂停 / 1x 正常运行 / 加速中）
+        const headerKey = paused ? 'p' : (rate > 1 ? 'w' : 'n');
         if (this._lastHeaderKey !== headerKey) {
             this._lastHeaderKey = headerKey;
-            this._header.textContent = paused ? '|| TIME PAUSED' : '>> TIME WARP ACTIVE';
+            this._header.textContent = paused
+                ? '|| TIME PAUSED'
+                : (rate > 1 ? '>> TIME WARP ACTIVE' : '>> NORMAL FLIGHT');
             this._header.style.color = paused ? COLOR_PAUSE : COLOR_RUN;
             this._right.style.borderColor = paused ? COLOR_PAUSE : COLOR_RUN;
         }
