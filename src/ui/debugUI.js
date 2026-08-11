@@ -8,13 +8,13 @@ import { celestialBodies } from '../physics/physics.js';
 let _cachedShipData = null;
 eventBus.on(Events.RENDER_DATA, (data) => {
     _cachedShipData = data;
-    // 如果调试面板可见，立即刷新
+    // 如果调试面板可见，立即刷新（仅更新数据，不重建 DOM）
     if (debugVisible) {
-        const debugData = buildDebugData();
-        if (debugData) uiManager.setData('debug', debugData);
+        updateDebugData();
     }
 });
 
+// ==================== 面板容器 ====================
 const debugPanel = document.createElement('div');
 debugPanel.id = 'debugPanel';
 debugPanel.style.display = 'none';
@@ -29,6 +29,9 @@ debugPanel.style.fontSize = '13px';
 debugPanel.style.border = '1px solid #555';
 debugPanel.style.borderRadius = '5px';
 debugPanel.style.minWidth = '220px';
+// 面板内容过长时可滚动，避免部署区溢出屏幕
+debugPanel.style.maxHeight = 'calc(100vh - 20px)';
+debugPanel.style.overflowY = 'auto';
 debugPanel.style.zIndex = '1000';
 document.body.appendChild(debugPanel);
 
@@ -37,145 +40,120 @@ debugPanel.appendChild(debugMainContent);
 
 let debugVisible = false;
 
-// 注册 debug 面板
-uiManager.registerPanel('debug', {
-    element: debugPanel,
-    render: (data) => {
-        if (!data.kepler) {
-            // 保存当前输入值，防止 innerHTML 重建时丢失用户输入
-            const savedThrustAngle = document.getElementById('thrustAngleInput')?.value;
-            const savedThrustMag = document.getElementById('thrustMagInput')?.value;
-            debugMainContent.innerHTML = `
-                <h3 style="margin:0 0 10px 0;color:#88ccff;border-bottom:1px solid #444;padding-bottom:5px;">调试面板</h3>
-                <div style="margin:5px 0;display:flex;justify-content:space-between;">
-                    <span style="color:#aaa;">模式:</span>
-                    <span style="color:#fff;font-weight:bold;">${data.currentMode}</span>
-                </div>
-                <div style="margin:5px 0;display:flex;justify-content:space-between;">
-                    <span style="color:#aaa;">引力范围:</span>
-                    <span style="color:#fff;font-weight:bold;">${data.currentSOI || '深空'}</span>
-                </div>
-                <div style="margin:5px 0;display:flex;justify-content:space-between;">
-                    <span style="color:#aaa;">引力常数:</span>
-                    <span style="color:#fff;font-weight:bold;">${data.currentGM}</span>
-                </div>
-                <div style="margin:5px 0;display:flex;justify-content:space-between;">
-                    <span style="color:#aaa;">推力X:</span>
-                    <span style="color:#fff;font-weight:bold;">${data.thrustAx}</span>
-                </div>
-                <div style="margin:5px 0;display:flex;justify-content:space-between;">
-                    <span style="color:#aaa;">推力Y:</span>
-                    <span style="color:#fff;font-weight:bold;">${data.thrustAy}</span>
-                </div>
-                <p style="color:#ff6666;">无轨道数据（双曲线轨道？）</p>
-                <div style="margin-top:10px;border-top:1px solid #444;padding-top:10px;">
-                    <span style="color:#aaa;">推力角度:</span>
-                    <input type="number" id="thrustAngleInput" value="${savedThrustAngle !== undefined ? savedThrustAngle : data.thrustAngle}" min="0" max="360" step="1" style="margin:3px;padding:4px 8px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;width:60px;text-align:center;">
-                    <span style="color:#aaa;">度</span>
-                </div>
-                <div style="margin-top:5px;">
-                    <span style="color:#aaa;">推力大小:</span>
-                    <input type="number" id="thrustMagInput" value="${savedThrustMag !== undefined ? savedThrustMag : data.thrustMag}" min="0" step="0.1" style="margin:3px;padding:4px 8px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;width:60px;text-align:center;">
-                    <span style="color:#aaa;">米/秒²</span>
-                </div>
-                <div style="margin-top:10px;">
-                    <button onclick="window.switchToThrustMode()" style="margin:3px;padding:4px 8px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;cursor:pointer;">切换到推力模式</button>
-                    <button onclick="window.switchToOrbitMode()" style="margin:3px;padding:4px 8px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;cursor:pointer;">切回在轨模式</button>
-                </div>
-                <div style="margin-top:10px;border-top:1px solid #444;padding-top:10px;">
-                    <button onclick="window.resetShip()" style="margin:3px;padding:4px 8px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;cursor:pointer;">重置默认</button>
-                </div>
-                <p style="margin-top:10px;color:#666;font-size:11px;">
-              F1切换 | Z=推力 | X=在轨
-            </p>
-            `;
-            _renderDeploySection(data);
-            return;
-        }
+// ==================== 静态面板结构 ====================
+// 结构只构建一次，之后仅更新数值 span 的 textContent，避免 innerHTML 重建打断输入框/下拉框/按钮交互
+const _els = {};
+const ROW_STYLE = 'margin:5px 0;display:flex;justify-content:space-between;';
 
-        const k = data.kepler;
-        // 保存当前输入值，防止 innerHTML 重建时丢失用户输入
-        const savedThrustAngle = document.getElementById('thrustAngleInput')?.value;
-        const savedThrustMag = document.getElementById('thrustMagInput')?.value;
-        const savedPrograde = document.getElementById('progradeInput')?.value;
-        const savedRetrograde = document.getElementById('retrogradeInput')?.value;
-        debugMainContent.innerHTML = `
-            <h3 style="margin:0 0 10px 0;color:#88ccff;border-bottom:1px solid #444;padding-bottom:5px;">调试面板</h3>
-            <div style="margin:5px 0;display:flex;justify-content:space-between;">
-                <span style="color:#aaa;">模式:</span>
-                <span style="color:#fff;font-weight:bold;">${data.currentMode}</span>
-            </div>
-            <div style="margin:5px 0;display:flex;justify-content:space-between;">
-                <span style="color:#aaa;">引力范围:</span>
-                <span style="color:#fff;font-weight:bold;">${data.currentSOI || '深空'}</span>
-            </div>
-            <div style="margin:5px 0;display:flex;justify-content:space-between;">
-                <span style="color:#aaa;">引力常数:</span>
-                <span style="color:#fff;font-weight:bold;">${data.currentGM}</span>
-            </div>
-            <div style="margin:5px 0;display:flex;justify-content:space-between;">
-                <span style="color:#aaa;">推力X:</span>
-                <span style="color:#fff;font-weight:bold;">${data.thrustAx}</span>
-            </div>
-            <div style="margin:5px 0;display:flex;justify-content:space-between;">
-                <span style="color:#aaa;">推力Y:</span>
-                <span style="color:#fff;font-weight:bold;">${data.thrustAy}</span>
-            </div>
-            <div style="margin:5px 0;display:flex;justify-content:space-between;">
+// 天体部署独立渲染区 —— 仅在 bodyList 变化时重建，防止打断原生 select 交互
+const _deploySection = document.createElement('div');
+let _deployVersion = null;
+
+function buildPanelStructure() {
+    debugMainContent.innerHTML = `
+        <h3 style="margin:0 0 10px 0;color:#88ccff;border-bottom:1px solid #444;padding-bottom:5px;">调试面板</h3>
+        <div style="${ROW_STYLE}">
+            <span style="color:#aaa;">模式:</span>
+            <span id="dbgMode" style="color:#fff;font-weight:bold;">—</span>
+        </div>
+        <div style="${ROW_STYLE}">
+            <span style="color:#aaa;">引力范围:</span>
+            <span id="dbgSOI" style="color:#fff;font-weight:bold;">—</span>
+        </div>
+        <div style="${ROW_STYLE}">
+            <span style="color:#aaa;">引力常数:</span>
+            <span id="dbgGM" style="color:#fff;font-weight:bold;">—</span>
+        </div>
+        <div style="${ROW_STYLE}">
+            <span style="color:#aaa;">推力X:</span>
+            <span id="dbgThrustX" style="color:#fff;font-weight:bold;">—</span>
+        </div>
+        <div style="${ROW_STYLE}">
+            <span style="color:#aaa;">推力Y:</span>
+            <span id="dbgThrustY" style="color:#fff;font-weight:bold;">—</span>
+        </div>
+        <div id="dbgKeplerBlock">
+            <div style="${ROW_STYLE}">
                 <span style="color:#aaa;">半长轴:</span>
-                <span style="color:#fff;font-weight:bold;">${k.a.toFixed(2)}</span>
+                <span id="dbgA" style="color:#fff;font-weight:bold;">—</span>
             </div>
-            <div style="margin:5px 0;display:flex;justify-content:space-between;">
+            <div style="${ROW_STYLE}">
                 <span style="color:#aaa;">离心率:</span>
-                <span style="color:#fff;font-weight:bold;">${k.e.toFixed(4)}</span>
+                <span id="dbgE" style="color:#fff;font-weight:bold;">—</span>
             </div>
-            <div style="margin:5px 0;display:flex;justify-content:space-between;">
+            <div style="${ROW_STYLE}">
                 <span style="color:#aaa;">近地点:</span>
-                <span style="color:#fff;font-weight:bold;">${data.periapsis.toFixed(2)}</span>
+                <span id="dbgPeriapsis" style="color:#fff;font-weight:bold;">—</span>
             </div>
-            <div style="margin:5px 0;display:flex;justify-content:space-between;">
+            <div style="${ROW_STYLE}">
                 <span style="color:#aaa;">远地点:</span>
-                <span style="color:#fff;font-weight:bold;">${data.apoapsis.toFixed(2)}</span>
+                <span id="dbgApoapsis" style="color:#fff;font-weight:bold;">—</span>
             </div>
-            <div style="margin:5px 0;display:flex;justify-content:space-between;">
+            <div style="${ROW_STYLE}">
                 <span style="color:#aaa;">速度:</span>
-                <span style="color:#fff;font-weight:bold;">${data.v.toFixed(2)}</span>
+                <span id="dbgV" style="color:#fff;font-weight:bold;">—</span>
             </div>
-            <div style="margin-top:10px;border-top:1px solid #444;padding-top:10px;">
-                <span style="color:#aaa;">推力角度:</span>
-                <input type="number" id="thrustAngleInput" value="${savedThrustAngle !== undefined ? savedThrustAngle : data.thrustAngle}" min="0" max="360" step="1" style="margin:3px;padding:4px 8px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;width:60px;text-align:center;">
-                <span style="color:#aaa;">度</span>
-            </div>
-            <div style="margin-top:5px;">
-                <span style="color:#aaa;">推力大小:</span>
-                <input type="number" id="thrustMagInput" value="${savedThrustMag !== undefined ? savedThrustMag : data.thrustMag}" min="0" step="0.1" style="margin:3px;padding:4px 8px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;width:60px;text-align:center;">
-                <span style="color:#aaa;">米/秒²</span>
-            </div>
-            <div style="margin-top:10px;">
-                <button onclick="window.switchToThrustMode()" style="margin:3px;padding:4px 8px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;cursor:pointer;">切换到推力模式</button>
-                <button onclick="window.switchToOrbitMode()" style="margin:3px;padding:4px 8px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;cursor:pointer;">切回在轨模式</button>
-            </div>
+        </div>
+        <div id="dbgNoKeplerBlock" style="display:none;">
+            <p style="color:#ff6666;">无轨道数据（双曲线轨道？）</p>
+        </div>
+        <div style="margin-top:10px;border-top:1px solid #444;padding-top:10px;">
+            <span style="color:#aaa;">推力角度:</span>
+            <input type="number" id="thrustAngleInput" value="90" min="0" max="360" step="1" style="margin:3px;padding:4px 8px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;width:60px;text-align:center;">
+            <span style="color:#aaa;">度</span>
+        </div>
+        <div style="margin-top:5px;">
+            <span style="color:#aaa;">推力大小:</span>
+            <input type="number" id="thrustMagInput" value="0.5" min="0" step="0.1" style="margin:3px;padding:4px 8px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;width:60px;text-align:center;">
+            <span style="color:#aaa;">米/秒²</span>
+        </div>
+        <div style="margin-top:10px;">
+            <button onclick="window.switchToThrustMode()" style="margin:3px;padding:4px 8px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;cursor:pointer;">切换到推力模式</button>
+            <button onclick="window.switchToOrbitMode()" style="margin:3px;padding:4px 8px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;cursor:pointer;">切回在轨模式</button>
+        </div>
+        <div id="dbgOrbitCtrl">
             <div style="margin-top:10px;border-top:1px solid #444;padding-top:10px;">
                 <button onclick="window.circularizeOrbit()" style="margin:3px;padding:4px 8px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;cursor:pointer;">圆化轨道</button>
             </div>
             <div style="margin-top:10px;border-top:1px solid #444;padding-top:10px;">
                 <span style="color:#aaa;">加速:</span>
-                <input type="number" id="progradeInput" value="${savedPrograde !== undefined ? savedPrograde : data.progradeVal}" step="0.1" style="margin:3px;padding:4px 8px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;width:60px;text-align:center;">
+                <input type="number" id="progradeInput" value="1" step="0.1" style="margin:3px;padding:4px 8px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;width:60px;text-align:center;">
                 <button onclick="window.progradeThrust()" style="margin:3px;padding:4px 8px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;cursor:pointer;">+</button>
             </div>
             <div style="margin-top:10px;border-top:1px solid #444;padding-top:10px;">
                 <span style="color:#aaa;">减速:</span>
-                <input type="number" id="retrogradeInput" value="${savedRetrograde !== undefined ? savedRetrograde : data.retrogradeVal}" step="0.1" style="margin:3px;padding:4px 8px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;width:60px;text-align:center;">
+                <input type="number" id="retrogradeInput" value="1" step="0.1" style="margin:3px;padding:4px 8px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;width:60px;text-align:center;">
                 <button onclick="window.retrogradeThrust()" style="margin:3px;padding:4px 8px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;cursor:pointer;">-</button>
             </div>
-            <div style="margin-top:10px;border-top:1px solid #444;padding-top:10px;">
-                <button onclick="window.resetShip()" style="margin:3px;padding:4px 8px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;cursor:pointer;">重置默认</button>
-            </div>
-            <p style="margin-top:10px;color:#666;font-size:11px;">
-              F1切换 | Z=推力 | X=在轨
-            </p>
-        `;
-        _renderDeploySection(data);
+        </div>
+        <div style="margin-top:10px;border-top:1px solid #444;padding-top:10px;">
+            <button onclick="window.resetShip()" style="margin:3px;padding:4px 8px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;cursor:pointer;">重置默认</button>
+        </div>
+        <p style="margin-top:10px;color:#666;font-size:11px;">
+            F1切换 | Z=推力 | X=在轨
+        </p>
+    `;
+
+    // 缓存动态数值 span 与条件区块的引用
+    const valueIds = ['dbgMode', 'dbgSOI', 'dbgGM', 'dbgThrustX', 'dbgThrustY',
+        'dbgA', 'dbgE', 'dbgPeriapsis', 'dbgApoapsis', 'dbgV'];
+    for (const id of valueIds) {
+        _els[id] = document.getElementById(id);
+    }
+    _els.keplerBlock = document.getElementById('dbgKeplerBlock');
+    _els.noKeplerBlock = document.getElementById('dbgNoKeplerBlock');
+    _els.orbitCtrl = document.getElementById('dbgOrbitCtrl');
+
+    // 部署区置于面板底部
+    debugPanel.appendChild(_deploySection);
+}
+
+// 注册 debug 面板
+uiManager.registerPanel('debug', {
+    element: debugPanel,
+    render: () => {
+        // 结构固定后不再由 setData 重建，此处仅做兜底刷新
+        if (debugVisible) updateDebugData();
     },
     show: () => {
         debugPanel.style.display = 'block';
@@ -185,11 +163,46 @@ uiManager.registerPanel('debug', {
     }
 });
 
-// 天体部署独立渲染区 --- 防止 innerHTML 重建打断原生 select 交互
-const _deploySection = document.createElement('div');
-let _deployVersion = null;
+// ==================== 动态数据更新（不重建 DOM） ====================
+function updateDebugData() {
+    if (!debugVisible) return;
+    const data = buildDebugData();
+    if (!data) return;
 
-function _renderDeploySection(data) {
+    _setText('dbgMode', data.currentMode);
+    _setText('dbgSOI', data.currentSOI || '深空');
+    _setText('dbgGM', data.currentGM);
+    _setText('dbgThrustX', data.thrustAx);
+    _setText('dbgThrustY', data.thrustAy);
+
+    const hasKepler = !!data.kepler;
+    _els.keplerBlock.style.display = hasKepler ? 'block' : 'none';
+    _els.noKeplerBlock.style.display = hasKepler ? 'none' : 'block';
+    _els.orbitCtrl.style.display = hasKepler ? 'block' : 'none';
+
+    if (hasKepler) {
+        _setText('dbgA', data.kepler.a.toFixed(2));
+        _setText('dbgE', data.kepler.e.toFixed(4));
+        _setText('dbgPeriapsis', data.periapsis.toFixed(2));
+        _setText('dbgApoapsis', data.apoapsis.toFixed(2));
+        _setText('dbgV', data.v.toFixed(2));
+    }
+
+    _updateDeploySection(data);
+}
+
+// 数值 span 更新（值未变化时跳过，避免无谓 DOM 写入）
+function _setText(id, text) {
+    const el = _els[id];
+    if (!el) return;
+    const str = String(text);
+    if (el.textContent !== str) {
+        el.textContent = str;
+    }
+}
+
+// 天体部署独立渲染区 —— 仅在 bodyList 变化时重建，防止打断原生 select 交互
+function _updateDeploySection(data) {
     const version = JSON.stringify(data.bodyList || []);
     let savedBody = '';
     let savedAlt = '';
@@ -236,7 +249,6 @@ function _renderDeploySection(data) {
         `;
         _deployVersion = version;
     }
-    debugPanel.appendChild(_deploySection);
 }
 
 // 调试面板刷新在 toggle 时按需启动/停止定时器
@@ -246,13 +258,11 @@ function toggleDebugPanel() {
     debugVisible = !debugVisible;
     if (debugVisible) {
         uiManager.showPanel('debug');
-        const data = buildDebugData();
-        uiManager.setData('debug', data);
+        updateDebugData();
         if (!_debugTimer) {
             _debugTimer = setInterval(() => {
                 if (debugVisible && _cachedShipData && _cachedShipData.exists) {
-                    const debugData = buildDebugData();
-                    if (debugData) uiManager.setData('debug', debugData);
+                    updateDebugData();
                 }
             }, 100);
         }
@@ -387,11 +397,13 @@ window.deploySelectPreset = deploySelectPreset;
 window.onDeployBodyChanged = onDeployBodyChanged;
 window.deployShipToBody = deployShipToBody;
 
+// 模块加载时一次性构建面板结构
+buildPanelStructure();
+
 export { toggleDebugPanel };
 
 export function refreshDebugPanel() {
     if (debugVisible) {
-        const data = buildDebugData();
-        if (data) uiManager.setData('debug', data);
+        updateDebugData();
     }
 }
