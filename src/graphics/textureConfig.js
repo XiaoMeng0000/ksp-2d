@@ -33,4 +33,10 @@ export const textureConfig = {
     kerbol_surface: 'assets/images/bodies/kerbol.png',
     mun_surface: 'assets/images/bodies/mun.png',
     minmus_surface: 'assets/images/bodies/minmus.png',
+
+    // 时间加速 UI
+    timewarp_pause: 'assets/images/ui/timewarp_pause.png',
+    timewarp_play: 'assets/images/ui/timewarp_play.png',
+    timewarp_cell_active: 'assets/images/ui/timewarp_cell_active.png',
+    timewarp_cell_inactive: 'assets/images/ui/timewarp_cell_inactive.png',
 };

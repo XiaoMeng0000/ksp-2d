@@ -53,6 +53,12 @@ class TimeWarp {
         return this._savedIndex;
     }
 
+    // 暂停前保存的档位倍率值（大圆按钮恢复目标；UI 暂停态高亮显示用）
+    // savedIndex 可能指向 4x 物理档（PANEL_RATES 不含该值），UI 需自行降级处理
+    getSavedRate() {
+        return WARP_RATES[this._savedIndex];
+    }
+
     // 最大档位索引（未点火时放开全部档位）
     getMaxIndex() {
         return WARP_RATES.length - 1;

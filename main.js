@@ -6,6 +6,8 @@ import './src/saveManager.js';
 
 // TimeWarp - 时间加速/暂停（模块加载即安装全局按键监听）
 import './src/timeWarp.js';
+// TimeWarpUI - 时间加速面板（KSP2 风格常驻 HUD，与 timeWarp 并列引入）
+import './src/ui/timeWarpUI.js';
 
 // SceneManager - 导入场景管理器
 import { sceneManager } from './src/sceneManager.js';

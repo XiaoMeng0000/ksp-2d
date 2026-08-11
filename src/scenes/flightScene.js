@@ -742,6 +742,8 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 : null;
             eventBus.emit(Events.RENDER_DATA, {
                 exists: !!activeShip,
+                // 世界游戏时间（秒）— 时间加速面板 UT 显示数据源（tracking 场景用 CELESTIAL_TIME_UPDATED）
+                time: _getCelestialTime(),
                 mode: activeShip?.mode ?? null,
                 currentSOI: activeShip?.currentSOI ?? null,
                 currentGM: activeShip?.currentGM ?? null,
