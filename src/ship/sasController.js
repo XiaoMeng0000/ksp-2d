@@ -1,15 +1,20 @@
-// SAS系统 —姿态稳定系统 级联控制器（位置环 + 速度环）
+// SAS系统 — 姿态稳定系统 时间最优姿态控制器（bang-bang）
+// 方案依据：时间最优双积分器控制（刹停距离判据）+ KSP 的按扭矩/MOI 自适应思想
+//   1. 每帧以可达角加速度 aMax=扭矩/惯量 评估"当前角速度的刹停距离 v²/(2·aMax)"
+//   2. 刹停距离 ≥ 剩余误差 → 立即全力刹车；距离充足 → 全力加速；达巡航上限 → 维持
+//   3. 双死区：角度与角速度都小 → 停止输出；角度已到位但仍有角速度 → 持续刹车
 
 import { SASMode, computeTargetHeading } from './sasModes.js';
 import { SAS_CONTROL } from '../config/sasConfig.js';
 
-// 级联控制器参数（统一从配置文件读取，避免硬编码）
-// 外环（位置 → 期望角速度）：限制最大旋转速度，从根源杜绝刹车不及导致的震荡
-const MAX_ANG_VEL = SAS_CONTROL.maxAngularVelocity;                 // 最大目标角速度（rad/s，约 115°/s）
-const KP_POS = MAX_ANG_VEL / SAS_CONTROL.positionErrorFullSpeed;    // 角度误差达到全速阈值（rad，约 46°）时驱动全速
+// 控制器参数（统一从配置文件读取，避免硬编码）
+const MAX_ANG_VEL = SAS_CONTROL.maxAngularVelocity;        // 绝对角速度上限（rad/s，约 115°/s）
+const VELOCITY_DEADBAND = SAS_CONTROL.velocityDeadband;    // 速度环死区（rad/s）
+const DEADBAND_ERROR = SAS_CONTROL.deadbandError;          // 角度死区（rad ≈ 0.6°）
+const DEADBAND_VELOCITY = SAS_CONTROL.deadbandVelocity;    // 角速度死区（rad/s）
 
 /**
- * SAS PD 控制器
+ * SAS 控制器
  * 每个飞船实例一个控制器，负责根据当前模式计算目标朝向并输出扭矩
  */
 export class SASController {
@@ -79,7 +84,7 @@ export class SASController {
 
     /**
      * 每帧调用，计算并返回应施加的扭矩
-     * @param {number} dt - 时间步长（秒），保留供未来扩展
+     * @param {number} dt - 时间步长（秒）
      * @param {number} manualInput - 手动输入: -1(A键), +1(D键), 0(无输入)
      * @param {object} context - 飞行上下文
      * @param {number} context.shipVx - 飞船速度 X
@@ -88,6 +93,7 @@ export class SASController {
      * @param {number} context.shipY - 飞船位置 Y
      * @param {number|undefined} context.hostX - SOI 中心天体 X
      * @param {number|undefined} context.hostY - SOI 中心天体 Y
+     * @param {number} context.shipHeading - 飞船当前朝向
      * @returns {number} 施加的扭矩（N·m），已限幅到 [-reactionWheelTorque, +reactionWheelTorque]
      */
     update(dt, manualInput, context) {
@@ -97,7 +103,7 @@ export class SASController {
         // 无动量轮，SAS 无效
         if (maxTorque <= 0) return 0;
 
-        // SAS 关闭 → 纯手动，无自动扭矩（不经过 PD，不施加阻尼）
+        // SAS 关闭 → 纯手动，无自动扭矩（不经过控制律，不施加阻尼）
         if (this.mode === SASMode.OFF) {
             return (manualInput || 0) * maxTorque;
         }
@@ -110,7 +116,7 @@ export class SASController {
             targetHeading = computeTargetHeading(this.mode, context, this._state);
         }
 
-        // STABILITY 模式：手动旋转时直接输出手动扭矩，跳过 PD 阻尼（避免与玩家对抗）
+        // STABILITY 模式：手动旋转时直接输出手动扭矩，跳过自动控制（避免与玩家对抗）
         if (this.mode === SASMode.STABILITY && manualInput !== 0) {
             this._wasManualInput = true;
             return manualInput * maxTorque;
@@ -122,15 +128,38 @@ export class SASController {
             Math.cos(targetHeading - ship.heading)
         );
 
-        // ---- 3. 级联控制（外环位置 + 内环速度） ----
-        // 外环（位置 → 期望角速度）：限制最大旋转速度，从根源杜绝刹车不及导致的震荡
-        const desiredAngVel = Math.max(-MAX_ANG_VEL,
-            Math.min(MAX_ANG_VEL, KP_POS * angleError));
-
-        // 内环（速度 → 扭矩）：追逐期望角速度
+        // ---- 3. 时间最优 bang-bang 控制 ----
+        const moi = ship.momentOfInertia || 1.0;
+        const aMax = maxTorque / moi;                 // 可达最大角加速度（物理极限）
         const angularVel = typeof ship.angularVelocity === 'number' ? ship.angularVelocity : 0;
-        const KP_VEL = maxTorque / MAX_ANG_VEL;        // 达到最大角速度时用满扭矩
-        let autoTorque = KP_VEL * (desiredAngVel - angularVel);
+        const signE = Math.sign(angleError);
+
+        let aCmd = 0;
+        if (Math.abs(angularVel) < DEADBAND_VELOCITY && Math.abs(angleError) < DEADBAND_ERROR) {
+            // 双死区：角度与角速度都已归位，完全停止输出，防到位抖动
+            aCmd = 0;
+        } else if (Math.abs(angleError) < DEADBAND_ERROR) {
+            // 角度已到位，仅消除残余角速度
+            aCmd = -Math.sign(angularVel) * aMax;
+        } else {
+            const vToward = signE * angularVel;       // 朝目标方向的角速度分量（>0 表示正向目标）
+            const stopDist = angularVel * angularVel / (2 * aMax);  // 当前角速度的刹停距离
+            if (vToward < 0) {
+                // 正在反向转动：先全力消除反向角速度
+                aCmd = signE * aMax;
+            } else if (stopDist >= Math.abs(angleError) - DEADBAND_ERROR) {
+                // 刹停距离已达剩余误差：立即全力刹车，杜绝过冲
+                aCmd = -signE * aMax;
+            } else if (Math.abs(angularVel) >= MAX_ANG_VEL - VELOCITY_DEADBAND) {
+                // 已达巡航速度上限：维持，不再加速
+                aCmd = 0;
+            } else {
+                // 距离充足：全力加速（时间最优）
+                aCmd = signE * aMax;
+            }
+        }
+
+        const autoTorque = moi * aCmd;
 
         // ---- 4. 手动输入叠加（KSP 方式） ----
         const manualTorque = manualInput * maxTorque;
