@@ -310,7 +310,7 @@ export const starSystemMeta = [
     {
         id: 'debdeb',
         name: 'Debdeb',
-        description: 'Debdeb 是坎巴拉天文台在深空巡天中捕捉到的一个遥远星系，它的星光要走过漫长的岁月才能抵达 Kerbol 系。目前我们只能确认那里有一颗明亮的恒星，其余的一切都笼罩在星尘与未知之中。观测望远镜已经对准了那片天空——敬请期待未来的开拓者。',
+        description: 'Debdeb 是坎巴拉天文台在深空巡天中捕捉到的一个遥远星系，它的星光要走过漫长的岁月才能抵达 Kerbolar 系。目前我们只能确认那里有一颗明亮的恒星，其余的一切都笼罩在星尘与未知之中。观测望远镜已经对准了那片天空——敬请期待未来的开拓者。',
         enabled: true,
         placeholder: true
     },
