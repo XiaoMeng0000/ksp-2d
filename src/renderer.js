@@ -5,7 +5,7 @@ import { getOrbitalInfo, stateToKepler } from './physics/orbitalMechanics.js';
 import { getFacilityType } from './facility/facilityTypes.js';
 import { renderableManager } from './graphics/renderable.js';
 import { textureManager } from './graphics/textureManager.js';
-import { drawStarGlow, drawStarBall } from './graphics/programEffects.js';
+import { drawStarGlow, drawStarBall, drawPlanetRing } from './graphics/programEffects.js';
 
 let stars = [];
 const STAR_COUNT = 800;
@@ -58,6 +58,10 @@ function renderBodyLayers(ctx, cx, cy, drawRadius, layers) {
             ctx.globalCompositeOperation = 'lighter';
             drawStarGlow(ctx, cx, cy, drawRadius, color, scale, alpha);
             ctx.restore();
+            rendered = true;
+        } else if (layer.program === 'planet_ring') {
+            // 程序星环层（天体赤道平面正圆环带，支持多细分 bands）
+            drawPlanetRing(ctx, cx, cy, drawRadius, layer);
             rendered = true;
         }
     }

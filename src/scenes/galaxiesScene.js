@@ -15,13 +15,17 @@ const CARD_BORDER = '#3a3a3a';  // 卡片边框
 const FONT_MONO = 'monospace';
 
 // 对比图绘制常量
-const CHART_HEIGHT = 240;          // 对比图画布高度
+const CHART_HEIGHT_BASE = 260;     // 对比图画布基础高度（行星中轴 + 上下留白 + 卫星区）
+const SAT_VSTEP = 30;              // 卫星垂直排列步长（直径 + 名称标注 + 间隙）
 const CHART_TEXTURE_SUFFIX = '_surface';  // 贴图 key 后缀：textureKey + '_surface'
-const PLANET_MIN_SIZE = 10;        // 行星最小可见尺寸兜底（px，保证 Mun/Minmus 可见）
-const PLANET_MAX_SIZE = 76;        // 最大行星绘制直径上限（px）
-const PLANET_SPACING = 34;         // 相邻行星间距（px）
+const PLANET_MIN_SIZE = 26;        // 行星最小直径（px，对数刻度下限，保证小行星可见）
+const PLANET_MAX_SIZE = 84;        // 行星最大直径上限（px，对数刻度上限，受画布高度限制）
+const PLANET_SPACING = 40;         // 相邻行星间距（px）
+const SAT_MIN_SIZE = 14;           // 卫星最小直径（px，保证 Jool 小卫星可见）
+const SAT_REL_SCALE = 0.6;         // 卫星直径相对母行星的额外缩放（层级区分）
+const SAT_GAP = 30;                // 行星下缘到第一颗卫星的间隙（px）
 const STAR_OVERSCALE = 2.6;        // 恒星直径 = 画布高度 × 该倍数（远超画布，暗示塞不下）
-const STAR_EXPOSE_RATIO = 0.45;    // 恒星露出宽度 = 画布高度 × 该倍数
+const STAR_EXPOSE_RATIO = 0.32;    // 恒星露出宽度 = 画布高度 × 该倍数（更靠左，不侵占行星区）
 const FADE_WIDTH = 36;             // 恒星右缘渐隐过渡带宽度（px）
 
 function registerGalaxiesScene() {
@@ -63,12 +67,12 @@ function registerGalaxiesScene() {
         ctx.restore();
     }
 
-    // 方案A：恒星"塞不下"裁切 + 行星等比排列 + 最小可见尺寸兜底
+    // 方案A：恒星"塞不下"裁切 + 行星/卫星层级分组排列（行星一行，卫星跟母行星下方）
     function _drawComparisonChart(ctx, width, height, bodies) {
         ctx.clearRect(0, 0, width, height);
 
         const star = bodies.find(b => b.type === 'star') || null;
-        const planets = bodies.filter(b => b.type !== 'star');
+        const planets = bodies.filter(b => b.type === 'planet');
 
         // ===== 恒星：只绘制左侧边缘一段，视觉上溢出画布 =====
         if (star) {
@@ -93,28 +97,112 @@ function registerGalaxiesScene() {
             ctx.fillText(star.name, 10, height - 10);
         }
 
-        // ===== 行星/卫星：按真实相对半径等比排列 =====
-        const rMax = planets.reduce((m, p) => Math.max(m, p.radius), 0);
+        // ===== 行星 + 卫星：层级分组排列 =====
+        // 行星位于画布水平中轴线上；卫星按相对半径等比缩小，垂直竖排在母行星正下方。
+        // 行星直径采用对数刻度（log 插值）：避免 Jool 的巨半径压扁中小行星，
+        // 使 Moho/Dres/Eeloo 等小天体与 Kerbin/Eve 等中型行星都保持可读尺寸。
+        const radii = planets.map(p => p.radius);
+        const rMin = Math.min(...radii);
+        const rMax = Math.max(...radii);
+        const logSpan = Math.log(rMax / rMin);
         const maxD = Math.min(PLANET_MAX_SIZE, height * 0.40);
 
-        let x = width * 0.40;
-        for (const p of planets) {
-            const d = Math.max(PLANET_MIN_SIZE, (p.radius / rMax) * maxD);
-            const cx = x + d / 2;
-            const cy = height / 2;
-            _drawBodyImage(ctx, p, d, cx, cy);
+        // 预计算每列：行星直径 + 卫星尺寸（卫星垂直排列，不占横向宽度）
+        const cols = planets.map(p => {
+            const t = logSpan > 0 ? Math.log(p.radius / rMin) / logSpan : 0;
+            const d = PLANET_MIN_SIZE + (maxD - PLANET_MIN_SIZE) * t;
+            const sats = bodies.filter(b => b.orbitParent === p.name);
+            const satSizes = sats.map(s =>
+                Math.max(SAT_MIN_SIZE, (s.radius / p.radius) * d * SAT_REL_SCALE)
+            );
+            return { p, d, sats, satSizes };
+        });
 
-            // 名称 + 半径标注
+        // 行星区总宽（直径 + 间距）：紧贴恒星露出区右侧排列，与恒星留出间距
+        const totalW = cols.reduce((s, c) => s + c.d, 0) + (cols.length - 1) * PLANET_SPACING;
+        const starExposed = star ? height * STAR_EXPOSE_RATIO : 0;
+        let x = starExposed + 110;   // 行星区起点：恒星露出区右侧留出 110px
+        const planetCy = height * 0.5;   // 行星水平中轴线
+
+        for (const col of cols) {
+            const cx = x + col.d / 2;
+
+            // 行星（母天体，位于水平中轴）
+            _drawBodyImage(ctx, col.p, col.d, cx, planetCy);
             ctx.fillStyle = TEXT_MAIN;
             ctx.font = '12px ' + FONT_MONO;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'alphabetic';
-            ctx.fillText(p.name, cx, cy + d / 2 + 18);
+            // 名称标注在行星上方，避免与下方卫星区重叠
+            ctx.fillText(col.p.name, cx, planetCy - col.d / 2 - 12);
             ctx.fillStyle = TEXT_DIM;
-            ctx.fillText(_formatRadius(p.radius), cx, cy + d / 2 + 34);
+            ctx.fillText(_formatRadius(col.p.radius), cx, planetCy + col.d / 2 + 16);
 
-            x += d + PLANET_SPACING;
+            // 卫星：垂直竖排在母行星正下方
+            let sy = planetCy + col.d / 2 + SAT_GAP;
+            for (let i = 0; i < col.sats.length; i++) {
+                const sat = col.sats[i];
+                const sd = col.satSizes[i];
+                _drawBodyImage(ctx, sat, sd, cx, sy);
+                ctx.fillStyle = TEXT_DIM;
+                ctx.fillText(sat.name, cx, sy + sd / 2 + 12);
+                sy += SAT_VSTEP;
+            }
+
+            x += col.d + PLANET_SPACING;
         }
+    }
+
+    // 占位星系：绘制"无数星光中一颗突出的亮点"效果（无真实天体数据，仅视觉占位）
+    function _drawPlaceholderStar(ctx, width, height) {
+        ctx.clearRect(0, 0, width, height);
+
+        // ===== 背景：大量暗淡小星点（伪随机固定分布，每次渲染一致） =====
+        for (let i = 0; i < 130; i++) {
+            const px = ((i * 137 + 371) % 997) / 997 * width;
+            const py = ((i * 251 + 619) % 991) / 991 * height;
+            const pr = 0.4 + ((i * 31) % 10) / 10 * 0.9;
+            const a = 0.12 + ((i * 17) % 40) / 100;
+            ctx.beginPath();
+            ctx.arc(px, py, pr, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255, 255, 255, ${a})`;
+            ctx.fill();
+        }
+
+        const cx = width / 2;
+        const cy = height * 0.42;
+
+        // ===== 中心亮点：小核心 + 柔和光晕（小而亮，不放大） =====
+        const coreR = 4.5;
+        const glowR = 30;
+        const glow = ctx.createRadialGradient(cx, cy, coreR * 0.4, cx, cy, glowR);
+        glow.addColorStop(0, 'rgba(255, 245, 220, 0.55)');
+        glow.addColorStop(0.35, 'rgba(255, 225, 170, 0.18)');
+        glow.addColorStop(1, 'rgba(255, 225, 170, 0)');
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.beginPath();
+        ctx.arc(cx, cy, glowR, 0, Math.PI * 2);
+        ctx.fillStyle = glow;
+        ctx.fill();
+        ctx.restore();
+
+        // ===== 亮核（中心最亮） =====
+        const core = ctx.createRadialGradient(cx - 1, cy - 1, 0, cx, cy, coreR);
+        core.addColorStop(0, 'rgba(255, 255, 255, 1)');
+        core.addColorStop(0.6, 'rgba(255, 244, 220, 0.95)');
+        core.addColorStop(1, 'rgba(255, 230, 185, 0.7)');
+        ctx.beginPath();
+        ctx.arc(cx, cy, coreR, 0, Math.PI * 2);
+        ctx.fillStyle = core;
+        ctx.fill();
+
+        // 底部提示文字
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillStyle = TEXT_DIM;
+        ctx.font = '12px ' + FONT_MONO;
+        ctx.fillText('✦ 遥远星系 · 尚未开放探索', cx, height - 22);
     }
 
     // 构建星系卡片：实色底，已加载天体放在卡片下侧可展开区域
@@ -133,14 +221,31 @@ function registerGalaxiesScene() {
         title.style.cssText = 'color:' + ACCENT_COLOR + ';font-family:' + FONT_MONO + ';font-size:22px;margin:0 0 16px 0;';
         card.appendChild(title);
 
-        // ===== 对比图：星体大小对比（Canvas 动态绘制，方案A） =====
-        const chart = document.createElement('canvas');
-        chart.width = chartWidth;
-        chart.height = CHART_HEIGHT;
-        chart.style.cssText = 'width:100%;display:block;margin-bottom:20px;';
-        const chartCtx = chart.getContext('2d');
-        _drawComparisonChart(chartCtx, chart.width, chart.height, solarSystemData);
-        card.appendChild(chart);
+        // ===== 占位星系：占位恒星图；正常星系：天体大小对比图 =====
+        if (meta.placeholder) {
+            // 占位星系：无真实天体数据，绘制遥远的恒星光点效果
+            const chart = document.createElement('canvas');
+            chart.width = chartWidth;
+            chart.height = 160;
+            chart.style.cssText = 'width:100%;display:block;margin-bottom:20px;';
+            const chartCtx = chart.getContext('2d');
+            _drawPlaceholderStar(chartCtx, chart.width, chart.height);
+            card.appendChild(chart);
+        } else {
+            // 正常星系：星体大小对比（Canvas 动态绘制，方案A）
+            // 高度随最大卫星数增长（行星中轴 + 卫星垂直竖排）
+            const maxSatCount = solarSystemData.reduce((m, b) => {
+                const n = solarSystemData.filter(x => x.orbitParent === b.name).length;
+                return Math.max(m, n);
+            }, 0);
+            const chart = document.createElement('canvas');
+            chart.width = chartWidth;
+            chart.height = CHART_HEIGHT_BASE + maxSatCount * SAT_VSTEP;
+            chart.style.cssText = 'width:100%;display:block;margin-bottom:20px;';
+            const chartCtx = chart.getContext('2d');
+            _drawComparisonChart(chartCtx, chart.width, chart.height, solarSystemData);
+            card.appendChild(chart);
+        }
 
         // 描述（百科天体档案文风）
         const desc = document.createElement('p');
@@ -149,13 +254,13 @@ function registerGalaxiesScene() {
         card.appendChild(desc);
 
         // 已加载天体：可展开区域（展开时流式推挤下方卡片）
-        card.appendChild(_buildCollapsibleBodies());
+        card.appendChild(_buildCollapsibleBodies(meta));
 
         return card;
     }
 
-    // 可展开的"已加载天体"区域
-    function _buildCollapsibleBodies() {
+    // 可展开的"已加载天体"区域（占位星系显示 0 与占位文案）
+    function _buildCollapsibleBodies(meta) {
         const wrapper = document.createElement('div');
 
         const header = document.createElement('div');
@@ -165,13 +270,22 @@ function registerGalaxiesScene() {
             + 'font-family:' + FONT_MONO + ';color:' + ACCENT_COLOR + ';font-size:14px;'
             + 'border-top:1px solid ' + CARD_BORDER + ';'
             + 'transition:background 0.15s ease;';
-        header.textContent = '已加载天体 (' + solarSystemData.length + ')  ▸';
+
+        const bodyCount = (meta && meta.placeholder) ? 0 : solarSystemData.length;
+        header.textContent = '已加载天体 (' + bodyCount + ')  ▸';
 
         const content = document.createElement('div');
         content.style.cssText = 'display:none;padding:4px 0 16px 0;';
 
-        for (const body of solarSystemData) {
-            content.appendChild(_buildBodyDataRow(body));
+        if (meta && meta.placeholder) {
+            const empty = document.createElement('div');
+            empty.textContent = '—— 该星系尚未开放，暂无已加载天体 ——';
+            empty.style.cssText = 'color:' + TEXT_DIM + ';font-family:' + FONT_MONO + ';font-size:12px;padding:6px 0;';
+            content.appendChild(empty);
+        } else {
+            for (const body of solarSystemData) {
+                content.appendChild(_buildBodyDataRow(body));
+            }
         }
 
         header.addEventListener('mouseenter', () => {
@@ -183,7 +297,7 @@ function registerGalaxiesScene() {
         header.addEventListener('click', () => {
             const expanded = content.style.display === 'block';
             content.style.display = expanded ? 'none' : 'block';
-            header.textContent = '已加载天体 (' + solarSystemData.length + ')  ' + (expanded ? '▸' : '▾');
+            header.textContent = '已加载天体 (' + bodyCount + ')  ' + (expanded ? '▸' : '▾');
         });
 
         wrapper.appendChild(header);
@@ -218,44 +332,20 @@ function registerGalaxiesScene() {
             panel.style.cssText = ''
                 + 'position:fixed;inset:0;z-index:2000;'
                 + 'background:' + PANEL_BG + ';backdrop-filter:blur(12px);'
-                + 'display:flex;font-family:' + FONT_MONO + ';';
+                + 'display:flex;flex-direction:column;font-family:' + FONT_MONO + ';';
 
-            // ========== 分割线 ==========
-            const divider = document.createElement('div');
-            divider.style.cssText = ''
-                + 'width:1px;background:#333;'
-                + 'align-self:stretch;flex-shrink:0;';
-
-            // ========== 左侧 Logo 区 ==========
-            const leftPanel = document.createElement('div');
-            leftPanel.style.cssText = ''
-                + 'width:280px;padding:0 40px;'
-                + 'display:flex;flex-direction:column;align-items:center;justify-content:center;'
+            // ========== 顶栏：返回按钮 + 标题 ==========
+            const topBar = document.createElement('div');
+            topBar.style.cssText = ''
+                + 'display:flex;align-items:center;gap:16px;'
+                + 'padding:14px 40px;'
+                + 'border-bottom:1px solid ' + CARD_BORDER + ';'
                 + 'flex-shrink:0;';
 
-            const logoContent = document.createElement('div');
-            logoContent.style.cssText = 'text-align:center;';
-
-            if (textureManager.isReady() && textureManager.get('title')) {
-                const titleImg = document.createElement('img');
-                titleImg.src = textureManager.get('title').src;
-                titleImg.style.cssText = 'max-width:220px;';
-                logoContent.appendChild(titleImg);
-            } else {
-                const titleFallback = document.createElement('div');
-                titleFallback.textContent = 'KSP 2D';
-                titleFallback.style.cssText = 'color:' + ACCENT_COLOR + ';font-family:' + FONT_MONO + ';font-size:36px;';
-                logoContent.appendChild(titleFallback);
-            }
-
-            leftPanel.appendChild(logoContent);
-
-            // 返回按钮 — 左下角固定
             const backBtn = document.createElement('button');
-            backBtn.textContent = '返回';
+            backBtn.textContent = '← 返回';
             backBtn.style.cssText = ''
-                + 'position:absolute;bottom:40px;left:40px;'
-                + 'padding:10px 36px;'
+                + 'padding:8px 28px;'
                 + 'background:rgba(30,30,30,0.8);color:white;'
                 + 'border:1px solid ' + ACCENT_COLOR + ';border-radius:4px;'
                 + 'font-family:' + FONT_MONO + ';font-size:14px;'
@@ -271,24 +361,30 @@ function registerGalaxiesScene() {
             backBtn.addEventListener('click', () => {
                 _close();
             });
-            panel.appendChild(backBtn);
+            topBar.appendChild(backBtn);
 
-            // ========== 右侧内容区（垂直滚动） ==========
-            const rightPanel = document.createElement('div');
-            rightPanel.style.cssText = ''
-                + 'flex:1;padding:0 60px 0 40px;'
-                + 'overflow-y:auto;';
+            const topTitle = document.createElement('span');
+            topTitle.textContent = '星系图';
+            topTitle.style.cssText = 'color:' + TEXT_MAIN + ';font-size:18px;letter-spacing:2px;';
+            topBar.appendChild(topTitle);
+
+            panel.appendChild(topBar);
+
+            // ========== 内容滚动区（全宽，卡片横向展开） ==========
+            const scrollArea = document.createElement('div');
+            scrollArea.style.cssText = ''
+                + 'flex:1;overflow-y:auto;'
+                + 'padding:0 40px;';
 
             const contentWrapper = document.createElement('div');
-            contentWrapper.style.cssText = 'width:100%;padding:60px 0;';
+            contentWrapper.style.cssText = 'width:100%;max-width:1400px;margin:0 auto;padding:40px 0;';
 
-            panel.appendChild(leftPanel);
-            panel.appendChild(divider);
-            panel.appendChild(rightPanel);
+            scrollArea.appendChild(contentWrapper);
+            panel.appendChild(scrollArea);
             document.body.appendChild(panel);
 
-            // 对比图画布宽度跟随内容区实际可用宽度
-            const chartWidth = Math.max(320, rightPanel.clientWidth - 40);
+            // 对比图画布宽度跟随内容区实际可用宽度（全宽布局下大幅加宽）
+            const chartWidth = Math.max(560, contentWrapper.clientWidth);
 
             for (const meta of starSystemMeta) {
                 if (!meta.enabled) {
@@ -302,8 +398,6 @@ function registerGalaxiesScene() {
             stat.textContent = '// 已加载 ' + starSystemMeta.length + ' 个星系 · ' + solarSystemData.length + ' 个天体';
             stat.style.cssText = 'color:' + TEXT_DIM + ';font-family:' + FONT_MONO + ';font-size:13px;text-align:center;padding:10px 0 20px 0;';
             contentWrapper.appendChild(stat);
-
-            rightPanel.appendChild(contentWrapper);
 
             escHandler = (event) => {
                 if (event.key === 'Escape') {
