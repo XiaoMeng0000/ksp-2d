@@ -41,4 +41,7 @@ export const textureConfig = {
     timewarp_play: 'assets/images/ui/timewarp_play.png',
     timewarp_cell_active: 'assets/images/ui/timewarp_cell_active.png',
     timewarp_cell_inactive: 'assets/images/ui/timewarp_cell_inactive.png',
+
+    // 存档管理 UI
+    ui_trash_can: 'assets/images/ui/trash_can.png',
 };

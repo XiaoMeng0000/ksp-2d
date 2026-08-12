@@ -6,6 +6,18 @@ import { createNotification, createDialog, createInputDialog, createConfirmDialo
 import { sceneManager } from '../sceneManager.js';
 import { saveManager } from '../saveManager.js';
 import { toggleDebugPanel, refreshDebugPanel } from './debugUI.js';
+import { textureManager } from '../graphics/textureManager.js';
+
+// 辅助：将 textureKey 转为 PNG <img> HTML 字符串，纹理未就绪时返回 fallback Emoji
+function renderIconHtml(textureKey, fallbackEmoji, sizePx) {
+    if (!textureKey) return fallbackEmoji || '';
+    const tex = textureManager.get(textureKey);
+    if (tex) {
+        const s = sizePx || 14;
+        return `<img src="${tex.src}" style="width:${s}px;height:${s}px;object-fit:contain;vertical-align:middle;">`;
+    }
+    return fallbackEmoji || '';
+}
 
 // EventBus 迁移 — 缓存最近一帧的飞船渲染数据，供 UI 只读函数使用
 let _cachedShipData = null;
@@ -314,7 +326,7 @@ function renderWorldList() {
                 <button onclick="window.__deleteWorld('${world.id}')" 
                     style="padding:3px 8px;background:rgba(255,80,80,0.1);border:1px solid rgba(255,80,80,0.3);
                     border-radius:3px;color:#ff6666;font-family:monospace;font-size:12px;cursor:pointer;">
-                    🗑️
+                    ${renderIconHtml('ui_trash_can', '🗑️', 12)}
                 </button>
             </div>
         `;

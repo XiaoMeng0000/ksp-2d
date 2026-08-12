@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { stateToKepler } from '../physics/orbitalMechanics.js';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿import { stateToKepler } from '../physics/orbitalMechanics.js';
 // 导入 uiManager（相对路径更新）
 import { uiManager } from './uiManager.js';
 // 导入事件总线
@@ -562,7 +562,7 @@ function renderWorldList() {
                 <button onclick="window.__deleteWorld('${world.id}')" 
                     style="padding:3px 8px;background:rgba(255,80,80,0.1);border:1px solid rgba(255,80,80,0.3);
                     border-radius:3px;color:#ff6666;font-family:monospace;font-size:12px;cursor:pointer;">
-                    🗑️
+                    ${renderIconHtml('ui_trash_can', '🗑️', 12)}
                 </button>
             </div>
         `;
