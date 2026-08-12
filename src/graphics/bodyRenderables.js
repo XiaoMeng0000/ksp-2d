@@ -51,6 +51,100 @@ export const bodyRenderableConfigs = {
         ]
     },
 
+    // Eve：单模式，表面贴图，无 LOD
+    eve: {
+        layers: [
+            { texture: 'eve_surface', zIndex: 0 }
+        ]
+    },
+
+    // Gilly：单模式，表面贴图，无 LOD
+    gilly: {
+        layers: [
+            { texture: 'gilly_surface', zIndex: 0 }
+        ]
+    },
+
+    // Moho：单模式，表面贴图，无 LOD
+    moho: {
+        layers: [
+            { texture: 'moho_surface', zIndex: 0 }
+        ]
+    },
+
+    // Dres：单模式，表面贴图 + 程序星环（2D 俯视为正圆环带，多细分分层）
+    // 参考 KSP2 官方效果：环带更暗、更薄、离天体更远，整体呈深灰半透明并带细密分层。
+    dres: {
+        layers: [
+            { texture: 'dres_surface', zIndex: 0 },
+            {
+                program: 'planet_ring',
+                color: '#9d9d9d',
+                alpha: 0.55,
+                zIndex: 1,
+                bands: [
+                    // 内侧主环带：内缘距表面 400km（半径比 (138000+400000)/138000 ≈ 3.90）
+                    { inner: 3.90, outer: 3.97, alpha: 0.80 },
+                    // 紧邻第二环带（缝隙 0.004，几乎贴合）
+                    { inner: 3.974, outer: 4.04, alpha: 0.55 },
+                    // 外侧主环带
+                    { inner: 4.044, outer: 4.11, alpha: 0.68 },
+                    // 最外侧稀薄晕：feather 1.0 = 渐变覆盖全带，向外自然消散且不产生额外暗缝
+                    { inner: 4.114, outer: 4.18, alpha: 0.20, feather: 1.0 }
+                ]
+            }
+        ]
+    },
+
+    // Jool：单模式，表面贴图，无 LOD（气态巨行星）
+    jool: {
+        layers: [
+            { texture: 'jool_surface', zIndex: 0 }
+        ]
+    },
+
+    // Laythe：单模式，表面贴图，无 LOD（海洋卫星）
+    laythe: {
+        layers: [
+            { texture: 'laythe_surface', zIndex: 0 }
+        ]
+    },
+
+    // Vall：单模式，表面贴图，无 LOD（冰卫星）
+    vall: {
+        layers: [
+            { texture: 'vall_surface', zIndex: 0 }
+        ]
+    },
+
+    // Tylo：单模式，表面贴图，无 LOD（大型冰卫星）
+    tylo: {
+        layers: [
+            { texture: 'tylo_surface', zIndex: 0 }
+        ]
+    },
+
+    // Bop：单模式，表面贴图，无 LOD（捕获小卫星）
+    bop: {
+        layers: [
+            { texture: 'bop_surface', zIndex: 0 }
+        ]
+    },
+
+    // Pol：单模式，表面贴图，无 LOD（捕获小卫星）
+    pol: {
+        layers: [
+            { texture: 'pol_surface', zIndex: 0 }
+        ]
+    },
+
+    // Eeloo：单模式，表面贴图，无 LOD（冰矮行星）
+    eeloo: {
+        layers: [
+            { texture: 'eeloo_surface', zIndex: 0 }
+        ]
+    },
+
     // Kerbol：LOD 分级渲染
     // nearScreenR / farScreenR 定义两档的阈值（像素），中间为过渡区
     kerbol: {

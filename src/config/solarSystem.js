@@ -3,7 +3,7 @@
 import { CelestialBody } from '../physics/celestialBody.js';
 
 // 天体驱动器 6.5 步
-// Kerbol 系天体数据 — 真实 KSP 尺度（第一阶段：仅 Kerbol + Kerbin + Mun）
+// Kerbol 系天体数据 — 真实 KSP 尺度
 export const solarSystemData = [
     new CelestialBody({
         name: 'Kerbol',
@@ -17,6 +17,57 @@ export const solarSystemData = [
         color: '#ffcc44',
         position: { x: 0, y: 0 },
         textureKey: 'kerbol'
+    }),
+    new CelestialBody({
+        name: 'Moho',
+        type: 'planet',
+        musicType: 'rocky',
+        gm: 1.68609378654509e11,
+        soiRadius: 9646663,
+        radius: 250000,
+        atmosphereHeight: 0,
+        hasAtmosphere: false,
+        color: '#fcb64c',
+        orbitParent: 'Kerbol',
+        orbitA: 5263138304,
+        orbitE: 0.2,
+        orbitOmega: Math.PI / 12,  // 15°（官方近点幅角，转弧度）
+        orbitTheta0: 3.14,
+        textureKey: 'moho'
+    }),
+    new CelestialBody({
+        name: 'Eve',
+        type: 'planet',
+        musicType: 'eve',
+        gm: 8.17173022921085e12,
+        soiRadius: 85109365,
+        radius: 700000,
+        atmosphereHeight: 90000,
+        hasAtmosphere: true,
+        color: '#9b42f5',
+        orbitParent: 'Kerbol',
+        orbitA: 9832684544,
+        orbitE: 0.01,
+        orbitOmega: 0,
+        orbitTheta0: 3.14,
+        textureKey: 'eve'
+    }),
+    new CelestialBody({
+        name: 'Gilly',
+        type: 'moon',
+        musicType: 'rocky',
+        gm: 8.28944981471635e6,
+        soiRadius: 126123.27,
+        radius: 13000,
+        atmosphereHeight: 0,
+        hasAtmosphere: false,
+        color: '#f5d5b3',
+        orbitParent: 'Eve',
+        orbitA: 31500000,
+        orbitE: 0.55,
+        orbitOmega: Math.PI / 18,  // 10°（官方近点幅角，转弧度）
+        orbitTheta0: 0.9,
+        textureKey: 'gilly'
     }),
     new CelestialBody({
         name: 'Kerbin',
@@ -105,18 +156,169 @@ export const solarSystemData = [
         orbitOmega: 0,
         orbitTheta0: 1.7,
         textureKey: 'ike'
+    }),
+    new CelestialBody({
+        name: 'Dres',
+        type: 'planet',
+        musicType: 'rocky',
+        gm: 2.1484489e10,
+        soiRadius: 32832840,
+        radius: 138000,
+        atmosphereHeight: 0,
+        hasAtmosphere: false,
+        color: '#b5ad94',
+        orbitParent: 'Kerbol',
+        orbitA: 40839348203,
+        orbitE: 0.145,
+        orbitOmega: Math.PI / 2,  // 90°（官方近点幅角，转弧度）
+        orbitTheta0: 3.14,
+        textureKey: 'dres'
+    }),
+    new CelestialBody({
+        name: 'Jool',
+        type: 'planet',
+        musicType: 'gas',
+        gm: 2.82528e14,
+        soiRadius: 2455985200,
+        radius: 6000000,
+        atmosphereHeight: 200000,
+        hasAtmosphere: true,
+        color: '#3fc144',
+        orbitParent: 'Kerbol',
+        orbitA: 68773560320,
+        orbitE: 0.05,
+        orbitOmega: 0,
+        orbitTheta0: 0.1,
+        textureKey: 'jool'
+    }),
+    new CelestialBody({
+        name: 'Laythe',
+        type: 'moon',
+        musicType: 'terrestrial',
+        gm: 1.962e12,
+        soiRadius: 3723645.8,
+        radius: 500000,
+        atmosphereHeight: 50000,
+        hasAtmosphere: true,
+        color: '#2e86de',
+        orbitParent: 'Jool',
+        orbitA: 27184000,
+        orbitE: 0,
+        orbitOmega: 0,
+        orbitTheta0: 0.9,
+        textureKey: 'laythe'
+    }),
+    new CelestialBody({
+        name: 'Vall',
+        type: 'moon',
+        musicType: 'ice',
+        gm: 2.074815e11,
+        soiRadius: 2406401.4,
+        radius: 300000,
+        atmosphereHeight: 0,
+        hasAtmosphere: false,
+        color: '#c0c8d0',
+        orbitParent: 'Jool',
+        orbitA: 43152000,
+        orbitE: 0,
+        orbitOmega: 0,
+        orbitTheta0: 0.9,
+        textureKey: 'vall'
+    }),
+    new CelestialBody({
+        name: 'Tylo',
+        type: 'moon',
+        musicType: 'rocky',
+        gm: 2.82528e12,
+        soiRadius: 10856518,
+        radius: 600000,
+        atmosphereHeight: 0,
+        hasAtmosphere: false,
+        color: '#a89080',
+        orbitParent: 'Jool',
+        orbitA: 68500000,
+        orbitE: 0,
+        orbitOmega: 0,
+        orbitTheta0: 0.9,
+        textureKey: 'tylo'
+    }),
+    new CelestialBody({
+        name: 'Bop',
+        type: 'moon',
+        musicType: 'rocky',
+        gm: 2.4868349e9,
+        soiRadius: 1221060.9,
+        radius: 65000,
+        atmosphereHeight: 0,
+        hasAtmosphere: false,
+        color: '#9a6b3f',
+        orbitParent: 'Jool',
+        orbitA: 128500000,
+        orbitE: 0.235,
+        orbitOmega: Math.PI * 25 / 180,  // 25°（官方近点幅角，转弧度）
+        orbitTheta0: 0.9,
+        textureKey: 'bop'
+    }),
+    new CelestialBody({
+        name: 'Pol',
+        type: 'moon',
+        musicType: 'rocky',
+        gm: 7.2170208e8,
+        soiRadius: 1042138.9,
+        radius: 44000,
+        atmosphereHeight: 0,
+        hasAtmosphere: false,
+        color: '#b35a8e',
+        orbitParent: 'Jool',
+        orbitA: 179890000,
+        orbitE: 0.171,
+        orbitOmega: Math.PI * 15 / 180,  // 15°（官方近点幅角，转弧度）
+        orbitTheta0: 0.9,
+        textureKey: 'pol'
+    }),
+    new CelestialBody({
+        name: 'Eeloo',
+        type: 'planet',
+        musicType: 'ice',
+        gm: 7.4410815e10,
+        soiRadius: 119082940,
+        radius: 210000,
+        atmosphereHeight: 0,
+        hasAtmosphere: false,
+        color: '#d2dfe8',
+        orbitParent: 'Kerbol',
+        orbitA: 90118820000,
+        orbitE: 0.26,
+        orbitOmega: Math.PI * 260 / 180,  // 260°（官方近点幅角，转弧度）
+        orbitTheta0: 3.14,
+        textureKey: 'eeloo'
     })
 ];
 
 // ========== 星系元数据（数据驱动） ==========
 // 星系级信息独立存放，不混入天体数据本体
-// 数组结构为将来多星系加载预留扩展点；当前仅 Kerbolar 系一个星系
+// 数组结构为将来多星系加载预留扩展点
+// placeholder: true 表示占位星系（仅展示，无真实天体数据）
 // description 采用游戏百科"天体档案"文风（温暖叙事 + 幽默点睛）
 export const starSystemMeta = [
     {
         id: 'kerbolar',
         name: 'Kerbolar 系',
-        description: '恒星 Kerbol 高悬于 Kerbolar 星系正中，以近乎炫耀的亮度与引力维系着整个家族的运转。环绕它的天体各司其职：Kerbin 以湛蓝的海洋和柔软的大气欢迎每一位到访者，Mun 与 Minmus 安静地陪在它身旁——一个布满撞击坑，一个光滑得令人怀疑人生；更远处，Duna 以锈红色的身姿等待着勇敢的探险家，它的潮汐锁定卫星 Ike 则像一位忠诚的守卫。坎巴拉航天中心在此温馨提醒：无论恒星多么璀璨，直视前请先确认面罩已经拉好。',
+        description: 'Kerbolar 系是一个由恒星 Kerbol 主导的行星系统，以其独特的天体多样性和物理特性而闻名。从炽热的恒星核心到遥远的外围行星，这个星系展现了宇宙演化的壮丽画卷。每一颗天体都拥有独特的环境特征——从浓厚的大气层到真空的岩石表面，从巨大的引力场到微弱的引力束缚。对于坎巴拉太空计划而言，这个星系既是实验室也是游乐场，充满了探索的挑战与机遇。',
         enabled: true
+    },
+    {
+        id: 'debdeb',
+        name: 'Debdeb',
+        description: 'Debdeb 是坎巴拉天文台在深空巡天中捕捉到的一个遥远星系，它的星光要走过漫长的岁月才能抵达 Kerbolar 系。目前我们只能确认那里有一颗明亮的恒星，其余的一切都笼罩在星尘与未知之中。观测望远镜已经对准了那片天空——敬请期待未来的开拓者。',
+        enabled: true,
+        placeholder: true
+    },
+    {
+        id: 'tuun',
+        name: 'Tuun',
+        description: 'Tuun 是坎巴拉天文台档案中的又一个遥远恒星系，关于它的信息少得可怜——只有几行零碎的观测记录和一张模糊的星图。没人知道它的历史，它的未来。',
+        enabled: true,
+        placeholder: true
     }
 ];

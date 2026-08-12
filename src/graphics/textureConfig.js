@@ -35,6 +35,17 @@ export const textureConfig = {
     minmus_surface: 'assets/images/bodies/minmus.png',
     duna_surface: 'assets/images/bodies/duna.png',
     ike_surface: 'assets/images/bodies/ike.png',
+    eve_surface: 'assets/images/bodies/eve.png',
+    gilly_surface: 'assets/images/bodies/gilly.png',
+    moho_surface: 'assets/images/bodies/moho.png',
+    dres_surface: 'assets/images/bodies/dres.png',
+    jool_surface: 'assets/images/bodies/jool.png',
+    laythe_surface: 'assets/images/bodies/laythe.png',
+    vall_surface: 'assets/images/bodies/vall.png',
+    tylo_surface: 'assets/images/bodies/tylo.png',
+    bop_surface: 'assets/images/bodies/bop.png',
+    pol_surface: 'assets/images/bodies/pol.png',
+    eeloo_surface: 'assets/images/bodies/eeloo.png',
 
     // 时间加速 UI
     timewarp_pause: 'assets/images/ui/timewarp_pause.png',

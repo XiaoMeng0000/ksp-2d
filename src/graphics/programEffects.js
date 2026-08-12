@@ -68,3 +68,72 @@ export function drawStarBall(ctx, cx, cy, radius, color = '#ffffff', alpha = 1.0
     ctx.fillStyle = grad;
     ctx.fill();
 }
+
+/**
+ * 绘制天体平面环（2D 俯视视角）
+ * 环位于天体赤道平面，从正上方看为与天体同心的正圆环带，与球体互不遮挡。
+ * 支持多细分环带（bands）：每个环带独立内外半径比、透明度与边缘羽化，
+ * 模拟真实行星环的疏密层次与柔和边界。
+ * @param {CanvasRenderingContext2D} ctx - 画布上下文
+ * @param {number} cx, cy - 屏幕中心坐标
+ * @param {number} baseRadius - 天体基础屏幕半径
+ * @param {Object} layer - 环配置层
+ *   layer.bands: Array<{ inner, outer, alpha, feather? }>  多细分环带
+ *     inner/outer: 相对天体半径的内外半径比
+ *     alpha: 该环带相对透明度（会再乘 layer.alpha）
+ *     feather: 边缘羽化比例（0~1，1 表示全带宽渐变），可选
+ *   layer.innerRatio / layer.outerRatio          单环带兜底（无 bands 时）
+ *   layer.color: string                          环颜色（hex）
+ *   layer.alpha: number                          整体透明度（0~1）
+ */
+export function drawPlanetRing(ctx, cx, cy, baseRadius, layer = {}) {
+    const alpha = layer.alpha !== undefined ? layer.alpha : 0.5;
+    if (alpha <= 0) return;
+
+    const color = layer.color || '#cccccc';
+    const cr = parseInt(color.slice(1, 3), 16);
+    const cg = parseInt(color.slice(3, 5), 16);
+    const cb = parseInt(color.slice(5, 7), 16);
+
+    // 多细分环带优先；无 bands 时回退为单环带（innerRatio/outerRatio）
+    const bands = (layer.bands && layer.bands.length)
+        ? layer.bands
+        : [{ inner: layer.innerRatio || 1.6, outer: layer.outerRatio || 2.0 }];
+
+    for (const band of bands) {
+        const innerR = baseRadius * band.inner;
+        const outerR = baseRadius * band.outer;
+        if (outerR <= 0 || outerR <= innerR) continue;
+
+        const bandAlpha = alpha * (band.alpha !== undefined ? band.alpha : 1);
+        if (bandAlpha <= 0) continue;
+
+        const feather = band.feather !== undefined ? band.feather : (layer.feather || 0);
+
+        if (feather > 0 && outerR - innerR > 1) {
+            // 边缘羽化：用径向渐变让环带内外边界自然淡出
+            // feather 控制渐变带宽占环带宽度的比例；1 表示从中心到边缘全程渐变
+            const midR = (innerR + outerR) / 2;
+            const halfW = (outerR - innerR) / 2;
+            const gradW = Math.max(0.5, halfW * Math.min(1, feather));
+            const grad = ctx.createRadialGradient(cx, cy, midR - gradW, cx, cy, midR + gradW);
+            grad.addColorStop(0, `rgba(${cr}, ${cg}, ${cb}, 0)`);
+            grad.addColorStop(0.35, `rgba(${cr}, ${cg}, ${cb}, ${bandAlpha})`);
+            grad.addColorStop(0.65, `rgba(${cr}, ${cg}, ${cb}, ${bandAlpha})`);
+            grad.addColorStop(1, `rgba(${cr}, ${cg}, ${cb}, 0)`);
+
+            ctx.beginPath();
+            ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
+            ctx.arc(cx, cy, innerR, 0, Math.PI * 2, true);
+            ctx.fillStyle = grad;
+            ctx.fill();
+        } else {
+            // 环带 = 外圆减内圆（内圆反方向闭合路径）
+            ctx.beginPath();
+            ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
+            ctx.arc(cx, cy, innerR, 0, Math.PI * 2, true);
+            ctx.fillStyle = `rgba(${cr}, ${cg}, ${cb}, ${bandAlpha})`;
+            ctx.fill();
+        }
+    }
+}
