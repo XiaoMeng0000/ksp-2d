@@ -23,9 +23,9 @@ export const SHIP_TEMPLATES = [
     // ========== 正式飞船 ==========
     {
         id: 'rex01_genesis_ark',
-        name: '创世纪方舟',
+        name: '测试巨兽promax',
         category: SHIP_CATEGORIES.interplanetary.id,
-        description: '英灵科技部门旗舰级生态战舰，搭载完整生态圈与多核心反应堆，集远征、生态维持、多态战斗于一体的移动战斗城市。',
+        description: '更高的数值！更狠的测试巨兽！！',
         dryMass: 420000000,
         fuelCapacity: 420000000,
         isp: 200000,
