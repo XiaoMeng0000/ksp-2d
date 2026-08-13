@@ -68,7 +68,8 @@ let frameCount = 0;
 function resize() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    createStars();
+    // 星空为屏幕空间天空盒，需按画布尺寸重新铺满
+    createStars(canvas.width, canvas.height);
 }
 
 function gameLoop(timestamp) {
