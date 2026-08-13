@@ -13,6 +13,14 @@ function registerInfoScene() {
 
     sceneManager.registerScene('info', {
         enter() {
+            const title = t('info.title');
+            const body = t('info.body');
+            if (!title && !body) {
+                // 公告内容为空时跳过公告页，直接进入主菜单
+                sceneManager.switchTo('menu');
+                return;
+            }
+
             panel = document.createElement('div');
             panel.id = 'infoScenePanel';
             panel.className = 'scene-fullscreen';
@@ -21,12 +29,12 @@ function registerInfoScene() {
             textContainer.className = 'info-text-container';
 
             const h1 = document.createElement('h1');
-            h1.textContent = t('info.title');
+            h1.textContent = title;
             h1.className = 'info-title';
 
             const p = document.createElement('p');
             p.className = 'info-body';
-            p.textContent = t('info.body');
+            p.textContent = body;
 
             textContainer.appendChild(h1);
             textContainer.appendChild(p);
