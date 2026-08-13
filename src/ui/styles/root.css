@@ -1,0 +1,181 @@
+/* ============================================================
+   root.css — 全局主题基石
+   所有 UI 样式从此处引用 CSS 变量,禁止在各 JS 文件中硬编码色值/字体
+   ============================================================ */
+
+:root {
+    /* ---- 配色 ---- */
+    --panel-bg: rgba(0, 0, 0, 0.85);      /* 面板半透明黑底 */
+    --panel-bg-deep: rgba(0, 0, 0, 0.92); /* 更深底色(弹层/提示) */
+    --panel-bg-soft: rgba(0, 0, 0, 0.55); /* 浅黑底(凹槽/占位) */
+    --card-bg: #333;                      /* 卡片/行实色底 */
+    --card-bg-dark: #222;                 /* 更深卡片底(槽位) */
+    --card-bg-light: #2a2a3a;             /* 悬停高亮底 */
+
+    --border: #555;                       /* 面板/按钮边框 */
+    --border-dark: #444;                  /* 分隔线/标题下划线 */
+    --border-light: #666;
+
+    --accent: #88ccff;                    /* HUD 主蓝 */
+    --accent-bg: rgba(136, 204, 255, 0.15); /* 主蓝高亮底 */
+    --accent-bg-strong: rgba(136, 204, 255, 0.2);
+    --accent-border: rgba(136, 204, 255, 0.3);
+
+    --danger: #ff6666;                    /* 危险红 */
+    --danger-bg: rgba(255, 80, 80, 0.1);
+    --danger-border: rgba(255, 80, 80, 0.3);
+    --danger-solid: #c44;
+    --danger-solid-bg: rgba(170, 68, 68, 0.15);
+    --danger-solid-border: #644;
+
+    --warn: #ffaa44;                      /* 警告橙 */
+
+    --success: #4c4;                      /* 成功绿 */
+    --success-bg: rgba(68, 170, 68, 0.15);
+    --success-border: #4c4;
+
+    --refuel: #cc4;                       /* 补给黄 */
+    --refuel-border: #554;
+
+    --text-bright: #fff;
+    --text-main: #ddd;
+    --text-mid: #aaa;
+    --text-dim: #666;
+    --text-faint: #555;
+    --text-danger: #ff5566;
+
+    --ut-gold: #d4c86a;                   /* 时间标签金 */
+    --ut-gold-border: #a8984a;
+
+    /* ---- 字体 ---- */
+    --font-mono: monospace;
+}
+
+/* ============================================================
+   通用组件 class
+   布局定位(display/position/left/top)由 JS 内联控制,
+   视觉样式(底色/边框/圆角/字体/字号)统一走 class
+   ============================================================ */
+
+/* 面板(半透明黑底 + 细边框) */
+.ui-panel {
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    font-family: var(--font-mono);
+}
+
+/* 面板头部标题行(标题 + 关闭按钮) */
+.ui-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border-dark);
+}
+
+/* 面板标题文字 */
+.ui-panel-title {
+    color: var(--accent);
+    margin: 0;
+    font-size: 14px;
+}
+
+/* 通用按钮 */
+.ui-btn {
+    padding: 6px 12px;
+    background: #333;
+    color: var(--text-bright);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+.ui-btn:hover {
+    background: var(--accent-bg);
+    color: var(--accent);
+}
+
+/* 小按钮(标题栏关闭/删除等) */
+.ui-btn-sm {
+    padding: 3px 8px;
+    background: var(--card-bg);
+    color: var(--text-mid);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    cursor: pointer;
+}
+.ui-btn-sm:hover {
+    background: var(--accent-bg);
+    color: var(--accent);
+}
+
+/* 危险按钮(删除/摧毁) */
+.ui-btn-danger {
+    padding: 3px 8px;
+    background: var(--danger-bg);
+    border: 1px solid var(--danger-border);
+    border-radius: 3px;
+    color: var(--danger);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    cursor: pointer;
+}
+.ui-btn-danger:hover {
+    background: var(--danger-bg);
+}
+
+/* 主操作按钮(确认/建造/部署) */
+.ui-btn-primary {
+    padding: 8px 24px;
+    background: var(--card-bg);
+    color: var(--accent);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    cursor: pointer;
+}
+.ui-btn-primary:hover {
+    background: var(--accent-bg);
+}
+
+/* 通用卡片/数据行 */
+.ui-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+}
+
+/* 空状态/占位提示文字 */
+.ui-hint {
+    color: var(--text-faint);
+    font-size: 11px;
+    text-align: center;
+    padding: 20px;
+}
+
+/* 分隔线 */
+.ui-divider {
+    border: none;
+    border-top: 1px solid var(--border-dark);
+}
+
+/* 标签小字(数据行的 label) */
+.ui-label {
+    color: var(--text-dim);
+    font-size: 11px;
+    margin-bottom: 4px;
+}
+
+/* 数据值(白色加粗) */
+.ui-value {
+    color: var(--text-bright);
+    font-size: 13px;
+    font-weight: bold;
+}

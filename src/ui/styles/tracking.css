@@ -1,0 +1,97 @@
+/* ============================================================
+   tracking.css — 追踪站(信息窗口 / 左侧导航栏)
+   ============================================================ */
+
+/* ---- 追踪信息窗口 ---- */
+#trackingInfo {
+    display: none;
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 240px;
+    background: var(--panel-bg);
+    color: var(--text-bright);
+    padding: 12px 15px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    border: 1px solid var(--border-dark);
+    border-radius: 5px;
+    z-index: 1000;
+}
+
+#trackingInfo .tracking-name {
+    font-weight: bold;
+    margin-bottom: 8px;
+    color: var(--accent);
+}
+
+#trackingInfo .tracking-btn-row {
+    margin-top: 10px;
+    display: flex;
+    gap: 6px;
+}
+
+#trackingInfo .tracking-control-btn {
+    flex: 1;
+    padding: 5px 0;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    background: var(--success-bg);
+    color: var(--success);
+    border: 1px solid var(--success-border);
+    border-radius: 3px;
+    cursor: pointer;
+}
+#trackingInfo .tracking-control-btn:hover {
+    background: var(--accent-bg);
+    color: var(--accent);
+}
+
+#trackingInfo .tracking-destroy-btn {
+    flex: 1;
+    padding: 5px 0;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    background: var(--danger-solid-bg);
+    color: var(--danger-solid);
+    border: 1px solid var(--danger-solid);
+    border-radius: 3px;
+    cursor: pointer;
+}
+#trackingInfo .tracking-destroy-btn:hover {
+    background: var(--danger-bg);
+}
+
+#trackingInfo .tracking-module-row {
+    color: var(--text-main);
+    font-size: 10px;
+    margin-bottom: 2px;
+}
+
+/* ---- 追踪站左侧导航栏 ---- */
+#trackingNav {
+    position: fixed;
+    left: 15px;
+    top: 0;
+    bottom: 0;
+    width: 280px;
+    background: var(--panel-bg);
+    border-right: 1px solid var(--border);
+    padding: 15px;
+    display: none;
+    flex-direction: column;
+    gap: 2px;
+    z-index: 800;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    overflow-y: auto;
+    box-sizing: border-box;
+}
+
+#trackingNav .tracking-nav-title {
+    color: var(--accent);
+    margin-bottom: 12px;
+    font-size: 14px;
+    border-bottom: 1px solid var(--border-dark);
+    padding-bottom: 8px;
+}

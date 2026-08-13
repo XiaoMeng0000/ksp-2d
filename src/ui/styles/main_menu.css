@@ -1,0 +1,72 @@
+/* ============================================================
+   main_menu.css — 主菜单（阶段 3：Canvas→DOM）
+   覆盖 menuScene.js 动态创建的 DOM 结构
+   布局值对应原 canvas 坐标：logo(30,50) 宽≤340 / 按钮 x=60 间距48 高36 字号20
+   ============================================================ */
+
+#mainMenuContainer {
+    position: fixed;
+    inset: 0;
+    z-index: 800;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    padding: 50px 0 0 30px;      /* 对应原 canvas logo 位置 (30, 50) */
+    font-family: var(--font-mono);
+    user-select: none;
+    pointer-events: none;        /* 空区域不拦截点击，背景仍走 canvas */
+}
+
+/* ---- Logo（图片优先，未就绪时文字 fallback） ---- */
+.mm-logo {
+    max-width: 340px;
+    margin-bottom: 40px;         /* 对应原 logo 与按钮间距 +40 */
+}
+.mm-logo img {
+    display: none;
+    max-width: 340px;
+    height: auto;
+}
+.mm-logo-text {
+    display: none;
+    color: #A04040;
+    font-size: 48px;
+    line-height: 1.1;
+}
+
+/* ---- 导航按钮列 ---- */
+.mm-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;                   /* 原 buttonSpacing 48 - buttonHeight 36 */
+    margin-left: 30px;           /* 对应原 buttonX=60（相对容器左 30） */
+    pointer-events: auto;
+}
+
+.mm-btn {
+    min-width: 200px;
+    height: 36px;
+    padding: 0 12px;
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.85);
+    font-family: var(--font-mono);
+    font-size: 20px;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+.mm-btn:hover {
+    background: rgba(80, 80, 160, 0.6);
+    color: #fff;
+}
+
+/* ---- 版本号（右下角） ---- */
+.mm-version {
+    position: absolute;
+    right: 20px;
+    bottom: 20px;
+    color: rgba(255, 255, 255, 0.3);
+    font-size: 11px;
+}

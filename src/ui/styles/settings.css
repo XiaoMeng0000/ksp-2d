@@ -1,0 +1,110 @@
+/* ============================================================
+   settings.css — 设置场景(左侧分类导航 + 右侧内容区)
+   ============================================================ */
+
+#settingsContainer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+    display: flex;
+    font-family: var(--font-mono);
+    color: var(--text-bright);
+    backdrop-filter: blur(4px);
+}
+
+/* 左侧导航栏 */
+#settingsNav {
+    width: 280px;
+    min-width: 280px;
+    background: var(--panel-bg);
+    border-right: 1px solid var(--border);
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 12px;
+    overflow-y: auto;
+    box-sizing: border-box;
+}
+
+#settingsNav .settings-nav-title {
+    color: var(--accent);
+    margin-bottom: 12px;
+    font-size: 14px;
+    border-bottom: 1px solid var(--border-dark);
+    padding-bottom: 8px;
+}
+
+#settingsNav .settings-cat {
+    padding: 8px 12px;
+    margin-bottom: 2px;
+    border-radius: 3px;
+    font-size: 13px;
+}
+#settingsNav .settings-cat.active {
+    color: var(--accent);
+    background: rgba(80, 80, 160, 0.4);
+}
+
+/* 底部返回按钮 */
+#settingsNav .settings-back-btn {
+    padding: 8px 12px;
+    cursor: pointer;
+    color: var(--accent);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    text-align: center;
+    font-size: 13px;
+}
+
+/* 右侧内容区 */
+#settingsContent {
+    flex: 1;
+    padding: 20px 30px;
+    overflow-y: auto;
+}
+
+#settingsContent .settings-content-title {
+    color: var(--accent);
+    font-size: 18px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 10px;
+}
+
+#settingsContent .settings-group-header {
+    background: rgba(0, 0, 0, 0.5);
+    color: var(--accent);
+    padding: 6px 12px;
+    font-size: 13px;
+    margin-top: 16px;
+    border-radius: 5px;
+    border: 1px solid var(--border-dark);
+}
+
+#settingsContent .settings-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#settingsContent .settings-row-label {
+    color: var(--text-main);
+    font-size: 13px;
+}
+
+#settingsContent .settings-row-control {
+    flex: 0 0 55%;
+    max-width: 320px;
+}
+
+#settingsContent .settings-btn-group {
+    display: flex;
+    gap: 4px;
+}

@@ -8,13 +8,14 @@ import { render } from '../renderer.js';
 import { eventBus, Events } from '../eventBus.js';
 import { gameState } from '../gameState.js';
 import { timeWarp } from '../timeWarp.js';
+import { t } from '../config/strings.js';
 
 // 追踪站内部状态
 let trackingFocusPos = null;
 let trackingSelectedId = null;
 let trackingFrameCount = 0;
 
-// 折叠状态 — 持久化，ui.js 飞船摧毁后刷新追踪树时需要
+// 折叠状态 — 持久化，UI 模块飞船摧毁后刷新追踪树时需要
 export const trackingCollapsed = {};
 
 // 由 main.js 注册时注入
@@ -60,7 +61,7 @@ export function buildTrackingTree() {
     // 将飞船添加到对应的 SOI 宿主下
     for (const ship of gameStateShips) {
         const shipNode = {
-            name: ship.displayName || ship.id || '飞船',
+            name: ship.displayName || ship.id || t('tracking.typeShip'),
             type: 'ship',
             children: [],
             id: ship.id,
@@ -80,7 +81,7 @@ export function buildTrackingTree() {
     const allFacilities = facilitySystem.getAllFacilities();
     for (const f of allFacilities) {
         const facilityNode = {
-            name: f.name || '设施',
+            name: f.name || t('tracking.typeFacility'),
             type: 'facility',
             children: [],
             id: f.id,
@@ -211,7 +212,7 @@ export function registerTrackingScene({ getTime, setTime, canvas }) {
     _canvas = canvas;
 
     sceneManager.registerScene('tracking', {
-        name: '追踪站',
+        name: t('tracking.stationName'),
         enter: () => {
             // 锁定飞船控制
             const activeShip = shipSystem.getActiveShip();
@@ -230,7 +231,7 @@ export function registerTrackingScene({ getTime, setTime, canvas }) {
                 trackingSelectedId = activeShip.id;
                 const absPos = getAbsolutePosition(activeShip);
                 trackingFocusPos = { x: absPos.x, y: absPos.y };
-                const shipName = activeShip.displayName || activeShip.id || '飞船';
+                const shipName = activeShip.displayName || activeShip.id || t('tracking.typeShip');
                 window.updateTrackingInfo({
                     id: activeShip.id,
                     name: shipName,

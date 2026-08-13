@@ -33,25 +33,6 @@ const MENUS = {
     extra: EXTRA_MENU,
 };
 
-// 菜单样式配置
-const MENU_STYLE = {
-    logoX: 30,
-    logoY: 50,
-    logoMaxWidth: 340,
-    buttonX: 60,
-    buttonStartY: 220,
-    buttonSpacing: 48,
-    buttonHeight: 36,
-    buttonMinWidth: 200,
-    fontSize: 20,
-    fontFamily: 'monospace',
-    textColor: 'rgba(255, 255, 255, 0.85)',
-    hoverBg: 'rgba(80, 80, 160, 0.6)',
-    hoverTextColor: 'rgba(255, 255, 255, 1.0)',
-    versionX: -20,
-    versionY: 20,
-    versionFontSize: 11,
-    versionColor: 'rgba(255, 255, 255, 0.3)',
-};
-
-export { MAIN_MENU, GAME_SUB_MENU, EXTRA_MENU, MENUS, MENU_STYLE };
+// 说明：主菜单布局样式（Logo/按钮/版本号）已随阶段 3 迁移至
+// src/ui/styles/main_menu.css，原 MENU_STYLE 布局常量已废弃移除
+export { MAIN_MENU, GAME_SUB_MENU, EXTRA_MENU, MENUS };

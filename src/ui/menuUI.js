@@ -2,22 +2,11 @@
 
 import { uiManager } from './uiManager.js';
 import { eventBus, Events } from '../eventBus.js';
-import { createNotification, createDialog, createInputDialog, createConfirmDialog } from './uiComponents.js';
+import { createNotification, createDialog, createInputDialog, createConfirmDialog, renderIconHtml } from './uiComponents.js';
 import { sceneManager } from '../sceneManager.js';
 import { saveManager } from '../saveManager.js';
 import { toggleDebugPanel, refreshDebugPanel } from './debugUI.js';
-import { textureManager } from '../graphics/textureManager.js';
-
-// 辅助：将 textureKey 转为 PNG <img> HTML 字符串，纹理未就绪时返回 fallback Emoji
-function renderIconHtml(textureKey, fallbackEmoji, sizePx) {
-    if (!textureKey) return fallbackEmoji || '';
-    const tex = textureManager.get(textureKey);
-    if (tex) {
-        const s = sizePx || 14;
-        return `<img src="${tex.src}" style="width:${s}px;height:${s}px;object-fit:contain;vertical-align:middle;">`;
-    }
-    return fallbackEmoji || '';
-}
+import { t } from '../config/strings.js';
 
 // EventBus 迁移 — 缓存最近一帧的飞船渲染数据，供 UI 只读函数使用
 let _cachedShipData = null;
@@ -29,42 +18,36 @@ eventBus.on(Events.RENDER_DATA, (data) => {
 const escMenu = document.createElement('div');
 escMenu.id = 'escMenu';
 escMenu.style.display = 'none';
-escMenu.style.position = 'fixed';
-escMenu.style.inset = '0';
-escMenu.style.background = 'rgba(0, 0, 0, 0.7)';
-escMenu.style.alignItems = 'center';
-escMenu.style.justifyContent = 'center';
-escMenu.style.zIndex = '10000';
-escMenu.style.backdropFilter = 'blur(4px)';
 
 function getCurrentWorldName() {
-    if (!window.currentWorldId) return '无';
+    if (!window.currentWorldId) return t('common.none');
     if (typeof window.__saveManager !== 'undefined') {
         const world = window.__saveManager.getWorld(window.currentWorldId);
-        return world ? world.metadata.name : '未知';
+        return world ? world.metadata.name : t('common.unknown');
     }
-    return '未知';
+    return t('common.unknown');
 }
 
 // 追踪站 - 根据场景返回 ESC 菜单按钮列表
+// handler 直接引用模块内函数（openSettings 由 main.js 提供，做一层包装）
 function getEscButtons(scene) {
     if (scene === 'tracking') {
         return [
-            { id: 'escResumeBtn', label: '继续游戏', action: 'window.resumeGame()' },
-            { id: 'escSaveBtn', label: '存档', action: 'window.saveGame()' },
-            { id: 'escLoadBtn', label: '读档', action: 'window.loadGame()' },
-            { id: 'escBackBtn', label: '回到飞行器', action: 'window.backToFlight()' },
-            { id: 'escSettingsBtn', label: '设置', action: 'window.openSettings()' },
-            { id: 'escQuitBtn', label: '退出到主菜单', action: 'window.quitToMenu()' }
+            { id: 'escResumeBtn', label: t('esc.resume'), handler: resumeGame },
+            { id: 'escSaveBtn', label: t('esc.save'), handler: saveGame },
+            { id: 'escLoadBtn', label: t('esc.load'), handler: loadGame },
+            { id: 'escBackBtn', label: t('esc.backToFlight'), handler: backToFlight },
+            { id: 'escSettingsBtn', label: t('common.settings'), handler: () => window.openSettings() },
+            { id: 'escQuitBtn', label: t('esc.quitToMenu'), handler: quitToMenu }
         ];
     }
     return [
-        { id: 'escResumeBtn', label: '继续游戏', action: 'window.resumeGame()' },
-        { id: 'escSaveBtn', label: '存档', action: 'window.saveGame()' },
-        { id: 'escLoadBtn', label: '读档', action: 'window.loadGame()' },
-        { id: 'escTrackingBtn', label: '追踪站', action: 'window.openTrackingStation()' },
-        { id: 'escSettingsBtn', label: '设置', action: 'window.openSettings()' },
-        { id: 'escQuitBtn', label: '退出到主菜单', action: 'window.quitToMenu()' }
+        { id: 'escResumeBtn', label: t('esc.resume'), handler: resumeGame },
+        { id: 'escSaveBtn', label: t('esc.save'), handler: saveGame },
+        { id: 'escLoadBtn', label: t('esc.load'), handler: loadGame },
+        { id: 'escTrackingBtn', label: t('esc.openTracking'), handler: openTrackingStation },
+        { id: 'escSettingsBtn', label: t('common.settings'), handler: () => window.openSettings() },
+        { id: 'escQuitBtn', label: t('esc.quitToMenu'), handler: quitToMenu }
     ];
 }
 
@@ -75,34 +58,23 @@ function renderEscMenuButtons(scene) {
     if (!btnContainer) return;
     
     btnContainer.innerHTML = '';
-    // 将 action 字符串映射到 window 函数，避免 onclick 属性中的可执行字符串
-    const actionMap = {
-        'window.resumeGame()': () => { if (typeof window.resumeGame === 'function') window.resumeGame(); },
-        'window.saveGame()': () => { if (typeof window.saveGame === 'function') window.saveGame(); },
-        'window.loadGame()': () => { if (typeof window.loadGame === 'function') window.loadGame(); },
-        'window.openTrackingStation()': () => { if (typeof window.openTrackingStation === 'function') window.openTrackingStation(); },
-        'window.backToFlight()': () => { if (typeof window.backToFlight === 'function') window.backToFlight(); },
-        'window.openSettings()': () => { if (typeof window.openSettings === 'function') window.openSettings(); },
-        'window.quitToMenu()': () => { if (typeof window.quitToMenu === 'function') window.quitToMenu(); }
-    };
     
     buttons.forEach(btn => {
         const el = document.createElement('button');
         el.id = btn.id;
         el.textContent = btn.label;
-        el.style.cssText = 'padding:6px 12px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:13px;cursor:pointer;';
-        const handler = actionMap[btn.action];
-        if (handler) el.addEventListener('click', handler);
+        el.className = 'ui-btn';
+        if (btn.handler) el.addEventListener('click', btn.handler);
         btnContainer.appendChild(el);
     });
 }
 
 escMenu.innerHTML = `
-    <div style="background: rgba(0, 0, 0, 0.85); padding: 20px 25px; border: 1px solid #555; border-radius: 5px; min-width: 250px; font-family: monospace;">
-        <h3 style="color: #88ccff; margin: 0 0 10px 0; border-bottom: 1px solid #444; padding-bottom: 5px;">菜单</h3>
-        <div id="escCurrentWorld" style="color:#666;font-size:12px;margin-bottom:15px;">当前世界：${getCurrentWorldName()}</div>
-        <div id="escBtnContainer" style="display: flex; flex-direction: column; gap: 8px;"></div>
-        <p style="margin-top: 15px; color: #666; font-size: 11px;">按 ESC 关闭</p>
+    <div class="ui-dialog" style="padding: 20px 25px; min-width: 250px;">
+        <h3 class="ui-dialog-title" style="margin-bottom: 10px;">${t('esc.menu')}</h3>
+        <div id="escCurrentWorld">${t('esc.currentWorld', { name: getCurrentWorldName() })}</div>
+        <div id="escBtnContainer"></div>
+        <p class="esc-close-hint">${t('esc.closeHint')}</p>
     </div>
 `;
 document.body.appendChild(escMenu);
@@ -114,7 +86,7 @@ uiManager.registerPanel('esc', {
     show: () => {
         const worldDisplay = document.getElementById('escCurrentWorld');
         if (worldDisplay) {
-            worldDisplay.textContent = `当前世界：${getCurrentWorldName()}`;
+            worldDisplay.textContent = t('esc.currentWorld', { name: getCurrentWorldName() });
         }
         // 追踪站 - 根据当前场景渲染按钮
         const currentScene = sceneManager.getCurrentScene();
@@ -163,101 +135,101 @@ window.addEventListener('keydown', (e) => {
 
 
 
-// ESC 菜单 — 按钮事件处理函数
-window.resumeGame = function() {
+// ESC 菜单 — 按钮事件处理函数（模块内私有，不再挂 window）
+function resumeGame() {
     uiManager.hidePanel('esc');
-};
+}
 
 // 追踪站 - 打开追踪站
-window.openTrackingStation = function() {
+function openTrackingStation() {
     if (_cachedShipData && _cachedShipData.mode === 'thrust') {
-        window.showNotification('推力模式下无法进入追踪站！', 'warning');
+        window.showNotification(t('esc.blockedThrustTracking'), 'warning');
         return;
     }
     uiManager.hidePanel('esc');
     sceneManager.switchTo('tracking');
-};
+}
 
 // 追踪站 - 回到飞行器
-window.backToFlight = function() {
+function backToFlight() {
     if (!_cachedShipData || !_cachedShipData.exists) {
-        window.showNotification('没有找到飞船', 'warning');
+        window.showNotification(t('esc.noShip'), 'warning');
         return;
     }
     uiManager.hidePanel('esc');
     sceneManager.switchTo('flight');
-};
+}
 
 // 层级存档 - 存档功能（在当前世界创建检查点）
-window.saveGame = function() {
+function saveGame() {
     try {
         const worldId = window.currentWorldId;
         if (!worldId) {
-            window.showNotification('没有当前世界', 'info');
+            window.showNotification(t('common.noWorld'), 'info');
             return;
         }
         const world = saveManager.getWorld(worldId);
-        const checkpointName = `检查点 ${world.checkpoints.length + 1}`;
+        const checkpointName = t('common.checkpointName', { n: world.checkpoints.length + 1 });
         const id = saveManager.saveCheckpoint(worldId, checkpointName);
-        if (id) window.showNotification('存档成功！已保存检查点', 'success');
-        else window.showNotification('存档失败', 'error');
+        if (id) window.showNotification(t('archive.saved'), 'success');
+        else window.showNotification(t('archive.saveFailed'), 'error');
     } catch (e) {
         console.error('[Save] 存档异常:', e);
-        window.showNotification('存档异常', 'error');
+        window.showNotification(t('archive.saveError'), 'error');
     }
-};
+}
 
 // 层级存档 - 读档功能（显示当前世界的检查点列表）
-window.loadGame = function() {
+function loadGame() {
     const worldId = window.currentWorldId;
     if (!worldId) {
-        window.showNotification('没有当前世界', 'info');
+        window.showNotification(t('common.noWorld'), 'info');
         return;
     }
     const list = saveManager.getCheckpointList(worldId);
     if (list.length === 0) {
-        window.showNotification('没有找到检查点', 'info');
+        window.showNotification(t('archive.noCheckpoints'), 'info');
         return;
     }
     const items = list.map(c => ({
         id: c.id,
         name: c.name,
-        subtitle: `${new Date(c.timestamp).toLocaleString()} · 游戏时间 ${c.gameTime.toFixed(1)}s`
+        subtitle: t('archive.checkpointSubtitle', { ts: c.timestamp, time: c.gameTime.toFixed(1) })
     }));
-    createDialog('选择检查点', items, (selectedId) => {
+    createDialog(t('archive.selectCheckpoint'), items, (selectedId) => {
         const success = saveManager.loadCheckpoint(worldId, selectedId);
         if (success) {
-            window.showNotification('✅ 读档成功！', 'success');
+            window.showNotification(t('archive.loaded'), 'success');
             if (sceneManager.getCurrentScene() === 'menu') {
                 sceneManager.switchTo('flight');
             }
             refreshDebugPanel();
         } else {
-            window.showNotification('❌ 读档失败', 'error');
+            window.showNotification(t('archive.loadFailed'), 'error');
         }
     });
-};
+}
 
 // 退出优化 - 优化退出游戏流程
-window.quitToMenu = function() {
+function quitToMenu() {
     // 1. 检查是否在推力模式
     if (_cachedShipData && _cachedShipData.mode === 'thrust') {
-        window.showNotification('推力模式下无法退出！', 'warning');
+        window.showNotification(t('esc.blockedThrustQuit'), 'warning');
         return;
     }
 
     // 2. 弹出确认对话框
-    window.__createConfirmDialog(
-        '退出到主菜单',
-        '是否保存当前进度？未保存的数据将丢失。',
+    createConfirmDialog(
+        t('esc.quitTitle'),
+        t('esc.quitMessage'),
         () => {
             // 用户选择「保存并退出」
             const worldId = window.currentWorldId;
             if (worldId) {
-                const world = window.__saveManager.getWorld(worldId);
-                const checkpointName = `检查点 ${world.checkpoints.length + 1}`;
-                window.__saveManager.saveCheckpoint(worldId, checkpointName);
-                window.showNotification('✅ 已保存检查点', 'success');
+                const world = saveManager.getWorld(worldId);
+                const checkpointName = t('common.checkpointName', { n: world.checkpoints.length + 1 });
+                saveManager.saveCheckpoint(worldId, checkpointName);
+                window.showNotification(t('archive.savedCheckpoint'), 'success');
             }
             uiManager.hidePanel('esc');
             sceneManager.switchTo('menu');
@@ -267,10 +239,10 @@ window.quitToMenu = function() {
             uiManager.hidePanel('esc');
             sceneManager.switchTo('menu');
         },
-        '保存并退出',  // 确认按钮文字
-        '直接退出'     // 取消按钮文字
+        t('esc.saveAndQuit'),  // 确认按钮文字
+        t('esc.quitDirect')     // 取消按钮文字
     );
-};
+}
 
 // 层级存档 - 暴露 UI 组件到全局，供 main.js 使用
 window.__createDialog = createDialog;
@@ -286,46 +258,54 @@ window.showNotification = function(message, type = 'info', duration = 2000) {
 // 存档管理 - 存档管理面板
 const archiveManagerPanel = document.createElement('div');
 archiveManagerPanel.id = 'archiveManagerPanel';
-archiveManagerPanel.style.cssText = `
-    display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:9999;
-    align-items:center;justify-content:center;font-family:monospace;
-`;
+archiveManagerPanel.style.display = 'none';
 archiveManagerPanel.innerHTML = `
-    <div style="background: rgba(0, 0, 0, 0.85); border: 1px solid #555; border-radius: 5px; padding: 15px; min-width: 350px; max-width: 550px; max-height: 80vh; overflow-y: auto; font-family: monospace;">
-        <h3 style="color: #88ccff; margin: 0 0 15px 0; border-bottom: 1px solid #444; padding-bottom: 5px;">存档管理</h3>
+    <div class="ui-dialog" style="min-width: 350px; max-width: 550px; max-height: 80vh; padding: 15px;">
+        <h3 class="ui-dialog-title" style="margin-bottom: 15px;">${t('archive.title')}</h3>
         <div id="archiveManagerContent"></div>
-        <button id="archiveManagerCloseBtn" 
-            style="margin-top:12px;padding:6px 12px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;cursor:pointer;">关闭</button>
+        <button id="archiveManagerCloseBtn" class="ui-btn" style="margin-top:12px;">${t('common.close')}</button>
     </div>
 `;
 document.body.appendChild(archiveManagerPanel);
 
+// 存档管理 - 事件委托（避免字符串 onclick）
+archiveManagerPanel.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const action = btn.dataset.action;
+    const worldId = btn.dataset.worldId;
+    if (action === 'view-checkpoints') {
+        renderCheckpointList(worldId);
+    } else if (action === 'delete-world') {
+        deleteWorld(worldId);
+    } else if (action === 'back-to-worlds') {
+        renderWorldList();
+    } else if (action === 'delete-checkpoint') {
+        deleteCheckpoint(worldId, btn.dataset.cpId);
+    }
+});
+
 // 存档管理 - 当前查看的世界ID
 let currentArchiveWorldId = null;
 
-// 存档管理 - 渲染世界列表
-function renderWorldList() {
+// 存档管理 - 渲染世界列表（阶段 4 起改为命名导出，供 main.js 直接引用）
+export function renderWorldList() {
     const content = document.getElementById('archiveManagerContent');
     const worldList = saveManager.getWorldList();
 
     if (worldList.length === 0) {
-        content.innerHTML = `<p style="color:#666;">没有存档世界</p>`;
+        content.innerHTML = `<p style="color:var(--text-dim);">${t('archive.noWorlds')}</p>`;
         return;
     }
 
-    let html = '<div style="display:flex;flex-direction:column;gap:6px;">';
+    let html = '<div class="ui-list">';
     worldList.forEach(world => {
         html += `
-            <div style="display:flex;align-items:center;justify-content:space-between;
-                padding:8px 10px;background:#333;border:1px solid #555;border-radius:3px;">
-                <button onclick="window.__renderCheckpointList('${world.id}')" 
-                    style="background:none;border:none;color:#88ccff;font-family:monospace;
-                    font-size:13px;cursor:pointer;text-align:left;font-weight:bold;">
+            <div class="archive-world-row">
+                <button data-action="view-checkpoints" data-world-id="${world.id}" class="archive-world-btn">
                     ${world.name}
                 </button>
-                <button onclick="window.__deleteWorld('${world.id}')" 
-                    style="padding:3px 8px;background:rgba(255,80,80,0.1);border:1px solid rgba(255,80,80,0.3);
-                    border-radius:3px;color:#ff6666;font-family:monospace;font-size:12px;cursor:pointer;">
+                <button data-action="delete-world" data-world-id="${world.id}" class="ui-btn-danger">
                     ${renderIconHtml('ui_trash_can', '🗑️', 12)}
                 </button>
             </div>
@@ -343,32 +323,27 @@ function renderCheckpointList(worldId) {
     const checkpoints = saveManager.getCheckpointList(worldId);
 
     let html = `
-        <div style="margin-bottom:12px;">
-            <button onclick="window.__renderWorldList()" 
-                style="padding:4px 10px;background:#333;color:#88ccff;border:1px solid #555;
-                border-radius:3px;font-family:monospace;font-size:12px;cursor:pointer;">
-                返回世界列表
+        <div class="archive-back-row">
+            <button data-action="back-to-worlds" class="archive-back-btn">
+                ${t('archive.backToList')}
             </button>
-            <span style="margin-left:10px;color:#aaa;font-size:12px;">${world.metadata.name}</span>
+            <span class="archive-world-name">${world.metadata.name}</span>
         </div>
     `;
 
     if (checkpoints.length === 0) {
-        html += `<p style="color:#666;">该世界没有检查点</p>`;
+        html += `<p style="color:var(--text-dim);">${t('archive.noCheckpointsInWorld')}</p>`;
     } else {
-        html += '<div style="display:flex;flex-direction:column;gap:6px;">';
+        html += '<div class="ui-list">';
         checkpoints.forEach(cp => {
             html += `
-                <div style="display:flex;align-items:center;justify-content:space-between;
-                    padding:8px 10px;background:#333;border:1px solid #555;border-radius:3px;">
+                <div class="archive-checkpoint-row">
                     <div style="text-align:left;">
-                        <div style="color:#ddd;font-size:13px;font-weight:bold;">${cp.name}</div>
-                        <div style="color:#666;font-size:11px;">${new Date(cp.timestamp).toLocaleString()} · 游戏时间 ${cp.gameTime.toFixed(1)}秒</div>
+                        <div class="archive-checkpoint-name">${cp.name}</div>
+                        <div class="archive-checkpoint-sub">${t('archive.checkpointSubtitleCn', { ts: cp.timestamp, time: cp.gameTime.toFixed(1) })}</div>
                     </div>
-                    <button onclick="window.__deleteCheckpoint('${worldId}', '${cp.id}')" 
-                        style="padding:3px 8px;background:rgba(255,80,80,0.1);border:1px solid rgba(255,80,80,0.3);
-                        border-radius:3px;color:#ff6666;font-family:monospace;font-size:12px;cursor:pointer;">
-                        删除
+                    <button data-action="delete-checkpoint" data-world-id="${worldId}" data-cp-id="${cp.id}" class="ui-btn-danger">
+                        ${t('common.delete')}
                     </button>
                 </div>
             `;
@@ -382,10 +357,10 @@ function renderCheckpointList(worldId) {
 // 存档管理 - 删除世界确认
 function deleteWorld(worldId) {
     const world = saveManager.getWorld(worldId);
-    createConfirmDialog('确认删除', `确认删除世界 "${world.metadata.name}" 及其所有检查点？此操作不可恢复。`, () => {
+    createConfirmDialog(t('archive.confirmDeleteTitle'), t('archive.confirmDeleteWorld', { name: world.metadata.name }), () => {
         saveManager.deleteWorld(worldId);
         renderWorldList();
-        window.showNotification('✅ 世界已删除', 'success');
+        window.showNotification(t('archive.worldDeleted'), 'success');
     }, () => {});
 }
 
@@ -393,18 +368,12 @@ function deleteWorld(worldId) {
 function deleteCheckpoint(worldId, checkpointId) {
     const checkpoints = saveManager.getCheckpointList(worldId);
     const cp = checkpoints.find(c => c.id === checkpointId);
-    createConfirmDialog('确认删除', `确认删除检查点 "${cp.name}"？此操作不可恢复。`, () => {
+    createConfirmDialog(t('archive.confirmDeleteTitle'), t('archive.confirmDeleteCheckpoint', { name: cp.name }), () => {
         saveManager.deleteCheckpoint(worldId, checkpointId);
         renderCheckpointList(worldId);
-        window.showNotification('✅ 检查点已删除', 'success');
+        window.showNotification(t('archive.checkpointDeleted'), 'success');
     }, () => {});
 }
-
-// 存档管理 - 暴露函数到全局
-window.__renderWorldList = renderWorldList;
-window.__renderCheckpointList = renderCheckpointList;
-window.__deleteWorld = deleteWorld;
-window.__deleteCheckpoint = deleteCheckpoint;
 
 // 存档管理 - 注册到 uiManager
 uiManager.registerPanel('archiveManager', {

@@ -6,6 +6,7 @@ import { renderIconHtml } from './uiComponents.js';
 import { getFacilityType } from '../facility/facilityTypes.js';
 import { facilitySystem } from '../facility/facilitySystem.js';
 import { sceneManager } from '../sceneManager.js';
+import { t } from '../config/strings.js';
 
 // EventBus 迁移 — 缓存最近一帧的飞船渲染数据，供 UI 只读函数使用
 let _cachedShipData = null;
@@ -32,10 +33,10 @@ function formatDistance(m) {
 }
 
 function formatEccentricity(e) {
-    if (e < 0.01) return '圆形';
-    if (e < 0.5) return '椭圆形';
-    if (e < 0.8) return '椭圆';
-    return '高椭圆';
+    if (e < 0.01) return t('tracking.eccCircular');
+    if (e < 0.5) return t('tracking.eccEllipticalLow');
+    if (e < 0.8) return t('tracking.eccElliptical');
+    return t('tracking.eccHigh');
 }
 
 function formatTime(s) {
@@ -49,40 +50,27 @@ function formatTime(s) {
     return m + 'm ' + sec + 's';
 }
 
-window.formatSpeed = formatSpeed;
-window.formatDistance = formatDistance;
-window.formatEccentricity = formatEccentricity;
-window.formatTime = formatTime;
-
+// 说明：4 个格式化函数仅供模块内部使用，已随阶段 4 收敛（不再挂到 window）
 
 
 // 追踪站 - 创建信息窗口
 const trackingInfo = document.createElement('div');
 trackingInfo.id = 'trackingInfo';
 trackingInfo.style.display = 'none';
-trackingInfo.style.position = 'fixed';
-trackingInfo.style.top = '20px';
-trackingInfo.style.right = '20px';
-trackingInfo.style.width = '240px';
-trackingInfo.style.background = 'rgba(0, 0, 0, 0.85)';
-trackingInfo.style.color = 'white';
-trackingInfo.style.padding = '12px 15px';
-trackingInfo.style.fontFamily = 'monospace';
-trackingInfo.style.fontSize = '12px';
-trackingInfo.style.border = '1px solid #444';
-trackingInfo.style.borderRadius = '5px';
-trackingInfo.style.zIndex = '1000';
 document.body.appendChild(trackingInfo);
 
 window.updateTrackingInfo = function(node) {
     trackingInfo.style.display = 'block';
-    let html = `<div style="font-weight: bold; margin-bottom: 8px; color: #88ccff;">${node.name}</div>`;
+    let html = `<div class="tracking-name">${node.name}</div>`;
     html += '<hr style="border:none;border-top:1px solid #444;margin:6px 0 8px 0;">';
-    html += `<div>类型: ${node.type === 'star' ? '恒星' : 
-        node.type === 'planet' ? '行星' : 
-        node.type === 'moon' ? '卫星' : 
-        node.type === 'ship' ? '飞船' : 
-        node.type === 'facility' ? '设施' : '未知'}</div>`;
+    const typeText = {
+        star: t('tracking.typeStar'),
+        planet: t('tracking.typePlanet'),
+        moon: t('tracking.typeMoon'),
+        ship: t('tracking.typeShip'),
+        facility: t('tracking.typeFacility')
+    }[node.type] || t('tracking.typeUnknown');
+    html += `<div>${t('tracking.typeLabel')}${typeText}</div>`;
     
     if (node.type === 'ship') {
         // 追踪站 - 用真实 ID 获取具体飞船（而非总是活动飞船）
@@ -95,15 +83,15 @@ window.updateTrackingInfo = function(node) {
                     pos: _cachedShipData.pos }
                 : null);
         if (ship) {
-            html += `<div>速度: ${formatSpeed(ship.vel)}</div>`;
-            html += `<div>SOI: ${ship.currentSOI || '深空'}</div>`;
+            html += `<div>${t('tracking.speedLabel')}${formatSpeed(ship.vel)}</div>`;
+            html += `<div>SOI: ${ship.currentSOI || t('tracking.deepSpace')}</div>`;
             // 追踪站 - 扩展显示燃料、质量、Δv
             const fuel = ship.fuel !== undefined ? ship.fuel : 'N/A';
             const maxFuel = ship.maxFuel !== undefined ? ship.maxFuel : 'N/A';
-            html += `<div>燃料: ${fuel} / ${maxFuel}</div>`;
+            html += `<div>${t('tracking.fuelLabel')}${fuel} / ${maxFuel}</div>`;
             // 使用 dryMass，单位改为 t
             const mass = ship.dryMass !== undefined ? ship.dryMass : 'N/A';
-            html += `<div>干质量: ${mass} t</div>`;
+            html += `<div>${t('tracking.dryMassLabel')}${mass} t</div>`;
             // 追踪站 - 计算 Δv
             let dv = 'N/A';
             if (ship.kepler && ship.currentGM !== undefined) {
@@ -114,15 +102,15 @@ window.updateTrackingInfo = function(node) {
             }
             html += `<div>Δv: ${dv}</div>`;
             if (ship.kepler) {
-                html += `<div>离心率: ${formatEccentricity(ship.kepler.e)}</div>`;
+                html += `<div>${t('tracking.eccLabel')}${formatEccentricity(ship.kepler.e)}</div>`;
             }
 
             // 模块系统 - 追踪站显示飞船模块
             const modules = ship.modules || [];
             html += '<hr style="border:none;border-top:1px solid #444;margin:8px 0;">';
-            html += '<div style="color:#666;font-size:11px;margin-bottom:4px;">模块:</div>';
+            html += '<div style="color:#666;font-size:11px;margin-bottom:4px;">' + t('tracking.modules') + '</div>';
             if (modules.length === 0) {
-                html += '<div style="color:#555;font-size:10px;margin-bottom:4px;">无</div>';
+                html += '<div style="color:#555;font-size:10px;margin-bottom:4px;">' + t('tracking.noModules') + '</div>';
             } else {
                 const counts = {};
                 for (const mod of modules) {
@@ -131,49 +119,39 @@ window.updateTrackingInfo = function(node) {
                 for (const [typeId, count] of Object.entries(counts)) {
                     const def = getModuleDef(typeId);
                     if (def) {
-                        html += `<div style="color:#ddd;font-size:10px;margin-bottom:2px;">${renderIconHtml(def.iconTextureKey, def.icon)} ${def.name} (×${count})</div>`;
+                        html += `<div class="tracking-module-row">${renderIconHtml(def.iconTextureKey, def.icon)} ${def.name} (×${count})</div>`;
                     }
                 }
             }
 
             // 追踪站 - 添加控制/摧毁按钮（统一带边框样式，等高等宽）
-            html += `<div style="margin-top: 10px; display: flex; gap: 6px;">
-                <button id="trackingControlBtn" style="
-                    flex: 1; padding: 5px 0; font-family: monospace; font-size: 12px;
-                    background: rgba(68, 170, 68, 0.15); color: #4c4;
-                    border: 1px solid #4c4; border-radius: 3px; cursor: pointer;
-                ">控制</button>
-                <button id="trackingDestroyBtn" style="
-                    flex: 1; padding: 5px 0; font-family: monospace; font-size: 12px;
-                    background: rgba(170, 68, 68, 0.15); color: #c44;
-                    border: 1px solid #c44; border-radius: 3px; cursor: pointer;
-                ">摧毁</button>
+            html += `<div class="tracking-btn-row">
+                <button id="trackingControlBtn" class="tracking-control-btn">${t('tracking.control')}</button>
+                <button id="trackingDestroyBtn" class="tracking-destroy-btn">${t('tracking.destroy')}</button>
             </div>`;
         }
     } else if (node.type === 'facility') {
         html += '<hr style="border:none;border-top:1px solid #444;margin:6px 0 8px 0;">';
         const typeCfg = node.facilityTypeId ? getFacilityType(node.facilityTypeId) : null;
-        html += '<div>类型: ' + (typeCfg ? typeCfg.name : '设施') + '</div>';
-        html += '<div>对接口: ' + (node.usedDocks ?? 0) + ' / ' + (node.maxDocks ?? 0) + '</div>';
+        html += '<div>' + t('tracking.typeLabel') + (typeCfg ? typeCfg.name : t('tracking.typeFacility')) + '</div>';
+        html += '<div>' + t('tracking.docksLabel') + (node.usedDocks ?? 0) + ' / ' + (node.maxDocks ?? 0) + '</div>';
         
         // 停靠飞船列表
         const fac = node.id ? facilitySystem.getFacility(node.id) : null;
         if (fac && fac.dockedShips && fac.dockedShips.length > 0) {
             html += '<hr style="border:none;border-top:1px solid #444;margin:6px 0;">';
-            html += '<div style="color:#666;font-size:11px;margin-bottom:4px;">停靠飞船:</div>';
+            html += '<div style="color:#666;font-size:11px;margin-bottom:4px;">' + t('tracking.dockedShips') + '</div>';
             for (const s of fac.dockedShips) {
-                html += '<div style="color:#ddd;font-size:10px;margin-bottom:2px;">' + renderIconHtml('ship_default_active', '🚀', 12) + ' ' + (s.displayName || s.id) + '</div>';
+                html += '<div class="tracking-module-row">' + renderIconHtml('ship_default_active', '🚀', 12) + ' ' + (s.displayName || s.id) + '</div>';
             }
         } else {
-            html += '<div style="color:#555;font-size:10px;margin-top:4px;">无停靠飞船</div>';
+            html += '<div style="color:#555;font-size:10px;margin-top:4px;">' + t('tracking.noDockedShips') + '</div>';
         }
         
         // 设施控制 + 摧毁按钮
-        html += '<div style="margin-top: 10px; display: flex; gap: 6px;">' +
-            '<button id="trackingControlBtn" style="flex:1;padding:5px 0;font-family:monospace;font-size:12px;' +
-            'background:rgba(68,170,68,0.15);color:#4c4;border:1px solid #4c4;border-radius:3px;cursor:pointer;">控制</button>' +
-            '<button id="trackingDestroyBtn" style="flex:1;padding:5px 0;font-family:monospace;font-size:12px;' +
-            'background:rgba(170,68,68,0.15);color:#c44;border:1px solid #c44;border-radius:3px;cursor:pointer;">摧毁</button>' +
+        html += '<div class="tracking-btn-row">' +
+            '<button id="trackingControlBtn" class="tracking-control-btn">' + t('tracking.control') + '</button>' +
+            '<button id="trackingDestroyBtn" class="tracking-destroy-btn">' + t('tracking.destroy') + '</button>' +
             '</div>';
     }
     
@@ -209,15 +187,15 @@ window.updateTrackingInfo = function(node) {
                 const allShips = window.__shipSystem?.getAllShips() || [];
                 if (allShips.length <= 1) {
                     if (typeof window.showNotification === 'function') {
-                        window.showNotification('至少保留一艘飞船', 'warning');
+                        window.showNotification(t('tracking.keepAtLeastOneShip'), 'warning');
                     }
                     return;
                 }
             }
             // 弹出确认对话框
             window.__createConfirmDialog(
-                '确认摧毁',
-                node.type === 'facility' ? '摧毁设施将释放所有停靠飞船，该操作无法撤销。是否继续？' : '该操作无法撤销，是否继续摧毁？',
+                t('tracking.confirmDestroyTitle'),
+                node.type === 'facility' ? t('tracking.confirmDestroyFacilityMsg') : t('tracking.confirmDestroyMsg'),
                 () => {
                     if (typeof node.delete === 'function') {
                         node.delete();
@@ -230,16 +208,16 @@ window.updateTrackingInfo = function(node) {
                         }
                     }
                     if (typeof window.showNotification === 'function') {
-                        window.showNotification(node.type === 'facility' ? '设施已摧毁' : '飞船已摧毁', 'info');
+                        window.showNotification(node.type === 'facility' ? t('tracking.facilityDestroyed') : t('tracking.shipDestroyed'), 'info');
                     }
                 },
                 () => {
                     if (typeof window.showNotification === 'function') {
-                        window.showNotification('已取消摧毁', 'info');
+                        window.showNotification(t('tracking.destroyCancelled'), 'info');
                     }
                 },
-                '摧毁',
-                '取消'
+                t('tracking.destroy'),
+                t('common.cancel')
             );
         }, { once: true });
     }
@@ -252,15 +230,8 @@ window.hideTrackingInfo = function() {
 // 追踪站 - 导航栏
 const trackingNav = document.createElement('div');
 trackingNav.id = 'trackingNav';
-trackingNav.style.cssText = `
-    position:fixed;left:15px;top:0;bottom:0;width:280px;
-    background:rgba(0,0,0,0.85);border-right:1px solid #555;
-    padding:15px;display:none;flex-direction:column;gap:2px;
-    z-index:800;font-family:monospace;font-size:12px;
-    overflow-y:auto;box-sizing:border-box;
-`;
 trackingNav.innerHTML = `
-    <div style="color:#88ccff;margin-bottom:12px;font-size:14px;border-bottom:1px solid #444;padding-bottom:8px;">天体列表</div>
+    <div class="tracking-nav-title">${t('tracking.bodyList')}</div>
     <div id="trackingTree"></div>
 `;
 document.body.appendChild(trackingNav);

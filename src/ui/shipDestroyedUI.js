@@ -7,6 +7,7 @@
 import { eventBus, Events } from '../eventBus.js';
 import { sceneManager } from '../sceneManager.js';
 import { timeWarp } from '../timeWarp.js';
+import { t } from '../config/strings.js';
 
 // 最近一次游戏时间缓存（CELESTIAL_TIME_UPDATED 广播，供损毁报告展示）
 let _lastGameTime = 0;
@@ -19,8 +20,8 @@ eventBus.on(Events.CELESTIAL_TIME_UPDATED, ({ time }) => {
 
 // 损毁原因文案映射
 const REASON_TEXT = {
-    atmosphere: '在大气层中坠毁',
-    surface: '撞击天体表面'
+    atmosphere: t('destroyed.reasonAtmosphere'),
+    surface: t('destroyed.reasonSurface')
 };
 
 // 数值格式化：>=1000 转 km，否则保留 m
@@ -72,17 +73,17 @@ function showDestroyedPanel(data) {
 
     // 标题
     const title = document.createElement('h3');
-    title.textContent = '💥 飞船损毁报告';
+    title.textContent = t('destroyed.title');
     title.style.cssText = 'color:#ff5566;margin:0 0 16px 0;border-bottom:1px solid #444;padding-bottom:10px;font-size:18px;';
 
     // 损毁信息
     const infoRows = [
-        ['飞船', data.shipName || data.shipId || '未知'],
-        ['损毁原因', REASON_TEXT[data.reason] || data.reason || '未知'],
-        ['所在天体', data.bodyName || '深空'],
-        ['损毁高度', formatDist(data.altitude || 0)],
-        ['损毁速度', Math.round(data.speed || 0) + ' m/s'],
-        ['游戏时间', _lastGameTime.toFixed(1) + ' s']
+        [t('destroyed.ship'), data.shipName || data.shipId || t('common.unknown')],
+        [t('destroyed.reason'), REASON_TEXT[data.reason] || data.reason || t('common.unknown')],
+        [t('destroyed.body'), data.bodyName || t('tracking.deepSpace')],
+        [t('destroyed.altitude'), formatDist(data.altitude || 0)],
+        [t('destroyed.speed'), Math.round(data.speed || 0) + ' m/s'],
+        [t('destroyed.gameTime'), _lastGameTime.toFixed(1) + ' s']
     ];
 
     const infoBox = document.createElement('div');
@@ -107,9 +108,9 @@ function showDestroyedPanel(data) {
     btnRow.style.cssText = 'display:flex;justify-content:center;gap:10px;';
 
     const loadBtn = document.createElement('button');
-    loadBtn.textContent = '读取存档';
+    loadBtn.textContent = t('destroyed.loadSave');
     const trackingBtn = document.createElement('button');
-    trackingBtn.textContent = '前往追踪站';
+    trackingBtn.textContent = t('destroyed.goTracking');
 
     const btnStyle = ''
         + 'padding:8px 14px;background:#333;color:#ddd;'
@@ -136,7 +137,7 @@ function showDestroyedPanel(data) {
         if (typeof window.openLoadMenu === 'function') {
             window.openLoadMenu();
         } else {
-            window.showNotification('存档菜单未加载', 'error');
+            window.showNotification(t('destroyed.loadMenuMissing'), 'error');
         }
     });
 

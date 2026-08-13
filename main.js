@@ -1,5 +1,6 @@
 // GameState 加载
 import { gameState } from './src/gameState.js';
+import { t } from './src/config/strings.js';
 
 // SaveManager - 加载存档管理器
 import './src/saveManager.js';
@@ -17,6 +18,7 @@ import { facilitySystem } from './src/facility/facilitySystem.js';
 // UI加载 - UI 模块必须尽早加载，确保菜单按钮点击时函数已就绪
 import './src/ui/trackingUI.js';
 import './src/ui/menuUI.js';
+import { renderWorldList } from './src/ui/menuUI.js';
 import './src/ui/shipBuilderUI.js';
 import './src/ui/facilityDeployUI.js';
 import './src/ui/flightUI.js';
@@ -85,7 +87,7 @@ function gameLoop(timestamp) {
     } catch (e) {
         console.error('[GameLoop] 异常:', e);
         if (typeof window.showNotification === 'function') {
-            window.showNotification('游戏发生异常: ' + e.message, 'error', 5000);
+            window.showNotification(t('newgame.exception', { msg: e.message }), 'error', 5000);
         }
     }
 
@@ -185,7 +187,7 @@ if (textureManager.isReady() && audioCore.isReady()) {
 
         if (failed > 0) {
             if (typeof window.showNotification === 'function') {
-                window.showNotification(failed + ' 张图片加载失败，部分界面可能异常', 'warning', 4000);
+                window.showNotification(t('newgame.imgLoadFail', { n: failed }), 'warning', 4000);
             }
         }
     };
@@ -212,7 +214,7 @@ if (textureManager.isReady() && audioCore.isReady()) {
 
         if (failed > 0) {
             if (typeof window.showNotification === 'function') {
-                window.showNotification(failed + ' 个音频加载失败，相关声音可能缺失', 'warning', 4000);
+                window.showNotification(t('newgame.audioLoadFail', { n: failed }), 'warning', 4000);
             }
         }
     };
@@ -233,7 +235,7 @@ if (textureManager.isReady() && audioCore.isReady()) {
 // 启动游戏循环
 requestAnimationFrame(gameLoop);
 
-// 追踪站 — 桥接 exports 供 ui.js 使用（飞船建造/摧毁刷新追踪树依赖）
+// 追踪站 — 桥接 exports 供 UI 模块使用（飞船建造/摧毁刷新追踪树依赖）
 window.__celestialBodies = celestialBodies;
 window.buildTrackingTree = buildTrackingTree;
 window.renderTrackingNav = renderTrackingNav;
@@ -261,11 +263,11 @@ window.startNewGame = function() {
     eventBus.emit(Events.CELESTIAL_TIME_UPDATED, { time: 0, dt: 0 });
     
     if (typeof window.__createInputDialog === 'function') {
-        window.__createInputDialog('新世界名称', '输入世界名称', '新世界', (name) => {
+        window.__createInputDialog(t('newgame.worldNameTitle'), t('newgame.worldNamePlaceholder'), t('newgame.worldNameDefault'), (name) => {
             // 飞船系统 - 使用 shipSystem 创建飞船实例
-            const newShip = shipSystem.createShip('debug_behemoth', '初始飞船', ['construction_package']);
+            const newShip = shipSystem.createShip('debug_behemoth', t('newgame.defaultShip'), ['construction_package']);
             if (!newShip) {
-                window.showNotification('飞船创建失败', 'error');
+                window.showNotification(t('build.createFailed'), 'error');
                 return;
             }
 
@@ -309,7 +311,7 @@ window.startNewGame = function() {
                 };
                 facilitySystem.createFacility(
                     'orbital_dockyard',
-                    'Kerbin 轨道船坞',
+                    t('newgame.startDockName'),
                     dockyardPos,
                     dockyardVel,
                     homeworld.name
@@ -320,15 +322,15 @@ window.startNewGame = function() {
             window.currentWorldId = window.__saveManager.createWorld(name);
             if (window.currentWorldId) {
                 sceneManager.switchTo('flight');
-                window.showNotification('新世界创建成功！', 'success');
+                window.showNotification(t('newgame.success'), 'success');
             } else {
                 // 名称冲突 — 回滚已创建的飞船/设施，不切场景
                 gameState.reset();
-                window.showNotification('世界名称已存在，请换一个', 'error');
+                window.showNotification(t('newgame.nameExists'), 'error');
             }
         });
     } else {
-        window.showNotification('UI 组件未加载', 'error');
+        window.showNotification(t('newgame.uiNotLoaded'), 'error');
     }
 };
 
@@ -337,7 +339,7 @@ window.startNewGame = function() {
 window.continueGame = function() {
     const worldList = window.__saveManager.getWorldList();
     if (worldList.length === 0) {
-        window.showNotification('没有存档，开始新游戏吧', 'info');
+        window.showNotification(t('load.noSaveStartNew'), 'info');
         return;
     }
 
@@ -356,7 +358,7 @@ window.continueGame = function() {
     }
 
     if (!latestCheckpoint || !latestWorldId) {
-        window.showNotification('没有找到有效的检查点', 'info');
+        window.showNotification(t('load.noValidCheckpoint'), 'info');
         return;
     }
 
@@ -369,28 +371,28 @@ window.continueGame = function() {
 window.openLoadMenu = function() {
     const worldList = window.__saveManager.getWorldList();
     if (worldList.length === 0) {
-        window.showNotification('没有存档', 'info');
+        window.showNotification(t('load.noSaves'), 'info');
         return;
     }
 
     const worldItems = worldList.map(w => ({
         id: w.id,
-        name: `${w.name}  (${w.checkpointCount} 个检查点)`,
+        name: t('load.worldItem', { name: w.name, count: w.checkpointCount }),
         subtitle: `${new Date(w.createdAt).toLocaleString()}`
     }));
 
-    window.__createDialog('选择世界', worldItems, (worldId) => {
+    window.__createDialog(t('load.selectWorld'), worldItems, (worldId) => {
         const checkpoints = window.__saveManager.getCheckpointList(worldId);
         if (checkpoints.length === 0) {
-            window.showNotification('该世界没有检查点', 'info');
+            window.showNotification(t('archive.noCheckpointsInWorld'), 'info');
             return;
         }
         const cpItems = checkpoints.map(c => ({
             id: c.id,
             name: c.name,
-            subtitle: `${new Date(c.timestamp).toLocaleString()} · 游戏时间 ${c.gameTime.toFixed(1)}s`
+            subtitle: t('archive.checkpointSubtitle', { ts: c.timestamp, time: c.gameTime.toFixed(1) })
         }));
-        window.__createDialog('选择检查点', cpItems, (checkpointId) => {
+        window.__createDialog(t('load.selectCheckpoint'), cpItems, (checkpointId) => {
             window.currentWorldId = worldId;
             window.__saveManager.loadCheckpoint(worldId, checkpointId);
             sceneManager.switchTo('flight');
@@ -403,9 +405,7 @@ window.openArchiveManager = function() {
     const panel = document.getElementById('archiveManagerPanel');
     if (panel) {
         panel.style.display = 'flex';
-        if (typeof window.__renderWorldList === 'function') {
-            window.__renderWorldList();
-        }
+        renderWorldList();
     } else {
         console.warn('[Archive] archiveManagerPanel 未找到');
     }
@@ -455,7 +455,7 @@ window.openFeedback = function() {
     qqRow.style.cssText = 'display:flex;align-items:center;margin-bottom:14px;';
     qqRow.appendChild(renderIcon('icon_qq', '\u{1F4F1}'));
     const qqText = document.createElement('span');
-    qqText.textContent = 'QQ\uFF1A1570447677';
+    qqText.textContent = t('feedback.qq');
     qqText.style.cssText = 'color:#ddd;font-size:13px;';
     qqRow.appendChild(qqText);
 
@@ -464,7 +464,7 @@ window.openFeedback = function() {
     emailRow.style.cssText = 'display:flex;align-items:center;margin-bottom:18px;';
     emailRow.appendChild(renderIcon('icon_email', '\u{1F4E7}'));
     const emailText = document.createElement('span');
-    emailText.textContent = '\u90AE\u7BB1\uFF1Amc1234com@163.com';
+    emailText.textContent = t('feedback.email');
     emailText.style.cssText = 'color:#ddd;font-size:13px;';
     emailRow.appendChild(emailText);
 
@@ -472,7 +472,7 @@ window.openFeedback = function() {
     const btnRow = document.createElement('div');
     btnRow.style.cssText = 'display:flex;justify-content:flex-end;';
     const closeBtn = document.createElement('button');
-    closeBtn.textContent = '\u5173\u95ED';
+    closeBtn.textContent = t('common.close');
     closeBtn.style.cssText = ''
         + 'padding:5px 16px;background:#333;color:#ddd;'
         + 'border:1px solid #555;border-radius:3px;'

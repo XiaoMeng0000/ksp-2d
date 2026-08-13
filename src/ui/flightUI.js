@@ -4,9 +4,10 @@ import { uiManager } from './uiManager.js';
 import { eventBus, Events } from '../eventBus.js';
 import { facilitySystem } from '../facility/facilitySystem.js';
 import { getFacilityCompartments, getFacilityType, getCompartmentDef } from '../facility/facilityTypes.js';
-import { getModuleDef, getAllModules } from '../ship/moduleTypes.js';
+import { getModuleDef } from '../ship/moduleTypes.js';
 import { textureManager } from '../graphics/textureManager.js';
 import { renderIconHtml } from './uiComponents.js';
+import { t } from '../config/strings.js';
 
 // EventBus 迁移 — 缓存最近一帧的飞船渲染数据，供 UI 只读函数使用
 let _cachedShipData = null;
@@ -20,14 +21,6 @@ let _controlledDockedShipId = null;
 // 飞船建造UI - 左侧工具栏
 const leftToolbar = document.createElement('div');
 leftToolbar.id = 'leftToolbar';
-leftToolbar.style.cssText = `
-    position:fixed;left:15px;top:50%;transform:translateY(-50%);
-    background:rgba(0,0,0,0.85);border:1px solid #555;border-radius:5px;
-    padding:8px;display:flex;flex-direction:column;gap:8px;
-    max-height:75vh;overflow-y:auto;
-    z-index:900;opacity:0;pointer-events:none;transition:opacity 0.3s ease;
-    font-family:monospace;
-`;
 leftToolbar.innerHTML = '';
 document.body.appendChild(leftToolbar);
 
@@ -40,12 +33,7 @@ function renderToolbarIcons(mode, data) {
 
     const createIcon = (icon, title, onClick, textureKey) => {
         const btn = document.createElement('button');
-        btn.style.cssText = `
-            width:40px;height:40px;padding:0;background:rgba(0,0,0,0.85);color:#88ccff;
-            border:1px solid #555;border-radius:3px;cursor:pointer;
-            font-family:monospace;font-size:16px;display:flex;
-            align-items:center;justify-content:center;flex-shrink:0;
-        `;
+        btn.className = 'toolbar-icon-btn';
         btn.title = title;
 
         // PNG 纹理就绪时用 <img>，否则 fallback 到 Emoji
@@ -63,12 +51,6 @@ function renderToolbarIcons(mode, data) {
             btn.innerHTML = icon;
         }
 
-        btn.addEventListener('mouseenter', () => {
-            btn.style.background = 'rgba(136,204,255,0.15)';
-        });
-        btn.addEventListener('mouseleave', () => {
-            btn.style.background = 'rgba(0,0,0,0.85)';
-        });
         btn.addEventListener('click', onClick);
         leftToolbar.appendChild(btn);
     };
@@ -82,7 +64,7 @@ function renderToolbarIcons(mode, data) {
             seen.add(def.capability);
 
             if (def.capability === 'deploy_facility') {
-                createIcon('🔧', '部署设施', () => {
+                createIcon('🔧', t('facility.deploy'), () => {
                     window.openFacilityDeployPanel();
                 }, 'icon_deploy_facility');
             }
@@ -137,10 +119,10 @@ function openCompartmentPanel(facility, compartmentId) {
             html = buildSupplyTerminalContent(facility);
             break;
         case 'laboratory':
-            html = '<div style="display:flex;align-items:center;justify-content:center;height:120px;color:#555;font-size:13px;">蓝图研究功能开发中...</div>';
+            html = '<div style="display:flex;align-items:center;justify-content:center;height:120px;color:#555;font-size:13px;">' + t('facility.bridgeResearch') + '</div>';
             break;
         default:
-            html = '<div style="color:#555;">未知舱室</div>';
+            html = '<div style="color:#555;">' + t('facility.unknownCompartment') + '</div>';
     }
 
     content.innerHTML = html;
@@ -152,46 +134,45 @@ function openCompartmentPanel(facility, compartmentId) {
 
 function buildBridgeContent(facility) {
     const typeConfig = getFacilityType(facility.typeId);
-    const typeName = typeConfig ? typeConfig.name : '设施';
+    const typeName = typeConfig ? typeConfig.name : t('facility.typeName');
     const docksUsed = facility.usedDocks || 0;
     const docksMax = facility.maxDocks || 0;
     const pct = docksMax > 0 ? (docksUsed / docksMax * 100) : 0;
 
     const card = (label, value, accent) => `
-        <div style="background:#333;border:1px solid #555;border-radius:3px;
-            padding:10px 12px;display:flex;flex-direction:column;gap:4px;min-width:0;">
-            <span style="color:#666;font-size:10px;">${label}</span>
-            <span style="color:${accent || '#ccc'};font-size:13px;font-weight:bold;
+        <div class="ui-card" style="padding:10px 12px;display:flex;flex-direction:column;gap:4px;min-width:0;">
+            <span style="color:var(--text-dim);font-size:10px;">${label}</span>
+            <span style="color:${accent || 'var(--text-mid)'};font-size:13px;font-weight:bold;
                 white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${value}</span>
         </div>`;
 
     let html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">';
-    html += card('设施名称', facility.name);
-    html += card('设施类型', typeName, '#88ccff');
-    html += card('对接口',
+    html += card(t('facility.nameLabel'), facility.name);
+    html += card(t('facility.typeLabel'), typeName, '#88ccff');
+    html += card(t('facility.dockLabel'),
         `<span style="display:inline-block;width:80px;height:6px;background:#333;border-radius:3px;vertical-align:middle;margin-right:6px;">
             <span style="display:inline-block;width:${pct}%;height:100%;background:#88ccff;border-radius:3px;"></span>
         </span> ${docksUsed} / ${docksMax}`, '#88ccff');
-    html += card('升级等级', (facility.upgradeLevel || 1) + ' 级');
+    html += card(t('facility.upgradeLabel'), (facility.upgradeLevel || 1) + t('facility.levelSuffix'));
     html += '</div>';
 
-    html += card('所属天体', facility.hostSOI || '-', '#aaa');
-    html += '<div style="margin-top:8px;">' + card('交互范围', (facility.interactionRange || '-') + ' 单位', '#aaa') + '</div>';
+    html += card(t('facility.hostBody'), facility.hostSOI || '-', '#aaa');
+    html += '<div style="margin-top:8px;">' + card(t('facility.interactionRange'), (facility.interactionRange || '-') + t('facility.rangeUnit'), '#aaa') + '</div>';
 
     if (_controlledDockedShipId) {
         const ship = facility.dockedShips?.find(s => s.id === _controlledDockedShipId);
         if (ship) {
             html += '<hr style="border:none;border-top:1px solid #444;margin:12px 0;">';
-            html += `<div style="color:#88ccff;font-size:13px;margin-bottom:8px;">${renderIconHtml('ship_default_active', '🚀', 12)} 当前控制：${ship.displayName || ship.id}</div>`;
+            html += `<div style="color:#88ccff;font-size:13px;margin-bottom:8px;">${renderIconHtml('ship_default_active', '🚀', 12)} ${t('facility.currentControl')}${ship.displayName || ship.id}</div>`;
             html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">';
-            html += card('燃料', (ship.fuel ?? '-') + ' / ' + (ship.maxFuel ?? '-'));
-            html += card('干质量', (ship.dryMass ?? '-') + ' t');
-            html += card('模块', (ship.modules?.length || 0) + ' 个');
+            html += card(t('facility.fuelLabel'), (ship.fuel ?? '-') + ' / ' + (ship.maxFuel ?? '-'));
+            html += card(t('facility.dryMassLabel'), (ship.dryMass ?? '-') + ' t');
+            html += card(t('facility.modulesLabel'), (ship.modules?.length || 0) + t('common.unitCount'));
             html += '</div>';
-            html += `<button onclick="window.__releaseShipControl()" style="
+            html += `<button data-action="release-control" style="
                 padding:5px 16px;background:#333;color:#ccc;border:1px solid #555;
                 border-radius:3px;cursor:pointer;font-family:monospace;font-size:12px;
-            ">返回设施总览</button>`;
+            ">${t('facility.backToOverview')}</button>`;
         }
     }
     return html;
@@ -208,20 +189,20 @@ function buildDockHubContent(facility) {
             + 'width:100%;padding:8px;background:rgba(68,136,255,0.15);color:#88ccff;'
             + 'border:1px solid #448;border-radius:3px;cursor:pointer;'
             + 'font-family:monospace;font-size:12px;margin-bottom:12px;'
-            + '">对接当前飞船：' + (activeShip.displayName || activeShip.id) + '（剩余 ' + freeDocks + ' 个对接口）</button>';
+            + '">' + t('dock.dockCurrentShip', { name: (activeShip.displayName || activeShip.id), free: freeDocks }) + '</button>';
     } else if (activeShip && freeDocks <= 0) {
         html += '<div style="color:#c44;font-size:12px;margin-bottom:12px;padding:6px 10px;'
             + 'background:rgba(170,68,68,0.1);border:1px solid #644;border-radius:3px;">'
-            + '⚠ 对接口已满（0/' + (facility.maxDocks || 0) + '）</div>';
+            + t('dock.docksFull', { max: (facility.maxDocks || 0) }) + '</div>';
     } else if (!activeShip) {
-        html += '<div style="color:#666;font-size:11px;margin-bottom:10px;padding:4px 0;">控制飞船靠近后可对接</div>';
+        html += '<div style="color:#666;font-size:11px;margin-bottom:10px;padding:4px 0;">' + t('dock.approachHint') + '</div>';
     }
 
     const dockedShips = facility.dockedShips || [];
     if (dockedShips.length === 0) {
-        html += '<div style="color:#555;font-size:12px;text-align:center;padding:20px;">暂无停靠飞船</div>';
+        html += '<div style="color:#555;font-size:12px;text-align:center;padding:20px;">' + t('dock.noDockedShips') + '</div>';
     } else {
-        html += '<div style="color:#666;font-size:11px;margin-bottom:8px;">停靠飞船（' + dockedShips.length + ' 艘）</div>';
+        html += '<div style="color:#666;font-size:11px;margin-bottom:8px;">' + t('dock.dockedShips', { n: dockedShips.length }) + '</div>';
         html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">';
         for (const ship of dockedShips) {
             const fuelPct = ship.maxFuel > 0 ? (ship.fuel / ship.maxFuel * 100) : 0;
@@ -234,18 +215,18 @@ function buildDockHubContent(facility) {
                 + '</span>'
                 + '<span style="font-size:10px;color:#888;">' + fuelPct.toFixed(0) + '%</span>'
                 + '</div>'
-                + '<div style="font-size:10px;color:#666;">模块: ' + (ship.modules?.length || 0) + ' 个</div>'
+                + '<div style="font-size:10px;color:#666;">' + t('dock.modulesCount', { n: ship.modules?.length || 0 }) + '</div>'
                 + '</div>';
             if (!activeShip) {
                 html += '<div style="display:flex;gap:6px;">'
-                    + '<button onclick="window.__facilitySwitchControl(\'' + ship.id + '\')" style="'
+                    + '<button data-action="switch-control" data-ship-id="' + ship.id + '" style="'
                     + 'flex:1;padding:5px 0;background:#333;color:#ccc;border:1px solid #555;'
                     + 'border-radius:3px;cursor:pointer;font-family:monospace;font-size:11px;'
-                    + '">切换控制</button>'
-                    + '<button onclick="window.__facilityUndockShip(\'' + ship.id + '\')" style="'
+                    + '">' + t('dock.switchControl') + '</button>'
+                    + '<button data-action="undock-ship" data-ship-id="' + ship.id + '" style="'
                     + 'flex:1;padding:5px 0;background:#333;color:#8f8;border:1px solid #484;'
                     + 'border-radius:3px;cursor:pointer;font-family:monospace;font-size:11px;'
-                    + '">起飞</button>'
+                    + '">' + t('dock.takeoff') + '</button>'
                     + '</div>';
             }
             html += '</div>';
@@ -276,9 +257,9 @@ function buildSupplyTerminalContent(facility) {
     let html = '';
     const dockedShips = facility.dockedShips || [];
     if (dockedShips.length === 0) {
-        html += '<div style="color:#555;font-size:12px;text-align:center;padding:20px;">暂无停靠飞船可补给</div>';
+        html += '<div style="color:#555;font-size:12px;text-align:center;padding:20px;">' + t('dock.noDockedShipsRefuel') + '</div>';
     } else {
-        html += '<div style="color:#666;font-size:11px;margin-bottom:8px;">可补给飞船（' + dockedShips.length + ' 艘）</div>';
+        html += '<div style="color:#666;font-size:11px;margin-bottom:8px;">' + t('dock.refuelableShips', { n: dockedShips.length }) + '</div>';
         html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">';
         for (const ship of dockedShips) {
             const fuelPct = ship.maxFuel > 0 ? (ship.fuel / ship.maxFuel * 100) : 0;
@@ -293,11 +274,11 @@ function buildSupplyTerminalContent(facility) {
                 + '</div>'
                 + '<div style="font-size:10px;color:#666;">' + (ship.fuel ?? '-') + ' / ' + (ship.maxFuel ?? '-') + '</div>'
                 + '</div>'
-                + '<button onclick="window.__facilityRefuelShip(\'' + ship.id + '\')" style="'
+                + '<button data-action="refuel-ship" data-ship-id="' + ship.id + '" style="'
                 + 'width:100%;padding:6px 0;background:#333;color:#cc4;border:1px solid #554;'
                 + 'border-radius:3px;cursor:pointer;font-family:monospace;font-size:11px;'
-                + '">补给燃料</button>'
-                + '<div style="font-size:9px;color:#666;text-align:center;margin-top:4px;">消耗: 0 点数</div>'
+                + '">' + t('dock.refuel') + '</button>'
+                + '<div style="font-size:9px;color:#666;text-align:center;margin-top:4px;">' + t('dock.refuelCost') + '</div>'
                 + '</div>';
         }
         html += '</div>';
@@ -306,7 +287,7 @@ function buildSupplyTerminalContent(facility) {
 }
 
 // 全局辅助函数：释放停靠飞船控制权
-window.__releaseShipControl = function() {
+function releaseShipControl() {
     _controlledDockedShipId = null;
     if (_currentFacility) {
         openCompartmentPanel(_currentFacility, 'bridge');
@@ -314,7 +295,7 @@ window.__releaseShipControl = function() {
 };
 
 // 全局辅助函数：切换控制到停靠飞船
-window.__facilitySwitchControl = function(shipId) {
+function facilitySwitchControl(shipId) {
     _controlledDockedShipId = shipId;
     if (_currentFacility) {
         openCompartmentPanel(_currentFacility, 'bridge');
@@ -322,7 +303,7 @@ window.__facilitySwitchControl = function(shipId) {
 };
 
 // 全局辅助函数：起飞
-window.__facilityUndockShip = function(shipId) {
+function facilityUndockShip(shipId) {
     if (_currentFacility) {
         facilitySystem.undockShip(_currentFacility.id, shipId);
         const updated = facilitySystem.getFacility(_currentFacility.id);
@@ -334,11 +315,11 @@ window.__facilityUndockShip = function(shipId) {
 };
 
 // 全局辅助函数：补给燃料
-window.__facilityRefuelShip = function(shipId) {
+function facilityRefuelShip(shipId) {
     if (_currentFacility) {
         facilitySystem.refuelShip(_currentFacility.id, shipId);
         if (typeof window.showNotification === 'function') {
-            window.showNotification('燃料补给完成', 'success');
+            window.showNotification(t('dock.refuelDone'), 'success');
         }
         const updated = facilitySystem.getFacility(_currentFacility.id);
         if (updated) {
@@ -348,62 +329,19 @@ window.__facilityRefuelShip = function(shipId) {
     }
 };
 
-// 全局辅助函数：建造飞船
-window.__facilityBuildShip = function(templateId) {
-    if (!_currentFacility) return;
-    const tpl = window.__shipSystem?.getAllTemplates?.().find(t => t.id === templateId);
-    const name = tpl ? tpl.name : '新建飞船';
-    const result = facilitySystem.buildShip(_currentFacility.id, templateId, name);
-    if (result && typeof window.showNotification === 'function') {
-        window.showNotification('飞船已建造在设施附近', 'success');
-    }
-};
-
-// 全局辅助函数：安装模块
-window.__facilityAddModule = function(shipId) {
-    if (!_currentFacility) return;
-    const allModules = getAllModules();
-    const modules = allModules.filter(m => m.id !== 'test_ballast');
-    if (modules.length > 0) {
-        facilitySystem.addModuleToShip(_currentFacility.id, shipId, modules[0].id);
-    }
-    const updated = facilitySystem.getFacility(_currentFacility.id);
-    if (updated) {
-        _currentFacility = updated;
-    }
-};
-
-// 全局辅助函数：卸载模块
-window.__facilityRemoveModule = function(shipId, moduleId) {
-    if (!_currentFacility) return;
-    facilitySystem.removeModuleFromShip(_currentFacility.id, shipId, moduleId);
-    const updated = facilitySystem.getFacility(_currentFacility.id);
-    if (updated) {
-        _currentFacility = updated;
-    }
-};
-
 // ========== 对接弹窗 ==========
 let _dockCallback = null;
 
 const dockPromptEl = document.createElement('div');
 dockPromptEl.id = 'dockPrompt';
-dockPromptEl.style.cssText = `
-    display:none;position:fixed;left:50%;top:calc(50% + 45px);transform:translateX(-50%);
-    background:rgba(0,0,0,0.85);border:1px solid #555;border-radius:5px;
-    padding:10px 14px;z-index:990;font-family:monospace;
-`;
+dockPromptEl.style.display = 'none';
 dockPromptEl.innerHTML = `
     <div style="display:flex;align-items:center;gap:12px;">
         <div style="display:flex;flex-direction:column;gap:2px;">
-            <span style="color:#ccc;font-size:12px;">按 [B] 对接</span>
-            <span id="dockPromptFacName" style="color:#888;font-size:10px;"></span>
+            <span style="color:var(--text-mid);font-size:12px;">${t('dock.promptDock')}</span>
+            <span id="dockPromptFacName">${t('facility.typeName')}</span>
         </div>
-        <button id="dockPromptBtn" style="
-            padding:5px 14px;background:rgba(136,204,255,0.15);color:#88ccff;
-            border:1px solid #88ccff;border-radius:3px;font-family:monospace;
-            font-size:13px;cursor:pointer;
-        ">对接</button>
+        <button id="dockPromptBtn" class="ui-btn" style="padding:5px 14px;background:var(--accent-bg);color:var(--accent);border:1px solid var(--accent);font-size:13px;">${t('dock.promptBtn')}</button>
     </div>
 `;
 document.body.appendChild(dockPromptEl);
@@ -414,7 +352,7 @@ document.getElementById('dockPromptBtn').addEventListener('click', () => {
 
 window.showDockPrompt = function(facility, onDock) {
     if (!facility) return;
-    document.getElementById('dockPromptFacName').textContent = facility.name || '设施';
+    document.getElementById('dockPromptFacName').textContent = facility.name || t('facility.typeName');
     _dockCallback = onDock;
     dockPromptEl.style.display = 'block';
 };
@@ -427,23 +365,34 @@ window.hideDockPrompt = function() {
 // 统一工具栏 — 浮层面板（舱室内容显示容器）
 const toolbarPanel = document.createElement('div');
 toolbarPanel.id = 'toolbarPanel';
-toolbarPanel.style.cssText = `
-    display:none;position:fixed;left:70px;top:50%;transform:translateY(-50%);
-    background:rgba(0,0,0,0.85);border:1px solid #555;border-radius:5px;
-    padding:12px 15px;width:550px;box-sizing:border-box;max-height:70vh;overflow-y:auto;
-    z-index:998;font-family:monospace;color:#ccc;font-size:12px;
-`;
+toolbarPanel.style.display = 'none';
 toolbarPanel.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;
-        margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid #444;">
-        <span id="toolbarPanelTitle" style="color:#88ccff;font-size:13px;"></span>
-        <button id="toolbarPanelCloseBtn" style="padding:2px 8px;background:#333;
-            color:#aaa;border:1px solid #555;border-radius:3px;cursor:pointer;
-            font-family:monospace;font-size:11px;">✕</button>
+    <div class="ui-panel-header">
+        <span id="toolbarPanelTitle">${t('facility.typeName')}</span>
+        <button id="toolbarPanelCloseBtn" class="ui-btn-sm">✕</button>
     </div>
     <div id="toolbarPanelContent"></div>
 `;
 document.body.appendChild(toolbarPanel);
+
+const toolbarPanelContentEl = document.getElementById('toolbarPanelContent');
+if (toolbarPanelContentEl) {
+    toolbarPanelContentEl.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-action]');
+        if (!btn) return;
+        const action = btn.dataset.action;
+        const shipId = btn.dataset.shipId;
+        if (action === 'release-control') {
+            releaseShipControl();
+        } else if (action === 'switch-control') {
+            facilitySwitchControl(shipId);
+        } else if (action === 'undock-ship') {
+            facilityUndockShip(shipId);
+        } else if (action === 'refuel-ship') {
+            facilityRefuelShip(shipId);
+        }
+    });
+}
 
 document.getElementById('toolbarPanelCloseBtn').addEventListener('click', () => {
     toolbarPanel.style.display = 'none';

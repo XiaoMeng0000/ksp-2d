@@ -2,6 +2,7 @@
 
 import { sceneManager } from './sceneManager.js';
 import { eventBus, Events } from './eventBus.js';
+import { t } from './config/strings.js';
 
 // 时间加速档位表（索引 0 = 暂停 / 0x）
 // KSP2 原版档位 + 0x 暂停档：. 升档 / , 降档，0x 即暂停
@@ -174,11 +175,11 @@ class TimeWarp {
         sceneManager.setPaused(paused);
         if (paused && !wasPaused) {
             if (typeof window.showNotification === 'function') {
-                window.showNotification('游戏已暂停', 'info');
+                window.showNotification(t('timewarp.pausedNotice'), 'info');
             }
         } else if (!paused && wasPaused) {
             if (typeof window.showNotification === 'function') {
-                window.showNotification('游戏已恢复', 'info');
+                window.showNotification(t('timewarp.resumedNotice'), 'info');
             }
         }
 

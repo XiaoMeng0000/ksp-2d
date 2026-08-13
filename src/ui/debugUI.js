@@ -3,6 +3,7 @@
 import { uiManager } from './uiManager.js';
 import { eventBus, Events } from '../eventBus.js';
 import { celestialBodies } from '../physics/physics.js';
+import { t } from '../config/strings.js';
 
 // 缓存最近一帧的飞船渲染数据
 let _cachedShipData = null;
@@ -108,26 +109,26 @@ function buildPanelStructure() {
             <span style="color:#aaa;">米/秒²</span>
         </div>
         <div style="margin-top:10px;">
-            <button onclick="window.switchToThrustMode()" style="margin:3px;padding:4px 8px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;cursor:pointer;">切换到推力模式</button>
-            <button onclick="window.switchToOrbitMode()" style="margin:3px;padding:4px 8px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;cursor:pointer;">切回在轨模式</button>
+            <button data-action="switch-thrust" style="margin:3px;padding:4px 8px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;cursor:pointer;">切换到推力模式</button>
+            <button data-action="switch-orbit" style="margin:3px;padding:4px 8px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;cursor:pointer;">切回在轨模式</button>
         </div>
         <div id="dbgOrbitCtrl">
             <div style="margin-top:10px;border-top:1px solid #444;padding-top:10px;">
-                <button onclick="window.circularizeOrbit()" style="margin:3px;padding:4px 8px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;cursor:pointer;">圆化轨道</button>
+                <button data-action="circularize" style="margin:3px;padding:4px 8px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;cursor:pointer;">圆化轨道</button>
             </div>
             <div style="margin-top:10px;border-top:1px solid #444;padding-top:10px;">
                 <span style="color:#aaa;">加速:</span>
                 <input type="number" id="progradeInput" value="1" step="0.1" style="margin:3px;padding:4px 8px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;width:60px;text-align:center;">
-                <button onclick="window.progradeThrust()" style="margin:3px;padding:4px 8px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;cursor:pointer;">+</button>
+                <button data-action="prograde" style="margin:3px;padding:4px 8px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;cursor:pointer;">+</button>
             </div>
             <div style="margin-top:10px;border-top:1px solid #444;padding-top:10px;">
                 <span style="color:#aaa;">减速:</span>
                 <input type="number" id="retrogradeInput" value="1" step="0.1" style="margin:3px;padding:4px 8px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;width:60px;text-align:center;">
-                <button onclick="window.retrogradeThrust()" style="margin:3px;padding:4px 8px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;cursor:pointer;">-</button>
+                <button data-action="retrograde" style="margin:3px;padding:4px 8px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;cursor:pointer;">-</button>
             </div>
         </div>
         <div style="margin-top:10px;border-top:1px solid #444;padding-top:10px;">
-            <button onclick="window.resetShip()" style="margin:3px;padding:4px 8px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;cursor:pointer;">重置默认</button>
+            <button data-action="reset-ship" style="margin:3px;padding:4px 8px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;cursor:pointer;">重置默认</button>
         </div>
         <p style="margin-top:10px;color:#666;font-size:11px;">
             F1切换 | Z=推力 | X=在轨
@@ -170,7 +171,7 @@ function updateDebugData() {
     if (!data) return;
 
     _setText('dbgMode', data.currentMode);
-    _setText('dbgSOI', data.currentSOI || '深空');
+    _setText('dbgSOI', data.currentSOI || t('tracking.deepSpace'));
     _setText('dbgGM', data.currentGM);
     _setText('dbgThrustX', data.thrustAx);
     _setText('dbgThrustY', data.thrustAy);
@@ -216,7 +217,7 @@ function _updateDeploySection(data) {
                 <span style="color:#88ccff;">=== 天体部署 ===</span>
             </div>
             <div style="margin-top:5px;">
-                <select id="deployBodySelect" onchange="window.onDeployBodyChanged()"
+                <select id="deployBodySelect" data-action="deploy-body-change"
                     style="margin:3px;padding:4px 8px;background:#333;color:white;border:1px solid #555;
                     border-radius:3px;font-family:monospace;font-size:12px;max-width:180px;">
                     ${(data.bodyList || []).map(b => `<option value="${b.name}" ${savedBody === b.name ? 'selected' : ''}>${b.name}</option>`).join('')}
@@ -230,18 +231,18 @@ function _updateDeploySection(data) {
                     width:60px;text-align:center;">
             </div>
             <div style="margin-top:5px;">
-                <button onclick="window.deploySelectPreset('low')" id="deployPresetLow"
+                <button data-action="deploy-preset" data-preset="low" id="deployPresetLow"
                     style="margin:2px;padding:3px 6px;background:#333;color:white;border:1px solid #555;
                     border-radius:3px;font-family:monospace;font-size:11px;cursor:pointer;">低轨</button>
-                <button onclick="window.deploySelectPreset('mid')" id="deployPresetMid"
+                <button data-action="deploy-preset" data-preset="mid" id="deployPresetMid"
                     style="margin:2px;padding:3px 6px;background:#333;color:white;border:1px solid #555;
                     border-radius:3px;font-family:monospace;font-size:11px;cursor:pointer;">中轨</button>
-                <button onclick="window.deploySelectPreset('high')" id="deployPresetHigh"
+                <button data-action="deploy-preset" data-preset="high" id="deployPresetHigh"
                     style="margin:2px;padding:3px 6px;background:#333;color:white;border:1px solid #555;
                     border-radius:3px;font-family:monospace;font-size:11px;cursor:pointer;">高轨</button>
             </div>
             <div style="margin-top:5px;">
-                <button onclick="window.deployShipToBody()"
+                <button data-action="deploy-ship"
                     style="margin:3px;padding:4px 8px;background:#333;color:#88ccff;
                     border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;
                     cursor:pointer;">部署</button>
@@ -354,13 +355,6 @@ function switchToOrbitMode() {
     eventBus.emit(Events.SHIP_COMMAND, { action: 'switchToOrbit', params: {} });
 }
 
-window.circularizeOrbit = circularizeOrbit;
-window.switchToThrustMode = switchToThrustMode;
-window.switchToOrbitMode = switchToOrbitMode;
-window.progradeThrust = progradeThrust;
-window.retrogradeThrust = retrogradeThrust;
-window.resetShip = resetShip;
-
 function deploySelectPreset(presetKey) {
     const select = document.getElementById('deployBodySelect');
     const bodyName = select?.value;
@@ -393,9 +387,25 @@ function deployShipToBody() {
     });
 }
 
-window.deploySelectPreset = deploySelectPreset;
-window.onDeployBodyChanged = onDeployBodyChanged;
-window.deployShipToBody = deployShipToBody;
+// 调试面板 - 事件委托（避免字符串 onclick/onchange）
+debugPanel.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const action = btn.dataset.action;
+    if (action === 'switch-thrust') switchToThrustMode();
+    else if (action === 'switch-orbit') switchToOrbitMode();
+    else if (action === 'circularize') circularizeOrbit();
+    else if (action === 'prograde') progradeThrust();
+    else if (action === 'retrograde') retrogradeThrust();
+    else if (action === 'reset-ship') resetShip();
+    else if (action === 'deploy-preset') deploySelectPreset(btn.dataset.preset);
+    else if (action === 'deploy-ship') deployShipToBody();
+});
+debugPanel.addEventListener('change', (e) => {
+    if (e.target.dataset && e.target.dataset.action === 'deploy-body-change') {
+        onDeployBodyChanged();
+    }
+});
 
 // 模块加载时一次性构建面板结构
 buildPanelStructure();

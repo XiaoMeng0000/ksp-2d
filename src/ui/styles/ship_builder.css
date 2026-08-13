@@ -1,0 +1,161 @@
+/* ============================================================
+   ship_builder.css — 飞船建造面板
+   ============================================================ */
+
+#shipBuilderPanel {
+    display: none;
+    position: fixed;
+    left: 70px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 15px;
+    width: 650px;
+    max-height: 70vh;
+    overflow: hidden;
+    z-index: 999;
+    font-family: var(--font-mono);
+}
+
+#shipBuilderPanel .builder-body {
+    display: flex;
+    height: calc(100% - 80px);
+    gap: 15px;
+}
+
+#shipBuilderPanel .builder-left {
+    width: 35%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#shipBuilderPanel .builder-preview {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 10px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-dim);
+    font-size: 12px;
+}
+
+#shipBuilderPanel .builder-categories {
+    flex: 1;
+    overflow-y: auto;
+}
+
+#shipBuilderPanel .builder-right {
+    width: 65%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#shipBuilderPanel .builder-stats {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 10px;
+    color: var(--text-dim);
+    font-size: 12px;
+}
+
+#shipBuilderPanel .builder-slots-box {
+    flex: 1;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 8px;
+    overflow: hidden;
+}
+
+#shipBuilderPanel .builder-slots-label {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-bottom: 5px;
+}
+
+#shipBuilderPanel .builder-slots {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 5px;
+}
+
+/* 分类折叠容器 */
+.builder-cat-box {
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.builder-cat-header {
+    padding: 8px;
+    background: var(--card-bg);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.builder-cat-header span:first-child {
+    color: var(--accent);
+    font-size: 12px;
+}
+
+.builder-cat-header span:last-child {
+    color: var(--text-dim);
+    font-size: 10px;
+}
+
+.builder-ship-btn {
+    width: 100%;
+    padding: 6px 10px;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--border-dark);
+    color: var(--text-main);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    cursor: pointer;
+    text-align: left;
+}
+.builder-ship-btn:hover {
+    background: var(--accent-bg);
+    color: var(--accent);
+}
+.builder-ship-btn.selected {
+    background: #2a2a4a;
+    color: var(--accent);
+}
+
+/* 模块槽 */
+.builder-slot {
+    min-width: 80px;
+    padding: 8px;
+    background: var(--card-bg-dark);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    text-align: center;
+    color: var(--text-main);
+    font-size: 11px;
+    flex-shrink: 0;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.builder-slot:hover {
+    border-color: var(--accent);
+    background: var(--card-bg-light);
+}
+
+.builder-slot-label {
+    color: var(--accent);
+    font-size: 10px;
+    margin-bottom: 4px;
+}

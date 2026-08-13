@@ -3,6 +3,7 @@
 import { sceneManager } from '../sceneManager.js';
 import { eventBus, Events } from '../eventBus.js';
 import { audioCore } from '../audio/audioCore.js';
+import { t } from '../config/strings.js';
 
 let _container = null;
 let _onKeyDown = null;
@@ -11,23 +12,23 @@ let _previousScene = 'menu';
 
 // 分类定义
 const CATEGORIES = [
-    { id: 'display',   label: '显示',  enabled: true },
-    { id: 'audio',     label: '音频',  enabled: true },
-    { id: 'control',   label: '控制',  enabled: false },
-    { id: 'game',      label: '游戏',  enabled: false },
+    { id: 'display',   label: t('settings.tabDisplay'),   enabled: true },
+    { id: 'audio',     label: t('settings.tabAudio'),     enabled: true },
+    { id: 'control',   label: t('settings.tabControl'),   enabled: false },
+    { id: 'game',      label: t('settings.tabGame'),      enabled: false },
 ];
 
 // 每个分类的说明文字
 const CATEGORY_DESCRIPTIONS = {
-    display: '选择菜单背景显示模式。星空模式会透出游戏星空背景，图片模式会加载自定义背景图。',
-    audio:   '选择菜单背景音乐。KSP1 / KSP2 对应两首不同的菜单音乐。',
-    control: '配置键盘映射、鼠标灵敏度等控制选项。（即将推出）',
-    game:    '调整游戏难度、时间加速倍率等玩法参数。（即将推出）',
+    display: t('settings.descDisplay'),
+    audio:   t('settings.descAudio'),
+    control: t('settings.descControl'),
+    game:    t('settings.descGame'),
 };
 
 // 分段按钮组 — 生成 HTML
 function _renderButtonGroup(name, options, currentValue, storageKey) {
-    let html = `<div style="display:flex; gap:4px;">`;
+    let html = `<div class="settings-btn-group">`;
     for (const opt of options) {
         const isSelected = opt.value === currentValue;
         const bg = isSelected ? 'rgba(136,204,255,0.2)' : 'rgba(0,0,0,0.85)';
@@ -46,46 +47,33 @@ function _renderButtonGroup(name, options, currentValue, storageKey) {
 
 // 设置行 — 左侧标签 + 右侧控件
 function _renderSettingRow(label, controlHtml) {
-    return `<div style="
-        display:flex; align-items:center; justify-content:space-between;
-        padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.1);
-    ">
-        <div style="color:#ddd; font-size:13px;">${label}</div>
-        <div style="flex:0 0 55%; max-width:320px;">${controlHtml}</div>
+    return `<div class="settings-row">
+        <div class="settings-row-label">${label}</div>
+        <div class="settings-row-control">${controlHtml}</div>
     </div>`;
 }
 
 // 分组标题条
 function _renderGroupHeader(title) {
-    return `<div style="
-        background:rgba(0,0,0,0.5); color:#88ccff;
-        padding:6px 12px; font-size:13px; margin-top:16px;
-        border-radius:5px; border:1px solid #444;
-    ">${title}</div>`;
+    return `<div class="settings-group-header">${title}</div>`;
 }
 
 function _renderNav(navEl) {
-    let html = '<div style="color:#88ccff;margin-bottom:12px;font-size:14px;border-bottom:1px solid #444;padding-bottom:8px;">设置</div>';
+    let html = '<div class="settings-nav-title">' + t('settings.title') + '</div>';
     for (const cat of CATEGORIES) {
         const isActive = cat.id === _currentCategory;
         const color = cat.enabled
             ? (isActive ? '#88ccff' : '#ccc')
             : '#555';
         const cursor = cat.enabled ? 'pointer' : 'default';
-        const bg = isActive ? 'rgba(80,80,160,0.4)' : 'transparent';
-        html += `<div data-cat="${cat.id}" style="
-            padding:8px 12px; margin-bottom:2px; cursor:${cursor};
-            color:${color}; background:${bg}; border-radius:3px;
-            font-size:13px;
+        const activeClass = isActive ? ' active' : '';
+        html += `<div data-cat="${cat.id}" class="settings-cat${activeClass}" style="
+            cursor:${cursor}; color:${color};
         ">${cat.label}</div>`;
     }
     // 底部返回按钮
     html += `<div style="margin-top:auto; padding-top:12px; border-top:1px solid #444;">
-        <div id="settingsBackBtn" style="
-            padding:8px 12px; cursor:pointer; color:#88ccff;
-            border:1px solid #555; border-radius:3px; text-align:center;
-            font-size:13px;
-        ">返回</div>
+        <div id="settingsBackBtn" class="settings-back-btn">${t('common.back')}</div>
     </div>`;
     navEl.innerHTML = html;
 
@@ -134,28 +122,28 @@ function _renderContent(content) {
     if (!cat) return;
 
     // 内容区标题
-    let html = `<div style="color:#88ccff;font-size:18px;margin-bottom:20px;border-bottom:1px solid #555;padding-bottom:10px;">${cat.label}</div>`;
+    let html = `<div class="settings-content-title">${cat.label}</div>`;
 
     if (cat.enabled) {
         if (_currentCategory === 'display') {
             const currentBg = _getMenuBgSetting();
 
             // 菜单分组
-            html += _renderGroupHeader('菜单');
+            html += _renderGroupHeader(t('settings.groupMenu'));
             html += _renderSettingRow(
-                '菜单背景',
+                t('settings.menuBg'),
                 _renderButtonGroup('menuBg', [
-                    { value: 'stars', label: '星空' },
-                    { value: 'image', label: '图片' },
+                    { value: 'stars', label: t('settings.bgStars') },
+                    { value: 'image', label: t('settings.bgImage') },
                 ], currentBg, 'ksp2d.menuBg')
             );
         } else if (_currentCategory === 'audio') {
             const currentMusic = _getMenuMusicSetting();
 
             // 音乐分组
-            html += _renderGroupHeader('音乐');
+            html += _renderGroupHeader(t('settings.groupMusic'));
             html += _renderSettingRow(
-                '菜单音乐',
+                t('settings.menuMusic'),
                 _renderButtonGroup('menuMusic', [
                     { value: 'ksp1', label: 'KSP1' },
                     { value: 'ksp2', label: 'KSP2' },
@@ -164,7 +152,7 @@ function _renderContent(content) {
         }
     } else {
         // 未启用的分类 — 灰色占位
-        html += `<div style="color:#555;font-size:14px;margin-top:60px;text-align:center;">即将推出</div>`;
+        html += `<div style="color:#555;font-size:14px;margin-top:60px;text-align:center;">${t('settings.comingSoon')}</div>`;
     }
 
     content.innerHTML = html;
@@ -207,27 +195,15 @@ function registerSettingsScene() {
             eventBus.on(Events.SCENE_CHANGED, sceneChangeHandler);
 
             _container = document.createElement('div');
-            _container.style.cssText = `
-                position:fixed; top:0; left:0; right:0; bottom:0;
-                background:rgba(0,0,0,0.7); z-index:1000;
-                display:flex; font-family:monospace; color:#fff;
-                backdrop-filter:blur(4px);
-            `;
+            _container.id = 'settingsContainer';
 
             // 左侧导航栏（复用追踪站样式）
             const navEl = document.createElement('div');
-            navEl.style.cssText = `
-                width:280px; min-width:280px;
-                background:rgba(0,0,0,0.85); border-right:1px solid #555;
-                padding:15px; display:flex; flex-direction:column; gap:2px;
-                font-size:12px; overflow-y:auto; box-sizing:border-box;
-            `;
+            navEl.id = 'settingsNav';
 
             // 右侧内容区（占满剩余空间）
             contentEl = document.createElement('div');
-            contentEl.style.cssText = `
-                flex:1; padding:20px 30px; overflow-y:auto;
-            `;
+            contentEl.id = 'settingsContent';
 
             _container.appendChild(navEl);
             _container.appendChild(contentEl);

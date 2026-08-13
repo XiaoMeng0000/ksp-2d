@@ -15,6 +15,7 @@ import { facilitySystem } from '../facility/facilitySystem.js';
 import { getModuleDef } from '../ship/moduleTypes.js';
 import { getFacilityType } from '../facility/facilityTypes.js';
 import { timeWarp } from '../timeWarp.js';
+import { t } from '../config/strings.js';
 
 // 由 main.js 在注册时注入的依赖
 let _throttleRate = 1.0;
@@ -148,20 +149,20 @@ eventBus.on(Events.SHIP_COMMAND, ({ action, params }) => {
                 return def?.capability === 'deploy_facility';
             });
             if (!hasModule) {
-                window.showNotification('未挂载建设集成模块', 'warning');
+                window.showNotification(t('deploy.noModule'), 'warning');
                 break;
             }
 
             // 检查在宿主 SOI 内且在轨
             if (!ship.currentSOI || ship.mode !== 'on_rails') {
-                window.showNotification('必须在稳定轨道上才能部署设施', 'warning');
+                window.showNotification(t('deploy.needStableOrbit'), 'warning');
                 break;
             }
 
             // 检查是否为稳定轨道（禁止逃逸轨道上部署，防止设施 SOI 切换 Bug）
             // 双曲线轨道 kepler.a < 0（e>=1 无椭圆解），椭圆/圆轨道 a > 0
             if (!ship.kepler || ship.kepler.a < 0) {
-                window.showNotification('逃逸轨道上无法部署设施，需在椭圆/圆轨道上进行', 'warning');
+                window.showNotification(t('deploy.noEscapeTrajectory'), 'warning');
                 break;
             }
 
@@ -176,7 +177,7 @@ eventBus.on(Events.SHIP_COMMAND, ({ action, params }) => {
                     ? hostBody.radius + hostBody.atmosphereHeight
                     : hostBody.radius;
                 if (shipDist < hazardBoundary) {
-                    window.showNotification('无法在危险区域内部署设施（大气层/表面范围内）', 'warning');
+                    window.showNotification(t('deploy.dangerZone'), 'warning');
                     break;
                 }
             }
@@ -197,7 +198,7 @@ eventBus.on(Events.SHIP_COMMAND, ({ action, params }) => {
             // 创建设施（createFacility 期望绝对世界坐标，需从相对坐标转换）
             const absPos = getAbsolutePosition(ship);
             const typeCfg = getFacilityType(typeId);
-            const facilityName = params?.facilityName || (typeCfg ? '新建' + typeCfg.name : '新建设施');
+            const facilityName = params?.facilityName || (typeCfg ? t('deploy.newName', { name: typeCfg.name }) : t('deploy.newFacility'));
             const facility = facilitySystem.createFacility(
                 typeId,
                 facilityName,
@@ -207,21 +208,21 @@ eventBus.on(Events.SHIP_COMMAND, ({ action, params }) => {
             );
 
             if (facility) {
-                window.showNotification(`${facilityName} 部署成功`, 'success');
+                window.showNotification(t('deploy.success', { name: facilityName }), 'success');
             } else {
-                window.showNotification('设施部署失败', 'error');
+                window.showNotification(t('deploy.failed'), 'error');
             }
             break;
         }
         case 'deployToBody': {
             const targetBody = celestialBodies.find(b => b.name === params.targetBody);
             if (!targetBody) {
-                window.showNotification('目标天体不存在', 'error');
+                window.showNotification(t('deploy.noTargetBody'), 'error');
                 break;
             }
             const orbitR = targetBody.radius + params.altitude;
             if (orbitR >= targetBody.soiRadius) {
-                window.showNotification('轨道高度超出天体引力范围', 'error');
+                window.showNotification(t('deploy.altitudeOutOfRange'), 'error');
                 break;
             }
             ship.pos = { x: orbitR, y: 0 };
@@ -233,7 +234,7 @@ eventBus.on(Events.SHIP_COMMAND, ({ action, params }) => {
             ship.orbitTime = 0;
             ship.mode = 'on_rails';
             ship.thrust = { ax: 0, ay: 0 };
-            window.showNotification(`已部署到 ${targetBody.name} 轨道，高度 ${params.altitude}`, 'success');
+            window.showNotification(t('deploy.deployedAt', { name: targetBody.name, altitude: params.altitude }), 'success');
             break;
         }
     }
@@ -546,9 +547,9 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             if (inputManager.justPressed('KeyB') && _nearFacility && activeShip) {
                 const result = facilitySystem.dockShip(_nearFacility.id, activeShip.id);
                 if (result) {
-                    window.showNotification('对接成功', 'success');
+                    window.showNotification(t('dock.success'), 'success');
                 } else {
-                    window.showNotification('对接失败（对接口已满或其他原因）', 'warning');
+                    window.showNotification(t('dock.failFull'), 'warning');
                 }
             }
 
@@ -564,7 +565,7 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 facilitySystem.lastDockedFacilityId = null;
             }
 
-            // 5d. 对接弹窗状态驱动（委托 ui.js 管理 HTML DOM，渲染函数不碰 UI）
+            // 5d. 对接弹窗状态驱动（委托 UI 模块管理 HTML DOM，渲染函数不碰 UI）
             if (_nearFacility && activeShip) {
                 if (_dockPromptFacId !== _nearFacility.id) {
                     if (_dockPromptFacId) window.hideDockPrompt();
@@ -574,9 +575,9 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                         if (ship && _nearFacility) {
                             const result = facilitySystem.dockShip(facId, ship.id);
                             if (result) {
-                                window.showNotification('对接成功', 'success');
+                                window.showNotification(t('dock.success'), 'success');
                             } else {
-                                window.showNotification('对接失败（对接口已满或其他原因）', 'warning');
+                                window.showNotification(t('dock.failFull'), 'warning');
                             }
                         }
                     });

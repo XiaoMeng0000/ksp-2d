@@ -9,6 +9,7 @@ import { facilitySystem } from './facility/facilitySystem.js';
 import { stateToKepler } from './physics/orbitalMechanics.js';
 import { celestialBodies } from './physics/physics.js';
 import { eventBus, Events } from './eventBus.js';
+import { t } from './config/strings.js';
 
 class SaveManager {
     constructor() {
@@ -188,7 +189,7 @@ class SaveManager {
         if (ship && ship.mode === 'thrust') {
             console.warn('[SaveManager] 推力模式下禁止存档');
             if (typeof window.showNotification === 'function') {
-                window.showNotification('推力模式下无法存档！', 'warning');
+                window.showNotification(t('save.thrustBlocked'), 'warning');
             }
             return null;
         }

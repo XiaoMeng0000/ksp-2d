@@ -4,20 +4,25 @@ import { sceneManager } from '../sceneManager.js';
 import { textureManager } from '../graphics/textureManager.js';
 import { eventBus, Events } from '../eventBus.js';
 import { renderableManager } from '../graphics/renderable.js';
-import { MENUS, MENU_STYLE } from '../config/menuConfig.js';
+import { MENUS } from '../config/menuConfig.js';
+
+// 主菜单 — DOM 版（阶段 3：Canvas→DOM）
+// - 数据驱动：menuConfig.js 的 MENUS 定义各菜单按钮（label/action）
+// - 布局样式见 src/ui/styles/main_menu.css
+// - 背景（星空 / 背景图）仍由 Canvas 绘制，仅菜单 UI（Logo/按钮/版本号）迁移为 DOM
+
+// 版本号（原 Canvas 硬编码文本）
+const VERSION_TEXT = 'v0.2.4-alpha (Build 202608)';
 
 let _canvas = null;
 let _currentMenu = 'main';
-let _hoverIndex = -1;
-let _buttonRects = [];
 let _stars = [];
-let _logoHeight = 0;
-let _onMouseMove = null;
-let _onClick = null;
+let _container = null;      // 主菜单 DOM 容器
 let _onKeyDown = null;
 let _texturesReadyHandler = null;
 let _callbacks = {};
 
+// 生成背景星空
 function _generateStars() {
     const stars = [];
     for (let i = 0; i < 300; i++) {
@@ -31,48 +36,28 @@ function _generateStars() {
     _stars = stars;
 }
 
-function _getMenu() {
-    return MENUS[_currentMenu] || MENUS.main;
-}
-
-function _buildButtonRects(buttonStartY) {
-    const yStart = buttonStartY || MENU_STYLE.buttonStartY;
-    const menu = _getMenu();
-    const rects = [];
-    for (let i = 0; i < menu.length; i++) {
-        rects.push({
-            x: MENU_STYLE.buttonX,
-            y: yStart + i * MENU_STYLE.buttonSpacing,
-            w: MENU_STYLE.buttonMinWidth,
-            h: MENU_STYLE.buttonHeight,
-            action: menu[i].action,
-            label: menu[i].label
-        });
+// 绘制星空背景（纯黑 + 随机星点）
+function _drawStars(ctx) {
+    ctx.fillStyle = 'black';
+    ctx.fillRect(0, 0, _canvas.width, _canvas.height);
+    for (const star of _stars) {
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 255, 255, ' + star.alpha + ')';
+        ctx.fill();
     }
-    _buttonRects = rects;
 }
 
-function _getHoverIndex(mx, my) {
-    for (let i = 0; i < _buttonRects.length; i++) {
-        const r = _buttonRects[i];
-        if (mx >= r.x && mx <= r.x + r.w && my >= r.y && my <= r.y + r.h) {
-            return i;
-        }
-    }
-    return -1;
-}
-
+// 执行菜单动作（menuConfig action 协议：back / submenu:X / scene:X / callback:X）
 function _executeAction(action) {
     if (action === 'back') {
         _currentMenu = 'main';
-        _hoverIndex = -1;
-        _buildButtonRects(MENU_STYLE.buttonStartY);
+        _renderMenuButtons('main');
     } else if (action.startsWith('submenu:')) {
         const subMenuId = action.slice(8);
         if (MENUS[subMenuId]) {
             _currentMenu = subMenuId;
-            _hoverIndex = -1;
-            _buildButtonRects(MENU_STYLE.buttonStartY);
+            _renderMenuButtons(subMenuId);
         }
     } else if (action.startsWith('scene:')) {
         const sceneId = action.slice(6);
@@ -85,99 +70,82 @@ function _executeAction(action) {
     }
 }
 
-function _drawLogo(ctx) {
-    if (textureManager.isReady()) {
-        const img = textureManager.get('title');
-        if (img) {
-            const maxWidth = MENU_STYLE.logoMaxWidth;
-            let drawW = img.width;
-            let drawH = img.height;
-            if (drawW > maxWidth) {
-                const scale = maxWidth / drawW;
-                drawW = maxWidth;
-                drawH = img.height * scale;
-            }
-            ctx.drawImage(img, MENU_STYLE.logoX, MENU_STYLE.logoY, drawW, drawH);
-            return drawH;
-        }
-    }
-
-    // 文字 fallback
-    ctx.fillStyle = '#A04040';
-    ctx.font = '48px monospace';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillText('KSP 2D', MENU_STYLE.logoX, MENU_STYLE.logoY);
-    return 58;
-}
-
-function _drawVersion(ctx) {
-    const versionText = 'v0.2.3-alpha (Build 202608)';
-    ctx.font = MENU_STYLE.versionFontSize + 'px ' + MENU_STYLE.fontFamily;
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'bottom';
-    ctx.fillStyle = MENU_STYLE.versionColor;
-    ctx.fillText(
-        versionText,
-        _canvas.width + MENU_STYLE.versionX,
-        _canvas.height - MENU_STYLE.versionY
-    );
-}
-
-function _drawButtons(ctx, buttonStartY) {
-    const yStart = buttonStartY || MENU_STYLE.buttonStartY;
-    const menu = _getMenu();
-
-    for (let i = 0; i < menu.length; i++) {
-        const bx = MENU_STYLE.buttonX;
-        const by = yStart + i * MENU_STYLE.buttonSpacing;
-        const bw = MENU_STYLE.buttonMinWidth;
-        const bh = MENU_STYLE.buttonHeight;
-
-        // hover 背景高亮条
-        if (i === _hoverIndex) {
-            ctx.fillStyle = MENU_STYLE.hoverBg;
-            const padX = 12;
-            const padY = 4;
-            ctx.fillRect(bx - padX, by - padY, bw + padX * 2, bh + padY * 2);
-            ctx.fillStyle = MENU_STYLE.hoverTextColor;
-        } else {
-            ctx.fillStyle = MENU_STYLE.textColor;
-        }
-
-        ctx.font = MENU_STYLE.fontSize + 'px ' + MENU_STYLE.fontFamily;
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(menu[i].label, bx, by + bh / 2);
+// 渲染当前菜单按钮到导航区（每次切换菜单重建，避免字符串 onclick）
+function _renderMenuButtons(menuId) {
+    const menu = MENUS[menuId] || MENUS.main;
+    const nav = _container ? _container.querySelector('#mmNav') : null;
+    if (!nav) return;
+    nav.innerHTML = '';
+    for (const item of menu) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'mm-btn';
+        btn.textContent = item.label;
+        btn.addEventListener('click', () => _executeAction(item.action));
+        nav.appendChild(btn);
     }
 }
 
-function _handleMouseMove(event) {
-    const rect = _canvas.getBoundingClientRect();
-    const scaleX = _canvas.width / rect.width;
-    const scaleY = _canvas.height / rect.height;
-    const mx = (event.clientX - rect.left) * scaleX;
-    const my = (event.clientY - rect.top) * scaleY;
-
-    const newHover = _getHoverIndex(mx, my);
-    if (newHover !== _hoverIndex) {
-        _hoverIndex = newHover;
-        _canvas.style.cursor = _hoverIndex >= 0 ? 'pointer' : 'default';
+// 刷新 Logo：纹理就绪显示图片，否则文字 fallback
+function _updateLogo() {
+    const img = document.getElementById('mmLogo');
+    const text = document.getElementById('mmLogoText');
+    if (!img || !text) return;
+    const tex = textureManager.get('title');
+    if (tex && tex.complete && tex.naturalWidth > 0) {
+        img.src = tex.src;
+        img.style.display = 'block';
+        text.style.display = 'none';
+    } else {
+        img.style.display = 'none';
+        text.style.display = 'block';
     }
 }
 
-function _handleClick(event) {
-    if (_hoverIndex >= 0 && _hoverIndex < _buttonRects.length) {
-        _executeAction(_buttonRects[_hoverIndex].action);
-    }
+// 构建主菜单 DOM 骨架（进入场景时执行一次）
+function _buildMenuDOM() {
+    const container = document.createElement('div');
+    container.id = 'mainMenuContainer';
+    container.className = 'main-menu';
+
+    // Logo（图片优先，未就绪时文字 fallback）
+    const logoWrap = document.createElement('div');
+    logoWrap.className = 'mm-logo';
+    const logoImg = document.createElement('img');
+    logoImg.id = 'mmLogo';
+    logoImg.alt = 'KSP 2D';
+    const logoText = document.createElement('div');
+    logoText.id = 'mmLogoText';
+    logoText.className = 'mm-logo-text';
+    logoText.textContent = 'KSP 2D';
+    logoWrap.appendChild(logoImg);
+    logoWrap.appendChild(logoText);
+
+    // 导航按钮列
+    const nav = document.createElement('nav');
+    nav.id = 'mmNav';
+    nav.className = 'mm-nav';
+
+    // 版本号（右下角）
+    const version = document.createElement('div');
+    version.className = 'mm-version';
+    version.textContent = VERSION_TEXT;
+
+    container.appendChild(logoWrap);
+    container.appendChild(nav);
+    container.appendChild(version);
+    document.body.appendChild(container);
+
+    _updateLogo();
+    return container;
 }
 
+// ESC：从二级菜单返回主菜单
 function _handleKeyDown(event) {
     if (event.key === 'Escape') {
         if (_currentMenu !== 'main') {
             _currentMenu = 'main';
-            _hoverIndex = -1;
-            _buildButtonRects(MENU_STYLE.buttonStartY);
+            _renderMenuButtons('main');
         }
     }
 }
@@ -196,27 +164,23 @@ function registerMenuScene(options) {
         enter() {
             _canvas = document.getElementById('canvas');
             _currentMenu = 'main';
-            _hoverIndex = -1;
-
             _generateStars();
 
-            _onMouseMove = (e) => _handleMouseMove(e);
-            _onClick = (e) => _handleClick(e);
-            _onKeyDown = (e) => _handleKeyDown(e);
+            // 构建 DOM 主菜单并渲染主菜单按钮
+            _container = _buildMenuDOM();
+            _renderMenuButtons('main');
 
-            document.addEventListener('mousemove', _onMouseMove);
-            document.addEventListener('click', _onClick);
+            _onKeyDown = (e) => _handleKeyDown(e);
             document.addEventListener('keydown', _onKeyDown);
 
-            _canvas.style.cursor = 'default';
-
-            // 纹理就绪后注册 facility renderable
+            // 纹理就绪后注册 facility renderable + 刷新 Logo
             _texturesReadyHandler = () => {
                 renderableManager.register('facility', {
                     layers: [
                         { texture: 'facility', alpha: 1.0 }
                     ]
                 });
+                _updateLogo();
             };
             eventBus.on(Events.TEXTURES_READY, _texturesReadyHandler);
 
@@ -230,7 +194,7 @@ function registerMenuScene(options) {
         },
 
         render(ctx) {
-            // 读取菜单背景设置
+            // 仅绘制背景（星空 / 背景图）；菜单 UI 已由 DOM 承担
             const menuBgMode = localStorage.getItem('ksp2d.menuBg') || 'stars';
 
             if (menuBgMode === 'image') {
@@ -239,54 +203,14 @@ function registerMenuScene(options) {
                 if (bg) {
                     ctx.drawImage(bg, 0, 0, _canvas.width, _canvas.height);
                 } else {
-                    // 背景图未加载，fallback 到星空
-                    ctx.fillStyle = 'black';
-                    ctx.fillRect(0, 0, _canvas.width, _canvas.height);
-                    for (const star of _stars) {
-                        ctx.beginPath();
-                        ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
-                        ctx.fillStyle = 'rgba(255, 255, 255, ' + star.alpha + ')';
-                        ctx.fill();
-                    }
+                    _drawStars(ctx);
                 }
             } else {
-                // 星空模式：纯黑 + 星空
-                ctx.fillStyle = 'black';
-                ctx.fillRect(0, 0, _canvas.width, _canvas.height);
-                for (const star of _stars) {
-                    ctx.beginPath();
-                    ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
-                    ctx.fillStyle = 'rgba(255, 255, 255, ' + star.alpha + ')';
-                    ctx.fill();
-                }
+                _drawStars(ctx);
             }
-
-            // Logo — 返回实际高度用于动态布局
-            _logoHeight = _drawLogo(ctx);
-
-            // 按钮起始 Y = logo 底部 + 间距
-            const buttonStartY = MENU_STYLE.logoY + _logoHeight + 40;
-
-            // 每次 render 重建 hit area（适配窗口 resize 和动态布局）
-            // TODO: 只在 resize 或菜单切换时重建以优化性能
-            _buildButtonRects(buttonStartY);
-
-            // 按钮
-            _drawButtons(ctx, buttonStartY);
-
-            // 版本号
-            _drawVersion(ctx);
         },
 
         exit() {
-            if (_onMouseMove) {
-                document.removeEventListener('mousemove', _onMouseMove);
-                _onMouseMove = null;
-            }
-            if (_onClick) {
-                document.removeEventListener('click', _onClick);
-                _onClick = null;
-            }
             if (_onKeyDown) {
                 document.removeEventListener('keydown', _onKeyDown);
                 _onKeyDown = null;
@@ -295,7 +219,13 @@ function registerMenuScene(options) {
                 eventBus.off(Events.TEXTURES_READY, _texturesReadyHandler);
                 _texturesReadyHandler = null;
             }
-            _canvas.style.cursor = '';
+            if (_container && _container.parentNode) {
+                _container.parentNode.removeChild(_container);
+            }
+            _container = null;
+            if (_canvas) {
+                _canvas.style.cursor = '';
+            }
         }
     });
 }
