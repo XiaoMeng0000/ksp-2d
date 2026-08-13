@@ -109,7 +109,7 @@ export const solarSystemData = [
     new CelestialBody({
         name: 'Minmus',
         type: 'moon',
-        musicType: 'rocky',
+        musicType: 'ice',
         gm: 1.7658e9,
         soiRadius: 2247428.3,
         radius: 60000,

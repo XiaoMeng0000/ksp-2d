@@ -227,7 +227,8 @@ eventBus.on(Events.SHIP_COMMAND, ({ action, params }) => {
             }
             ship.pos = { x: orbitR, y: 0 };
             const v = Math.sqrt(targetBody.gm / orbitR);
-            ship.vel = { x: 0, y: -v };
+            // 顺行（逆时针，与天体公转同向）：pos 在 +x 时速度沿 +y
+            ship.vel = { x: 0, y: v };
             ship.currentSOI = targetBody.name;
             ship.currentGM = targetBody.gm;
             ship.kepler = stateToKepler(ship.pos, ship.vel, targetBody.gm);
