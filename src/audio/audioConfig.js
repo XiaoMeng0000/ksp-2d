@@ -35,10 +35,16 @@ export const musicMap = {
     }
 };
 
-// 音效映射表：音效标识 → { path }
-// 首期未实现音效，预留空结构，后续 UI 统一音效任务填充
+// 音效映射表：音效标识 → { path } 或 { variants: { 变体: { path } } }
+// variants 用于随机播放组（如 SOI 切换提示音两个变体随机播一个）
 export const sfxMap = {
-    // TODO: 后续任务填充，如 ui_click / ui_hover 等
+    // SOI 切换提示音：两个随机变体（当前控制飞船跨界时随机播一个）
+    soi_change: {
+        variants: {
+            a: { path: 'assets/audio/sfx/soi_change_1.ogg' },
+            b: { path: 'assets/audio/sfx/soi_change_2.ogg' }
+        }
+    }
 };
 
 // 菜单音乐选择的 localStorage 存储键（设置界面写入）
@@ -76,7 +82,27 @@ export function buildAudioManifest() {
         }
     }
     for (const key in sfxMap) {
-        manifest['sfx:' + key] = sfxMap[key].path;
+        const entry = sfxMap[key];
+        if (entry.variants) {
+            // 多变体音效（如随机播放组）：sfx:<key>_<variant>
+            for (const variantKey in entry.variants) {
+                manifest['sfx:' + key + '_' + variantKey] = entry.variants[variantKey].path;
+            }
+        } else {
+            manifest['sfx:' + key] = entry.path;
+        }
     }
     return manifest;
+}
+
+// 返回指定音效的随机变体资源标识（如 'sfx:soi_change_a'）
+// 无变体音效直接返回 'sfx:<key>'；供 audioDirector 随机选曲时使用
+export function getRandomSfxId(key) {
+    const entry = sfxMap[key];
+    if (!entry || !entry.variants) {
+        return 'sfx:' + key;
+    }
+    const variantKeys = Object.keys(entry.variants);
+    const pick = variantKeys[Math.floor(Math.random() * variantKeys.length)];
+    return 'sfx:' + key + '_' + pick;
 }

@@ -229,6 +229,39 @@ class AudioCore {
         this._musicGainNode = null;
     }
 
+    // 播放一次性音效：从已解码缓冲取音频，走 _sfxGain 总线，播完自动清理节点
+    // 未就绪或资源缺失时静默跳过，绝不阻塞游戏流程
+    playSfx(id, volume = 1) {
+        if (!this._ctx || !this._ready) {
+            return;
+        }
+        const buffer = this._buffers.get(id);
+        if (!buffer) {
+            console.warn('[AudioCore] 音效资源未找到: ' + id);
+            return;
+        }
+
+        const source = this._ctx.createBufferSource();
+        source.buffer = buffer;
+
+        const gainNode = this._ctx.createGain();
+        gainNode.gain.value = Math.max(0, Math.min(1, volume));
+        gainNode.connect(this._sfxGain);
+
+        source.connect(gainNode);
+        source.start();
+
+        // 播放结束后自动断开节点，防止长会话内存泄漏
+        source.onended = () => {
+            try {
+                source.disconnect();
+                gainNode.disconnect();
+            } catch (e) {
+                // 已断开时忽略
+            }
+        };
+    }
+
     // === 音量设置（供后续设置面板调用，本次仅提供接口） ===
 
     setMasterVolume(v) {
