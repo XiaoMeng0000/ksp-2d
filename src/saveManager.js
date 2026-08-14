@@ -50,8 +50,14 @@ class SaveManager {
             console.error('[SaveManager] 加载玩家档案失败:', e);
         }
         return {
-            points: 0,
+            // 0.2.0：points 废弃，迁移到 resources
+            gameMode: 'sandbox',            // 游戏模式：'sandbox' 自由 | 'career' 生涯
             unlockedBlueprints: [],
+            scannedBodies: {},              // 天体扫描进度：{ bodyId: { tiersScanned: n } }
+            resources: {
+                rocketParts: { amount: 500 },   // 火箭零件（建造耗材）
+                science: { amount: 50 }         // 科技点
+            },
             totalPlayTime: 0,
             stats: { orbits: 0, soiChanges: 0 }
         };
@@ -284,7 +290,31 @@ class SaveManager {
         for (const s of allShips) {
             if (s.maneuverNodes === undefined) s.maneuverNodes = [];
             if (s.burnDuration === undefined) s.burnDuration = 120;
+            // 0.2.0 迁移：旧 fuel/fuelCapacity（单一标量）→ resources（液氢/液氧，按 1:8 质量拆桶）
+            if (!s.resources) {
+                const oldFuel = typeof s.fuel === 'number' ? s.fuel : 0;
+                const oldCap = typeof s.fuelCapacity === 'number' ? s.fuelCapacity : oldFuel;
+                s.resources = {
+                    hydrogen: { amount: oldFuel / 9, capacity: oldCap / 9 },
+                    oxygen: { amount: oldFuel * 8 / 9, capacity: oldCap * 8 / 9 }
+                };
+                delete s.fuel;
+                delete s.fuelCapacity;
+            }
         }
+
+        // 0.2.0 迁移：玩家字段（gameMode/scannedBodies/resources）
+        const playerState = gameState.getState().player;
+        if (!playerState.gameMode) playerState.gameMode = 'sandbox';
+        if (!playerState.scannedBodies) playerState.scannedBodies = {};
+        if (!playerState.resources) {
+            playerState.resources = {
+                rocketParts: { amount: 500 },
+                science: { amount: 50 }
+            };
+        }
+        if ('points' in playerState) delete playerState.points;
+        gameState.setState({ player: playerState });
 
         // 切换到存档时的场景
         if (checkpoint.currentScene) {

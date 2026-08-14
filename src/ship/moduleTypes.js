@@ -2,7 +2,8 @@
 
 const CATEGORY_NAMES = {
     structure: '结构增强',
-    construction: '建设'
+    construction: '建设',
+    science: '资源扫描'
 };
 
 const MODULE_TYPES = [
@@ -29,6 +30,48 @@ const MODULE_TYPES = [
         capability: 'deploy_facility',
         massBonus: 2.0,
         momentOfInertiaBonus: 3.0
+    },
+
+    // ========== 资源扫描仪（0.2.0） ==========
+    // 探测天体资源丰度。测试期 price=0、直接可选装，科技解锁后置。
+    {
+        id: 'scanner_t1',
+        name: '资源扫描仪 Mk1',
+        category: 'science',
+        description: '探测天体 tier1 级资源分布（水冰、金属矿石）。',
+        icon: '🔭',
+        iconTextureKey: null,
+        price: 0,
+        capability: 'scan_resources',
+        scanTier: 1,
+        massBonus: 0.5,
+        momentOfInertiaBonus: 0.5
+    },
+    {
+        id: 'scanner_t2',
+        name: '资源扫描仪 Mk2',
+        category: 'science',
+        description: '探测天体 tier1~2 级资源分布（含稀土矿、裂变材料）。',
+        icon: '🔭',
+        iconTextureKey: null,
+        price: 0,
+        capability: 'scan_resources',
+        scanTier: 2,
+        massBonus: 0.8,
+        momentOfInertiaBonus: 0.8
+    },
+    {
+        id: 'scanner_t3',
+        name: '资源扫描仪 Mk3',
+        category: 'science',
+        description: '探测天体全部资源分布（含氦-3 等隐藏资源）。',
+        icon: '🔭',
+        iconTextureKey: null,
+        price: 0,
+        capability: 'scan_resources',
+        scanTier: 3,
+        massBonus: 1.2,
+        momentOfInertiaBonus: 1.2
     }
 ];
 

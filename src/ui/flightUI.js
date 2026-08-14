@@ -7,6 +7,7 @@ import { getFacilityCompartments, getFacilityType, getCompartmentDef } from '../
 import { getModuleDef } from '../ship/moduleTypes.js';
 import { textureManager } from '../graphics/textureManager.js';
 import { renderIconHtml } from './uiComponents.js';
+import { getFuelAmount, getFuelCapacity } from '../resources/resourceSystem.js';
 import { t } from '../config/strings.js';
 
 // EventBus 迁移 — 缓存最近一帧的飞船渲染数据，供 UI 只读函数使用
@@ -165,7 +166,7 @@ function buildBridgeContent(facility) {
             html += '<hr style="border:none;border-top:1px solid #444;margin:12px 0;">';
             html += `<div style="color:#88ccff;font-size:13px;margin-bottom:8px;">${renderIconHtml('ship_default_active', '🚀', 12)} ${t('facility.currentControl')}${ship.displayName || ship.id}</div>`;
             html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">';
-            html += card(t('facility.fuelLabel'), (ship.fuel ?? '-') + ' / ' + (ship.maxFuel ?? '-'));
+            html += card(t('facility.fuelLabel'), getFuelAmount(ship).toFixed(0) + ' / ' + getFuelCapacity(ship).toFixed(0));
             html += card(t('facility.dryMassLabel'), (ship.dryMass ?? '-') + ' t');
             html += card(t('facility.modulesLabel'), (ship.modules?.length || 0) + t('common.unitCount'));
             html += '</div>';
@@ -205,7 +206,7 @@ function buildDockHubContent(facility) {
         html += '<div style="color:#666;font-size:11px;margin-bottom:8px;">' + t('dock.dockedShips', { n: dockedShips.length }) + '</div>';
         html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">';
         for (const ship of dockedShips) {
-            const fuelPct = ship.maxFuel > 0 ? (ship.fuel / ship.maxFuel * 100) : 0;
+            const fuelPct = getFuelCapacity(ship) > 0 ? (getFuelAmount(ship) / getFuelCapacity(ship) * 100) : 0;
             html += '<div style="background:#333;border:1px solid #555;border-radius:3px;padding:10px 12px;">'
                 + '<div style="font-size:13px;color:#aaa;margin-bottom:6px;font-weight:bold;">' + renderIconHtml('ship_default_active', '🚀', 12) + ' ' + (ship.displayName || ship.id) + '</div>'
                 + '<div style="margin-bottom:6px;">'
@@ -262,7 +263,7 @@ function buildSupplyTerminalContent(facility) {
         html += '<div style="color:#666;font-size:11px;margin-bottom:8px;">' + t('dock.refuelableShips', { n: dockedShips.length }) + '</div>';
         html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">';
         for (const ship of dockedShips) {
-            const fuelPct = ship.maxFuel > 0 ? (ship.fuel / ship.maxFuel * 100) : 0;
+            const fuelPct = getFuelCapacity(ship) > 0 ? (getFuelAmount(ship) / getFuelCapacity(ship) * 100) : 0;
             html += '<div style="background:#333;border:1px solid #555;border-radius:3px;padding:10px 12px;">'
                 + '<div style="font-size:13px;color:#aaa;margin-bottom:6px;font-weight:bold;">' + renderIconHtml('ship_default_active', '🚀', 12) + ' ' + (ship.displayName || ship.id) + '</div>'
                 + '<div style="margin-bottom:8px;">'
@@ -272,7 +273,7 @@ function buildSupplyTerminalContent(facility) {
                 + '</span>'
                 + '<span style="font-size:10px;color:#888;">' + fuelPct.toFixed(0) + '%</span>'
                 + '</div>'
-                + '<div style="font-size:10px;color:#666;">' + (ship.fuel ?? '-') + ' / ' + (ship.maxFuel ?? '-') + '</div>'
+                + '<div style="font-size:10px;color:#666;">' + getFuelAmount(ship).toFixed(0) + ' / ' + getFuelCapacity(ship).toFixed(0) + '</div>'
                 + '</div>'
                 + '<button data-action="refuel-ship" data-ship-id="' + ship.id + '" style="'
                 + 'width:100%;padding:6px 0;background:#333;color:#cc4;border:1px solid #554;'

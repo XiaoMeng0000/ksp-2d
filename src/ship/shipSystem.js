@@ -22,6 +22,14 @@ class ShipSystem {
         const state = gameState.getState();
         const shipId = `ship_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
+        // 0.2.0：按模板燃料储罐生成推进剂资源槽（旧 fuel/fuelCapacity 字段废弃）
+        const resources = {};
+        if (template.fuelTanks) {
+            for (const [resId, capacity] of Object.entries(template.fuelTanks)) {
+                resources[resId] = { amount: capacity, capacity: capacity };   // 初始满罐
+            }
+        }
+
         // 从模板复制属性，增加运行时状态
         const shipInstance = {
             id: shipId,
@@ -29,15 +37,18 @@ class ShipSystem {
             displayName: name || template.name,
             // 模板属性
             dryMass: template.dryMass,
-            fuelCapacity: template.fuelCapacity,
             isp: template.isp,
             maxThrust: template.maxThrust,
             moduleSlots: template.moduleSlots,
+            // 模板升级体系（0.2.0）
+            family: template.family || null,
+            tier: template.tier || 1,
+            engineType: template.engineType || 'chemical',
             // 继承模板的旋转物理参数
             momentOfInertia: template.momentOfInertia || 1.0,
             reactionWheelTorque: template.reactionWheelTorque || 0,
             // 运行时属性
-            fuel: template.fuelCapacity,
+            resources: resources,
             modules: [],
             // 轨道状态属性
             pos: { x: 0, y: 0 },

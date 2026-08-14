@@ -6,6 +6,7 @@ import { renderIconHtml } from './uiComponents.js';
 import { getFacilityType } from '../facility/facilityTypes.js';
 import { facilitySystem } from '../facility/facilitySystem.js';
 import { sceneManager } from '../sceneManager.js';
+import { getFuelAmount, getFuelCapacity, computeDeltaV } from '../resources/resourceSystem.js';
 import { t } from '../config/strings.js';
 
 // EventBus 迁移 — 缓存最近一帧的飞船渲染数据，供 UI 只读函数使用
@@ -79,27 +80,22 @@ window.updateTrackingInfo = function(node) {
             : (_cachedShipData && _cachedShipData.exists
                 ? { vel: _cachedShipData.vel, currentSOI: _cachedShipData.currentSOI,
                     fuel: _cachedShipData.fuel, dryMass: _cachedShipData.dryMass,
+                    isp: _cachedShipData.isp, resources: _cachedShipData.resources,
                     kepler: _cachedShipData.kepler, currentGM: _cachedShipData.currentGM,
                     pos: _cachedShipData.pos }
                 : null);
         if (ship) {
             html += `<div>${t('tracking.speedLabel')}${formatSpeed(ship.vel)}</div>`;
             html += `<div>SOI: ${ship.currentSOI || t('tracking.deepSpace')}</div>`;
-            // 追踪站 - 扩展显示燃料、质量、Δv
-            const fuel = ship.fuel !== undefined ? ship.fuel : 'N/A';
-            const maxFuel = ship.maxFuel !== undefined ? ship.maxFuel : 'N/A';
+            // 追踪站 - 扩展显示燃料、质量、Δv（0.2.0：统一走资源工具函数，修复 B2）
+            const fuel = getFuelAmount(ship).toFixed(0);
+            const maxFuel = getFuelCapacity(ship).toFixed(0);
             html += `<div>${t('tracking.fuelLabel')}${fuel} / ${maxFuel}</div>`;
             // 使用 dryMass，单位改为 t
             const mass = ship.dryMass !== undefined ? ship.dryMass : 'N/A';
             html += `<div>${t('tracking.dryMassLabel')}${mass} t</div>`;
-            // 追踪站 - 计算 Δv
-            let dv = 'N/A';
-            if (ship.kepler && ship.currentGM !== undefined) {
-                const gm = ship.currentGM;
-                const a = ship.kepler.a;
-                const v = Math.sqrt(gm * (2 / Math.sqrt(ship.pos.x * ship.pos.x + ship.pos.y * ship.pos.y) - 1 / a));
-                dv = formatSpeed({ x: v, y: 0 });
-            }
+            // 追踪站 - ΔV（0.2.0：KSP 式，从当前燃料烧到耗尽；旧实现误显示轨道速度）
+            const dv = computeDeltaV(ship) > 0 ? formatSpeed({ x: computeDeltaV(ship), y: 0 }) : 'N/A';
             html += `<div>Δv: ${dv}</div>`;
             if (ship.kepler) {
                 html += `<div>${t('tracking.eccLabel')}${formatEccentricity(ship.kepler.e)}</div>`;

@@ -150,6 +150,25 @@ function selectShip(shipId) {
     renderShipBuilderSlots();
 }
 
+// 建造面板 - 计算模板燃料总容量（0.2.0：模板燃料改为 fuelTanks，兼容旧 fuelCapacity）
+function getTemplateFuelTotal(ship) {
+    if (!ship) return 0;
+    if (ship.fuelTanks) {
+        return Object.values(ship.fuelTanks).reduce((sum, cap) => sum + (cap || 0), 0);
+    }
+    return ship.fuelCapacity ?? 0;
+}
+
+// 建造面板 - 满燃料 ΔV（KSP 式火箭方程），含已选模块的干质量加成
+function computeTemplateDeltaV(ship, massBonus) {
+    if (!ship || !ship.isp) return 0;
+    const g0 = 9.81;
+    const dryMass = (ship.dryMass || 0) + (massBonus || 0);
+    const totalMass = dryMass + getTemplateFuelTotal(ship);
+    if (dryMass <= 0 || totalMass <= dryMass) return 0;
+    return ship.isp * g0 * Math.log(totalMass / dryMass);
+}
+
 // 建造面板 - 更新 stats 显示（含简介 + 模块加成括号）
 function updateShipBuilderStats() {
     const ship = selectedShip;
@@ -200,8 +219,8 @@ function updateShipBuilderStats() {
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
             <div><span style="color:#666;">${t('build.dryMass')}</span> <span style="color:#fff;">${massStr}${bonusMassStr}</span></div>
             <div><span style="color:#666;">${t('build.thrust')}</span> <span style="color:#fff;">${ship.maxThrust != null ? ship.maxThrust.toFixed(0) : '-'} N</span></div>
-            <div><span style="color:#666;">${t('build.dv')}</span> <span style="color:#fff;">${ship.initialDeltaV != null ? ship.initialDeltaV.toFixed(0) : '-'} m/s</span></div>
-            <div><span style="color:#666;">${t('build.fuel')}</span> <span style="color:#fff;">${ship.fuelCapacity != null ? ship.fuelCapacity.toFixed(0) : '-'}</span></div>
+            <div><span style="color:#666;">ΔV:</span> <span style="color:#fff;">${computeTemplateDeltaV(ship, totalMassBonus).toFixed(0)} m/s</span></div>
+            <div><span style="color:#666;">燃料:</span> <span style="color:#fff;">${getTemplateFuelTotal(ship).toFixed(0)}</span></div>
             <div><span style="color:#666;">${t('build.moi')}</span> <span style="color:#fff;">${moiStr}${bonusMoiStr}</span></div>
             <div><span style="color:#666;">${t('build.slots')}</span> <span style="color:#fff;">${ship.moduleSlots != null ? ship.moduleSlots : '-'}</span></div>
         </div>

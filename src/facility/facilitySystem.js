@@ -271,8 +271,12 @@ class FacilitySystem {
             return false;
         }
 
-        // TODO: 点数系统启用后扣除点数
-        ship.fuel = ship.fuelCapacity;
+        // TODO: 点数系统启用后扣除点数（阶段 3）
+        // 0.2.0：补满推进剂资源槽（旧 ship.fuel 字段已废弃）
+        const hyd = ship.resources ? ship.resources.hydrogen : null;
+        const ox = ship.resources ? ship.resources.oxygen : null;
+        if (hyd) hyd.amount = hyd.capacity;
+        if (ox) ox.amount = ox.capacity;
 
         this.persistFacility(facility);
         console.log(`[FacilitySystem] 飞船 ${shipId} 燃料已补满`);

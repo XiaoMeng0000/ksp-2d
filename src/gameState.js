@@ -10,12 +10,18 @@ const initialState = {
     activeShipId: null,
     activeFacilityId: null,
     player: {
-        points: 0,
-        unlockedBlueprints: []
+        // 0.2.0：points 字段废弃，迁移到 resources
+        gameMode: 'sandbox',            // 游戏模式：'sandbox' 自由 | 'career' 生涯
+        unlockedBlueprints: [],
+        scannedBodies: {},              // 天体扫描进度：{ bodyId: { tiersScanned: n } }
+        resources: {
+            rocketParts: { amount: 500 },   // 火箭零件（建造耗材）
+            science: { amount: 50 }         // 科技点
+        }
     },
     missions: [],
     gameTime: 0,
-    version: '0.1.0',
+    version: '0.2.0',
     // 追踪站 - 当前场景
     currentScene: 'menu'
 };
@@ -93,4 +99,9 @@ class GameState {
 
 // 导出单例实例
 export const gameState = new GameState();
+
+// 挂载到 window 供调试（与 shipSystem/facilitySystem 保持一致）
+if (typeof window !== 'undefined') {
+    window.__gameState = gameState;
+}
 
