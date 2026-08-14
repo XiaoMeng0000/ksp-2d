@@ -25,11 +25,12 @@ const EXTRA_MENU = [
     { id: 'back',     label: '返回',      action: 'back' },
 ];
 
+// 主菜单链接栏（icon_key 对应 textureConfig.js 中的纹理 key，由 textureManager 统一加载）
 const LINKS_ICONS = [
-    {label: 'QQ群',  type: 'qgroup',  links: '1098073419', icon_src: 'assets/images/menu/link_icons/icon_qq.png' },
-    {label: 'E-mail',  type: 'email',  links: 'mc1234com@163.com', icon_src: 'assets/images/menu/link_icons/icon_email.png' },
-    {label: 'Github',  type: 'link',  links: 'https://github.com/XiaoMeng0000/ksp-2d', icon_src: 'assets/images/menu/link_icons/github.gif' },
-    {label: 'Github Issues',  type: 'link',  links: 'https://github.com/XiaoMeng0000/ksp-2d/issues', icon_src: 'assets/images/menu/link_icons/github.gif' },
+    {label: 'QQ群',  type: 'qgroup',  links: '1098073419', icon_key: 'link_qq' },
+    {label: 'E-mail',  type: 'email',  links: 'mc1234com@163.com', icon_key: 'link_email' },
+    {label: 'Github',  type: 'link',  links: 'https://github.com/XiaoMeng0000/ksp-2d', icon_key: 'link_github' },
+    {label: 'Github Issues',  type: 'link',  links: 'https://github.com/XiaoMeng0000/ksp-2d/issues', icon_key: 'link_github' },
 ];
 
 // 菜单查找表：主菜单 + 各二级菜单

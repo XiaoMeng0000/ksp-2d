@@ -25,6 +25,7 @@ import './src/ui/flightUI.js';
 import './src/ui/shipDestroyedUI.js';
 // 图形系统 - 纹理管理器
 import { textureManager } from './src/graphics/textureManager.js';
+import { fontManager } from './src/graphics/fontManager.js';
 import { registerBodyRenderables } from './src/graphics/bodyRenderables.js';
 
 import { initCamera } from './src/camera.js';
@@ -133,7 +134,7 @@ registerTrackingScene({
     canvas: canvas
 });
 
-// SceneManager - 启动加载画面：纹理与音频都就绪后才进入场景链
+// SceneManager - 启动加载画面：纹理、音频与字体都就绪后才进入场景链
 const loadingScreen = document.getElementById('loadingScreen');
 const loadingLogContent = document.getElementById('loadingLogContent');
 const loadingLogBox = document.getElementById('loadingLogBox');
@@ -141,17 +142,20 @@ const loadingProgressBarInner = document.getElementById('loadingProgressBarInner
 const loadingProgressText = document.getElementById('loadingProgressText');
 const audioProgressBarInner = document.getElementById('loadingAudioProgressBarInner');
 const audioProgressText = document.getElementById('loadingAudioProgressText');
+const fontProgressBarInner = document.getElementById('loadingFontProgressBarInner');
+const fontProgressText = document.getElementById('loadingFontProgressText');
 
-// 加载完成状态标记（纹理 / 音频两路都就绪后才放行）
+// 加载完成状态标记（纹理 / 音频 / 字体三路都就绪后才放行）
 // 已就绪的一路初始化为 true，避免缓存命中时该路事件不触发导致状态卡死
 const _loadState = {
     textures: textureManager.isReady(),
-    audio: audioCore.isReady()
+    audio: audioCore.isReady(),
+    fonts: fontManager.isReady()
 };
 
-// 两路加载全部完成 → 隐藏加载画面并进入 splash
+// 三路加载全部完成 → 隐藏加载画面并进入 splash
 function _finishLoading() {
-    if (_loadState.textures && _loadState.audio) {
+    if (_loadState.textures && _loadState.audio && _loadState.fonts) {
         setTimeout(() => {
             loadingScreen.style.display = 'none';
             sceneManager.switchTo('splash');
@@ -159,8 +163,8 @@ function _finishLoading() {
     }
 }
 
-if (textureManager.isReady() && audioCore.isReady()) {
-    // 纹理与音频均已就绪（二次访问），跳过加载画面
+if (textureManager.isReady() && audioCore.isReady() && fontManager.isReady()) {
+    // 纹理 / 音频 / 字体均已就绪（二次访问），跳过加载画面
     sceneManager.switchTo('splash');
 } else {
     loadingScreen.style.display = 'flex';
@@ -218,7 +222,34 @@ if (textureManager.isReady() && audioCore.isReady()) {
         }
     };
 
-    // 分别注册并启动未就绪的一路：纹理与音频并行加载，互不阻塞
+    // === 字体加载进度与完成 ===
+    const onFontProgress = ({ key, loaded, total, success }) => {
+        // 与纹理 / 音频加载一致，在信息栏中逐行记录加载情况
+        const line = document.createElement('div');
+        line.textContent = (success ? '[OK] ' : '[FAIL] ') + key;
+        line.className = success ? 'loading-log-ok' : 'loading-log-fail';
+        loadingLogContent.appendChild(line);
+
+        const pct = Math.round(loaded / total * 100);
+        fontProgressBarInner.style.width = (loaded / total * 100) + '%';
+        fontProgressText.textContent = loaded + '/' + total + ' (' + pct + '%)';
+
+        loadingLogBox.scrollTop = loadingLogBox.scrollHeight;
+    };
+    const onFontsReady = ({ loaded, failed }) => {
+        eventBus.off(Events.FONT_PROGRESS, onFontProgress);
+        eventBus.off(Events.FONTS_READY, onFontsReady);
+        _loadState.fonts = true;
+        _finishLoading();
+
+        if (failed > 0) {
+            if (typeof window.showNotification === 'function') {
+                window.showNotification(t('newgame.fontLoadFail', { n: failed }), 'warning', 4000);
+            }
+        }
+    };
+
+    // 分别注册并启动未就绪的一路：纹理、音频与字体三路并行加载，互不阻塞
     if (!_loadState.textures) {
         eventBus.on(Events.TEXTURE_PROGRESS, onTextureProgress);
         eventBus.on(Events.TEXTURES_READY, onTexturesReady);
@@ -228,6 +259,11 @@ if (textureManager.isReady() && audioCore.isReady()) {
         eventBus.on(Events.AUDIO_PROGRESS, onAudioProgress);
         eventBus.on(Events.AUDIO_READY, onAudioReady);
         audioCore.init();
+    }
+    if (!_loadState.fonts) {
+        eventBus.on(Events.FONT_PROGRESS, onFontProgress);
+        eventBus.on(Events.FONTS_READY, onFontsReady);
+        fontManager.init();
     }
 }
 

@@ -4,6 +4,11 @@ export const textureConfig = {
     title: 'assets/images/menu/title.png',
     menu_bg: 'assets/images/menu/background.png',
     project_logo: 'assets/images/menu/ev.png',
+
+    // 主菜单链接栏图标
+    link_qq: 'assets/images/menu/link_icons/icon_qq.png',
+    link_email: 'assets/images/menu/link_icons/icon_email.png',
+    link_github: 'assets/images/menu/link_icons/github.gif',
     facility: 'assets/images/facilities/facility.png',
 
     // 设施舱室图标

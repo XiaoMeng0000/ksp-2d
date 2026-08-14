@@ -22,6 +22,10 @@ export const Events = {
     AUDIO_READY: 'audio:ready',               // 所有音频资源加载完成
     AUDIO_PROGRESS: 'audio:progress',         // 单个音频资源加载完成或失败时广播
     AUDIO_LOAD_ERROR: 'audio:loadError',      // 单个音频资源加载失败
+    // 字体系统事件
+    FONTS_READY: 'fonts:ready',               // 所有字体加载完成
+    FONT_PROGRESS: 'font:progress',           // 单个字体加载完成或失败时广播
+    FONT_LOAD_ERROR: 'font:loadError',        // 单个字体加载失败
     // 设施系统事件
     FACILITY_CREATED: 'facility:created',
     FACILITY_DELETED: 'facility:deleted',

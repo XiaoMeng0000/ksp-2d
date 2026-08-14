@@ -23,14 +23,14 @@
     border-radius: 5px;
     margin: 15px;
     margin-right: 0px;
-    width: 280px;
-    min-width: 280px;
-    background: var(--panel-bg);
+    width: 240px;
+    min-width: 240px;
+    background: #1C212A;   /* 固定色，不随全局 --panel-bg 变化（设置页独立于全局配色） */
     padding: 5px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    font-size: 20px;
+    gap: 6px;
+    font-size: 14px;
     overflow-y: auto;
     box-sizing: border-box;
 }
@@ -39,15 +39,15 @@
     color: var(--text-bright);
     text-align: center;
     margin-bottom: 5px;
-    font-size: 30px;
+    font-size: 18px;
     padding-bottom: 8px;
 }
 
 #settingsNav .settings-cat {
     text-align: center;
     position: relative;
-    padding: 8px 12px;
-    font-size: 15px;
+    padding: 6px 10px;
+    font-size: 13px;
     background: #14191F;
 }
 
@@ -92,14 +92,14 @@
 
 /* 底部返回按钮 */
 #settingsNav .settings-back-btn {
-    padding: 8px 12px;
+    padding: 6px 10px;
     cursor: pointer;
     color: var(--text-bright);
     background-color: #000000;
     border: 1px solid #676767;
     border-radius: 5px;
     text-align: center;
-    font-size: 13px;
+    font-size: 12px;
 }
 
 #settingsNav .settings-back-btn:hover {
@@ -110,33 +110,33 @@
 #settingsContent {
     border-radius: 5px;
     margin: 15px;
-    background: var(--panel-bg);
+    background: #1C212A;   /* 固定色，不随全局 --panel-bg 变化（设置页独立于全局配色） */
     flex: 1;
-    padding: 15px;
+    padding: 12px;
     overflow-y: auto;
 }
 
 #settingsContent .settings-content-title {
     color: var(--accent);
-    font-size: 20px;
-    margin-bottom: 20px;
+    font-size: 16px;
+    margin-bottom: 16px;
     border-bottom: 1px solid var(--border);
-    padding-bottom: 10px;
+    padding-bottom: 8px;
 }
 
 #settingsContent .settings-group-header {
     background: var(--header-bg);
     color: var(--text-bright);
-    padding: 6px 12px;
-    font-size: 17px;
-    margin-top: 16px;
+    padding: 5px 10px;
+    font-size: 14px;
+    margin-top: 12px;
 }
 
 #settingsContent .settings-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px;
+    padding: 8px;
     border-bottom: 1px solid #060709;
 }
 
@@ -146,7 +146,7 @@
 
 #settingsContent .settings-row-label {
     color: var(--text-main);
-    font-size: 13px;
+    font-size: 12px;
 }
 
 #settingsContent .settings-row-control {
@@ -160,12 +160,13 @@
 
 .settings-btn {
     font-family: var(--font-mono);
-    height: 30px;
+    height: 26px;
     flex: 1;
     color: var(--text-bright);
     background-color: #0F1318;
     border: 1px var(--border-light) solid;
     border-radius: 5px;
+    font-size: 12px;
 }
 
 .settings-btn.selected {

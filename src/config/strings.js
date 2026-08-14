@@ -282,6 +282,7 @@ const STRINGS = {
     'newgame.exception': (p) => `游戏发生异常: ${p.msg}`,
     'newgame.imgLoadFail': (p) => `${p.n} 张图片加载失败，部分界面可能异常`,
     'newgame.audioLoadFail': (p) => `${p.n} 个音频加载失败，相关声音可能缺失`,
+    'newgame.fontLoadFail': (p) => `${p.n} 个字体加载失败，部分文字可能使用系统字体`,
     'newgame.worldNameTitle': '新世界名称',
     'newgame.worldNamePlaceholder': '输入世界名称',
     'newgame.worldNameDefault': '新世界',

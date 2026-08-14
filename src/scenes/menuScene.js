@@ -103,6 +103,21 @@ function _updateLogo() {
     }
 }
 
+// 刷新链接栏图标：从 textureManager 取图回填 src（与 Logo fallback 机制一致）
+function _updateLinkIcons() {
+    const linksWrap = _container ? _container.querySelector('#mmLinks') : null;
+    if (!linksWrap) return;
+    for (const item of LINKS_ICONS) {
+        const img = linksWrap.querySelector('img[data-icon-key="' + item.icon_key + '"]');
+        if (!img) continue;
+        const tex = textureManager.get(item.icon_key);
+        if (tex && tex.complete && tex.naturalWidth > 0) {
+            img.src = tex.src;
+            img.style.visibility = 'visible';
+        }
+    }
+}
+
 // ========== 2. 固定链接点击处理逻辑（完整版） ==========
 function _handleLinkClick(item) {
     const { type, links } = item;
@@ -179,10 +194,17 @@ function _buildMenuDOM() {
         linkBtn.className = 'mm-link-btn';
         
         const img = document.createElement('img');
-        img.src = item.icon_src;
         img.alt = item.label;
         img.title = item.label;          // 悬停显示文字
         img.className = 'mm-link-icon';
+        img.dataset.iconKey = item.icon_key;  // 纹理就绪后由 _updateLinkIcons 回填
+        // 纹理已加载则直接使用缓存图片，否则先隐藏待 TEXTURES_READY 回填
+        const tex = textureManager.get(item.icon_key);
+        if (tex && tex.complete && tex.naturalWidth > 0) {
+            img.src = tex.src;
+        } else {
+            img.style.visibility = 'hidden';
+        }
         
         linkBtn.appendChild(img);
         linkBtn.addEventListener('click', () => _handleLinkClick(item));
@@ -202,6 +224,7 @@ function _buildMenuDOM() {
     document.body.appendChild(container);
 
     _updateLogo();
+    _updateLinkIcons();
     return container;
 }
 
@@ -244,6 +267,7 @@ function registerMenuScene(options) {
                     ]
                 });
                 _updateLogo();
+                _updateLinkIcons();
             };
             eventBus.on(Events.TEXTURES_READY, _texturesReadyHandler);
 

@@ -146,7 +146,7 @@ function _renderContent(content) {
         }
     } else {
         // 未启用的分类 — 灰色占位
-        html += `<div style="color:#555;font-size:14px;margin-top:60px;text-align:center;">${t('settings.comingSoon')}</div>`;
+        html += `<div style="color:#555;font-size:13px;margin-top:60px;text-align:center;">${t('settings.comingSoon')}</div>`;
     }
 
     content.innerHTML = html;
