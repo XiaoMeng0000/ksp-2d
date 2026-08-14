@@ -3,9 +3,8 @@
 // 一级菜单按钮列表
 const MAIN_MENU = [
     { id: 'startGame',    label: '开始游戏',  action: 'submenu:game' },
-    { id: 'encyclopedia', label: '游戏百科',  action: 'scene:encyclopedia' },
+    { id: 'encyclopedia', label: '百科',  action: 'scene:encyclopedia' },
     { id: 'extra',        label: '额外内容',  action: 'submenu:extra' },
-    { id: 'feedback',     label: '反馈',      action: 'callback:openFeedback' },
     { id: 'settings',     label: '设置',      action: 'callback:openSettings' },
 ];
 
@@ -26,6 +25,13 @@ const EXTRA_MENU = [
     { id: 'back',     label: '返回',      action: 'back' },
 ];
 
+const LINKS_ICONS = [
+    {label: 'QQ群',  type: 'qgroup',  links: '1098073419', icon_src: 'assets/images/menu/link_icons/icon_qq.png' },
+    {label: 'E-mail',  type: 'email',  links: 'mc1234com@163.com', icon_src: 'assets/images/menu/link_icons/icon_email.png' },
+    {label: 'Github',  type: 'link',  links: 'https://github.com/XiaoMeng0000/ksp-2d', icon_src: 'assets/images/menu/link_icons/github.gif' },
+    {label: 'Github Issues',  type: 'link',  links: 'https://github.com/XiaoMeng0000/ksp-2d/issues', icon_src: 'assets/images/menu/link_icons/github.gif' },
+];
+
 // 菜单查找表：主菜单 + 各二级菜单
 const MENUS = {
     main: MAIN_MENU,
@@ -35,4 +41,4 @@ const MENUS = {
 
 // 说明：主菜单布局样式（Logo/按钮/版本号）已随阶段 3 迁移至
 // src/ui/styles/main_menu.css，原 MENU_STYLE 布局常量已废弃移除
-export { MAIN_MENU, GAME_SUB_MENU, EXTRA_MENU, MENUS };
+export { MAIN_MENU, GAME_SUB_MENU, EXTRA_MENU, MENUS, LINKS_ICONS };

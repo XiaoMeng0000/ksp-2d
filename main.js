@@ -110,7 +110,6 @@ registerMenuScene({
     openLoadMenu: () => window.openLoadMenu(),
     openArchiveManager: () => window.openArchiveManager(),
     openSettings: () => window.openSettings(),
-    openFeedback: () => window.openFeedback()
 });
 registerEncyclopediaScene();
 registerCreditsScene();
@@ -409,105 +408,4 @@ window.openArchiveManager = function() {
     } else {
         console.warn('[Archive] archiveManagerPanel 未找到');
     }
-};
-
-// 反馈入口 - 显示联系方式对话框
-window.openFeedback = function() {
-    const overlay = document.createElement('div');
-    overlay.style.cssText = ''
-        + 'position:fixed;inset:0;background:rgba(0,0,0,0.8);'
-        + 'display:flex;align-items:center;justify-content:center;'
-        + 'z-index:10000;';
-
-    const panel = document.createElement('div');
-    panel.style.cssText = ''
-        + 'background:rgba(0,0,0,0.85);border:1px solid #555;'
-        + 'border-radius:5px;padding:20px;min-width:300px;'
-        + 'max-width:360px;font-family:monospace;color:white;';
-
-    // 标题
-    const title = document.createElement('h3');
-    title.textContent = '反馈渠道';
-    title.style.cssText = 'color:#88ccff;margin:0 0 16px 0;border-bottom:1px solid #444;padding-bottom:8px;';
-
-    // 图标辅助函数
-    function renderIcon(texKey, emoji) {
-        const container = document.createElement('span');
-        container.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;margin-right:10px;flex-shrink:0;';
-
-        const tex = textureManager.get(texKey);
-        if (tex && tex.complete) {
-            const img = document.createElement('img');
-            img.src = tex.src;
-            img.style.cssText = 'width:24px;height:24px;object-fit:contain;';
-            container.appendChild(img);
-        } else {
-            const span = document.createElement('span');
-            span.textContent = emoji;
-            span.style.cssText = 'font-size:18px;text-align:center;';
-            container.appendChild(span);
-        }
-        return container;
-    }
-
-    // QQ 行
-    const qqRow = document.createElement('div');
-    qqRow.style.cssText = 'display:flex;align-items:center;margin-bottom:14px;';
-    qqRow.appendChild(renderIcon('icon_qq', '\u{1F4F1}'));
-    const qqText = document.createElement('span');
-    qqText.textContent = t('feedback.qq');
-    qqText.style.cssText = 'color:#ddd;font-size:13px;';
-    qqRow.appendChild(qqText);
-
-    // 邮箱行
-    const emailRow = document.createElement('div');
-    emailRow.style.cssText = 'display:flex;align-items:center;margin-bottom:18px;';
-    emailRow.appendChild(renderIcon('icon_email', '\u{1F4E7}'));
-    const emailText = document.createElement('span');
-    emailText.textContent = t('feedback.email');
-    emailText.style.cssText = 'color:#ddd;font-size:13px;';
-    emailRow.appendChild(emailText);
-
-    // 关闭按钮
-    const btnRow = document.createElement('div');
-    btnRow.style.cssText = 'display:flex;justify-content:flex-end;';
-    const closeBtn = document.createElement('button');
-    closeBtn.textContent = t('common.close');
-    closeBtn.style.cssText = ''
-        + 'padding:5px 16px;background:#333;color:#ddd;'
-        + 'border:1px solid #555;border-radius:3px;'
-        + 'font-family:monospace;font-size:12px;cursor:pointer;';
-
-    closeBtn.addEventListener('mouseenter', () => {
-        closeBtn.style.background = 'rgba(136,204,255,0.15)';
-        closeBtn.style.color = '#88ccff';
-    });
-    closeBtn.addEventListener('mouseleave', () => {
-        closeBtn.style.background = '#333';
-        closeBtn.style.color = '#ddd';
-    });
-
-    btnRow.appendChild(closeBtn);
-
-    panel.appendChild(title);
-    panel.appendChild(qqRow);
-    panel.appendChild(emailRow);
-    panel.appendChild(btnRow);
-    overlay.appendChild(panel);
-    document.body.appendChild(overlay);
-
-    const close = () => {
-        if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
-        document.removeEventListener('keydown', escHandler);
-    };
-
-    const escHandler = (e) => {
-        if (e.key === 'Escape') close();
-    };
-
-    closeBtn.addEventListener('click', close);
-    overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) close();
-    });
-    document.addEventListener('keydown', escHandler);
 };

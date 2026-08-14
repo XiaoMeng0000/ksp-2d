@@ -24,10 +24,6 @@ export const textureConfig = {
     ship_default_active: 'assets/images/ships/bodies/ship_default_active.png',
     ship_default_inactive: 'assets/images/ships/bodies/ship_default_inactive.png',
 
-    // 反馈渠道图标
-    icon_qq: 'assets/images/menu/icon_qq.png',
-    icon_email: 'assets/images/menu/icon_email.png',
-
     // 天体贴图
     kerbin_surface: 'assets/images/bodies/kerbin.png',
     kerbol_surface: 'assets/images/bodies/kerbol.png',

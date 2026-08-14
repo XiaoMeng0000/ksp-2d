@@ -3,38 +3,63 @@
    所有 UI 样式从此处引用 CSS 变量,禁止在各 JS 文件中硬编码色值/字体
    ============================================================ */
 
+/* 字体引用 */
+@font-face {
+    font-family: 'JetBrainsMono-Regular';
+    src: url('../../../assets/fonts/JetBrainsMapleMono-Regular.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'JetBrainsMono-Bold';
+    src: url('../../../assets/fonts/JetBrainsMapleMono-Bold.ttf') format('truetype');
+}
+
 :root {
     /* ---- 配色 ---- */
-    --panel-bg: rgba(0, 0, 0, 0.85);      /* 面板半透明黑底 */
-    --panel-bg-deep: rgba(0, 0, 0, 0.92); /* 更深底色(弹层/提示) */
-    --panel-bg-soft: rgba(0, 0, 0, 0.55); /* 浅黑底(凹槽/占位) */
-    --card-bg: #333;                      /* 卡片/行实色底 */
-    --card-bg-dark: #222;                 /* 更深卡片底(槽位) */
-    --card-bg-light: #2a2a3a;             /* 悬停高亮底 */
+    --panel-bg: #1C212A;
+    /* 面板半透明黑底 */
+    --panel-bg-deep: rgba(0, 0, 0, 0.92);
+    /* 更深底色(弹层/提示) */
+    --panel-bg-soft: rgba(0, 0, 0, 0.55);
+    /* 浅黑底(凹槽/占位) */
+    --card-bg: #333;
+    /* 卡片/行实色底 */
+    --card-bg-dark: #222;
+    /* 更深卡片底(槽位) */
+    --card-bg-light: #2a2a3a;
+    /* 悬停高亮底 */
 
-    --border: #555;                       /* 面板/按钮边框 */
-    --border-dark: #444;                  /* 分隔线/标题下划线 */
+    --border: #555;
+    /* 面板/按钮边框 */
+    --border-dark: #444;
+    /* 分隔线/标题下划线 */
     --border-light: #666;
+    --header-bg: #232A48;
 
-    --accent: #88ccff;                    /* HUD 主蓝 */
-    --accent-bg: rgba(136, 204, 255, 0.15); /* 主蓝高亮底 */
+    --accent: #88ccff;
+    /* HUD 主蓝 */
+    --accent-bg: rgba(136, 204, 255, 0.15);
     --accent-bg-strong: rgba(136, 204, 255, 0.2);
     --accent-border: rgba(136, 204, 255, 0.3);
 
-    --danger: #ff6666;                    /* 危险红 */
+    --danger: #ff6666;
+    /* 危险红 */
     --danger-bg: rgba(255, 80, 80, 0.1);
     --danger-border: rgba(255, 80, 80, 0.3);
     --danger-solid: #c44;
     --danger-solid-bg: rgba(170, 68, 68, 0.15);
     --danger-solid-border: #644;
 
-    --warn: #ffaa44;                      /* 警告橙 */
+    --warn: #ffaa44;
+    /* 警告橙 */
 
-    --success: #4c4;                      /* 成功绿 */
+    --success: #4c4;
+    /* 成功绿 */
     --success-bg: rgba(68, 170, 68, 0.15);
     --success-border: #4c4;
 
-    --refuel: #cc4;                       /* 补给黄 */
+    --refuel: #cc4;
+    /* 补给黄 */
     --refuel-border: #554;
 
     --text-bright: #fff;
@@ -44,11 +69,13 @@
     --text-faint: #555;
     --text-danger: #ff5566;
 
-    --ut-gold: #d4c86a;                   /* 时间标签金 */
+    --ut-gold: #d4c86a;
+    /* 时间标签金 */
     --ut-gold-border: #a8984a;
 
-    /* ---- 字体 ---- */
-    --font-mono: monospace;
+    /* ---- 字体变量 ---- */
+    --font-mono: 'JetBrainsMono-Regular', monospace;
+    --font-mono-bold: 'JetBrainsMono-Bold', monospace;
 }
 
 /* ============================================================
@@ -94,6 +121,7 @@
     cursor: pointer;
     transition: background 0.15s ease;
 }
+
 .ui-btn:hover {
     background: var(--accent-bg);
     color: var(--accent);
@@ -110,6 +138,7 @@
     font-size: 12px;
     cursor: pointer;
 }
+
 .ui-btn-sm:hover {
     background: var(--accent-bg);
     color: var(--accent);
@@ -126,6 +155,7 @@
     font-size: 12px;
     cursor: pointer;
 }
+
 .ui-btn-danger:hover {
     background: var(--danger-bg);
 }
@@ -141,6 +171,7 @@
     font-size: 13px;
     cursor: pointer;
 }
+
 .ui-btn-primary:hover {
     background: var(--accent-bg);
 }

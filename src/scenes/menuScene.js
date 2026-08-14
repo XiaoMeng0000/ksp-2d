@@ -5,6 +5,7 @@ import { textureManager } from '../graphics/textureManager.js';
 import { eventBus, Events } from '../eventBus.js';
 import { renderableManager } from '../graphics/renderable.js';
 import { MENUS } from '../config/menuConfig.js';
+import { LINKS_ICONS } from '../config/menuConfig.js'; // 1. 导入数据
 
 // 主菜单 — DOM 版（阶段 3：Canvas→DOM）
 // - 数据驱动：menuConfig.js 的 MENUS 定义各菜单按钮（label/action）
@@ -102,6 +103,48 @@ function _updateLogo() {
     }
 }
 
+// ========== 2. 固定链接点击处理逻辑（完整版） ==========
+function _handleLinkClick(item) {
+    const { type, links } = item;
+    switch (type) {
+        case 'qgroup':
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(links).then(() => {
+                    window.showNotification('Copied: ' + links);
+                }).catch(() => {
+                    _fallbackCopy(links);
+                });
+            } else {
+                _fallbackCopy(links);
+            }
+            break;
+        case 'email':
+            window.location.href = 'mailto:' + links;
+            break;
+        case 'link':
+            window.open(links, '_blank');
+            break;
+        default:
+            break;
+    }
+}
+
+// 复制降级方案
+function _fallbackCopy(text) {
+    const input = document.createElement('input');
+    input.value = text;
+    document.body.appendChild(input);
+    input.select();
+    try {
+        document.execCommand('copy');
+        alert('QQ群号已复制：' + text);
+    } catch (e) {
+        alert('复制失败，请手动复制：' + text);
+    }
+    document.body.removeChild(input);
+}
+// =================================================
+
 // 构建主菜单 DOM 骨架（进入场景时执行一次）
 function _buildMenuDOM() {
     const container = document.createElement('div');
@@ -126,6 +169,27 @@ function _buildMenuDOM() {
     nav.id = 'mmNav';
     nav.className = 'mm-nav';
 
+    // ========== 3. 固定链接栏（带图标，完整循环） ==========
+    const linksWrap = document.createElement('div');
+    linksWrap.id = 'mmLinks';
+    linksWrap.className = 'mm-links';
+    for (const item of LINKS_ICONS) {
+        const linkBtn = document.createElement('button');
+        linkBtn.type = 'button';
+        linkBtn.className = 'mm-link-btn';
+        
+        const img = document.createElement('img');
+        img.src = item.icon_src;
+        img.alt = item.label;
+        img.title = item.label;          // 悬停显示文字
+        img.className = 'mm-link-icon';
+        
+        linkBtn.appendChild(img);
+        linkBtn.addEventListener('click', () => _handleLinkClick(item));
+        linksWrap.appendChild(linkBtn);
+    }
+    // ================================================
+
     // 版本号（右下角）
     const version = document.createElement('div');
     version.className = 'mm-version';
@@ -133,6 +197,7 @@ function _buildMenuDOM() {
 
     container.appendChild(logoWrap);
     container.appendChild(nav);
+    container.appendChild(linksWrap);   // 固定链接在导航与版本号之间
     container.appendChild(version);
     document.body.appendChild(container);
 
@@ -166,14 +231,12 @@ function registerMenuScene(options) {
             _currentMenu = 'main';
             _generateStars();
 
-            // 构建 DOM 主菜单并渲染主菜单按钮
             _container = _buildMenuDOM();
             _renderMenuButtons('main');
 
             _onKeyDown = (e) => _handleKeyDown(e);
             document.addEventListener('keydown', _onKeyDown);
 
-            // 纹理就绪后注册 facility renderable + 刷新 Logo
             _texturesReadyHandler = () => {
                 renderableManager.register('facility', {
                     layers: [
@@ -194,11 +257,8 @@ function registerMenuScene(options) {
         },
 
         render(ctx) {
-            // 仅绘制背景（星空 / 背景图）；菜单 UI 已由 DOM 承担
             const menuBgMode = localStorage.getItem('ksp2d.menuBg') || 'stars';
-
             if (menuBgMode === 'image') {
-                // 图片模式：优先用背景图，加载失败则退回星空
                 const bg = textureManager.get('menu_bg');
                 if (bg) {
                     ctx.drawImage(bg, 0, 0, _canvas.width, _canvas.height);
