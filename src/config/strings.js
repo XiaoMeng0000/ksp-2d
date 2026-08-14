@@ -70,7 +70,7 @@ const STRINGS = {
     'esc.menu': '菜单',
     'esc.currentWorld': (p) => `当前世界：${p.name}`,
     'esc.closeHint': '按 ESC 关闭',
-    'esc.resume': '继续游戏',
+    'esc.resume': '继续',
     'esc.save': '存档',
     'esc.load': '读档',
     'esc.openTracking': '追踪站',
@@ -83,6 +83,16 @@ const STRINGS = {
     'esc.quitMessage': '是否保存当前进度？未保存的数据将丢失。',
     'esc.saveAndQuit': '保存并退出',
     'esc.quitDirect': '直接退出',
+    // 0.2.5 ESC 菜单改版（独立组件 escMenuUI）
+    'esc.facilities': '设施',
+    'esc.universeTime': '宇宙时间',
+    'esc.gameMode': '游戏模式',
+    'esc.encyclopedia': '游戏百科',
+    'esc.missions': '任务中心',
+    'esc.notReady': '功能尚未开放',
+    'esc.sectionFacilities': 'FACILITIES',
+    'esc.agencyTitle': '坎巴拉航天局',
+    'esc.gameWord': '游戏',
 
     // ---------- 存档管理 ----------
     'archive.title': '存档管理',

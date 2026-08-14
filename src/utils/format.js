@@ -7,6 +7,9 @@
 // 游戏日秒数（与 scanSystem 约定一致：6 小时/日）
 export const GAME_DAY_SECONDS = 21600;
 
+// Kerbin 年秒数（426 日 × 6 小时/日 × 3600 秒/小时）
+const GAME_YEAR_SECONDS = GAME_DAY_SECONDS * 426;
+
 // 游戏时间格式化：秒 → "X日 X时" / "X时 X分" / "X分 X秒"
 export function formatGameTime(s) {
     if (s >= GAME_DAY_SECONDS) {
@@ -22,6 +25,24 @@ export function formatGameTime(s) {
     const m = Math.floor(s / 60);
     const sec = Math.floor(s % 60);
     return m + '分 ' + sec + '秒';
+}
+
+// 宇宙时间格式化：秒 → "Y:D:H:M"（KSP2 风格，例：1Y:10D:00H:01M）
+// 与示例图 ESC 菜单元信息展示一致
+export function formatUniverseTime(s) {
+    const yearSeconds = GAME_YEAR_SECONDS;
+    const daySeconds = GAME_DAY_SECONDS;
+    const hourSeconds = 3600;
+    const minuteSeconds = 60;
+    let t = Math.max(0, Math.floor(s));
+    const y = Math.floor(t / yearSeconds);
+    t %= yearSeconds;
+    const d = Math.floor(t / daySeconds);
+    t %= daySeconds;
+    const h = Math.floor(t / hourSeconds);
+    t %= hourSeconds;
+    const m = Math.floor(t / minuteSeconds);
+    return `${y}Y:${String(d).padStart(2, '0')}D:${String(h).padStart(2, '0')}H:${String(m).padStart(2, '0')}M`;
 }
 
 // 存档时间戳格式化：毫秒 → 本地日期时间（"2026/8/15 02:25"）

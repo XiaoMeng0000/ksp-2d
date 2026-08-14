@@ -1,0 +1,267 @@
+/* ============================================================
+   esc_menu.css — ESC 菜单（0.2.5 大型重构，KSP2 终端控制台风格）
+   布局学习示例图：
+   - 左贴边、上下占满整个屏幕高度（左侧栏 320px，不是居中弹窗）
+   - 顶部：机构名 + 右上角小 logo；下方两道虚线分隔
+   - 元信息：UNIVERSE TIME / GAME MODE，中间用 `····` 填充，右侧贴值
+   - 行号侧边（0 起），等宽字体；空行占位也保留行号
+   - 配色按行：main 蓝/绿/蓝（动作词彩色 + 名词白色）；facilities 绿
+   - 面板右侧一条紫色竖线（例图标志性边框装饰）
+   - 版本号本身也是一行（带行号），灰蓝色
+   自成一套 --esc-* 变量，不污染 theme.css
+   ============================================================ */
+
+:root {
+    --esc-bg: rgba(21, 29, 56, 0.7);
+    /* 面板底（深蓝，70% 不透明度，明显透出场景） */
+    --esc-accent: #58a6ff;
+    /* Resume/Load 蓝 */
+    --esc-success: #56d364;
+    /* Save/设施 绿 */
+    --esc-facility: #56d364;
+    /* 设施 绿 */
+    --esc-fg: #e6edf3;
+    /* 主文字（plain 行也用此色） */
+    --esc-fg-dim: #7d8590;
+    /* 副文字（标签/虚线） */
+    --esc-fg-disabled: #4a5560;
+    /* disabled 行 */
+    --esc-line-num: #5154c2;
+    /* 行号默认（左侧行号列统一色） */
+    --esc-dash: #2a3340;
+    /* 虚线分隔条颜色 */
+    --esc-version: #4a6fa5;
+    /* 版本号 灰蓝 */
+    --esc-border-right: #5154c2;
+    /* 面板右侧竖线 */
+}
+
+/* ---- 面板容器（左贴边、上下占满屏，320px 宽，flex 纵向布局） ---- */
+#escMenu {
+    display: none;
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 320px;
+    height: 100vh;
+    flex-direction: column;
+    background: var(--esc-bg);
+    backdrop-filter: blur(8px) saturate(1.2);
+    -webkit-backdrop-filter: blur(8px) saturate(1.2);
+    box-sizing: border-box;
+    padding: 14px 12px 14px 4px;
+    overflow-y: auto;
+    border-right: 2px solid var(--esc-border-right);
+    z-index: 2000;
+    font-family: var(--font-mono);
+    color: var(--esc-fg);
+    font-size: 14px;
+    line-height: 1.4;
+    animation: esc-slide-in 0.18s ease-out;
+    user-select: none;
+}
+
+@keyframes esc-slide-in {
+    from { transform: translateX(-12px); opacity: 0; }
+    to   { transform: translateX(0);     opacity: 1; }
+}
+
+/* ---- 顶部：机构名 + 右上角小 logo ---- */
+#escMenu .esc-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+#escMenu .esc-agency {
+    color: var(--esc-fg);
+    font-family: var(--font-mono-bold);
+    font-size: 18px;
+    letter-spacing: 1px;
+}
+
+#escMenu .esc-agency-logo {
+    width: 22px;
+    height: 22px;
+    background: var(--esc-fg);
+    -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="white" d="M12 2 14 8h6l-5 4 2 6-5-4-5 4 2-6-5-4h6z"/></svg>') center/contain no-repeat;
+            mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="white" d="M12 2 14 8h6l-5 4 2 6-5-4-5 4 2-6-5-4h6z"/></svg>') center/contain no-repeat;
+}
+
+/* ---- 虚线分隔（例图标志性元素） ---- */
+#escMenu .esc-dash {
+    border-top: 1px dashed var(--esc-dash);
+    margin: 8px 0;
+}
+
+/* ---- 元信息行（UNIVERSE TIME / GAME MODE）
+   左标签 + 中间 ···· 填充 + 右侧贴值 ---- */
+#escMenu .esc-meta {
+    margin: 4px 0 6px 0;
+}
+
+#escMenu .esc-meta-row {
+    display: flex;
+    align-items: baseline;
+    font-size: 11px;
+    letter-spacing: 1px;
+    line-height: 1.5;
+}
+
+#escMenu .esc-meta-label {
+    color: var(--esc-fg-dim);
+    flex: 0 0 auto;
+}
+
+#escMenu .esc-meta-dots {
+    flex: 1;
+    overflow: hidden;
+    color: var(--esc-fg-dim);
+    white-space: nowrap;
+    letter-spacing: 0;
+    margin: 0 2px;
+}
+
+#escMenu .esc-meta-value {
+    color: var(--esc-fg);
+    font-family: var(--font-mono-bold);
+    flex: 0 0 auto;
+    text-align: right;
+}
+
+/* ---- 分组标题（## 设施，本身占一个行号；行号与标题零间距） ---- */
+#escMenu .esc-group-title {
+    color: var(--esc-facility);
+    font-family: var(--font-mono-bold);
+    font-size: 13px;
+    margin: 0;
+    gap: 0;
+    letter-spacing: 2px;
+    cursor: default;
+}
+#escMenu .esc-group-title:hover {
+    background: transparent;
+}
+#escMenu .esc-group-title-text {
+    padding-left: 0;
+}
+
+/* ---- 操作行（行号 + 图标 + 标签） ---- */
+#escMenu .esc-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 8px 0 0;
+    border-radius: 2px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.08s ease;
+}
+
+#escMenu .esc-row:hover {
+    background: rgba(88, 166, 255, 0.12);
+}
+
+/* 行高统一为 24px（与 JS 中 ESC_ROW_HEIGHT 一致，保证行号连续填充计算准确） */
+#escMenu .esc-row,
+#escMenu .esc-row-empty,
+#escMenu .esc-group-title,
+#escMenu .esc-version {
+    box-sizing: border-box;
+    height: 24px;
+}
+
+/* 空行占位（带行号，固定高度拉开分组距离） */
+#escMenu .esc-row-empty {
+    display: flex;
+    align-items: center;
+}
+
+/* 行号侧边（默认暗灰，选中行变蓝；分组标题/版本号行号保持同款样式） */
+#escMenu .esc-line-num {
+    flex: 0 0 22px;
+    text-align: right;
+    color: var(--esc-line-num);
+    font-size: 11px;
+    font-family: var(--font-mono);
+    font-weight: normal;
+    letter-spacing: 0;
+    /* 覆盖父级继承的 letter-spacing（如分组标题的 2px），避免数字之间出现字间距 */
+    transition: color 0.08s ease;
+}
+
+/* 操作行（有图标的 main/facilities 行）：行号与内容之间加空格，视觉更疏朗；
+   分组标题行（gap:0）与 footer plain 行（无图标）不受影响 */
+#escMenu .esc-row-tone-accent  > .esc-line-num,
+#escMenu .esc-row-tone-success > .esc-line-num,
+#escMenu .esc-row-tone-facility > .esc-line-num {
+    margin-right: 12px;
+}
+
+/* 行号填充区（版本号之前）：flex:1 拉伸吸收剩余高度，保证版本号绝对贴底；
+   内部空行固定 24px 由 JS 按行高填充（行号连续到底） */
+#escMenu .esc-fill {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+/* 行内图标（plain 行不渲染） */
+#escMenu .esc-icon {
+    flex: 0 0 18px;
+    text-align: center;
+    font-size: 12px;
+    line-height: 1;
+}
+
+/* 标签（label-1 动作词继承行 tone 颜色；label-2 名词固定白色） */
+#escMenu .esc-label {
+    flex: 1;
+    font-size: 14px;
+}
+
+#escMenu .esc-label-2 {
+    color: var(--esc-fg);
+}
+
+/* ---- 功能语义配色（仅 main/facilities 生效） ----
+   例图：Resume 蓝、Save 绿、Load 蓝、设施绿 ---- */
+#escMenu .esc-row-tone-accent  .esc-label { color: var(--esc-accent); }
+#escMenu .esc-row-tone-accent  .esc-icon  { color: var(--esc-accent); }
+#escMenu .esc-row-tone-success .esc-label { color: var(--esc-success); }
+#escMenu .esc-row-tone-success .esc-icon  { color: var(--esc-success); }
+#escMenu .esc-row-tone-facility .esc-label { color: var(--esc-facility); }
+#escMenu .esc-row-tone-facility .esc-icon  { color: var(--esc-facility); }
+
+/* plain 行：白字、无图标（DOM 不渲染 .esc-icon）、无色调 */
+#escMenu .esc-row-tone-plain .esc-label { color: var(--esc-fg); }
+#escMenu .esc-row-tone-plain:hover { background: rgba(255, 255, 255, 0.04); }
+
+/* 未启用行（disabled 占位：仅图标与标签灰显，行号保持统一颜色） */
+#escMenu .esc-row.esc-row-disabled .esc-label,
+#escMenu .esc-row.esc-row-disabled .esc-icon {
+    color: var(--esc-fg-disabled);
+}
+#escMenu .esc-row.esc-row-disabled {
+    cursor: default;
+}
+#escMenu .esc-row.esc-row-disabled:hover {
+    background: transparent;
+}
+
+/* ---- 底部版本号（本身是一行，带行号；例图行号 28） ---- */
+#escMenu .esc-version {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 8px 0 0;
+    color: var(--esc-version);
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    line-height: 1.4;
+    word-break: break-all;
+}
+
+#escMenu .esc-version .esc-line-num {
+    font-size: 11px;
+}

@@ -18,6 +18,8 @@ import { facilitySystem } from './src/facility/facilitySystem.js';
 // UI加载 - UI 模块必须尽早加载，确保菜单按钮点击时函数已就绪
 import './src/ui/trackingUI.js';
 import './src/ui/menuUI.js';
+// 0.2.5 ESC 菜单 — 独立组件（KSP2 控制台风格，自 menuUI 抽离）
+import './src/ui/escMenuUI.js';
 import './src/ui/shipBuilderUI.js';
 // 0.2.5 开始游戏流程 — 左侧综合面板 + 创建新战役对话框
 import { openStartGamePanel } from './src/ui/startGamePanel.js';

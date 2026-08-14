@@ -148,6 +148,7 @@ function renderCheckpointList() {
 }
 
 // 渲染选中存档的元信息块（右列顶部，数据驱动：名称/最近游玩/游戏时间/游戏模式）
+// 用 DOM API 构建（避免 innerHTML 拼接玩家自定义名称的 XSS 隐患）
 function renderCheckpointMeta() {
     const metaEl = document.getElementById('sgpCpMeta');
     const checkpoints = _selectedWorldId ? saveManager.getCheckpointList(_selectedWorldId) : [];
@@ -163,20 +164,32 @@ function renderCheckpointMeta() {
         ? t('common.modeCareer')
         : t('common.modeSandbox');
 
-    metaEl.innerHTML =
-        `<div class="sgp-meta-name">${cp.name}</div>` +
-        `<div class="sgp-meta-item">` +
-            `<span class="sgp-meta-label">${t('startgame.metaLastPlayed')}</span>` +
-            `<span class="sgp-meta-value">${formatGameDate(cp.timestamp)}</span>` +
-        `</div>` +
-        `<div class="sgp-meta-item">` +
-            `<span class="sgp-meta-label">${t('startgame.metaGameTime')}</span>` +
-            `<span class="sgp-meta-value">${formatGameTime(cp.gameTime)}</span>` +
-        `</div>` +
-        `<div class="sgp-meta-item">` +
-            `<span class="sgp-meta-label">${t('startgame.metaGameMode')}</span>` +
-            `<span class="sgp-meta-value">${mode}</span>` +
-        `</div>`;
+    metaEl.innerHTML = '';
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'sgp-meta-name';
+    nameEl.textContent = cp.name;
+    metaEl.appendChild(nameEl);
+
+    const rows = [
+        { label: t('startgame.metaLastPlayed'), value: formatGameDate(cp.timestamp) },
+        { label: t('startgame.metaGameTime'),   value: formatGameTime(cp.gameTime) },
+        { label: t('startgame.metaGameMode'),   value: mode }
+    ];
+    for (const row of rows) {
+        const item = document.createElement('div');
+        item.className = 'sgp-meta-item';
+        const labelEl = document.createElement('span');
+        labelEl.className = 'sgp-meta-label';
+        labelEl.textContent = row.label;
+        const valueEl = document.createElement('span');
+        valueEl.className = 'sgp-meta-value';
+        valueEl.textContent = row.value;
+        item.appendChild(labelEl);
+        item.appendChild(valueEl);
+        metaEl.appendChild(item);
+    }
+
     metaEl.style.display = 'block';
 }
 

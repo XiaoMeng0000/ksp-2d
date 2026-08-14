@@ -107,6 +107,13 @@ function getTypeTag(type) {
     }[type] || t('tracking.typeTagUnknown');
 }
 
+// 追踪站 - HTML 转义（node.name 为玩家自定义名称，拼接 innerHTML 前需转义）
+function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, (c) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+}
+
 // 追踪站 - 创建信息窗口
 const trackingInfo = document.createElement('div');
 trackingInfo.id = 'trackingInfo';
@@ -115,7 +122,7 @@ document.body.appendChild(trackingInfo);
 
 // 追踪站 - 内部渲染（节点点击 / 分组折叠时重绘）
 function renderInfo(node) {
-    let html = `<div class="tracking-name">${node.name}</div>`;
+    let html = `<div class="tracking-name">${escapeHtml(node.name)}</div>`;
     html += `<div class="tracking-type-tag">${getTypeTag(node.type)}</div>`;
 
     if (node.type === 'ship') {
@@ -212,7 +219,7 @@ function renderFacilitySections(node) {
     let dockHtml = '';
     if (fac && fac.dockedShips && fac.dockedShips.length > 0) {
         for (const s of fac.dockedShips) {
-            dockHtml += `<div class="tracking-module-row">${renderIconHtml('ship_default_active', '◈', 12)} ${s.displayName || s.id}</div>`;
+            dockHtml += `<div class="tracking-module-row">${renderIconHtml('ship_default_active', '◈', 12)} ${escapeHtml(s.displayName || s.id)}</div>`;
         }
     } else {
         dockHtml = `<div class="tracking-list-empty">${t('tracking.noDockedShips')}</div>`;

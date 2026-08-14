@@ -204,6 +204,16 @@ export function createConfirmDialog(title, message, onConfirm, onCancel, confirm
     return overlay;
 }
 
+// 辅助：HTML 转义（用户输入内容拼 innerHTML 前必须转义，防 XSS）
+export function escapeHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 // 辅助：将 textureKey 转为 PNG <img> HTML 字符串，纹理未就绪时返回 fallback Emoji
 export function renderIconHtml(textureKey, fallbackEmoji, sizePx) {
     if (!textureKey) return fallbackEmoji || '';

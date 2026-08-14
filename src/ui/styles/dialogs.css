@@ -159,64 +159,8 @@
 .ui-notification-info    { border: 1px solid var(--text-mid); }
 .ui-notification-warning { border: 1px solid var(--warn); }
 
-/* ---- ESC 菜单 ---- */
-#escMenu {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.7);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 10000;
-    backdrop-filter: blur(4px);
-}
-
-#escMenu .ui-dialog {
-    padding: 20px 25px;
-    min-width: 250px;
-}
-
-#escMenu .ui-dialog-title {
-    font-size: 15px;
-    margin-bottom: 10px;
-}
-
-#escCurrentWorld {
-    color: var(--text-dim);
-    font-size: 12px;
-    margin-bottom: 15px;
-}
-
-#escBtnContainer {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-#escMenu .ui-btn {
-    padding: 6px 12px;
-    font-size: 13px;
-}
-
-/* ESC 菜单按钮 hover 用实色高亮，避免半透明 accent-bg 叠加
-   backdrop-blur + 半透明面板产生浑浊叠加效果 */
-#escMenu .ui-btn:hover {
-    background: var(--card-bg-light);
-    color: var(--accent);
-    border-color: var(--accent-border);
-}
-
-/* 消除点击/聚焦时浏览器默认蓝色外框 */
-#escMenu .ui-btn:focus-visible {
-    outline: none;
-    border-color: var(--accent);
-}
-
-.esc-close-hint {
-    margin-top: 15px;
-    color: var(--text-dim);
-    font-size: 11px;
-}
+/* ---- ESC 菜单 ----
+   0.2.5 已抽离为独立组件，样式见 esc_menu.css（--esc-* 独立配色） */
 
 /* ---- 存档管理面板 ---- */
 #archiveManagerPanel {

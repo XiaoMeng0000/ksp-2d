@@ -169,8 +169,11 @@ function closeSettings() {
 }
 
 // 全局 ESC：设置面板可见时关闭（不切场景）
+// 注意：必须 stopPropagation —— 飞行/追踪场景下 menuUI 的 window 级 ESC 处理器
+// 会 toggleEscMenu()，若不拦截会同时打开 ESC 菜单（document 先于 window 冒泡）。
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && container.style.display !== 'none') {
+        e.stopPropagation();
         closeSettings();
     }
 });

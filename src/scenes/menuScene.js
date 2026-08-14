@@ -6,14 +6,13 @@ import { eventBus, Events } from '../eventBus.js';
 import { renderableManager } from '../graphics/renderable.js';
 import { MENUS } from '../config/menuConfig.js';
 import { LINKS_ICONS } from '../config/menuConfig.js'; // 1. 导入数据
+import { VERSION_TEXT } from '../config/version.js';
 
 // 主菜单 — DOM 版（阶段 3：Canvas→DOM）
 // - 数据驱动：menuConfig.js 的 MENUS 定义各菜单按钮（label/action）
 // - 布局样式见 src/ui/styles/main_menu.css
 // - 背景（星空 / 背景图）仍由 Canvas 绘制，仅菜单 UI（Logo/按钮/版本号）迁移为 DOM
-
-// 版本号（原 Canvas 硬编码文本）
-const VERSION_TEXT = 'v0.2.4-alpha (Build 202608)';
+// - 版本号常量与 ESC 菜单共享（src/config/version.js）
 
 let _canvas = null;
 let _currentMenu = 'main';
