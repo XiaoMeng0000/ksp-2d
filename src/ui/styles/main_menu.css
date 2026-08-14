@@ -13,7 +13,7 @@
     align-items: flex-start;
     justify-content: flex-start;
     padding: 50px 0 0 30px;      /* 对应原 canvas logo 位置 (30, 50) */
-    font-family: var(--font-mono);
+    font-family: var(--font-mono-blod);
     user-select: none;
     pointer-events: none;        /* 空区域不拦截点击，背景仍走 canvas */
 }
@@ -39,27 +39,24 @@
 .mm-nav {
     display: flex;
     flex-direction: column;
-    gap: 12px;                   /* 原 buttonSpacing 48 - buttonHeight 36 */
-    margin-left: 30px;           /* 对应原 buttonX=60（相对容器左 30） */
+    gap: 20px;                   /* 原 buttonSpacing 48 - buttonHeight 36 */
+    margin-left: 20px;           /* 对应原 buttonX=60（相对容器左 30） */
     pointer-events: auto;
 }
 
 .mm-btn {
-    min-width: 200px;
-    height: 36px;
+    min-width: 270px;
     padding: 0 12px;
     background: none;
     border: none;
-    color: rgba(255, 255, 255, 0.85);
+    color: #fff;
     font-family: var(--font-mono);
     font-size: 20px;
     text-align: left;
     cursor: pointer;
-    transition: background 0.15s ease;
 }
 .mm-btn:hover {
-    background: rgba(80, 80, 160, 0.6);
-    color: #fff;
+    background: #3B3F8D;
 }
 
 /* ---- 版本号（右下角） ---- */

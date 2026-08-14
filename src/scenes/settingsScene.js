@@ -31,15 +31,8 @@ function _renderButtonGroup(name, options, currentValue, storageKey) {
     let html = `<div class="settings-btn-group">`;
     for (const opt of options) {
         const isSelected = opt.value === currentValue;
-        const bg = isSelected ? 'rgba(136,204,255,0.2)' : 'rgba(0,0,0,0.85)';
-        const color = isSelected ? '#88ccff' : '#ccc';
-        const border = '1px solid #555';
-        html += `<button data-group="${name}" data-value="${opt.value}" style="
-            flex:1; padding:6px 16px; cursor:pointer;
-            background:${bg}; color:${color}; border:${border};
-            border-radius:5px; font-family:monospace; font-size:12px;
-            transition:background 0.15s ease;
-        ">${opt.label}</button>`;
+        const state = isSelected ? 'selected' : 'unselected';
+        html += `<button data-group="${name}" class="settings-btn ${state}" data-value="${opt.value}">${opt.label}</button>`;
     }
     html += `</div>`;
     return html;
@@ -67,12 +60,13 @@ function _renderNav(navEl) {
             : '#555';
         const cursor = cat.enabled ? 'pointer' : 'default';
         const activeClass = isActive ? ' active' : '';
-        html += `<div data-cat="${cat.id}" class="settings-cat${activeClass}" style="
-            cursor:${cursor}; color:${color};
+        const isEnable = cat.enabled ?  '' : ' disabled';
+        html += `<div data-cat="${cat.id}" class="settings-cat${activeClass}${isEnable}" style="
+            cursor:${cursor};
         ">${cat.label}</div>`;
     }
     // 底部返回按钮
-    html += `<div style="margin-top:auto; padding-top:12px; border-top:1px solid #444;">
+    html += `<div style="margin-top:auto; padding-top:12px;">
         <div id="settingsBackBtn" class="settings-back-btn">${t('common.back')}</div>
     </div>`;
     navEl.innerHTML = html;

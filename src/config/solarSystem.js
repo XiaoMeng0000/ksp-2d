@@ -299,7 +299,7 @@ export const solarSystemData = [
 // 星系级信息独立存放，不混入天体数据本体
 // 数组结构为将来多星系加载预留扩展点
 // placeholder: true 表示占位星系（仅展示，无真实天体数据）
-// description 采用游戏百科"天体档案"文风（温暖叙事 + 幽默点睛）
+// description 采用百科"天体档案"文风（温暖叙事 + 幽默点睛）
 export const starSystemMeta = [
     {
         id: 'kerbolar',
