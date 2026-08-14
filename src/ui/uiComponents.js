@@ -2,6 +2,7 @@
 
 import { textureManager } from '../graphics/textureManager.js';
 import { t } from '../config/strings.js';
+import { getResourceType } from '../resources/resourceTypes.js';
 
 export function createNotification(message, type = 'info', duration = 2000) {
     // 创建或获取通知容器
@@ -212,4 +213,40 @@ export function renderIconHtml(textureKey, fallbackEmoji, sizePx) {
         return `<img src="${tex.src}" style="width:${s}px;height:${s}px;object-fit:contain;vertical-align:middle;">`;
     }
     return fallbackEmoji || '';
+}
+
+// 燃料分槽进度条（0.2.0 阶段4）— 每种推进剂独立一条 bar，供各面板复用
+// 结构：资源名 [进度条] 存量/容量；无 resources 时回退单一燃料条
+export function renderFuelBarsHtml(ship, opts = {}) {
+    if (!ship) return '';
+    const color = opts.color || 'var(--accent)';
+
+    const rows = [];
+    if (ship.resources) {
+        for (const [resId, slot] of Object.entries(ship.resources)) {
+            if (!slot) continue;
+            const def = getResourceType(resId);
+            rows.push({
+                name: def ? def.name : resId,
+                amount: slot.amount || 0,
+                capacity: slot.capacity || 0
+            });
+        }
+    } else if (typeof ship.fuel === 'number') {
+        rows.push({ name: t('common.fuel'), amount: ship.fuel, capacity: ship.fuelCapacity ?? ship.fuel });
+    }
+
+    let html = '';
+    for (const r of rows) {
+        const pct = r.capacity > 0 ? Math.min(100, Math.max(0, r.amount / r.capacity * 100)) : 0;
+        html += '<div style="display:flex;align-items:center;gap:6px;">'
+            + '<span style="width:64px;flex-shrink:0;color:#888;font-size:10px;text-align:right;'
+            + 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + r.name + '</span>'
+            + '<span style="flex:1;display:inline-block;height:6px;background:#333;border-radius:3px;overflow:hidden;">'
+            + '<span style="display:block;width:' + pct + '%;height:100%;background:' + color + ';border-radius:3px;"></span></span>'
+            + '<span style="width:84px;flex-shrink:0;color:#888;font-size:10px;white-space:nowrap;">'
+            + Math.floor(r.amount) + ' / ' + Math.floor(r.capacity) + '</span>'
+            + '</div>';
+    }
+    return html;
 }

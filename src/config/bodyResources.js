@@ -30,6 +30,9 @@ export const BODY_RESOURCES = {
 };
 
 // 获取天体资源配置（不存在时返回空结构，避免调用方判空）
+// 0.2.0 阶段4：key 归一化 — 配置表用小写 id（kerbin），运行时传入的是天体 name（Kerbin）
 export function getBodyResources(bodyId) {
-    return BODY_RESOURCES[bodyId] || { surface: {}, orbitBands: {} };
+    if (!bodyId) return { surface: {}, orbitBands: {} };
+    const key = typeof bodyId === 'string' ? bodyId : String(bodyId);
+    return BODY_RESOURCES[key] || BODY_RESOURCES[key.toLowerCase()] || { surface: {}, orbitBands: {} };
 }

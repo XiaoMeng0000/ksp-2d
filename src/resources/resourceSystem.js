@@ -5,6 +5,8 @@
 // holder 结构：{ resources: { resourceId: { amount, capacity } } }
 
 import { gameState } from '../gameState.js';
+import { isResourceCheckEnabled } from './modeRules.js';
+import { getCargoUsed } from './cargoSystem.js';
 
 // 获取资源槽（{amount, capacity}），不存在返回 null
 export function getResource(holder, resourceId) {
@@ -40,7 +42,7 @@ export function consumeResource(holder, resourceId, amount) {
     return true;
 }
 
-// 获取飞船总质量（干质量 + 全部推进剂存量；兼容旧 fuel 字段）
+// 获取飞船总质量（干质量 + 全部推进剂存量 + 货仓货物；兼容旧 fuel 字段）
 export function getTotalMass(ship) {
     if (!ship) return 0;
     let fuelMass = 0;
@@ -53,7 +55,9 @@ export function getTotalMass(ship) {
         // 迁移期兼容：无 resources 时回退旧 fuel 字段
         fuelMass = ship.fuel;
     }
-    return (ship.dryMass || 0) + fuelMass;
+    // 0.2.0 阶段5：货仓货物计入总质量（影响推力加速度与 ΔV）
+    const cargoMass = getCargoUsed(ship);
+    return (ship.dryMass || 0) + fuelMass + cargoMass;
 }
 
 // 获取推进剂总存量（迁移期兼容：有 resources 时汇总，否则回退旧 fuel 字段）
@@ -90,16 +94,41 @@ export function getPlayerResource(resourceId) {
     return player.resources && player.resources[resourceId] ? player.resources[resourceId].amount : 0;
 }
 
+// 玩家全局资源 - 增加存量
+export function addPlayerResource(resourceId, amount) {
+    const state = gameState.getState();
+    const player = state.player;
+    if (!player.resources) player.resources = {};
+    if (!player.resources[resourceId]) player.resources[resourceId] = { amount: 0 };
+    player.resources[resourceId].amount += amount;
+    gameState.setState({ player });
+    return true;
+}
+
+// 玩家全局资源 - 尝试消耗（当前仅科技点；实体资源已迁至设施存储/飞船货仓，见 cargoSystem.js）
+// sandbox 免检保留给 science 类消耗（蓝图解锁等），余额不足返回 false 且不扣款
+export function consumePlayerResource(resourceId, amount) {
+    if (!isResourceCheckEnabled()) return true;   // 自由模式资源免检
+    const state = gameState.getState();
+    const player = state.player;
+    const slot = player.resources && player.resources[resourceId];
+    if (!slot || slot.amount < amount) return false;
+    slot.amount -= amount;
+    gameState.setState({ player });
+    return true;
+}
+
 // 标准重力加速度（m/s²）
 export const G0 = 9.81;
 
 // 计算飞船当前可用的 ΔV（KSP 方式：从当前状态烧到燃料耗尽）
 // ΔV = isp × g0 × ln(当前总质量 / 燃料耗尽后质量)
+// 0.2.0 阶段5：货物不参与燃烧，末质量 = 干质量 + 货仓货物（载荷越重 ΔV 越低）
 // 注意：多推进剂引擎下"先耗尽的那种燃料"决定实际 ΔV，双燃料按引擎配方精算在阶段 2 实现
 export function computeDeltaV(ship) {
     if (!ship || !ship.isp) return 0;
     const currentMass = getTotalMass(ship);
-    const dryMass = ship.dryMass || 0;
-    if (dryMass <= 0 || currentMass <= dryMass) return 0;
-    return ship.isp * G0 * Math.log(currentMass / dryMass);
+    const endMass = (ship.dryMass || 0) + getCargoUsed(ship);
+    if (endMass <= 0 || currentMass <= endMass) return 0;
+    return ship.isp * G0 * Math.log(currentMass / endMass);
 }

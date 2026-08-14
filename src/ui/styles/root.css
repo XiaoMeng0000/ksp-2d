@@ -210,3 +210,57 @@
     font-size: 13px;
     font-weight: bold;
 }
+
+/* ============================================================
+   玩家资源 HUD（0.2.0 阶段4）— 右上角常驻模式+全局资源显示
+   ============================================================ */
+#playerResourceHud {
+    position: fixed;
+    top: 8px;
+    right: 12px;
+    z-index: 900;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 6px 12px;
+    background: var(--panel-bg);
+    border: 1px solid var(--border-dark);
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-mid);
+    pointer-events: none;
+    user-select: none;
+}
+
+#playerResourceHud .prh-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+#playerResourceHud .prh-value {
+    font-family: var(--font-mono-bold);
+    font-weight: normal;
+    color: var(--text-bright);
+}
+
+#playerResourceHud .prh-mode {
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+#playerResourceHud .prh-mode-sandbox {
+    color: var(--success);
+    background: var(--success-bg);
+    border: 1px solid var(--success-border);
+}
+
+#playerResourceHud .prh-mode-career {
+    color: var(--warn);
+    background: rgba(255, 170, 68, 0.12);
+    border: 1px solid rgba(255, 170, 68, 0.35);
+}

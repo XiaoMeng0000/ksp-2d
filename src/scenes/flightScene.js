@@ -15,7 +15,9 @@ import { facilitySystem } from '../facility/facilitySystem.js';
 import { getModuleDef } from '../ship/moduleTypes.js';
 import { getFacilityType } from '../facility/facilityTypes.js';
 import { getTotalMass, getResource, getFuelAmount, getFuelCapacity } from '../resources/resourceSystem.js';
+import { updateScanProgress } from '../resources/scanSystem.js';
 import { getEngineType } from '../resources/engineConfig.js';
+import { consumeCargo, hasCargoHold, getCargoAmount } from '../resources/cargoSystem.js';
 import { timeWarp } from '../timeWarp.js';
 import { t } from '../config/strings.js';
 
@@ -155,6 +157,16 @@ eventBus.on(Events.SHIP_COMMAND, ({ action, params }) => {
                 break;
             }
 
+            // 0.2.0 阶段5：部署设施消耗材料套装（从部署飞船货仓扣除）
+            // 修复：扣费校验前置但实际扣除后移 —— 原实现在所有轨道校验之前扣费，
+            // 校验失败（逃逸轨道/危险区）时材料套装已被扣但设施未部署（资源丢失）
+            const deployTypeCfg = getFacilityType(typeId);
+            const deployCost = (deployTypeCfg && deployTypeCfg.cost) || 0;
+            if (deployCost > 0 && (!hasCargoHold(ship) || getCargoAmount(ship, 'materialKits') < deployCost)) {
+                window.showNotification(t('deploy.noKits'), 'warning');
+                break;
+            }
+
             // 检查在宿主 SOI 内且在轨
             if (!ship.currentSOI || ship.mode !== 'on_rails') {
                 window.showNotification(t('deploy.needStableOrbit'), 'warning');
@@ -184,6 +196,25 @@ eventBus.on(Events.SHIP_COMMAND, ({ action, params }) => {
                 }
             }
 
+            // 创建设施（createFacility 期望绝对世界坐标，需从相对坐标转换）
+            const absPos = getAbsolutePosition(ship);
+            const typeCfg = getFacilityType(typeId);
+            const facilityName = params?.facilityName || (typeCfg ? t('deploy.newName', { name: typeCfg.name }) : t('deploy.newFacility'));
+            const facility = facilitySystem.createFacility(
+                typeId,
+                facilityName,
+                { x: absPos.x, y: absPos.y },
+                { x: ship.vel.x, y: ship.vel.y },
+                ship.currentSOI
+            );
+
+            // 设施创建成功后才真正扣费 + 消耗建设模块（避免失败时资源/模块丢失）
+            if (!facility) {
+                window.showNotification(t('deploy.failed'), 'error');
+                break;
+            }
+            if (deployCost > 0) consumeCargo(ship, 'materialKits', deployCost);
+
             // 消耗建设模块（移除第一个匹配的）
             const modIndex = ship.modules.findIndex(m => {
                 const def = getModuleDef(m.type);
@@ -197,23 +228,7 @@ eventBus.on(Events.SHIP_COMMAND, ({ action, params }) => {
             }
             shipSystem.persistShip(ship);
 
-            // 创建设施（createFacility 期望绝对世界坐标，需从相对坐标转换）
-            const absPos = getAbsolutePosition(ship);
-            const typeCfg = getFacilityType(typeId);
-            const facilityName = params?.facilityName || (typeCfg ? t('deploy.newName', { name: typeCfg.name }) : t('deploy.newFacility'));
-            const facility = facilitySystem.createFacility(
-                typeId,
-                facilityName,
-                { x: absPos.x, y: absPos.y },
-                { x: ship.vel.x, y: ship.vel.y },
-                ship.currentSOI
-            );
-
-            if (facility) {
-                window.showNotification(t('deploy.success', { name: facilityName }), 'success');
-            } else {
-                window.showNotification(t('deploy.failed'), 'error');
-            }
+            window.showNotification(t('deploy.success', { name: facilityName }), 'success');
             break;
         }
         case 'deployToBody': {
@@ -517,6 +532,9 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             _setCelestialTime(_getCelestialTime() + simDt);
             updateCelestialBodies(_getCelestialTime());
             eventBus.emit(Events.CELESTIAL_TIME_UPDATED, { time: _getCelestialTime(), dt: simDt });
+
+            // 0.2.0 阶段6：扫描任务推进（随 simDt，时间加速下同步加速）
+            updateScanProgress(simDt);
 
             // 物理推进
             for (const s of allShips) {

@@ -3,10 +3,10 @@
 
 | 项 | 内容 |
 |---|---|
-| 版本 | v1.4 |
-| 日期 | 2026-08-08 |
-| 状态 | 方案已确认，待分阶段实施 |
-| 分支 | `feature/resource-system`（基于 `main`） |
+| 版本 | v1.7 |
+| 日期 | 2026-08-15 |
+| 状态 | 阶段 1-6 已实施；后置事项见 §13（v1.7 同步文档与实现，含 modeRules/资源归属修正） |
+| 分支 | `feature`（当前工作分支） |
 
 ---
 
@@ -41,7 +41,7 @@
 ```
 星球资源(原料) → [扫描模块] → 丰度可见 → [采矿模块(后置)] → 原料库存
                                                           ↓ [精炼(后置)]
-玩家资源(科技点/火箭零件) → [解锁/建造] → 飞船模板(家族分代)
+玩家资源(科技点/材料套装) → [解锁/建造] → 飞船模板(家族分代)
                                               ↓
                         飞船实例.resources(推进剂) → [引擎] → 飞行/消耗
                                               ↓
@@ -62,7 +62,7 @@
 - **代码 id**：全小写驼峰，稳定不可变（进入存档，改名成本高）
 - **中文显示名**：玩家可见，2~4 字为宜
 - **分类**：`propellant`（推进剂）/ `raw`（原料）/ `construction`（建造）/ `research`（科研）
-- **单位**：推进剂与原料 kg；耗材"个"；科技点"点"
+- **单位**：推进剂与原料 kg；耗材"套"；科技点"点"
 - **探测等级（tier）**：仅 `raw` 与可作为星球资源的推进剂需要（1 常见 / 2 稀有 / 3 隐藏）
 
 ### 3.2 资源注册表（定稿 18 类）
@@ -91,7 +91,7 @@ export const RESOURCE_TYPES = [
   { id: 'fissileMaterials',name: '裂变材料',   category: 'raw', unit: 'kg', tier: 2 },
 
   // ===== 玩家全局 =====
-  { id: 'rocketParts', name: '火箭零件', category: 'construction', unit: '个' },
+  { id: 'materialKits', name: '材料套装', category: 'construction', unit: '套' },
   { id: 'science',     name: '科技点',   category: 'research',     unit: '点' },
 ];
 ```
@@ -101,7 +101,7 @@ export const RESOURCE_TYPES = [
 | 归属 | 资源 | 说明 |
 |---|---|---|
 | 飞船实例 `ship.resources` | 全部推进剂 | 每艘船独立库存，`amount` + `capacity`（储罐容量） |
-| 玩家 `player.resources` | rocketParts / science | 全局库存 |
+| 玩家 `player.resources` | science（科技点） | v1.7 修正：0.2.0 阶段 5 起全局仅科技点；materialKits 等实体资源迁入设施存储 / 飞船货仓 |
 | 天体配置 `BODY_RESOURCES` | 原料（静态丰度表） | 只读配置，不可增删 |
 
 飞船资源结构：
@@ -114,12 +114,13 @@ ship.resources = {
 }
 ```
 
-废弃字段：`ship.fuel`、`ship.fuelCapacity`、`player.points`。
+废弃字段：`ship.fuel`、`ship.fuelCapacity`、`player.points`、`player.resources.rocketParts`（重命名为 materialKits）、`player.resources.materialKits`（阶段 5 迁入设施存储）。
 
 ### 3.4 统一工具函数（新建 `src/resources/resourceSystem.js`）
 
 - `getResource(holder, id)` / `setResource` / `addResource` / `consumeResource(holder, id, amount)`
 - `getTotalMass(ship)`：干质量 + Σ(所有推进剂 amount)
+- 玩家全局：`getPlayerResource` / `addPlayerResource` / `consumePlayerResource`（0.2.0 阶段3，career 校验余额）
 - 所有模块只经工具函数读写资源，杜绝裸字段操作
 
 ---
@@ -158,6 +159,7 @@ export const ENGINE_TYPES = [
 ### 5.1 形态选型：家族分代（Tier）
 
 同系列分 Tier（如 坎星号 Mk1 → Mk2 → Mk3），每代换引擎类型 / 燃料 / 数值，靠科技点逐级解锁。
+> 已实施注：tier1 现役舰已命名为「储备坎巴拉K2号」（id 仍为 `kanxing-1`，family `kanxing`），定位对标 KSP 原版 K2 火箭（Mun/Minmus 往返专用）。
 
 ```
 坎星号 Mk1 (tier1, 化学) → Mk2 (tier2, 金属氢) → Mk3 (tier3, 氙电推)
@@ -167,14 +169,14 @@ export const ENGINE_TYPES = [
 
 ```js
 {
-  id: 'kanxing-1', name: '坎星号 Mk1',
+  id: 'kanxing-1', name: '储备坎巴拉K2号',
   family: 'kanxing',          // 系列名（升级线）
   tier: 1,                    // 分代序号，1 起
   category: 'probe',
   engineType: 'chemical',     // 关联 ENGINE_TYPES，决定燃料配方
-  fuelTanks: { hydrogen: 5000, oxygen: 40000 },  // 按引擎配方配储罐
-  dryMass: 2000, isp: 350, maxThrust: 100000,
-  cost: 50,                   // 建造耗材（火箭零件）
+  fuelTanks: { hydrogen: 280, oxygen: 2240 },  // 按引擎配方配储罐（总 2520 kg，ΔV≈2800）
+  dryMass: 2000, isp: 350, maxThrust: 70000,
+  cost: 50,                   // 建造耗材（材料套装）
   scienceCost: 0,             // 科技点（0 = 默认解锁；本期科技树不生效，保留字段）
   unlockCondition: 'always',  // 'always' | 'science' | '__debug__'
   ...
@@ -194,12 +196,14 @@ export const ENGINE_TYPES = [
 
 | 族 | tier | 引擎 | ΔV 目标 | scienceCost | cost |
 |---|---|---|---|---|---|
-| 坎星号 Mk1 | 1 | 化学氢氧 | 3,500 | 0 | 50 |
+| 储备坎巴拉K2号 | 1 | 化学氢氧 | 2,800 | 0 | 50 |
 | 坎星号 Mk2 | 2 | 金属氢 | 12,000 | 80 | 400 |
 | 坎星号 Mk3 | 3 | 氙电推 | 30,000 | 250 | 1,500 |
 | 深空先锋 | 3 | 核盐水 | 40,000 | 400 | 2,500 |
 | 代达罗斯级 | 4 | 聚变 | 80,000 | 800 | 5,000 |
 | 创世纪方舟 | 5 | 反物质（旗舰） | 保留 | 2,000 | 9,999 |
+
+> 已实施注：K2 号 ΔV 校准至 2,800 m/s（TWR≈1.58），足够 Mun/Minmus 往返、不足以直飞 Duna，符合 KSP 原版 K2 火箭定位。
 
 测试巨兽保留 `__debug__` 特殊解锁。创世纪方舟按旗舰保留夸张数值，但 TWR 需 ≥ 1（阶段 2 校准）。
 
@@ -244,11 +248,14 @@ export const BODY_RESOURCES = {
 - 复用现有 `capability` 机制（capability = `scan_resources`），安装流程走 `addModuleToShip`
 - **测试期 price 全 0、可直接选装**（科技树本期不生效）
 
-### 6.4 扫描判定逻辑（阶段 3）
+### 6.4 扫描判定逻辑（阶段 6 ✅ 已实施：主动扫描模型）
 
-- 活动飞船 modules 含扫描仪（取最高 scanTier）且**在该天体 SOI 内** → 写入 `player.scannedBodies[bodyId].tiersScanned`（取 max，不降级）
-- 天体资源可见条件：`资源.tier ≤ tiersScanned`
-- sandbox 模式：直接全部可见
+- 扫描菜单（工具栏 🔭 图标）："开始扫描"启动任务 → 随游戏时间累积 → 完成写入 `tiersScanned`（取 max 不降级）
+- 扫描时长 = 10 游戏天（21600s/天）× (radius/200km) × 等级系数（t1 ×1 / t2 ×0.5 / t3 ×0.25）
+- 约束：飞船带扫描仪且在天体 SOI 内；全局单任务（单通道）；离开 SOI 任务中断（进度清零）
+- 天体资源可见条件：`资源.tier ≤ tiersScanned`（`getVisibleBodyResources`）
+- sandbox 模式：直接全部可见（`isScansEnabled()` 豁免）
+- 附带：SOI 首访奖励（`awardFirstVisit`，发放科技点 +5，记录 `visitedBodies`）
 
 ```js
 player.scannedBodies = {
@@ -264,7 +271,7 @@ player.scannedBodies = {
 
 - **普通天体**：轨道飞船/设施挖**地表矿**，单一丰度系数
 - **轨道资源带**：仅 Dres / Jool 周边，本期仅数据结构预留
-- 采矿模块接口签名：`mineResource(bodyId, module, dt)`——本期只建接口，功能后置
+- v1.7 修正：原计划"本期只建接口 `mineResource(bodyId, module, dt)`"，实际**接口也未建立**，采矿整体后置
 
 ### 7.2 精炼转化链（只定义数据，本期不实现）
 
@@ -272,7 +279,7 @@ player.scannedBodies = {
 // src/resources/craftRecipes.js（后置）
 export const CRAFT_RECIPES = [
   { input: { waterIce: 9 },          output: { hydrogen: 1, oxygen: 8 }, time: 60 },   // 电解
-  { input: { metallicOre: 10 },      output: { rocketParts: 1 },        time: 60 },   // 冶炼
+  { input: { metallicOre: 10 },      output: { materialKits: 1 },        time: 60 },   // 冶炼
   { input: { fissileMaterials: 2 },  output: { nuclearSaltWater: 1 },   time: 120 },
 ];
 ```
@@ -292,9 +299,11 @@ export const CRAFT_RECIPES = [
 
 | 接口 | sandbox | career |
 |---|---|---|
-| `isResourceCheckEnabled()` | false（资源免检） | true（扣费/校验余额） |
+| `isResourceCheckEnabled()` | true（统一扣费） | true（扣费/校验余额） |
 | `isTechLocked()` | false（全解锁） | true（需科技解锁） |
 | `isScansEnabled()` | true（丰度直接可见） | false（需扫描） |
+
+> v1.7 修正：`isResourceCheckEnabled()` 原设计 sandbox 免检，但 0.2.0 阶段 4 起改为**全模式统一扣费**（保证经济闭环可观测，修复资源数字静止 / 免费建造问题）。若将来需要"无限资源沙盒"，改回按 mode 区分（`modeRules.js` 已留 TODO）。
 
 业务代码**只调这些接口**，不散落 `if (mode === 'career')`。将来加差异只改 modeRules 一处。
 
@@ -308,12 +317,17 @@ export const CRAFT_RECIPES = [
 
 | 旧字段 | 迁移逻辑 |
 |---|---|
-| `ship.fuel`（number） | → `resources.hydrogen.amount` |
-| `ship.fuelCapacity` | → 按 1:8 质量拆 `hydrogen.capacity` / `oxygen.capacity` |
-| `player.points` | 废弃，映射为初始 rocketParts / science 默认值 |
+| `ship.fuel`（number） | 按 1:8 质量拆桶 → `resources.hydrogen.amount = fuel/9`、`resources.oxygen.amount = fuel*8/9` |
+| `ship.fuelCapacity` | 按 1:8 拆 → `hydrogen.capacity` / `oxygen.capacity` |
+| `player.points` | 废弃，映射为初始 materialKits / science 默认值 |
+| `player.resources.rocketParts` | → 重命名为 `materialKits`（已存在则保留新值） |
+| `player.resources.materialKits` | 阶段 5：转入第一个设施的存储槽（`addStorage`） |
 | 缺失 `resources` 的新飞船 | 按模板 `fuelTanks` 重建 |
+| 无 `facility.storage` | 按类型 `storageProfile` 补建空仓（`initFacilityStorage`） |
 | 无 `gameMode` | 默认 `'sandbox'` |
 | 无 `scannedBodies` | 默认 `{}` |
+| 无 `visitedBodies` | 默认 `{}`（阶段3：SOI 首访奖励记录） |
+| 无 `engineOut` | 默认 `false` |
 
 版本号：`state.version` 提升至 `0.2.0`。
 
@@ -323,20 +337,23 @@ export const CRAFT_RECIPES = [
 
 | # | Bug | 修复方式 | 阶段 |
 |---|---|---|---|
-| B1 | 燃料耗尽 `maxThrust` 永久置 0 | 改 `engineOut` 标志，补给恢复 | 2 |
-| B2 | UI 用 `maxFuel`，数据是 `fuelCapacity` | 统一走 `ship.resources`，UI 改用工具函数 | 1 |
+| B1 | 燃料耗尽 `maxThrust` 永久置 0 | 改 `engineOut` 标志 + 停机重算 kepler，补给恢复 | 2 ✅ |
+| B2 | UI 用 `maxFuel`，数据是 `fuelCapacity` | 统一走 `getFuelAmount/getFuelCapacity` 工具函数 | 1 ✅ |
+| B3 | ΔV 显示为轨道速度 / 手填值 | 新增 `computeDeltaV`（KSP 火箭方程），追踪站与建造面板统一 | 2 ✅ |
 
 ---
 
 ## 11. 分阶段实施计划
 
-| 阶段 | 内容 | 验收标准 |
-|---|---|---|
-| **1** | 资源表 18 类 + bodyResources（surface/orbitBands）+ 引擎表 + 模板字段扩展 + 3 级扫描仪 + gameMode/scannedBodies + modeRules 骨架 + 存档迁移 + 修 B2 | 旧存档可加载且燃料换算正确；grep 无 `ship.fuel`/`maxFuel`/`points` 裸引用；debugUI 可打印新字段；新模块无导入报错 |
-| **2** | 化学引擎双燃料消耗 + engineOut 停机 + 修 B1 + 模板族数值重做 | lf/ox（hydrogen/oxygen）独立消耗；任一耗尽停机；补给后恢复点火；TWR ≥ 1 |
-| **3** | 扫描解锁逻辑 + career 经济闭环（耗材扣费 + SOI 首访奖励；科技解锁留接口不生效） | 扫描仪分级探测生效；sandbox 豁免；资源不足操作被拒且有提示 |
-| **4** | UI：燃料槽 / 扫描状态 / 星球资源信息 / 模式显示 | 所有界面燃料数字与进度条正确；无字段错位残留 |
-| 后置 | 采矿模块 + 精炼转化 + 生涯任务 + 选模式入口 + 科技树 + Dres/Jool 天体 | — |
+| 阶段 | 内容 | 验收标准 | 状态 |
+|---|---|---|---|
+| **1** | 资源表 18 类 + bodyResources（surface/orbitBands）+ 引擎表 + 模板字段扩展 + 3 级扫描仪 + gameMode/scannedBodies + modeRules 骨架 + 存档迁移 + 修 B2 | 旧存档可加载且燃料换算正确；grep 无 `ship.fuel`/`maxFuel`/`points` 裸引用；debugUI 可打印新字段；新模块无导入报错 | ✅ 完成 |
+| **2** | 化学引擎双燃料消耗 + engineOut 停机 + 修 B1 + 模板族数值重做 | lf/ox（hydrogen/oxygen）独立消耗；任一耗尽停机；补给后恢复点火；TWR ≥ 1 | ✅ 完成 |
+| **3** | 扫描解锁逻辑 + career 经济闭环（耗材扣费 + SOI 首访奖励；科技解锁留接口不生效） | 扫描仪分级探测生效；sandbox 豁免；资源不足操作被拒且有提示 | ✅ 完成 |
+| **4** | UI：燃料槽 / 扫描状态 / 星球资源信息 / 模式显示 | 所有界面燃料数字与进度条正确；无字段错位残留 | ✅ 完成 |
+| **5** | 货运与存储：飞船货仓（货运模块）+ 设施存储（storageProfile 差异化）+ 全局资源只留科技点 + 设施间调拨菜单 + 自动物流接口预留 + 部署设施扣费修复 | 货仓/存储容量生效；建造/补给/装模块/部署均从正确位置扣费；调拨可用 | ✅ 完成 |
+| **6** | 主动扫描：扫描菜单（工具栏图标）+ 扫描时长（游戏天，随星球规模/扫描仪等级）+ 进行中进度/取消 + 已知弹窗提示 | 菜单可用；扫描随游戏时间推进（时间加速同步）；离开 SOI 中断 | ✅ 完成 |
+| 后置 | 采矿模块 + 精炼转化 + 生涯任务 + 选模式入口 + 科技树 + Dres/Jool 天体 + 自动物流执行 | — | ⬜ |
 
 每阶段独立提交，经审查通过后进入下一阶段。
 
@@ -344,22 +361,28 @@ export const CRAFT_RECIPES = [
 
 ## 12. 文件影响面清单
 
-| 文件 | 阶段 | 改动 |
-|---|---|---|
-| `src/resources/resourceTypes.js` | 1 | **新建**：资源注册表 |
-| `src/resources/resourceSystem.js` | 1 | **新建**：资源工具函数 |
-| `src/resources/engineConfig.js` | 1 | **新建**：引擎类型表 |
-| `src/resources/modeRules.js` | 1 | **新建**：模式规则 |
-| `src/config/bodyResources.js` | 1 | **新建**：星球资源 |
-| `src/gameState.js` | 1 | player 扩展 gameMode / scannedBodies / resources |
-| `src/ship/shipTemplates.js` | 1/2 | 模板字段扩展 + 族数值重做 |
-| `src/ship/moduleTypes.js` | 1 | 扫描仪 3 级模块 |
-| `src/ship/shipSystem.js` | 1 | createShip 生成 resources，废弃 fuel |
-| `src/scenes/flightScene.js` | 2 | 双燃料消耗 + engineOut |
-| `src/facility/facilitySystem.js` | 3 | 扣耗材 / 补给恢复 |
-| `src/saveManager.js` | 1 | 存档迁移 + 版本号 |
-| `src/ui/flightUI.js` 等 UI | 1/4 | 燃料字段统一、分槽显示 |
-| `src/physics/physicsUpdate.js` 等 | 2 | 质量计算改用 getTotalMass |
+| 文件 | 阶段 | 改动 | 状态 |
+|---|---|---|---|
+| `src/resources/resourceTypes.js` | 1 | **新建**：资源注册表（含材料套装） | ✅ |
+| `src/resources/resourceSystem.js` | 1/2 | **新建**：资源工具函数 + `computeDeltaV` | ✅ |
+| `src/resources/engineConfig.js` | 1 | **新建**：引擎类型表 | ✅ |
+| `src/resources/modeRules.js` | 1 | **新建**：模式规则 | ✅ |
+| `src/resources/scanSystem.js` | 3 | **新建**：扫描探测 / 资源可见性 / SOI 首访奖励 | ✅ |
+| `src/resources/cargoSystem.js` | 5 | **新建**：飞船货仓 / 设施存储 / 双向调拨 / 自动物流接口预留 | ✅ |
+| `src/config/bodyResources.js` | 1 | **新建**：星球资源 | ✅ |
+| `src/gameState.js` | 1 | player 扩展 gameMode / scannedBodies / visitedBodies / resources | ✅ |
+| `src/ship/shipTemplates.js` | 1/2 | 模板字段扩展 + 族数值重做 + K2 号改名/ΔV 校准 | ✅ |
+| `src/ship/moduleTypes.js` | 1 | 扫描仪 3 级模块 | ✅ |
+| `src/ship/shipSystem.js` | 1 | createShip 生成 resources，废弃 fuel | ✅ |
+| `src/scenes/flightScene.js` | 2/3 | 双燃料消耗 + engineOut + 扫描更新 | ✅ |
+| `src/facility/facilitySystem.js` | 2/3 | 补给恢复 engineOut + 建造/补给/装模块扣费 | ✅ |
+| `src/saveManager.js` | 1 | 存档迁移 + 版本号 + rocketParts→materialKits + visitedBodies | ✅ |
+| `src/ui/flightUI.js` 等 UI | 1/4 | 燃料字段统一工具函数 + 分槽显示；补给面板停机提示 + 扣费失败提示 | ✅ |
+| `src/physics/physicsUpdate.js` 等 | 2 | 质量计算改用 getTotalMass | ✅ |
+| `src/ui/trackingUI.js` | 2/4 | ΔV 改用 `computeDeltaV` + 燃料分槽 + 天体资源丰度/扫描状态显示 | ✅ |
+| `src/ui/shipBuilderUI.js` | 2/3 | 建造面板 ΔV 实时计算 + 成本显示 + 建造扣费 | ✅ |
+| `src/ui/resourceHUD.js` | 4 | **新建**：右上角常驻玩家资源 HUD（模式 + 科技点；阶段 5 后材料套装退场仅剩科技点） | ✅ |
+| `src/config/bodyResources.js` | 1/4 | **新建**：星球资源 + key 归一化（Kerbin↔kerbin） | ✅ |
 
 ---
 
@@ -367,11 +390,13 @@ export const CRAFT_RECIPES = [
 
 ### 已确认后置
 
-- 采矿模块 + 精炼转化（只建数据/接口）
+- 采矿模块 + 精炼转化（v1.7 修正：接口 `mineResource` 与 `craftRecipes.js` 均未建立，整体后置）
+- 高级模板族（Mk2/Mk3、深空先锋、代达罗斯级、创世纪方舟——仅 §5.4 方向表，模板未建）
 - 生涯任务系统
 - 选模式 UI 入口
 - 科技树（science 数据保留，解锁功能不生效）
 - Dres / Jool 天体（本期仅 orbitBands 结构预留）
+- 自动物流执行（`updateAutoLogistics()` 空实现，仅注册骨架）
 
 ### 待决策（后续）
 

@@ -49,6 +49,8 @@ class ShipSystem {
             reactionWheelTorque: template.reactionWheelTorque || 0,
             // 运行时属性
             resources: resources,
+            // 0.2.0 阶段5：货仓（货运模块扩展的共享容量池；自带燃料 resources 不在此）
+            cargo: {},
             modules: [],
             // 轨道状态属性
             pos: { x: 0, y: 0 },

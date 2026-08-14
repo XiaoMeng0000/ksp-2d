@@ -27,6 +27,11 @@ const STRINGS = {
     'common.noWorld': '没有当前世界',
     'common.checkpointName': (p) => `检查点 ${p.n}`,
     'common.unitCount': ' 个',
+    // ---------- 通用补充（数据驱动收敛） ----------
+    'common.free': '免费',
+    'common.fuel': '燃料',
+    'common.modeSandbox': '自由模式',
+    'common.modeCareer': '生涯模式',
 
     // ---------- ESC 菜单 ----------
     'esc.menu': '菜单',
@@ -142,10 +147,18 @@ const STRINGS = {
     'dock.noDockedShipsRefuel': '暂无停靠飞船可补给',
     'dock.refuelableShips': (p) => `可补给飞船（${p.n} 艘）`,
     'dock.refuel': '补给燃料',
-    'dock.refuelCost': '消耗: 0 点数',
+    'dock.refuelCost': '消耗设施存储的氢/氧燃料',
     'dock.refuelDone': '燃料补给完成',
     'dock.promptDock': '按 [B] 对接',
     'dock.promptBtn': '对接',
+    'dock.engineOut': '⚠ 引擎已停机（燃料耗尽）',
+
+    // ---------- 轨道类型 HUD（数据驱动收敛，renderer.js） ----------
+    'orbit.type.circular': '圆轨',
+    'orbit.type.elliptical': '椭圆轨',
+    'orbit.type.suborbital': '亚轨道',
+    'orbit.type.escape': '逃逸',
+    'orbit.type.deepSpace': '深空',
 
     // ---------- 飞船建造 ----------
     'build.title': '飞船建造',
@@ -163,6 +176,9 @@ const STRINGS = {
     'build.bonusShort': (p) => `(+${p.mass}t +${p.moi}惯)`,
     'build.massBonus': (p) => `干质量加成: +${p.v} t`,
     'build.moiBonus': (p) => `转动惯量加成: +${p.v} kg·m²`,
+    // 建造补充（数据驱动收敛）
+    'build.costIncludesModules': (p) => `（含模块 ${p.cost} 套）`,
+    'build.modulePriceSuffix': (p) => ` · ${p.price}套`,
     'build.uninstall': '卸载',
     'build.noSlots': '暂无模块槽',
     'build.slotIndex': (p) => `槽${p.i}`,
@@ -310,6 +326,67 @@ const STRINGS = {
     'atmo.entering': (p) => `⚠ 警告：正在进入 ${p.name} 大气层！`,
     'atmo.destroyedAtmosphere': (p) => `💥 ${p.name} 在大气层中坠毁`,
     'atmo.destroyedSurface': (p) => `💥 ${p.name} 撞击天体表面`,
+
+    // ---------- 经济 / 扫描（0.2.0 阶段3） ----------
+    'economy.insufficientKits': '材料套装不足，无法完成该操作！',
+    'economy.buildCost': (p) => `建造耗材: ${p.cost} 套`,
+    'scan.firstVisit': (p) => `首次进入 ${p.name} 轨道，科技点 +${p.n}`,
+
+    // ---------- 扫描菜单（0.2.0 阶段6：主动扫描模型） ----------
+    'scan.menuTitle': '资源扫描',
+    'scan.deepSpace': '深空无宿主天体，无法扫描',
+    'scan.scannerTier': (p) => `扫描仪等级: tier ${p.tier}`,
+    'scan.noResources': '该天体未探测到可开采资源',
+    'scan.startBtn': (p) => `开始扫描（约 ${p.d} 天）`,
+    'scan.inProgress': (p) => `正在扫描（tier ${p.tier}）...`,
+    'scan.daysLeft': (p) => `剩余 ${p.d} 天`,
+    'scan.cancel': '取消扫描',
+    'scan.knownTier': (p) => `当前已知资源等级: tier ${p.tier}（更高级扫描仪可探测更多）`,
+    'scan.completed': (p) => `${p.name} 扫描完成（tier ${p.tier}），资源丰度已更新`,
+    'scan.aborted': (p) => `扫描任务中断：已离开 ${p.name}`,
+    'scan.reason.invalid': '参数无效',
+    'scan.reason.noScanner': '当前飞船未安装扫描仪',
+    'scan.reason.notInSOI': '必须处于目标天体的引力范围内',
+    'scan.reason.busy': '已有扫描任务进行中（扫描仪单通道）',
+    'scan.reason.alreadyKnown': (p) => `该天体资源丰度已知（当前扫描仪 tier ${p.tier} 无新发现），需更高级扫描仪`,
+    'scan.reason.noDuration': '无法计算扫描时长',
+
+    // ---------- 追踪站天体资源（0.2.0 阶段4） ----------
+    'tracking.bodyResources': '资源丰度:',
+    'tracking.noResources': '未探测到可开采资源',
+    'tracking.scanStatus': (p) => `扫描等级: tier ${p.tier}（需扫描仪探测更多资源）`,
+
+    // ---------- 货运 / 存储（0.2.0 阶段5） ----------
+    'cargo.title': '货仓',
+    'cargo.capacity': '货仓容量（共享池）',
+    'cargo.capacityShort': '容量:',
+    'cargo.empty': '货仓为空',
+    'cargo.fuelNote': '※ 飞船自带燃料（燃料罐）不计入货仓',
+    'cargo.loadAmount': (p) => `装入 ${p.name} 到飞船货仓（可用 ${p.max}）`,
+    'cargo.unloadAmount': (p) => `卸出 ${p.name} 到设施存储（船上 ${p.max}）`,
+    'cargo.transferred': (p) => `已转移 ${p.n}`,
+    'cargo.transferFailed': '转移失败（容量不足或数量无效）',
+    'cargo.facToShip': (p) => `${p.fac} → 船 ${p.ship}`,
+
+    'facility.storage': '货物储备',
+    'facility.storageHint': '设施存储的全部资源（含行内调拨到其他设施）',
+    'facility.transfer': '调拨',
+    'facility.transferTarget': '选择目标设施',
+    'facility.transferAmount': (p) => `转移 ${p.name}：${p.from} → ${p.to}（可用 ${p.max}）`,
+    'facility.noOtherFacilities': '没有其他设施可调拨',
+    'build.noFacility': '未找到所属设施，无法建造',
+
+    'dock.moduleManage': '模块管理',
+    'dock.moduleManageHint': '改装停靠飞船的模块（消耗/返还设施存储的材料套装）',
+    'dock.installModule': '安装',
+    'dock.moduleInstalled': (p) => `已安装 ${p.name}`,
+    'dock.moduleRemoved': '模块已卸载（材料已返还设施）',
+    'dock.cargoHold': '货仓调拨',
+    'dock.cargoShip': (p) => `飞船：${p.name}`,
+
+    'economy.kitsUnit': ' 套',
+    'economy.noFuelStorage': '设施无可用燃料存储，无法补给！',
+    'deploy.noKits': '飞船货仓材料套装不足，无法部署设施',
 };
 
 // 查询文本：key 缺失时返回 key 本身（便于定位），debug 模式下打印警告

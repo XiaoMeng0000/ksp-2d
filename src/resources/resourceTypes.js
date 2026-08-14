@@ -27,7 +27,7 @@ export const RESOURCE_TYPES = [
     { id: 'fissileMaterials', name: '裂变材料', category: 'raw', unit: 'kg', tier: 2 },
 
     // ===== 玩家全局 =====
-    { id: 'rocketParts', name: '火箭零件', category: 'construction', unit: '个' },
+    { id: 'materialKits', name: '材料套装', category: 'construction', unit: '套' },
     { id: 'science', name: '科技点', category: 'research', unit: '点' }
 ];
 

@@ -9,6 +9,7 @@ import { stateToKepler } from '../physics/orbitalMechanics.js';
 import { textureManager } from '../graphics/textureManager.js';
 import { renderIconHtml } from './uiComponents.js';
 import { sceneManager } from '../sceneManager.js';
+import { consumeStorage } from '../resources/cargoSystem.js';
 import { t } from '../config/strings.js';
 
 // EventBus 迁移 — 缓存最近一帧的飞船渲染数据，供 UI 只读函数使用
@@ -177,6 +178,7 @@ function updateShipBuilderStats() {
     // 计算模块累计加成
     let totalMassBonus = 0;
     let totalMoiBonus = 0;
+    let totalModuleCost = 0;
     const slots = selectedModules;
     if (slots) {
         slots.forEach(modId => {
@@ -185,6 +187,7 @@ function updateShipBuilderStats() {
                 if (def) {
                     totalMassBonus += def.massBonus;
                     totalMoiBonus += def.momentOfInertiaBonus;
+                    totalModuleCost += (def.price || 0);
                 }
             }
         });
@@ -213,17 +216,19 @@ function updateShipBuilderStats() {
         : '';
 
     const statsEl = document.getElementById('shipBuilderStats');
+    const totalCost = (ship.cost || 0) + totalModuleCost;
     statsEl.innerHTML = `
         <div style="color:#88ccff;font-weight:bold;margin-bottom:4px;font-size:13px;">${ship.name}</div>
         ${descHtml}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
             <div><span style="color:#666;">${t('build.dryMass')}</span> <span style="color:#fff;">${massStr}${bonusMassStr}</span></div>
             <div><span style="color:#666;">${t('build.thrust')}</span> <span style="color:#fff;">${ship.maxThrust != null ? ship.maxThrust.toFixed(0) : '-'} N</span></div>
-            <div><span style="color:#666;">ΔV:</span> <span style="color:#fff;">${computeTemplateDeltaV(ship, totalMassBonus).toFixed(0)} m/s</span></div>
-            <div><span style="color:#666;">燃料:</span> <span style="color:#fff;">${getTemplateFuelTotal(ship).toFixed(0)}</span></div>
+            <div><span style="color:#666;">${t('build.dv')}</span> <span style="color:#fff;">${computeTemplateDeltaV(ship, totalMassBonus).toFixed(0)} m/s</span></div>
+            <div><span style="color:#666;">${t('build.fuel')}</span> <span style="color:#fff;">${getTemplateFuelTotal(ship).toFixed(0)}</span></div>
             <div><span style="color:#666;">${t('build.moi')}</span> <span style="color:#fff;">${moiStr}${bonusMoiStr}</span></div>
             <div><span style="color:#666;">${t('build.slots')}</span> <span style="color:#fff;">${ship.moduleSlots != null ? ship.moduleSlots : '-'}</span></div>
         </div>
+        <div style="margin-top:8px;font-size:11px;color:#cc8;">${t('economy.buildCost', { cost: totalCost })}${totalModuleCost > 0 ? t('build.costIncludesModules', { cost: totalModuleCost }) : ''}</div>
     `;
 }
 
@@ -294,7 +299,7 @@ function showModuleSelector(slotIndex, slotElement) {
                 padding:4px 10px;cursor:pointer;display:flex;
                 align-items:center;gap:4px;font-size:11px;
             `;
-            row.innerHTML = `${renderIconHtml(modDef.iconTextureKey, modDef.icon)} ${modDef.name} <span style="color:#666;font-size:10px;">${t('build.bonusShort', { mass: modDef.massBonus.toFixed(1), moi: modDef.momentOfInertiaBonus.toFixed(0) })}</span>`;
+            row.innerHTML = `${renderIconHtml(modDef.iconTextureKey, modDef.icon)} ${modDef.name} <span style="color:#666;font-size:10px;">${t('build.bonusShort', { mass: modDef.massBonus.toFixed(1), moi: modDef.momentOfInertiaBonus.toFixed(0) })}${modDef.price ? t('build.modulePriceSuffix', { price: modDef.price }) : ''}</span>`;
 
             // Tooltip
             let tooltip = null;
@@ -469,6 +474,22 @@ function buildShip() {
             // 创建飞船实例
             const shipName = t('build.shipNameSuffix', { name: selectedShip.name });
             const installedModules = selectedModules.filter(m => m !== null);
+            // 0.2.0 阶段5：建造扣费从当前设施存储扣（全局资源已退场，只留科技点）
+            const moduleCost = installedModules.reduce((sum, id) => {
+                const def = getModuleDef(id);
+                return sum + ((def && def.price) || 0);
+            }, 0);
+            const totalCost = (selectedShip.cost || 0) + moduleCost;
+            const facility = window.__getControlledFacility ? window.__getControlledFacility() : null;
+            if (!facility) {
+                window.showNotification(t('build.noFacility'), 'error');
+                return;
+            }
+            if (!consumeStorage(facility, 'materialKits', totalCost)) {
+                window.showNotification(t('economy.insufficientKits'), 'error');
+                return;
+            }
+
             const newShip = window.__shipSystem.createShip(selectedShip.id, shipName, installedModules);
             if (!newShip) {
                 window.showNotification(t('build.createFailed'), 'error');

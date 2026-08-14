@@ -23,6 +23,8 @@ import './src/ui/shipBuilderUI.js';
 import './src/ui/facilityDeployUI.js';
 import './src/ui/flightUI.js';
 import './src/ui/shipDestroyedUI.js';
+// 玩家资源 HUD（0.2.0 阶段4）— 右上角常驻模式 + 材料套装/科技点显示
+import './src/ui/resourceHUD.js';
 // 图形系统 - 纹理管理器
 import { textureManager } from './src/graphics/textureManager.js';
 import { fontManager } from './src/graphics/fontManager.js';
@@ -351,6 +353,23 @@ window.startNewGame = function() {
                     dockyardVel,
                     homeworld.name
                 );
+                // 0.2.0 阶段5：起始船坞预填初始物资（全局资源已退场，实体资源落位设施存储）
+                // 注意：预填量必须 ≤ 槽容量，否则 amount 超 capacity 导致 UI 进度条 >100%
+                const startDock = facilitySystem.getAllFacilities()[0];
+                if (startDock && startDock.storage) {
+                    if (startDock.storage.materialKits) {
+                        startDock.storage.materialKits.amount = 500;
+                        startDock.storage.materialKits.capacity = Math.max(startDock.storage.materialKits.capacity, 500);
+                    }
+                    if (startDock.storage.hydrogen) {
+                        startDock.storage.hydrogen.amount = 1000;
+                        startDock.storage.hydrogen.capacity = Math.max(startDock.storage.hydrogen.capacity, 1000);
+                    }
+                    if (startDock.storage.oxygen) {
+                        startDock.storage.oxygen.amount = 8000;
+                        startDock.storage.oxygen.capacity = Math.max(startDock.storage.oxygen.capacity, 8000);
+                    }
+                }
             }
 
             // 先创建世界（含名称冲突检测），成功后再切场景

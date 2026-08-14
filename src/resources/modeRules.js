@@ -10,9 +10,11 @@ function getMode() {
     return gameState.getState().player.gameMode || 'sandbox';
 }
 
-// 是否启用资源校验/扣费（career=true，sandbox=false 资源免检）
+// 是否启用资源校验/扣费（0.2.0 阶段4：全模式生效，保证经济闭环可观测）
+// 原设计 sandbox 免检，但会导致建造/补给完全不扣费、资源数字静止，已改为统一扣费
+// TODO: 将来若需要"无限资源沙盒"，改回按 mode 区分
 export function isResourceCheckEnabled() {
-    return getMode() === 'career';
+    return true;
 }
 
 // 蓝图是否需要科技解锁（career=true，sandbox=false 全解锁）

@@ -10,6 +10,7 @@ import { stateToKepler } from './physics/orbitalMechanics.js';
 import { celestialBodies } from './physics/physics.js';
 import { eventBus, Events } from './eventBus.js';
 import { t } from './config/strings.js';
+import { initFacilityStorage, addStorage } from './resources/cargoSystem.js';
 
 class SaveManager {
     constructor() {
@@ -54,9 +55,9 @@ class SaveManager {
             gameMode: 'sandbox',            // 游戏模式：'sandbox' 自由 | 'career' 生涯
             unlockedBlueprints: [],
             scannedBodies: {},              // 天体扫描进度：{ bodyId: { tiersScanned: n } }
+            visitedBodies: {},              // 天体访问记录：{ bodyId: true }（阶段3：SOI 首访奖励）
             resources: {
-                rocketParts: { amount: 500 },   // 火箭零件（建造耗材）
-                science: { amount: 50 }         // 科技点
+                science: { amount: 50 }         // 科技点（唯一全局资源）
             },
             totalPlayTime: 0,
             stats: { orbits: 0, soiChanges: 0 }
@@ -104,6 +105,23 @@ class SaveManager {
         } catch (e) {
             console.error('[SaveManager] 保存到 localStorage 失败:', e);
         }
+    }
+
+    // 玩家状态进存档/跨世界前清洗：剥离"进行中"的扫描任务（scanning → false, progress → 0）。
+    // 扫描是实时进行的行为，不随存档持久化；否则 scanning 状态会经 _playerProfile / world.player
+    // 跨世界泄漏，卡死全局"扫描单通道"（startScan 遇任何 scanning=true 即返回 busy）
+    _sanitizePlayerForSave(player) {
+        if (!player) return { scannedBodies: {}, visitedBodies: {}, resources: {} };
+        const clean = JSON.parse(JSON.stringify(player));
+        if (clean.scannedBodies) {
+            for (const [bodyId, entry] of Object.entries(clean.scannedBodies)) {
+                if (entry && entry.scanning) {
+                    entry.scanning = false;
+                    entry.progress = 0;
+                }
+            }
+        }
+        return clean;
     }
 
     // 序列化前清洗飞船对象：剔除下划线开头的运行时对象引用（如 _sasController，
@@ -163,7 +181,7 @@ class SaveManager {
                 createdAt: now,
                 configVersion: state.version || '0.1.0'
             },
-            player: { ...this._playerProfile },
+            player: this._sanitizePlayerForSave(this._playerProfile),
             checkpoints: [initialCheckpoint],
             activeCheckpointId: initialCheckpoint.id
         };
@@ -253,6 +271,10 @@ class SaveManager {
 
         world.checkpoints.unshift(checkpoint);
         world.activeCheckpointId = checkpointId;
+        // 0.2.0 阶段4：同步玩家状态到世界档案与本地档案（读档按 world.player 恢复，不同步会回滚到初始 500 套）
+        world.player = gameState.getState().player;
+        this._playerProfile = world.player;
+        this._savePlayerProfile();
         this._saveToStorage();
 
         console.log(`[SaveManager] 检查点创建成功: ${checkpointId}`);
@@ -275,7 +297,7 @@ class SaveManager {
 
         gameState.setState({
             ships: checkpoint.ships,
-            player: world.player,
+            player: this._sanitizePlayerForSave(world.player),
             missions: checkpoint.missions,
             facilities: checkpoint.facilities,
             gameTime: checkpoint.gameTime,
@@ -290,6 +312,8 @@ class SaveManager {
         for (const s of allShips) {
             if (s.maneuverNodes === undefined) s.maneuverNodes = [];
             if (s.burnDuration === undefined) s.burnDuration = 120;
+            // 0.2.0 阶段5：货仓默认值（无货运模块时为空池）
+            if (s.cargo === undefined) s.cargo = {};
             // 0.2.0 迁移：旧 fuel/fuelCapacity（单一标量）→ resources（液氢/液氧，按 1:8 质量拆桶）
             if (!s.resources) {
                 const oldFuel = typeof s.fuel === 'number' ? s.fuel : 0;
@@ -305,15 +329,39 @@ class SaveManager {
             if (s.engineOut === undefined) s.engineOut = false;
         }
 
+        // 0.2.0 阶段5：旧设施补存储槽（按类型 storageProfile 初始化空仓）
+        for (const f of gameState.getAllFacilitiesRef()) {
+            if (!f.storage) initFacilityStorage(f);
+        }
+
         // 0.2.0 迁移：玩家字段（gameMode/scannedBodies/resources）
         const playerState = gameState.getState().player;
         if (!playerState.gameMode) playerState.gameMode = 'sandbox';
         if (!playerState.scannedBodies) playerState.scannedBodies = {};
+        if (!playerState.visitedBodies) playerState.visitedBodies = {};
         if (!playerState.resources) {
             playerState.resources = {
-                rocketParts: { amount: 500 },
                 science: { amount: 50 }
             };
+        }
+        // 0.2.0 迁移：火箭零件 rocketParts → 材料套装 materialKits
+        if (playerState.resources.rocketParts) {
+            if (!playerState.resources.materialKits) {
+                playerState.resources.materialKits = playerState.resources.rocketParts;
+            }
+            delete playerState.resources.rocketParts;
+        }
+        // 0.2.0 阶段5 迁移：全局实体资源（materialKits）退场 → 转入第一个设施的存储
+        const legacyKits = playerState.resources.materialKits
+            ? playerState.resources.materialKits.amount || 0
+            : 0;
+        delete playerState.resources.materialKits;
+        if (legacyKits > 0) {
+            const firstFacility = gameState.getAllFacilitiesRef()[0] || null;
+            if (firstFacility) {
+                addStorage(firstFacility, 'materialKits', legacyKits);
+                console.log(`[SaveManager] 迁移：全局材料套装 ${legacyKits} 套转入设施 ${firstFacility.name} 存储`);
+            }
         }
         if ('points' in playerState) delete playerState.points;
         gameState.setState({ player: playerState });

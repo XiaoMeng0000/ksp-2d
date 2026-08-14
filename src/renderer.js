@@ -7,6 +7,7 @@ import { renderableManager } from './graphics/renderable.js';
 import { textureManager } from './graphics/textureManager.js';
 import { drawStarGlow, drawStarBall, drawPlanetRing } from './graphics/programEffects.js';
 import { STARFIELD_CONFIG } from './config/starfieldConfig.js';
+import { t } from './config/strings.js';
 
 // 星空背景（天空盒）：屏幕空间固定坐标 + 固定像素尺寸，与相机解耦
 let stars = [];
@@ -486,7 +487,7 @@ function getOrbitColor(soiName, isManeuver = false, isCurrentSoi = false) {
         'rgba(255, 136, 68, 0.8)',
         'rgba(136, 68, 255, 0.8)'
     ];
-    const safeName = soiName || '深空';
+    const safeName = soiName || t('orbit.type.deepSpace');
     let hash = 0;
     for (let i = 0; i < safeName.length; i++) hash = (hash * 31 + safeName.charCodeAt(i)) | 0;
     return brightColors[Math.abs(hash) % brightColors.length];
@@ -605,13 +606,13 @@ const HUD_VALUE = `rgba(${HUD_GREEN}, 0.95)`;
 const HUD_WARN = 'rgba(255, 80, 80, 0.95)';
 const HUD_ESCAPE = 'rgba(255, 220, 80, 0.95)';
 
-// 轨道类型 → 显示文本
+// 轨道类型 → 显示文本（数据驱动收敛：文案入库 strings.js）
 const ORBIT_TYPE_TEXT = {
-    circular: '圆轨',
-    elliptical: '椭圆轨',
-    suborbital: '亚轨道',
-    escape: '逃逸',
-    deep_space: '深空'
+    circular: t('orbit.type.circular'),
+    elliptical: t('orbit.type.elliptical'),
+    suborbital: t('orbit.type.suborbital'),
+    escape: t('orbit.type.escape'),
+    deep_space: t('orbit.type.deepSpace')
 };
 
 // 高度格式化：≥1000m 显示 km，否则 m
@@ -652,7 +653,7 @@ function renderOrbitHud(ctx, canvas, ship) {
     const info = getOrbitalInfo(liveKepler, ship.currentGM, body, ship.pos);
     if (!info) return;
 
-    const soiText = (ship.currentSOI || '深空')
+    const soiText = (ship.currentSOI || t('orbit.type.deepSpace'))
         + (info.orbitType === 'deep_space' ? '' : ' · ' + (ORBIT_TYPE_TEXT[info.orbitType] || '--'));
 
     const vel = Math.sqrt(ship.vel.x * ship.vel.x + ship.vel.y * ship.vel.y);

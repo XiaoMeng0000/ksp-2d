@@ -21,6 +21,10 @@ export const textureConfig = {
     // 飞船能力图标
     icon_deploy_facility: 'assets/images/ships/assembly_shop(ship).png',
 
+    // 飞船资源扫描/货运能力图标（0.2.0 阶段5：🔭/📦 的 PNG 替换，图片待美术补位）
+    icon_scan_resources: 'assets/images/ships/scanner.png',
+    icon_cargo_hold: 'assets/images/ships/cargo_hold.png',
+
     // 飞船模块图标
     mod_test_ballast: 'assets/images/ships/test_ballast.png',
     mod_construction_package: 'assets/images/ships/construction_package.png',

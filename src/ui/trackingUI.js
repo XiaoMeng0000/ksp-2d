@@ -1,12 +1,16 @@
 'use strict'
 
 import { eventBus, Events } from '../eventBus.js';
+import { gameState } from '../gameState.js';
 import { getModuleDef } from '../ship/moduleTypes.js';
 import { renderIconHtml } from './uiComponents.js';
 import { getFacilityType } from '../facility/facilityTypes.js';
 import { facilitySystem } from '../facility/facilitySystem.js';
 import { sceneManager } from '../sceneManager.js';
-import { getFuelAmount, getFuelCapacity, computeDeltaV } from '../resources/resourceSystem.js';
+import { computeDeltaV } from '../resources/resourceSystem.js';
+import { getVisibleBodyResources } from '../resources/scanSystem.js';
+import { getResourceType } from '../resources/resourceTypes.js';
+import { isScansEnabled } from '../resources/modeRules.js';
 import { t } from '../config/strings.js';
 
 // EventBus 迁移 — 缓存最近一帧的飞船渲染数据，供 UI 只读函数使用
@@ -87,10 +91,7 @@ window.updateTrackingInfo = function(node) {
         if (ship) {
             html += `<div>${t('tracking.speedLabel')}${formatSpeed(ship.vel)}</div>`;
             html += `<div>SOI: ${ship.currentSOI || t('tracking.deepSpace')}</div>`;
-            // 追踪站 - 扩展显示燃料、质量、Δv（0.2.0：统一走资源工具函数，修复 B2）
-            const fuel = getFuelAmount(ship).toFixed(0);
-            const maxFuel = getFuelCapacity(ship).toFixed(0);
-            html += `<div>${t('tracking.fuelLabel')}${fuel} / ${maxFuel}</div>`;
+            // 0.2.0 阶段4：燃料显示移除（追踪站聚焦轨道信息，燃料见飞行 HUD / 设施面板）
             // 使用 dryMass，单位改为 t
             const mass = ship.dryMass !== undefined ? ship.dryMass : 'N/A';
             html += `<div>${t('tracking.dryMassLabel')}${mass} t</div>`;
@@ -131,7 +132,6 @@ window.updateTrackingInfo = function(node) {
         const typeCfg = node.facilityTypeId ? getFacilityType(node.facilityTypeId) : null;
         html += '<div>' + t('tracking.typeLabel') + (typeCfg ? typeCfg.name : t('tracking.typeFacility')) + '</div>';
         html += '<div>' + t('tracking.docksLabel') + (node.usedDocks ?? 0) + ' / ' + (node.maxDocks ?? 0) + '</div>';
-        
         // 停靠飞船列表
         const fac = node.id ? facilitySystem.getFacility(node.id) : null;
         if (fac && fac.dockedShips && fac.dockedShips.length > 0) {
@@ -149,6 +149,30 @@ window.updateTrackingInfo = function(node) {
             '<button id="trackingControlBtn" class="tracking-control-btn">' + t('tracking.control') + '</button>' +
             '<button id="trackingDestroyBtn" class="tracking-destroy-btn">' + t('tracking.destroy') + '</button>' +
             '</div>';
+    } else if (node.type === 'star' || node.type === 'planet' || node.type === 'moon') {
+        // 0.2.0 阶段4：天体资源丰度显示（sandbox 直接可见；career 按扫描等级过滤）
+        const visible = getVisibleBodyResources(node.name);
+        html += '<hr style="border:none;border-top:1px solid #444;margin:8px 0;">';
+        html += '<div style="color:#666;font-size:11px;margin-bottom:4px;">' + t('tracking.bodyResources') + '</div>';
+        const entries = Object.entries(visible);
+        if (entries.length === 0) {
+            html += '<div style="color:#555;font-size:10px;">' + t('tracking.noResources') + '</div>';
+        } else {
+            for (const [resId, info] of entries) {
+                const def = getResourceType(resId);
+                const name = def ? def.name : resId;
+                const pct = Math.round((info.abundance ?? 0) * 100);
+                html += '<div class="tracking-module-row">' + name
+                    + ' <span style="display:inline-block;width:70px;height:6px;background:#333;border-radius:3px;vertical-align:middle;margin:0 6px;">'
+                    + '<span style="display:inline-block;width:' + pct + '%;height:100%;background:#8c8;border-radius:3px;"></span></span>'
+                    + '<span style="color:#8c8;">' + pct + '%</span></div>';
+            }
+        }
+        // career 模式显示扫描状态
+        if (!isScansEnabled()) {
+            const scanned = gameState.getState().player.scannedBodies?.[node.name]?.tiersScanned || 0;
+            html += '<div style="color:#666;font-size:10px;margin-top:6px;">' + t('tracking.scanStatus', { tier: scanned }) + '</div>';
+        }
     }
     
     trackingInfo.innerHTML = html;

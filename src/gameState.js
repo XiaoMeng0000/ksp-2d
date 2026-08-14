@@ -14,9 +14,9 @@ const initialState = {
         gameMode: 'sandbox',            // 游戏模式：'sandbox' 自由 | 'career' 生涯
         unlockedBlueprints: [],
         scannedBodies: {},              // 天体扫描进度：{ bodyId: { tiersScanned: n } }
+        visitedBodies: {},              // 天体访问记录：{ bodyId: true }（0.2.0 阶段3：SOI 首访奖励用）
         resources: {
-            rocketParts: { amount: 500 },   // 火箭零件（建造耗材）
-            science: { amount: 50 }         // 科技点
+            science: { amount: 50 }         // 科技点（唯一全局资源；实体资源存于设施 storage / 飞船货仓）
         }
     },
     missions: [],
@@ -94,6 +94,11 @@ class GameState {
     // 返回指定飞船的直接引用
     getShipRef(id) {
         return this._state.ships.find(s => s.id === id) || null;
+    }
+
+    // 返回玩家状态直接引用（非深拷贝），供高频持续更新的系统（如扫描进度）使用
+    getPlayerRef() {
+        return this._state.player;
     }
 }
 
