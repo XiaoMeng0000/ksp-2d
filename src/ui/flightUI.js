@@ -274,6 +274,9 @@ function buildSupplyTerminalContent(facility) {
                 + '<span style="font-size:10px;color:#888;">' + fuelPct.toFixed(0) + '%</span>'
                 + '</div>'
                 + '<div style="font-size:10px;color:#666;">' + getFuelAmount(ship).toFixed(0) + ' / ' + getFuelCapacity(ship).toFixed(0) + '</div>'
+                + (ship.engineOut
+                    ? '<div style="font-size:10px;color:#e66;margin-top:2px;">⚠ 引擎已停机（燃料耗尽）</div>'
+                    : '')
                 + '</div>'
                 + '<button data-action="refuel-ship" data-ship-id="' + ship.id + '" style="'
                 + 'width:100%;padding:6px 0;background:#333;color:#cc4;border:1px solid #554;'

@@ -301,6 +301,8 @@ class SaveManager {
                 delete s.fuel;
                 delete s.fuelCapacity;
             }
+            // 0.2.0 阶段2：engineOut 默认值（旧存档无此字段视为正常状态）
+            if (s.engineOut === undefined) s.engineOut = false;
         }
 
         // 0.2.0 迁移：玩家字段（gameMode/scannedBodies/resources）

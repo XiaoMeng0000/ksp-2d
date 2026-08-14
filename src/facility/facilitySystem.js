@@ -277,6 +277,8 @@ class FacilitySystem {
         const ox = ship.resources ? ship.resources.oxygen : null;
         if (hyd) hyd.amount = hyd.capacity;
         if (ox) ox.amount = ox.capacity;
+        // 0.2.0 阶段2：补给后恢复点火能力（修复 B1：燃料耗尽不再永久置 maxThrust=0）
+        ship.engineOut = false;
 
         this.persistFacility(facility);
         console.log(`[FacilitySystem] 飞船 ${shipId} 燃料已补满`);

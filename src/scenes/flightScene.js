@@ -15,6 +15,7 @@ import { facilitySystem } from '../facility/facilitySystem.js';
 import { getModuleDef } from '../ship/moduleTypes.js';
 import { getFacilityType } from '../facility/facilityTypes.js';
 import { getTotalMass, getResource, getFuelAmount, getFuelCapacity } from '../resources/resourceSystem.js';
+import { getEngineType } from '../resources/engineConfig.js';
 import { timeWarp } from '../timeWarp.js';
 import { t } from '../config/strings.js';
 
@@ -658,6 +659,10 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 if (inputManager.isDown('KeyZ')) activeShip.throttle = 1;
                 if (inputManager.isDown('KeyX')) activeShip.throttle = 0;
                 activeShip.throttle = Math.max(0, Math.min(1, activeShip.throttle));
+                // 0.2.0 阶段2：引擎停机（燃料耗尽）时禁止点火，油门强制归零
+                if (activeShip.engineOut) {
+                    activeShip.throttle = 0;
+                }
             }
 
             // 推力模式自动切换（油门驱动）
@@ -680,7 +685,7 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             }
 
             // 推力向量计算 + 燃料消耗（活动飞船，每帧）
-            if (activeShip && activeShip.throttle > 0) {
+            if (activeShip && activeShip.throttle > 0 && !activeShip.engineOut) {
                 // 0.2.0：总质量 = 干质量 + 全部推进剂存量（资源模型）
                 const totalMass = getTotalMass(activeShip);
                 const thrustAccel = activeShip.throttle * activeShip.maxThrust / totalMass;
@@ -690,18 +695,36 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 };
 
                 // 燃料消耗（火箭方程：质量流量 = 推力 / (比冲 × g0)）
-                // 阶段1：迁移期先只消耗液氢（保持原"耗尽熄火"行为），双燃料独立消耗在阶段2实现
+                // 0.2.0 阶段2：按引擎配方向各推进剂槽独立分配消耗（chemical: 氢:氧 = 1:8）
                 const massFlow = activeShip.throttle * activeShip.maxThrust / (activeShip.isp * 9.81);
-                const hydrogen = getResource(activeShip, 'hydrogen');
-                if (hydrogen) {
-                    hydrogen.amount = Math.max(0, hydrogen.amount - massFlow * simDt);
-                    if (hydrogen.amount <= 0) {
-                        hydrogen.amount = 0;
+                const engineDef = getEngineType(activeShip.engineType) || getEngineType('chemical');
+                if (engineDef && engineDef.props.length > 0) {
+                    const totalRatio = engineDef.props.reduce((sum, p) => sum + p.ratio, 0);
+                    for (const prop of engineDef.props) {
+                        const slot = getResource(activeShip, prop.id);
+                        if (slot) {
+                            slot.amount = Math.max(0, slot.amount - massFlow * prop.ratio / totalRatio * simDt);
+                        }
+                    }
+                    // 任一配方燃料耗尽 → 引擎停机（不修改 maxThrust，修复 B1）
+                    const anyEmpty = engineDef.props.some(prop => {
+                        const slot = getResource(activeShip, prop.id);
+                        return !slot || slot.amount <= 0;
+                    });
+                    if (anyEmpty) {
+                        activeShip.engineOut = true;
                         activeShip.throttle = 0;
                         activeShip.mode = 'on_rails';
-                        // TEMP: B1 保留原行为（maxThrust 置 0），阶段 2 改为 engineOut 标志
-                        activeShip.maxThrust = 0;
                         activeShip.thrust = { ax: 0, ay: 0 };
+                        // 停机时从当前 pos/vel 重算 kepler（与手动熄火一致，避免旧轨道跳变）
+                        const host = getSOIHost(getAbsolutePosition(activeShip));
+                        if (host) {
+                            activeShip.kepler = stateToKepler(activeShip.pos, activeShip.vel, host.gm) || null;
+                            activeShip.orbitTime = 0;
+                        } else {
+                            activeShip.kepler = null;
+                        }
+                        eventBus.emit(Events.SHIP_THRUST_ENDED, { shipId: activeShip.id, reason: 'out_of_fuel' });
                     }
                 }
             } else if (activeShip && activeShip.throttle === 0) {
@@ -801,6 +824,8 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 maxThrust: activeShip?.maxThrust ?? 0,
                 heading: activeShip?.heading ?? 0,
                 throttle: activeShip?.throttle ?? 0,
+                // 0.2.0 阶段2：引擎停机状态（燃料耗尽），供 UI 显示
+                engineOut: activeShip?.engineOut ?? false,
                 controlsLocked: activeShip?.controlsLocked ?? false,
                 displayName: activeShip?.displayName ?? '',
                 nearFacilityId: _nearFacility?.id ?? null,

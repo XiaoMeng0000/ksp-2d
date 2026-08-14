@@ -60,6 +60,8 @@ class ShipSystem {
             currentGM: null,
             currentHostPos: { x: 0, y: 0 },
             controlsLocked: false,
+            // 0.2.0 阶段2：引擎停机标志（任一配方燃料耗尽置 true，补给后恢复）
+            engineOut: false,
             thrust: { ax: 0, ay: 0 },  // 推力加速度向量，始终存在，无推力时为 { ax:0, ay:0 }
             // 机动节点数组，每个节点的数据结构见 renderer.js renderManeuverOrbits 上方注释
             maneuverNodes: [],
