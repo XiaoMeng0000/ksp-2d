@@ -17,8 +17,10 @@ const CREDITS = {
                             { name: 'KIMI K3',           icon: null },
                             { name: 'QWEN 3.7 PLUS',     icon: null }
                         ]},
-                        { role: '美术设计',    members: [{ name: 'XiaoMeng', icon: null }, { name: '离川', icon: null }] },
-                        { role: 'UI图标绘制',  members: [{ name: 'XiaoMeng', icon: null }] }
+                        { role: '美术设计',    members: [{ name: 'XiaoMeng', icon: null }, { name: 'melonTMD', icon: null }] },
+                        { role: 'UI图标绘制',  members: [{ name: 'XiaoMeng', icon: null }] },
+                        { role: 'UI界面设计',  members: [{ name: 'melonTMD', icon: null }] },
+                        { role: '字体与链接栏',  members: [{ name: 'melonTMD', icon: null }] }
                     ]
                 }
             ]
