@@ -33,6 +33,39 @@ const STRINGS = {
     'common.modeSandbox': '自由模式',
     'common.modeCareer': '生涯模式',
 
+    // ---------- 开始游戏面板（左侧滑出综合面板，替代原 game 子菜单/读档/存档管理） ----------
+    'startgame.title': '开始游戏',
+    'startgame.close': '关闭',
+    'startgame.newCampaign': '创建新战役',
+    'startgame.worlds': '战役',
+    'startgame.games': '游戏',
+    'startgame.worldCount': (p) => `${p.n} 个战役`,
+    'startgame.noWorlds': '暂无战役，点击「创建新战役」开始',
+    'startgame.noCheckpoints': '该战役暂无存档',
+    'startgame.worldItem': (p) => `${p.name}（${p.count} 个存档）`,
+    'startgame.gameCount': (p) => `${p.n} 个存档`,
+    'startgame.loadGame': '加载游戏',
+    'startgame.deleteGame': '删除',
+    'startgame.deleteWorld': '删除战役',
+    'startgame.confirmDeleteWorld': (p) => `确认删除战役「${p.name}」及其所有存档？此操作不可恢复。`,
+    'startgame.confirmDeleteCheckpoint': (p) => `确认删除存档「${p.name}」？此操作不可恢复。`,
+    'startgame.selectWorldHint': '请先选择左侧的战役',
+    'startgame.metaLastPlayed': '最近游玩',
+    'startgame.metaGameTime': '游戏时间',
+    'startgame.metaGameMode': '游戏模式',
+
+    // ---------- 创建新战役对话框 ----------
+    'newcampaign.title': '创建新战役',
+    'newcampaign.gameMode': '游戏模式',
+    'newcampaign.campaignName': '战役名称',
+    'newcampaign.namePlaceholder': '输入战役名称',
+    'newcampaign.nameDefault': '新世界',
+    'newcampaign.modeDescSandbox': '无资源消耗限制，自由建造、部署与探索，适合快速体验。',
+    'newcampaign.modeDescCareer': '包含资源消耗、科技解锁与扫描探测的完整生涯流程。',
+    'newcampaign.modeNotReady': '生涯模式尚未完成，请先体验自由模式。',
+    'newcampaign.cancel': '取消',
+    'newcampaign.start': '开始新战役',
+
     // ---------- ESC 菜单 ----------
     'esc.menu': '菜单',
     'esc.currentWorld': (p) => `当前世界：${p.name}`,
@@ -330,25 +363,17 @@ const STRINGS = {
     // ---------- 追踪站场景 ----------
     'tracking.stationName': '追踪站',
 
-    // ---------- 新游戏 / 读档 / 反馈(main.js) ----------
+    // ---------- 新游戏 / 反馈(main.js) ----------
+    // 0.2.5：worldName* 与 load.* 已整合进"开始游戏"面板（startgame.* / newcampaign.*），此处删除
     'newgame.exception': (p) => `游戏发生异常: ${p.msg}`,
     'newgame.imgLoadFail': (p) => `${p.n} 张图片加载失败，部分界面可能异常`,
     'newgame.audioLoadFail': (p) => `${p.n} 个音频加载失败，相关声音可能缺失`,
     'newgame.fontLoadFail': (p) => `${p.n} 个字体加载失败，部分文字可能使用系统字体`,
-    'newgame.worldNameTitle': '新世界名称',
-    'newgame.worldNamePlaceholder': '输入世界名称',
-    'newgame.worldNameDefault': '新世界',
     'newgame.defaultShip': '初始飞船',
     'newgame.startDockName': 'Kerbin 轨道船坞',
     'newgame.success': '新世界创建成功！',
     'newgame.nameExists': '世界名称已存在，请换一个',
     'newgame.uiNotLoaded': 'UI 组件未加载',
-    'load.noSaveStartNew': '没有存档，开始新游戏吧',
-    'load.noValidCheckpoint': '没有找到有效的检查点',
-    'load.noSaves': '没有存档',
-    'load.worldItem': (p) => `${p.name}  (${p.count} 个检查点)`,
-    'load.selectWorld': '选择世界',
-    'load.selectCheckpoint': '选择检查点',
     'feedback.title': '反馈渠道',
     'feedback.qq': 'QQ：1570447677',
     'feedback.email': '邮箱：mc1234com@163.com',

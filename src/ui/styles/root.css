@@ -79,6 +79,26 @@
 }
 
 /* ============================================================
+   全局文本选择策略
+   游戏 UI 为界面化操作，禁止鼠标拖拽选中文本；
+   输入框 / 文本域 / 可编辑区保留选中与编辑能力（名称输入等）。
+   JS 复制（如 QQ 群号按钮的 clipboard API）不受 user-select 影响。
+   ============================================================ */
+* {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    user-select: none;
+}
+
+input,
+textarea,
+[contenteditable] {
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    user-select: text;
+}
+
+/* ============================================================
    通用组件 class
    布局定位(display/position/left/top)由 JS 内联控制,
    视觉样式(底色/边框/圆角/字体/字号)统一走 class

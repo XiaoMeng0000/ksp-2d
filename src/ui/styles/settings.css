@@ -1,5 +1,6 @@
 /* ============================================================
    settings.css — 设置场景(左侧分类导航 + 右侧内容区)
+   配色已收敛到 theme.css 的 --theme-* 变量（设置页/开始游戏面板共用）
    ============================================================ */
 
 #settingsContainer {
@@ -10,7 +11,7 @@
     width: 60vw;
     min-width: 1000px;
     height: calc(100vh - 20px);
-    background: #2E3540;
+    background: var(--theme-bg);
     z-index: 1000;
     display: flex;
     font-family: var(--font-mono);
@@ -25,7 +26,7 @@
     margin-right: 0px;
     width: 240px;
     min-width: 240px;
-    background: #1C212A;   /* 固定色，不随全局 --panel-bg 变化（设置页独立于全局配色） */
+    background: var(--theme-panel);
     padding: 5px;
     display: flex;
     flex-direction: column;
@@ -48,7 +49,7 @@
     position: relative;
     padding: 6px 10px;
     font-size: 13px;
-    background: #14191F;
+    background: var(--theme-panel-deep);
 }
 
 #settingsNav .settings-cat::after {
@@ -75,7 +76,7 @@
 
 #settingsNav .settings-cat.active {
     color: var(--text-bright);
-    background: rgba(80, 80, 160, 0.4);
+    background: var(--theme-active-bg);
 }
 
 #settingsNav .settings-cat.active::after {
@@ -95,22 +96,22 @@
     padding: 6px 10px;
     cursor: pointer;
     color: var(--text-bright);
-    background-color: #000000;
-    border: 1px solid #676767;
+    background-color: var(--theme-btn-bg);
+    border: 1px solid var(--theme-border);
     border-radius: 5px;
     text-align: center;
     font-size: 12px;
 }
 
 #settingsNav .settings-back-btn:hover {
-    border-color: #4B758A;
+    border-color: var(--theme-border-hover);
 }
 
 /* 右侧内容区 */
 #settingsContent {
     border-radius: 5px;
     margin: 15px;
-    background: #1C212A;   /* 固定色，不随全局 --panel-bg 变化（设置页独立于全局配色） */
+    background: var(--theme-panel);
     flex: 1;
     padding: 12px;
     overflow-y: auto;
@@ -137,11 +138,11 @@
     align-items: center;
     justify-content: space-between;
     padding: 8px;
-    border-bottom: 1px solid #060709;
+    border-bottom: 1px solid var(--theme-border-row);
 }
 
 #settingsContent .settings-row:hover {
-    background-color: #080B0F;
+    background-color: var(--theme-hover);
 }
 
 #settingsContent .settings-row-label {
@@ -163,15 +164,15 @@
     height: 26px;
     flex: 1;
     color: var(--text-bright);
-    background-color: #0F1318;
+    background-color: var(--theme-btn-bg);
     border: 1px var(--border-light) solid;
     border-radius: 5px;
     font-size: 12px;
 }
 
 .settings-btn.selected {
-    background-color: #4852AF;
-    border: 1px #4852AF solid;
+    background-color: var(--theme-btn-selected);
+    border: 1px var(--theme-btn-selected) solid;
 }
 
 /* ===== 固定链接栏 ===== */

@@ -18,8 +18,12 @@ import { facilitySystem } from './src/facility/facilitySystem.js';
 // UI加载 - UI 模块必须尽早加载，确保菜单按钮点击时函数已就绪
 import './src/ui/trackingUI.js';
 import './src/ui/menuUI.js';
-import { renderWorldList } from './src/ui/menuUI.js';
 import './src/ui/shipBuilderUI.js';
+// 0.2.5 开始游戏流程 — 左侧综合面板 + 创建新战役对话框
+import { openStartGamePanel } from './src/ui/startGamePanel.js';
+import './src/ui/newCampaignDialog.js';
+// 0.2.5 设置面板 — 从 scene 抽离为覆盖式 UI 面板
+import { openSettings as openSettingsUI } from './src/ui/settingsUI.js';
 import './src/ui/facilityDeployUI.js';
 import './src/ui/flightUI.js';
 import './src/ui/shipDestroyedUI.js';
@@ -44,7 +48,7 @@ import { registerEncyclopediaScene } from './src/scenes/encyclopediaScene.js';
 import { registerCreditsScene } from './src/scenes/creditsScene.js';
 import { registerLicenseScene } from './src/scenes/licenseScene.js';
 import { registerGalaxiesScene } from './src/scenes/galaxiesScene.js';
-import { registerSettingsScene } from './src/scenes/settingsScene.js';
+
 // 音频系统 - 底层引擎与决策层（import 即完成事件订阅）
 import { audioCore } from './src/audio/audioCore.js';
 import { audioDirector } from './src/audio/audioDirector.js';
@@ -108,17 +112,14 @@ registerBodyRenderables();
 registerSplashScene();
 registerInfoScene();
 registerMenuScene({
-    startNewGame: () => window.startNewGame(),
-    continueGame: () => window.continueGame(),
-    openLoadMenu: () => window.openLoadMenu(),
-    openArchiveManager: () => window.openArchiveManager(),
+    // 0.2.5：开始游戏/读档/存档管理整合为左侧"开始游戏"综合面板
+    openStartGamePanel: () => openStartGamePanel(),
     openSettings: () => window.openSettings(),
 });
 registerEncyclopediaScene();
 registerCreditsScene();
 registerLicenseScene();
 registerGalaxiesScene();
-registerSettingsScene();
 
 // 注册飞行场景（注入 main.js 持有的模块级依赖）
 registerFlightScene({
@@ -281,16 +282,17 @@ window.trackingCollapsed = trackingCollapsed;
 // 场景就绪时重置 lastTime，防止读档后 dt 异常大
 eventBus.on(Events.SCENE_READY, () => { lastTime = 0; });
 
-// 设置场景入口
+// 0.2.5 设置面板入口（从 scene 抽离为覆盖式 UI 面板，不切换场景/不中断音乐）
 window.openSettings = function() {
-    sceneManager.switchTo('settings');
+    openSettingsUI();
 };
 
 // 层级存档 - 当前世界 ID
 window.currentWorldId = null;
 
-// 层级存档 - 开始新游戏（创建新世界）
-window.startNewGame = function() {
+// 0.2.5 创建新战役核心逻辑（供"创建新战役"对话框调用）
+// 返回创建成功的世界 ID；名称冲突等失败时返回 null 并已回滚
+window.applyNewGameCreation = function(name) {
     // Bug修复 — 新游戏前清空旧飞船，防止跨世界飞船泄漏
     gameState.reset();
 
@@ -298,169 +300,94 @@ window.startNewGame = function() {
     _celestialTime = 0;
     updateCelestialBodies(0);
     eventBus.emit(Events.CELESTIAL_TIME_UPDATED, { time: 0, dt: 0 });
-    
-    if (typeof window.__createInputDialog === 'function') {
-        window.__createInputDialog(t('newgame.worldNameTitle'), t('newgame.worldNamePlaceholder'), t('newgame.worldNameDefault'), (name) => {
-            // 飞船系统 - 使用 shipSystem 创建飞船实例
-            const newShip = shipSystem.createShip('debug_behemoth', t('newgame.defaultShip'), ['construction_package']);
-            if (!newShip) {
-                window.showNotification(t('build.createFailed'), 'error');
-                return;
-            }
 
-            // 飞船系统 - 设置初始位置和轨道（pos 为相对宿主坐标）
-            const homeworld = celestialBodies.find(b => b.isHomeworld);
-            if (!homeworld) {
-                console.warn('[startNewGame] 找不到起始天体数据，使用硬编码默认值');
-                newShip.pos = { x: 580, y: 0 };
-                newShip.vel = { x: 0, y: Math.sqrt(10000 / 80) };  // 顺行：pos 在 +x 时速度沿 +y
-                newShip.currentGM = 10000;
-                newShip.kepler = stateToKepler({ x: 80, y: 0 }, newShip.vel, 10000);
-            } else {
-                const orbitR = homeworld.radius + (homeworld.defaultOrbitAltitude || 0);
-                newShip.pos = { x: orbitR, y: 0 };
-                const orbitalSpeed = Math.sqrt(homeworld.gm / orbitR);
-                // 顺行（逆时针，与天体公转同向）：pos 在 +x 时速度应沿 +y
-                newShip.vel = { x: 0, y: orbitalSpeed };
-                newShip.currentGM = homeworld.gm;
-                newShip.kepler = stateToKepler(newShip.pos, newShip.vel, homeworld.gm);
-            }
-            newShip.currentSOI = homeworld ? homeworld.name : null;
-            newShip.orbitTime = 0;
-            newShip.mode = 'on_rails';
+    // 飞船系统 - 使用 shipSystem 创建飞船实例
+    const newShip = shipSystem.createShip('debug_behemoth', t('newgame.defaultShip'), ['construction_package']);
+    if (!newShip) {
+        window.showNotification(t('build.createFailed'), 'error');
+        return null;
+    }
 
-            // 飞船系统 - 持久化到 GameState（createShip 返回的是原始对象，需手动写入）
-            shipSystem.persistShip(newShip);
-            // 飞船系统 - 设为活动飞船并同步 GameState
-            shipSystem.switchShip(newShip.id);
-
-            // 预置 Kerbin 轨道船坞
-            if (homeworld) {
-                // Bug修复 — 船坞与初始飞船使用同一轨道半径，避免旧硬编码 70m 使船坞埋在行星内部
-                const dockyardOrbitR = homeworld.radius + (homeworld.defaultOrbitAltitude || 0);
-                const dockyardPos = {
-                    x: homeworld.position.x + dockyardOrbitR,
-                    y: homeworld.position.y
-                };
-                const dockyardVel = {
-                    x: 0,
-                    y: Math.sqrt(homeworld.gm / dockyardOrbitR)  // 顺行：pos 在 +x 时速度沿 +y
-                };
-                facilitySystem.createFacility(
-                    'orbital_dockyard',
-                    t('newgame.startDockName'),
-                    dockyardPos,
-                    dockyardVel,
-                    homeworld.name
-                );
-                // 0.2.0 阶段5：起始船坞预填初始物资（全局资源已退场，实体资源落位设施存储）
-                // 注意：预填量必须 ≤ 槽容量，否则 amount 超 capacity 导致 UI 进度条 >100%
-                const startDock = facilitySystem.getAllFacilities()[0];
-                if (startDock && startDock.storage) {
-                    if (startDock.storage.materialKits) {
-                        startDock.storage.materialKits.amount = 500;
-                        startDock.storage.materialKits.capacity = Math.max(startDock.storage.materialKits.capacity, 500);
-                    }
-                    if (startDock.storage.hydrogen) {
-                        startDock.storage.hydrogen.amount = 1000;
-                        startDock.storage.hydrogen.capacity = Math.max(startDock.storage.hydrogen.capacity, 1000);
-                    }
-                    if (startDock.storage.oxygen) {
-                        startDock.storage.oxygen.amount = 8000;
-                        startDock.storage.oxygen.capacity = Math.max(startDock.storage.oxygen.capacity, 8000);
-                    }
-                }
-            }
-
-            // 先创建世界（含名称冲突检测），成功后再切场景
-            window.currentWorldId = window.__saveManager.createWorld(name);
-            if (window.currentWorldId) {
-                sceneManager.switchTo('flight');
-                window.showNotification(t('newgame.success'), 'success');
-            } else {
-                // 名称冲突 — 回滚已创建的飞船/设施，不切场景
-                gameState.reset();
-                window.showNotification(t('newgame.nameExists'), 'error');
-            }
-        });
+    // 飞船系统 - 设置初始位置和轨道（pos 为相对宿主坐标）
+    const homeworld = celestialBodies.find(b => b.isHomeworld);
+    if (!homeworld) {
+        console.warn('[applyNewGameCreation] 找不到起始天体数据，使用硬编码默认值');
+        newShip.pos = { x: 580, y: 0 };
+        newShip.vel = { x: 0, y: Math.sqrt(10000 / 80) };  // 顺行：pos 在 +x 时速度沿 +y
+        newShip.currentGM = 10000;
+        newShip.kepler = stateToKepler({ x: 80, y: 0 }, newShip.vel, 10000);
     } else {
-        window.showNotification(t('newgame.uiNotLoaded'), 'error');
+        const orbitR = homeworld.radius + (homeworld.defaultOrbitAltitude || 0);
+        newShip.pos = { x: orbitR, y: 0 };
+        const orbitalSpeed = Math.sqrt(homeworld.gm / orbitR);
+        // 顺行（逆时针，与天体公转同向）：pos 在 +x 时速度应沿 +y
+        newShip.vel = { x: 0, y: orbitalSpeed };
+        newShip.currentGM = homeworld.gm;
+        newShip.kepler = stateToKepler(newShip.pos, newShip.vel, homeworld.gm);
     }
-};
+    newShip.currentSOI = homeworld ? homeworld.name : null;
+    newShip.orbitTime = 0;
+    newShip.mode = 'on_rails';
 
-// 读取存档菜单 - 继续游戏（加载最近检查点）
-// 继续游戏优化 - 加载所有世界中最新保存的检查点
-window.continueGame = function() {
-    const worldList = window.__saveManager.getWorldList();
-    if (worldList.length === 0) {
-        window.showNotification(t('load.noSaveStartNew'), 'info');
-        return;
-    }
+    // 飞船系统 - 持久化到 GameState（createShip 返回的是原始对象，需手动写入）
+    shipSystem.persistShip(newShip);
+    // 飞船系统 - 设为活动飞船并同步 GameState
+    shipSystem.switchShip(newShip.id);
 
-    // 遍历所有世界，收集所有检查点，按 timestamp 排序取最新
-    let latestCheckpoint = null;
-    let latestWorldId = null;
-
-    for (const world of worldList) {
-        const checkpoints = window.__saveManager.getCheckpointList(world.id);
-        for (const cp of checkpoints) {
-            if (!latestCheckpoint || cp.timestamp > latestCheckpoint.timestamp) {
-                latestCheckpoint = cp;
-                latestWorldId = world.id;
+    // 预置 Kerbin 轨道船坞
+    if (homeworld) {
+        // Bug修复 — 船坞与初始飞船使用同一轨道半径，避免旧硬编码 70m 使船坞埋在行星内部
+        const dockyardOrbitR = homeworld.radius + (homeworld.defaultOrbitAltitude || 0);
+        const dockyardPos = {
+            x: homeworld.position.x + dockyardOrbitR,
+            y: homeworld.position.y
+        };
+        const dockyardVel = {
+            x: 0,
+            y: Math.sqrt(homeworld.gm / dockyardOrbitR)  // 顺行：pos 在 +x 时速度沿 +y
+        };
+        facilitySystem.createFacility(
+            'orbital_dockyard',
+            t('newgame.startDockName'),
+            dockyardPos,
+            dockyardVel,
+            homeworld.name
+        );
+        // 0.2.0 阶段5：起始船坞预填初始物资（全局资源已退场，实体资源落位设施存储）
+        // 注意：预填量必须 ≤ 槽容量，否则 amount 超 capacity 导致 UI 进度条 >100%
+        const startDock = facilitySystem.getAllFacilities()[0];
+        if (startDock && startDock.storage) {
+            if (startDock.storage.materialKits) {
+                startDock.storage.materialKits.amount = 500;
+                startDock.storage.materialKits.capacity = Math.max(startDock.storage.materialKits.capacity, 500);
+            }
+            if (startDock.storage.hydrogen) {
+                startDock.storage.hydrogen.amount = 1000;
+                startDock.storage.hydrogen.capacity = Math.max(startDock.storage.hydrogen.capacity, 1000);
+            }
+            if (startDock.storage.oxygen) {
+                startDock.storage.oxygen.amount = 8000;
+                startDock.storage.oxygen.capacity = Math.max(startDock.storage.oxygen.capacity, 8000);
             }
         }
     }
 
-    if (!latestCheckpoint || !latestWorldId) {
-        window.showNotification(t('load.noValidCheckpoint'), 'info');
-        return;
+    // 先创建世界（含名称冲突检测），成功后再切场景
+    const worldId = window.__saveManager.createWorld(name);
+    if (worldId) {
+        window.currentWorldId = worldId;
+        sceneManager.switchTo('flight');
+        window.showNotification(t('newgame.success'), 'success');
+    } else {
+        // 名称冲突 — 回滚已创建的飞船/设施，不切场景
+        gameState.reset();
+        window.showNotification(t('newgame.nameExists'), 'error');
     }
-
-    window.currentWorldId = latestWorldId;
-    window.__saveManager.loadCheckpoint(latestWorldId, latestCheckpoint.id);
-    sceneManager.switchTo('flight');
+    return worldId;
 };
 
-// 读取存档菜单 - 读取存档（两级菜单）
+// 0.2.5 读取存档：重定向到左侧"开始游戏"综合面板（原两级对话框已整合进面板）
+// 飞船损毁结算界面仍通过 window.openLoadMenu 进入读档流程
 window.openLoadMenu = function() {
-    const worldList = window.__saveManager.getWorldList();
-    if (worldList.length === 0) {
-        window.showNotification(t('load.noSaves'), 'info');
-        return;
-    }
-
-    const worldItems = worldList.map(w => ({
-        id: w.id,
-        name: t('load.worldItem', { name: w.name, count: w.checkpointCount }),
-        subtitle: `${new Date(w.createdAt).toLocaleString()}`
-    }));
-
-    window.__createDialog(t('load.selectWorld'), worldItems, (worldId) => {
-        const checkpoints = window.__saveManager.getCheckpointList(worldId);
-        if (checkpoints.length === 0) {
-            window.showNotification(t('archive.noCheckpointsInWorld'), 'info');
-            return;
-        }
-        const cpItems = checkpoints.map(c => ({
-            id: c.id,
-            name: c.name,
-            subtitle: t('archive.checkpointSubtitle', { ts: c.timestamp, time: c.gameTime.toFixed(1) })
-        }));
-        window.__createDialog(t('load.selectCheckpoint'), cpItems, (checkpointId) => {
-            window.currentWorldId = worldId;
-            window.__saveManager.loadCheckpoint(worldId, checkpointId);
-            sceneManager.switchTo('flight');
-        });
-    });
-};
-
-// 存档管理 - 打开存档管理面板
-window.openArchiveManager = function() {
-    const panel = document.getElementById('archiveManagerPanel');
-    if (panel) {
-        panel.style.display = 'flex';
-        renderWorldList();
-    } else {
-        console.warn('[Archive] archiveManagerPanel 未找到');
-    }
+    openStartGamePanel();
 };

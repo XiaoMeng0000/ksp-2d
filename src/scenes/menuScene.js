@@ -240,10 +240,8 @@ function _handleKeyDown(event) {
 
 function registerMenuScene(options) {
     _callbacks = {
-        startNewGame: options.startNewGame,
-        continueGame: options.continueGame,
-        openLoadMenu: options.openLoadMenu,
-        openArchiveManager: options.openArchiveManager,
+        // 0.2.5：开始游戏/读档/存档管理整合为左侧"开始游戏"综合面板
+        openStartGamePanel: options.openStartGamePanel,
         openSettings: options.openSettings,
         openFeedback: options.openFeedback
     };

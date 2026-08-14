@@ -2,19 +2,11 @@
 
 // 一级菜单按钮列表
 const MAIN_MENU = [
-    { id: 'startGame',    label: '开始游戏',  action: 'submenu:game' },
+    // 0.2.5：开始游戏不再进入子菜单，直接打开左侧"开始游戏"综合面板
+    { id: 'startGame',    label: '开始游戏',  action: 'callback:openStartGamePanel' },
     { id: 'encyclopedia', label: '百科',  action: 'scene:encyclopedia' },
     { id: 'extra',        label: '额外内容',  action: 'submenu:extra' },
     { id: 'settings',     label: '设置',      action: 'callback:openSettings' },
-];
-
-// 二级菜单（开始游戏子菜单）
-const GAME_SUB_MENU = [
-    { id: 'newFlight',  label: '开始飞行',  action: 'callback:startNewGame' },
-    { id: 'continue',   label: '继续游戏',  action: 'callback:continueGame' },
-    { id: 'loadGame',   label: '读取存档',  action: 'callback:openLoadMenu' },
-    { id: 'archives',   label: '存档管理',  action: 'callback:openArchiveManager' },
-    { id: 'back',       label: '返回',      action: 'back' },
 ];
 
 // 二级菜单（额外内容子菜单）
@@ -34,12 +26,13 @@ const LINKS_ICONS = [
 ];
 
 // 菜单查找表：主菜单 + 各二级菜单
+// 0.2.5：原 game 子菜单（开始飞行/继续游戏/读取存档/存档管理）已整合进
+// 左侧"开始游戏"综合面板（startGamePanel.js），此处不再维护 game 菜单
 const MENUS = {
     main: MAIN_MENU,
-    game: GAME_SUB_MENU,
     extra: EXTRA_MENU,
 };
 
 // 说明：主菜单布局样式（Logo/按钮/版本号）已随阶段 3 迁移至
 // src/ui/styles/main_menu.css，原 MENU_STYLE 布局常量已废弃移除
-export { MAIN_MENU, GAME_SUB_MENU, EXTRA_MENU, MENUS, LINKS_ICONS };
+export { MAIN_MENU, EXTRA_MENU, MENUS, LINKS_ICONS };

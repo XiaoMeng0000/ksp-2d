@@ -15,6 +15,7 @@ import { t } from '../config/strings.js';
 import { celestialBodies } from '../physics/physics.js';
 import { ENCYCLOPEDIA } from '../config/encyclopediaConfig.js';
 import { focusTrackingNode, setTrackingNavTab } from '../scenes/trackingScene.js';
+import { formatGameTime } from '../utils/format.js';
 
 // EventBus 迁移 — 缓存最近一帧的飞船渲染数据，供 UI 只读函数使用
 let _cachedShipData = null;
@@ -28,7 +29,6 @@ const collapsedSections = {};
 
 // 物理常量（质量科学计数与密度计算用）
 const GRAV_CONST = 6.674e-11;      // 万有引力常数 m³/(kg·s²)
-const GAME_DAY_SECONDS = 21600;    // 游戏日 = 6 小时（与 scanSystem 约定一致）
 
 // 追踪站 - 数据格式化函数
 function formatSpeed(vel) {
@@ -53,27 +53,6 @@ function formatEccentricity(e) {
     if (e < 0.5) return t('tracking.eccEllipticalLow');
     if (e < 0.8) return t('tracking.eccElliptical');
     return t('tracking.eccHigh');
-}
-
-function formatTime(s) {
-    if (s >= 3600) {
-        const h = Math.floor(s / 3600);
-        const m = Math.floor((s % 3600) / 60);
-        return h + 'h ' + m + 'm';
-    }
-    const m = Math.floor(s / 60);
-    const sec = Math.floor(s % 60);
-    return m + 'm ' + sec + 's';
-}
-
-// 追踪站 0.2.5 - 周期格式化（游戏日 6h，跨日显示 Xd Yh）
-function formatPeriod(s) {
-    if (s >= GAME_DAY_SECONDS) {
-        const d = Math.floor(s / GAME_DAY_SECONDS);
-        const h = Math.round((s % GAME_DAY_SECONDS) / 3600);
-        return h > 0 ? d + 'd ' + h + 'h' : d + 'd';
-    }
-    return formatTime(s);
 }
 
 // 追踪站 0.2.5 - 质量科学计数（kg → 5.29 × 10^22 kg）
@@ -275,7 +254,7 @@ function renderBodySections(node) {
         let period = 'N/A';
         let avgVel = 'N/A';
         if (parent && parent.gm > 0) {
-            period = formatPeriod(2 * Math.PI * Math.sqrt(Math.pow(body.orbitA, 3) / parent.gm));
+            period = formatGameTime(2 * Math.PI * Math.sqrt(Math.pow(body.orbitA, 3) / parent.gm));
             avgVel = formatSpeed({ x: 2 * Math.PI * body.orbitA / (2 * Math.PI * Math.sqrt(Math.pow(body.orbitA, 3) / parent.gm)), y: 0 });
         }
         const orbitGrid = renderDataGrid([
