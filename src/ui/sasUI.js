@@ -115,7 +115,10 @@ class SASUI {
      * @param {HTMLCanvasElement} canvas
      */
     updateLayout(canvas) {
-        this._scale = Math.min(canvas.width / 1920, canvas.height / 1080, 1.0);
+        // 缩放下限 0.15：canvas 尺寸为 0/极小的瞬间（预览面板 resize 等）会算得 _scale=0，
+        // 导致导航球装饰环 R-21/R-23 等硬编码偏移变成负半径，ctx.arc 抛 IndexSizeError。
+        // 下限 0.15 保证 R=175×0.15=26.25 > 23，所有装饰偏移均为正。
+        this._scale = Math.max(0.15, Math.min(canvas.width / 1920, canvas.height / 1080, 1.0));
         const margin = MARGIN * this._scale;
         // 底部预留：取两个约束较大者（均在屏幕外不再画，只影响导航球上移量）
         //  a) 节流阀弧外缘(210)距底 ≥ 16

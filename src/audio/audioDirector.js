@@ -2,7 +2,7 @@
 
 import { eventBus, Events } from '../eventBus.js';
 import { audioCore } from './audioCore.js';
-import { getMenuMusicVariant } from './audioConfig.js';
+import { getMenuMusicVariant, getRandomSfxId } from './audioConfig.js';
 import { getMusicTypeForSOI } from '../physics/physics.js';
 import { gameState } from '../gameState.js';
 import { sceneManager } from '../sceneManager.js';
@@ -26,11 +26,17 @@ class AudioDirector {
             this._handleSceneChanged(from, to);
         });
 
-        // SOI 变化 → 飞行中切换宿主天体音乐
-        eventBus.on(Events.SOI_CHANGED, ({ to }) => {
-            if (sceneManager.getCurrentScene() === 'flight') {
-                this._playFlightMusic();
+        // SOI 变化 → 飞行中切换宿主天体音乐；当前控制飞船跨界时播放 SOI 切换音效
+        eventBus.on(Events.SOI_CHANGED, ({ shipId }) => {
+            if (sceneManager.getCurrentScene() !== 'flight') {
+                return;
             }
+            const ship = gameState.getActiveShip();
+            if (ship && ship.id === shipId) {
+                // 当前控制飞船发生 SOI 切换 → 随机播放两个变体之一
+                audioCore.playSfx(getRandomSfxId('soi_change'));
+            }
+            this._playFlightMusic();
         });
     }
 
