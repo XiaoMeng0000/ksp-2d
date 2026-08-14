@@ -55,7 +55,7 @@ class SaveManager {
             gameMode: 'sandbox',            // 游戏模式：'sandbox' 自由 | 'career' 生涯
             unlockedBlueprints: [],
             scannedBodies: {},              // 天体扫描进度：{ bodyId: { tiersScanned: n } }
-            visitedBodies: {},              // 天体访问记录：{ bodyId: true }（阶段3：SOI 首访奖励）
+            visitedBodies: {},              // 天体访问记录（已废弃：首访奖励已移除，字段保留兼容存档）
             resources: {
                 science: { amount: 50 }         // 科技点（唯一全局资源）
             },

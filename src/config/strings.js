@@ -366,7 +366,6 @@ const STRINGS = {
     // ---------- 经济 / 扫描（0.2.0 阶段3） ----------
     'economy.insufficientKits': '材料套装不足，无法完成该操作！',
     'economy.buildCost': (p) => `建造耗材: ${p.cost} 套`,
-    'scan.firstVisit': (p) => `首次进入 ${p.name} 轨道，科技点 +${p.n}`,
 
     // ---------- 扫描菜单（0.2.0 阶段6：主动扫描模型） ----------
     'scan.menuTitle': '资源扫描',

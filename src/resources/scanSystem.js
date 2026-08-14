@@ -6,7 +6,6 @@
 //      扫描时长 = 基准天数 × 星球规模系数 / 扫描仪等级系数（越高级扫描仪越快，越大星球越慢）
 //   2. 扫描进度：scannedBodies[bodyId].progress（秒）/ scanDuration（秒）/ scanning（bool）
 //   3. 资源可见性过滤：sandbox 全部可见；career 仅显示 tier ≤ 已扫描等级的资源
-//   4. SOI 首访奖励：首次进入天体 SOI 记录 visitedBodies 并发放科技点
 // 规则约定：自由模式（sandbox）丰度直接可见；生涯模式（career）需主动扫描后可见
 
 import { gameState } from '../gameState.js';
@@ -18,9 +17,6 @@ import { celestialBodies } from '../physics/physics.js';
 import { getResourceType } from './resourceTypes.js';
 import { isScansEnabled } from './modeRules.js';
 import { t } from '../config/strings.js';
-
-// SOI 首访奖励（科技点），数值后置调整
-const FIRST_VISIT_SCIENCE = 5;
 
 // KSP 一天 = 6 小时 = 21600 秒（Kerbin 自转周期）
 export const GAME_DAY_SECONDS = 21600;
@@ -180,30 +176,9 @@ export function getVisibleBodyResources(bodyId) {
     return visible;
 }
 
-// SOI 首访奖励：玩家首次进入某天体 SOI 时记录并发放科技点
-export function awardFirstVisit(bodyId) {
-    if (!bodyId) return 0;
-    const state = gameState.getState();
-    const player = state.player;
-    if (!player.visitedBodies) player.visitedBodies = {};
-    if (player.visitedBodies[bodyId]) return 0;
-
-    player.visitedBodies[bodyId] = true;
-    if (!player.resources) player.resources = {};
-    // 0.2.0 阶段4：全模式发放（原仅 career；测试期保证 science 数字可观测）
-    if (!player.resources.science) player.resources.science = { amount: 0 };
-    player.resources.science.amount += FIRST_VISIT_SCIENCE;
-    gameState.setState({ player });
-    return FIRST_VISIT_SCIENCE;
-}
-
-// 订阅 SOI 切换事件：首访奖励 + 扫描任务随飞船离开而中断（进度清零）
+// 订阅 SOI 切换事件：扫描任务随飞船离开而中断（进度清零）
 eventBus.on(Events.SOI_CHANGED, ({ shipId, to }) => {
     if (!to) return;
-    const sci = awardFirstVisit(to);
-    if (sci > 0 && typeof window !== 'undefined' && typeof window.showNotification === 'function') {
-        window.showNotification(t('scan.firstVisit', { name: to, n: sci }), 'success');
-    }
     // 扫描飞船离开目标天体 → 任务中断（简单可靠；扫描仪必须留在轨道上工作）
     const player = gameState.getState().player;
     if (player.scannedBodies) {
