@@ -1,0 +1,35 @@
+---
+name: 提问 / 讨论
+description: 咨询游戏机制、代码实现或开发约定
+title: "[question] "
+labels: [question]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 填写须知
+        - 用于机制咨询、代码理解、架构讨论等非 Bug / 非新功能类问题。
+        - 涉及代码时请尽量标注相关文件路径（参考 src/ 目录结构）。
+  - type: dropdown
+    id: module
+    attributes:
+      label: 相关模块
+      description: 问题主要涉及哪个代码模块（与 src/ 目录对应），不确定可跳过
+      options:
+        - physics（轨道力学 / SOI / 大气）
+        - rendering（渲染 / 纹理 / 特效）
+        - ship（飞船 / 模块 / SAS）
+        - facility（设施系统）
+        - ui（界面组件 / HUD）
+        - audio（音频）
+        - save（存档）
+        - timewarp（时间加速）
+        - config（天体 / 菜单 / 文案配置）
+        - 不涉及具体模块
+  - type: textarea
+    id: question
+    attributes:
+      label: 问题描述 *
+      placeholder: 例：天体 SOI 判定为何在开普勒解析推进下优先检查宿主子天体？
+    validations:
+      required: true
