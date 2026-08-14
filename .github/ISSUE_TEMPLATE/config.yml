@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 项目说明 README
+    url: https://github.com/XiaoMeng0000/ksp-2d/blob/main/README.md
+    about: 提交 issue 前请先阅读项目简介，了解游戏定位与功能范围。
+  - name: 待处理问题清单（KNOWN_ISSUES.md）
+    url: https://github.com/XiaoMeng0000/ksp-2d/blob/main/KNOWN_ISSUES.md
+    about: 已登记的问题与处置决策（open / resolved / wontfix），提交前请先查阅，避免重复报告。

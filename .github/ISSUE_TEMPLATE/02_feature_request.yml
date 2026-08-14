@@ -1,0 +1,62 @@
+---
+name: 功能建议
+description: 提出新功能、玩法或改进建议
+title: "[feature] "
+labels: [feature]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 填写须知
+        - 建议应基于当前项目已有的架构与数据约定（配置统一放在 src/config/、状态由 GameState 管理、通信走 EventBus）。
+        - 请说明功能落在哪个模块，便于评估与拆分实现。
+  - type: dropdown
+    id: module
+    attributes:
+      label: 关联模块 *
+      description: 该功能主要落在哪个模块（与 src/ 目录对应）
+      options:
+        - physics（轨道力学 / SOI / 大气）
+        - rendering（渲染 / 纹理 / 特效）
+        - ship（飞船 / 模块 / SAS）
+        - facility（设施系统）
+        - ui（界面组件 / HUD）
+        - audio（音频）
+        - save（存档）
+        - timewarp（时间加速）
+        - config（天体 / 菜单 / 文案配置）
+        - 跨模块 / 不确定
+    validations:
+      required: true
+  - type: textarea
+    id: background
+    attributes:
+      label: 需求背景 *
+      description: 这个功能要解决什么问题、填补什么体验空白
+      placeholder: 例：目前飞船缺少实时燃料显示，无法判断是否足够返回
+    validations:
+      required: true
+  - type: textarea
+    id: expectation
+    attributes:
+      label: 期望效果 *
+      description: 具体描述期望的功能表现，尽量用可观察的行为描述
+      placeholder: 例：在飞行 HUD 显示剩余燃料量与预计剩余 delta-v
+    validations:
+      required: true
+  - type: textarea
+    id: relation
+    attributes:
+      label: 与现有模块的关联
+      description: 需要新增/修改哪些文件（按 src/ 目录结构描述），是否需要新增配置数据
+      placeholder: 例：新增 src/ship/fuelSystem.js；模块类型在 src/ship/moduleTypes.js 中补充 fuelCapacity 字段；HUD 在 src/ui/flightUI.js 中渲染
+  - type: checkboxes
+    id: acceptance
+    attributes:
+      label: 验收标准（可勾选，供实现阶段参考）
+      description: 功能完成后应满足的检查项；项目采用增量实现 + 独立验证阶段
+      options:
+        - label: 功能在对应场景中可直接运行验证
+        - label: 涉及配置的改动已落入 src/config/ 或模块配置文件
+        - label: 与现有事件总线（EventBus）通信方式保持一致
+        - label: 不破坏现有存档的读取兼容

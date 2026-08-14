@@ -1,0 +1,92 @@
+---
+name: Bug 报告
+description: 报告游戏功能异常，附带复现步骤与诊断信息
+title: "[bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 填写须知
+        - 提交前请先在已有 issue 中搜索是否已报告过同类问题，避免重复（会被标记 `duplicate`）。
+        - 带 * 的为必填项。信息不全的 issue 会被标记 `question` 并要求补充。
+        - 若该问题在 KNOWN_ISSUES.md 中已登记，请直接引用对应条目，并说明触发条件。
+  - type: dropdown
+    id: scene
+    attributes:
+      label: 出现场景 *
+      description: 问题发生在哪个界面（与 src/scenes/ 对应）
+      options:
+        - splash（启动页）
+        - menu（主菜单）
+        - flight（飞行场景）
+        - tracking（追踪站）
+        - ship builder（飞船建造）
+        - galaxies（星图）
+        - settings（设置）
+        - encyclopedia（百科）
+        - 其他
+    validations:
+      required: true
+  - type: dropdown
+    id: module
+    attributes:
+      label: 主要涉及模块 *
+      description: 问题主要归属于哪个代码模块（与 src/ 目录对应）
+      options:
+        - physics（轨道力学 / SOI / 大气）
+        - rendering（渲染 / 纹理 / 特效）
+        - ship（飞船 / 模块 / SAS）
+        - facility（设施系统）
+        - ui（界面组件 / HUD）
+        - audio（音频）
+        - save（存档）
+        - timewarp（时间加速）
+        - config（天体 / 菜单 / 文案配置）
+        - 不确定
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤 *
+      description: 请逐步描述复现路径；若依赖特定初始相位/存档/时间加速档位，请注明触发条件
+      placeholder: |
+        1. 进入飞行场景，选择飞船 X
+        2. 开启时间加速至 100x
+        3. 等待飞船接近目标天体 SOI
+        4. 观察到轨道预测抖动
+    validations:
+      required: true
+  - type: input
+    id: expected
+    attributes:
+      label: 预期行为 *
+      placeholder: 例：飞船进入目标天体 SOI 后轨道预测应平滑切换
+    validations:
+      required: true
+  - type: input
+    id: actual
+    attributes:
+      label: 实际行为 *
+      placeholder: 例：预测轨迹在两星 SOI 边界反复跳跃
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: 环境
+      description: 浏览器及版本、系统、游戏版本（分支）
+      placeholder: 例：Chrome 131 / Windows 11 / v0.2.4-alpha
+  - type: input
+    id: save
+    attributes:
+      label: 存档文件名
+      description: 如问题与存档相关，请提供存档文件名（可先备份副本）
+      placeholder: 例：ksp2d_slot1.sav
+  - type: textarea
+    id: extra
+    attributes:
+      label: 补充信息
+      description: 截图、控制台报错、相关代码文件路径等
+      placeholder: 例：报错信息 / 截图链接 / 相关文件 src/physics/physicsUpdate.js
