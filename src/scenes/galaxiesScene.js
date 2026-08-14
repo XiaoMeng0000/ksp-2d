@@ -3,15 +3,12 @@
 import { sceneManager } from '../sceneManager.js';
 import { textureManager } from '../graphics/textureManager.js';
 import { solarSystemData, starSystemMeta } from '../config/solarSystem.js';
+import { t } from '../config/strings.js';
 
-// ========== 样式常量（与游戏百科/制作人员面板风格统一） ==========
-const PANEL_BG = 'rgba(0, 0, 0, 0.92)';
-const ACCENT_COLOR = '#A04040';
+// ========== 样式常量（Canvas 绘制用；DOM 样式已迁移至 scenes.css） ==========
 const TEXT_MAIN = 'rgba(255, 255, 255, 0.92)';
-const TEXT_BODY = '#999';       // 正文段落（与百科一致）
 const TEXT_DIM = '#666';        // 数据小字
-const CARD_BG = '#1e1e24';      // 卡片实色底
-const CARD_BORDER = '#3a3a3a';  // 卡片边框
+const CARD_BG = '#1e1e24';      // 卡片实色底（Canvas 渐变/文字用）
 const FONT_MONO = 'monospace';
 
 // 对比图绘制常量
@@ -43,7 +40,7 @@ function registerGalaxiesScene() {
 
     // 天体类型中文映射
     function _typeName(type) {
-        const map = { star: '恒星', planet: '行星', moon: '卫星' };
+        const map = { star: t('galaxies.star'), planet: t('galaxies.planet'), moon: t('galaxies.moon') };
         return map[type] || type;
     }
 
@@ -202,23 +199,18 @@ function registerGalaxiesScene() {
         ctx.textBaseline = 'alphabetic';
         ctx.fillStyle = TEXT_DIM;
         ctx.font = '12px ' + FONT_MONO;
-        ctx.fillText('✦ 遥远星系 · 尚未开放探索', cx, height - 22);
+        ctx.fillText(t('galaxies.notOpen'), cx, height - 22);
     }
 
-    // 构建星系卡片：实色底，已加载天体放在卡片下侧可展开区域
+    // 构建星系卡片：实色底，已加载天体放在卡片下侧可展开区域（样式见 scenes.css）
     function _buildStarSystemCard(meta, chartWidth) {
         const card = document.createElement('div');
-        card.style.cssText = ''
-            + 'background:' + CARD_BG + ';'
-            + 'border:1px solid ' + CARD_BORDER + ';'
-            + 'border-radius:8px;'
-            + 'margin-bottom:30px;'
-            + 'padding:20px 20px 0 20px;';
+        card.className = 'galaxies-card';
 
         // 星系名标题
         const title = document.createElement('h2');
         title.textContent = meta.name;
-        title.style.cssText = 'color:' + ACCENT_COLOR + ';font-family:' + FONT_MONO + ';font-size:22px;margin:0 0 16px 0;';
+        title.className = 'galaxies-card-title';
         card.appendChild(title);
 
         // ===== 占位星系：占位恒星图；正常星系：天体大小对比图 =====
@@ -227,7 +219,7 @@ function registerGalaxiesScene() {
             const chart = document.createElement('canvas');
             chart.width = chartWidth;
             chart.height = 160;
-            chart.style.cssText = 'width:100%;display:block;margin-bottom:20px;';
+            chart.className = 'galaxies-chart';
             const chartCtx = chart.getContext('2d');
             _drawPlaceholderStar(chartCtx, chart.width, chart.height);
             card.appendChild(chart);
@@ -241,7 +233,7 @@ function registerGalaxiesScene() {
             const chart = document.createElement('canvas');
             chart.width = chartWidth;
             chart.height = CHART_HEIGHT_BASE + maxSatCount * SAT_VSTEP;
-            chart.style.cssText = 'width:100%;display:block;margin-bottom:20px;';
+            chart.className = 'galaxies-chart';
             const chartCtx = chart.getContext('2d');
             _drawComparisonChart(chartCtx, chart.width, chart.height, solarSystemData);
             card.appendChild(chart);
@@ -250,7 +242,7 @@ function registerGalaxiesScene() {
         // 描述（百科天体档案文风）
         const desc = document.createElement('p');
         desc.textContent = meta.description;
-        desc.style.cssText = 'color:' + TEXT_BODY + ';font-family:' + FONT_MONO + ';font-size:13px;line-height:1.8;margin:0 0 12px 0;';
+        desc.className = 'galaxies-desc';
         card.appendChild(desc);
 
         // 已加载天体：可展开区域（展开时流式推挤下方卡片）
@@ -264,23 +256,18 @@ function registerGalaxiesScene() {
         const wrapper = document.createElement('div');
 
         const header = document.createElement('div');
-        header.style.cssText = ''
-            + 'display:flex;align-items:center;gap:8px;'
-            + 'padding:14px 0;cursor:pointer;user-select:none;'
-            + 'font-family:' + FONT_MONO + ';color:' + ACCENT_COLOR + ';font-size:14px;'
-            + 'border-top:1px solid ' + CARD_BORDER + ';'
-            + 'transition:background 0.15s ease;';
+        header.className = 'galaxies-collapse-header';
 
         const bodyCount = (meta && meta.placeholder) ? 0 : solarSystemData.length;
-        header.textContent = '已加载天体 (' + bodyCount + ')  ▸';
+        header.textContent = t('galaxies.loadedBodies', { n: bodyCount, arrow: '▸' });
 
         const content = document.createElement('div');
-        content.style.cssText = 'display:none;padding:4px 0 16px 0;';
+        content.className = 'galaxies-collapse-content';
 
         if (meta && meta.placeholder) {
             const empty = document.createElement('div');
-            empty.textContent = '—— 该星系尚未开放，暂无已加载天体 ——';
-            empty.style.cssText = 'color:' + TEXT_DIM + ';font-family:' + FONT_MONO + ';font-size:12px;padding:6px 0;';
+            empty.textContent = t('galaxies.noBodies');
+            empty.className = 'galaxies-empty';
             content.appendChild(empty);
         } else {
             for (const body of solarSystemData) {
@@ -288,16 +275,10 @@ function registerGalaxiesScene() {
             }
         }
 
-        header.addEventListener('mouseenter', () => {
-            header.style.background = 'rgba(255, 255, 255, 0.05)';
-        });
-        header.addEventListener('mouseleave', () => {
-            header.style.background = 'transparent';
-        });
         header.addEventListener('click', () => {
             const expanded = content.style.display === 'block';
             content.style.display = expanded ? 'none' : 'block';
-            header.textContent = '已加载天体 (' + bodyCount + ')  ' + (expanded ? '▸' : '▾');
+            header.textContent = t('galaxies.loadedBodies', { n: bodyCount, arrow: (expanded ? '▸' : '▾') });
         });
 
         wrapper.appendChild(header);
@@ -308,18 +289,18 @@ function registerGalaxiesScene() {
     // 单个天体的数据行：标题 + 数据小字（仅展示已加载信息，不放档案文案）
     function _buildBodyDataRow(body) {
         const row = document.createElement('div');
-        row.style.cssText = 'margin-bottom:12px;';
+        row.className = 'galaxies-row';
 
         const title = document.createElement('h3');
         title.textContent = body.name;
-        title.style.cssText = 'color:' + ACCENT_COLOR + ';font-family:' + FONT_MONO + ';font-size:16px;margin:0 0 4px 0;';
+        title.className = 'galaxies-row-title';
         row.appendChild(title);
 
         const dataLine = document.createElement('div');
-        dataLine.textContent = '类型: ' + _typeName(body.type)
-            + ' · 半径: ' + _formatRadius(body.radius)
-            + ' · 大气: ' + (body.hasAtmosphere ? '有' : '无');
-        dataLine.style.cssText = 'color:' + TEXT_DIM + ';font-family:' + FONT_MONO + ';font-size:12px;';
+        dataLine.textContent = t('galaxies.typeLabel') + _typeName(body.type)
+            + t('galaxies.radiusLabel') + _formatRadius(body.radius)
+            + t('galaxies.atmosphereLabel') + (body.hasAtmosphere ? t('galaxies.hasAtmosphere') : t('galaxies.noAtmosphere'));
+        dataLine.className = 'galaxies-row-data';
         row.appendChild(dataLine);
 
         return row;
@@ -329,55 +310,33 @@ function registerGalaxiesScene() {
         enter() {
             panel = document.createElement('div');
             panel.id = 'galaxiesPanel';
-            panel.style.cssText = ''
-                + 'position:fixed;inset:0;z-index:2000;'
-                + 'background:' + PANEL_BG + ';backdrop-filter:blur(12px);'
-                + 'display:flex;flex-direction:column;font-family:' + FONT_MONO + ';';
+            panel.className = 'scene-fullscreen';
 
             // ========== 顶栏：返回按钮 + 标题 ==========
             const topBar = document.createElement('div');
-            topBar.style.cssText = ''
-                + 'display:flex;align-items:center;gap:16px;'
-                + 'padding:14px 40px;'
-                + 'border-bottom:1px solid ' + CARD_BORDER + ';'
-                + 'flex-shrink:0;';
+            topBar.className = 'galaxies-topbar';
 
             const backBtn = document.createElement('button');
-            backBtn.textContent = '← 返回';
-            backBtn.style.cssText = ''
-                + 'padding:8px 28px;'
-                + 'background:rgba(30,30,30,0.8);color:white;'
-                + 'border:1px solid ' + ACCENT_COLOR + ';border-radius:4px;'
-                + 'font-family:' + FONT_MONO + ';font-size:14px;'
-                + 'cursor:pointer;transition:all 0.2s ease;';
-            backBtn.addEventListener('mouseenter', () => {
-                backBtn.style.background = '#2a2a2a';
-                backBtn.style.borderColor = '#c05050';
-            });
-            backBtn.addEventListener('mouseleave', () => {
-                backBtn.style.background = 'rgba(30,30,30,0.8)';
-                backBtn.style.borderColor = ACCENT_COLOR;
-            });
+            backBtn.textContent = t('galaxies.back');
+            backBtn.className = 'galaxies-back-btn';
             backBtn.addEventListener('click', () => {
                 _close();
             });
             topBar.appendChild(backBtn);
 
             const topTitle = document.createElement('span');
-            topTitle.textContent = '星系图';
-            topTitle.style.cssText = 'color:' + TEXT_MAIN + ';font-size:18px;letter-spacing:2px;';
+            topTitle.textContent = t('galaxies.title');
+            topTitle.className = 'galaxies-title';
             topBar.appendChild(topTitle);
 
             panel.appendChild(topBar);
 
             // ========== 内容滚动区（全宽，卡片横向展开） ==========
             const scrollArea = document.createElement('div');
-            scrollArea.style.cssText = ''
-                + 'flex:1;overflow-y:auto;'
-                + 'padding:0 40px;';
+            scrollArea.className = 'galaxies-scroll';
 
             const contentWrapper = document.createElement('div');
-            contentWrapper.style.cssText = 'width:100%;max-width:1400px;margin:0 auto;padding:40px 0;';
+            contentWrapper.className = 'galaxies-content';
 
             scrollArea.appendChild(contentWrapper);
             panel.appendChild(scrollArea);
@@ -395,8 +354,8 @@ function registerGalaxiesScene() {
 
             // 底部统计
             const stat = document.createElement('div');
-            stat.textContent = '// 已加载 ' + starSystemMeta.length + ' 个星系 · ' + solarSystemData.length + ' 个天体';
-            stat.style.cssText = 'color:' + TEXT_DIM + ';font-family:' + FONT_MONO + ';font-size:13px;text-align:center;padding:10px 0 20px 0;';
+            stat.textContent = t('galaxies.summary', { galaxies: starSystemMeta.length, bodies: solarSystemData.length });
+            stat.className = 'galaxies-stat';
             contentWrapper.appendChild(stat);
 
             escHandler = (event) => {

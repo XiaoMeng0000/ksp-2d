@@ -22,6 +22,14 @@ class ShipSystem {
         const state = gameState.getState();
         const shipId = `ship_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
+        // 0.2.0：按模板燃料储罐生成推进剂资源槽（旧 fuel/fuelCapacity 字段废弃）
+        const resources = {};
+        if (template.fuelTanks) {
+            for (const [resId, capacity] of Object.entries(template.fuelTanks)) {
+                resources[resId] = { amount: capacity, capacity: capacity };   // 初始满罐
+            }
+        }
+
         // 从模板复制属性，增加运行时状态
         const shipInstance = {
             id: shipId,
@@ -29,15 +37,20 @@ class ShipSystem {
             displayName: name || template.name,
             // 模板属性
             dryMass: template.dryMass,
-            fuelCapacity: template.fuelCapacity,
             isp: template.isp,
             maxThrust: template.maxThrust,
             moduleSlots: template.moduleSlots,
+            // 模板升级体系（0.2.0）
+            family: template.family || null,
+            tier: template.tier || 1,
+            engineType: template.engineType || 'chemical',
             // 继承模板的旋转物理参数
             momentOfInertia: template.momentOfInertia || 1.0,
             reactionWheelTorque: template.reactionWheelTorque || 0,
             // 运行时属性
-            fuel: template.fuelCapacity,
+            resources: resources,
+            // 0.2.0 阶段5：货仓（货运模块扩展的共享容量池；自带燃料 resources 不在此）
+            cargo: {},
             modules: [],
             // 轨道状态属性
             pos: { x: 0, y: 0 },
@@ -49,6 +62,8 @@ class ShipSystem {
             currentGM: null,
             currentHostPos: { x: 0, y: 0 },
             controlsLocked: false,
+            // 0.2.0 阶段2：引擎停机标志（任一配方燃料耗尽置 true，补给后恢复）
+            engineOut: false,
             thrust: { ax: 0, ay: 0 },  // 推力加速度向量，始终存在，无推力时为 { ax:0, ay:0 }
             // 机动节点数组，每个节点的数据结构见 renderer.js renderManeuverOrbits 上方注释
             maneuverNodes: [],

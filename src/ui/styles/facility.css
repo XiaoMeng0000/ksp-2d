@@ -1,0 +1,111 @@
+/* ============================================================
+   facility.css — 设施部署面板
+   ============================================================ */
+
+#facilityDeployPanel {
+    display: none;
+    position: fixed;
+    left: 70px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 15px;
+    width: 650px;
+    max-height: 70vh;
+    overflow: hidden;
+    z-index: 999;
+    font-family: var(--font-mono);
+}
+
+#facilityDeployPanel .deploy-body {
+    display: flex;
+    height: calc(100% - 80px);
+    gap: 15px;
+}
+
+#facilityDeployPanel .deploy-categories {
+    width: 35%;
+    flex: 1;
+    overflow-y: auto;
+}
+
+#facilityDeployPanel .deploy-detail {
+    width: 65%;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 10px;
+    color: var(--text-dim);
+    font-size: 12px;
+}
+
+.deploy-cat-box {
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.deploy-cat-header {
+    padding: 8px;
+    background: var(--card-bg);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.deploy-cat-header span:first-child {
+    color: var(--accent);
+    font-size: 12px;
+}
+
+.deploy-cat-header span:last-child {
+    color: var(--text-dim);
+    font-size: 10px;
+}
+
+.deploy-facility-btn {
+    width: 100%;
+    padding: 6px 10px;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--border-dark);
+    color: var(--text-main);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    cursor: pointer;
+    text-align: left;
+}
+.deploy-facility-btn:hover {
+    background: var(--accent-bg);
+    color: var(--accent);
+}
+.deploy-facility-btn.selected {
+    background: #2a2a4a;
+    color: var(--accent);
+}
+
+/* 详情标签 chip */
+.deploy-chip {
+    display: inline-block;
+    margin: 2px;
+    padding: 2px 6px;
+    background: var(--card-bg-dark);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-size: 10px;
+    color: var(--text-mid);
+}
+
+.deploy-chip-service {
+    display: inline-block;
+    margin: 2px;
+    padding: 2px 6px;
+    background: var(--card-bg-dark);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-size: 10px;
+    color: #88cc88;
+}

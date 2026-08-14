@@ -6,10 +6,11 @@ import { getFacilityType } from './facility/facilityTypes.js';
 import { renderableManager } from './graphics/renderable.js';
 import { textureManager } from './graphics/textureManager.js';
 import { drawStarGlow, drawStarBall, drawPlanetRing } from './graphics/programEffects.js';
+import { STARFIELD_CONFIG } from './config/starfieldConfig.js';
+import { t } from './config/strings.js';
 
+// 星空背景（天空盒）：屏幕空间固定坐标 + 固定像素尺寸，与相机解耦
 let stars = [];
-const STAR_COUNT = 800;
-const WORLD_RANGE = 6.8e10;  // Kerbin 轨道半径 × 5，适配真实 KSP 尺度
 const BODY_MIN_SCREEN_RADIUS = 3;  // 天体最低屏幕半径，防止远距离缩成一个像素以下
 
 function hexToRgba(hex, alpha) {
@@ -69,18 +70,102 @@ function renderBodyLayers(ctx, cx, cy, drawRadius, layers) {
     return rendered;
 }
 
-function createStars() {
+/**
+ * 生成天空盒星空（屏幕空间固定背景）
+ * @param {number} canvasWidth - 画布物理像素宽度
+ * @param {number} canvasHeight - 画布物理像素高度
+ */
+function createStars(canvasWidth, canvasHeight) {
+    const cfg = STARFIELD_CONFIG;
+    // 按屏幕面积（含边缘余量）计算星数，限制在 [minCount, maxCount] 防失控
+    const totalArea = (canvasWidth + cfg.margin * 2) * (canvasHeight + cfg.margin * 2);
+    const count = Math.round(totalArea / cfg.density);
+    const n = Math.max(cfg.minCount, Math.min(cfg.maxCount, count));
+
     stars = [];
-    for (let i = 0; i < STAR_COUNT; i++) {
-        const dist = Math.random() * WORLD_RANGE;
-        const angle = Math.random() * Math.PI * 2;
+    for (let i = 0; i < n; i++) {
         stars.push({
-            x: dist * Math.cos(angle),
-            y: dist * Math.sin(angle),
-            radius: 0.8 + Math.random() * 1.5,
-            brightness: 0.3 + Math.random() * 0.7
+            x: Math.random() * (canvasWidth + cfg.margin * 2) - cfg.margin,
+            y: Math.random() * (canvasHeight + cfg.margin * 2) - cfg.margin,
+            radius: cfg.radiusRange.min + Math.random() * (cfg.radiusRange.max - cfg.radiusRange.min),
+            brightness: cfg.brightnessRange.min + Math.random() * (cfg.brightnessRange.max - cfg.brightnessRange.min),
+            color: cfg.colors[Math.floor(Math.random() * cfg.colors.length)],
+            // 闪烁参数：随机相位 + 周期 + 振幅
+            phase: Math.random() * Math.PI * 2,
+            period: cfg.twinkle.periodRange.min + Math.random() * (cfg.twinkle.periodRange.max - cfg.twinkle.periodRange.min),
+            amplitude: cfg.twinkle.amplitudeRange.min + Math.random() * (cfg.twinkle.amplitudeRange.max - cfg.twinkle.amplitudeRange.min)
         });
     }
+}
+
+/**
+ * 绘制天空盒星空：屏幕空间固定坐标 + 固定像素尺寸
+ * 不随相机平移/缩放变化（恒星无限远语义）；
+ * 亮度按真实时间微闪烁，不受游戏时间加速影响
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {HTMLCanvasElement} canvas
+ * @param {number} [globalAlpha=1] - 整层透明度乘数（0~1），用于恒星遮挡淡出
+ */
+function renderStarfield(ctx, canvas, globalAlpha = 1) {
+    const cfg = STARFIELD_CONFIG;
+    // 闪烁时间基准：performance.now（真实时间，秒），与游戏时间加速无关
+    const t = performance.now() / 1000;
+    const W = canvas.width;
+    const H = canvas.height;
+
+    for (const star of stars) {
+        if (star.x < -50 || star.x > W + 50 ||
+            star.y < -50 || star.y > H + 50) continue;
+
+        // 微闪烁：alpha = 基准亮度 × (1 + 振幅 × sin(2π·t/周期 + 相位))
+        let alpha = star.brightness;
+        if (cfg.twinkle.enabled) {
+            alpha = star.brightness * (1 + star.amplitude * Math.sin(2 * Math.PI * t / star.period + star.phase));
+        }
+
+        ctx.globalAlpha = Math.max(0, Math.min(1, alpha * globalAlpha));
+        ctx.fillStyle = star.color;
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    ctx.globalAlpha = 1.0;
+}
+
+/**
+ * 计算恒星对星空的遮挡系数（0=星空完全消失，1=星空完整可见）
+ * 科学依据：视角靠近恒星时，恒星光芒淹没背景星光
+ * 驱动指标 covered = 星盘屏幕半径 − 星心到屏幕中心距离（px）
+ *   covered <= fadeStart：恒星未覆盖视野中央，不遮挡
+ *   covered >= fadeEnd：恒星充分覆盖视野，星空完全消失
+ * 遍历所有恒星型天体取最小可见系数，兼容未来多恒星系统
+ * @param {HTMLCanvasElement} canvas
+ * @returns {number} 星空透明度乘数（0~1）
+ */
+function computeStarfieldVisibility(canvas) {
+    const cfg = STARFIELD_CONFIG;
+    const oc = cfg.starOcclusion;
+    if (!oc || !oc.enabled) return 1;
+
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    let minFactor = 1;
+
+    for (const body of celestialBodies) {
+        if (body.type !== 'star') continue;
+        // 与天体渲染一致的恒星屏幕半径（无最小保护，直接等比缩放）
+        const drawRadius = body.displayRadius * camera.zoom;
+        if (drawRadius <= oc.fadeStart) continue;
+
+        const screen = worldToScreen(body.position.x, body.position.y, canvas);
+        const distToCenter = Math.hypot(screen.x - cx, screen.y - cy);
+        const covered = drawRadius - distToCenter;
+        if (covered <= oc.fadeStart) continue;
+
+        const t = Math.min(1, (covered - oc.fadeStart) / (oc.fadeEnd - oc.fadeStart));
+        minFactor = Math.min(minFactor, 1 - t);
+    }
+    return minFactor;
 }
 
 /**
@@ -142,17 +227,10 @@ function render(ctx, canvas, activeShip, options = {}) {
     ctx.fillStyle = 'black';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    for (const star of stars) {
-        const screen = worldToScreen(star.x, star.y, canvas);
-        if (screen.x < -50 || screen.x > canvas.width + 50 ||
-            screen.y < -50 || screen.y > canvas.height + 50) continue;
-        
-        const drawRadius = Math.max(0.5, star.radius * camera.zoom);
-        ctx.beginPath();
-        ctx.arc(screen.x, screen.y, drawRadius, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(255, 255, 255, ${star.brightness})`;
-        ctx.fill();
-    }
+    // 天空盒星空（屏幕空间固定背景 + 微闪烁）
+    // 靠近恒星时恒星光茫淹没背景 → 星空整层淡出
+    const starfieldAlpha = computeStarfieldVisibility(canvas);
+    renderStarfield(ctx, canvas, starfieldAlpha);
 
     // 天体轨道线（以天体代表色绘制，右下角👁可开关）
     if (visibility.bodyOrbits !== false) {
@@ -409,7 +487,7 @@ function getOrbitColor(soiName, isManeuver = false, isCurrentSoi = false) {
         'rgba(255, 136, 68, 0.8)',
         'rgba(136, 68, 255, 0.8)'
     ];
-    const safeName = soiName || '深空';
+    const safeName = soiName || t('orbit.type.deepSpace');
     let hash = 0;
     for (let i = 0; i < safeName.length; i++) hash = (hash * 31 + safeName.charCodeAt(i)) | 0;
     return brightColors[Math.abs(hash) % brightColors.length];
@@ -528,13 +606,13 @@ const HUD_VALUE = `rgba(${HUD_GREEN}, 0.95)`;
 const HUD_WARN = 'rgba(255, 80, 80, 0.95)';
 const HUD_ESCAPE = 'rgba(255, 220, 80, 0.95)';
 
-// 轨道类型 → 显示文本
+// 轨道类型 → 显示文本（数据驱动收敛：文案入库 strings.js）
 const ORBIT_TYPE_TEXT = {
-    circular: '圆轨',
-    elliptical: '椭圆轨',
-    suborbital: '亚轨道',
-    escape: '逃逸',
-    deep_space: '深空'
+    circular: t('orbit.type.circular'),
+    elliptical: t('orbit.type.elliptical'),
+    suborbital: t('orbit.type.suborbital'),
+    escape: t('orbit.type.escape'),
+    deep_space: t('orbit.type.deepSpace')
 };
 
 // 高度格式化：≥1000m 显示 km，否则 m
@@ -575,7 +653,7 @@ function renderOrbitHud(ctx, canvas, ship) {
     const info = getOrbitalInfo(liveKepler, ship.currentGM, body, ship.pos);
     if (!info) return;
 
-    const soiText = (ship.currentSOI || '深空')
+    const soiText = (ship.currentSOI || t('orbit.type.deepSpace'))
         + (info.orbitType === 'deep_space' ? '' : ' · ' + (ORBIT_TYPE_TEXT[info.orbitType] || '--'));
 
     const vel = Math.sqrt(ship.vel.x * ship.vel.x + ship.vel.y * ship.vel.y);

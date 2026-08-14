@@ -112,7 +112,7 @@ export function updateShipPhysics(ship, dt, isActive = true) {
 
             ship.currentSOI = host.name;
             ship.currentGM = host.gm;
-            eventBus.emit(Events.SOI_CHANGED, { from: oldSOI, to: host.name });
+            eventBus.emit(Events.SOI_CHANGED, { from: oldSOI, to: host.name, shipId: ship.id });
 
             // 重拟合轨道根数；近抛物线/径向病态区间 stateToKepler 返回 null → 后续走 RK4 兜底
             const newKepler = stateToKepler(ship.pos, ship.vel, host.gm);
@@ -129,7 +129,7 @@ export function updateShipPhysics(ship, dt, isActive = true) {
                 ship.pos.y = oldHost.position.y + ship.pos.y;
             }
 
-            eventBus.emit(Events.SOI_CHANGED, { from: ship.currentSOI, to: null });
+            eventBus.emit(Events.SOI_CHANGED, { from: ship.currentSOI, to: null, shipId: ship.id });
             convertVelocityFrame(ship.vel, ship.currentSOI, null);
             ship.currentSOI = null;
             ship.currentGM = 0;

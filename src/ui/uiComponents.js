@@ -1,50 +1,21 @@
 // UI组件 - 通知和对话框组件
 
 import { textureManager } from '../graphics/textureManager.js';
+import { t } from '../config/strings.js';
+import { getResourceType } from '../resources/resourceTypes.js';
 
 export function createNotification(message, type = 'info', duration = 2000) {
-    // 堆叠通知 - 添加 warning 类型颜色
-    const colors = { success: '#88ccff', error: '#ff6666', info: '#aaa', warning: '#ffaa44' };
-
     // 创建或获取通知容器
     let container = document.getElementById('notification-container');
     if (!container) {
         container = document.createElement('div');
         container.id = 'notification-container';
-        container.style.cssText = `
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 10001;
-            display: flex;
-            flex-direction: column-reverse;
-            align-items: center;
-            gap: 8px;
-            pointer-events: none;
-            max-width: 90vw;
-        `;
         document.body.appendChild(container);
     }
 
-    // 堆叠通知 - 创建独立通知元素
+    // 堆叠通知 - 创建独立通知元素（边框颜色由类型 class 控制）
     const div = document.createElement('div');
-    div.style.cssText = `
-        background: rgba(0, 0, 0, 0.85);
-        border: 1px solid ${colors[type] || colors.info};
-        border-radius: 3px;
-        padding: 8px 16px;
-        color: white;
-        font-family: monospace;
-        font-size: 12px;
-        opacity: 0;
-        transform: translateY(10px);
-        transition: all 0.3s ease;
-        pointer-events: none;
-        text-align: center;
-        max-width: 80vw;
-        min-width: 120px;
-    `;
+    div.className = 'ui-notification ui-notification-' + type;
     div.textContent = message;
 
     // 堆叠通知 - 插入到最顶部（视觉上的底部）
@@ -79,37 +50,28 @@ export function createNotification(message, type = 'info', duration = 2000) {
 
 export function createDialog(title, items, onSelect, onCancel) {
     const overlay = document.createElement('div');
-    overlay.style.cssText = `
-        position: fixed; inset: 0; background: rgba(0,0,0,0.8);
-        display: flex; align-items: center; justify-content: center;
-        z-index: 10000;
-    `;
+    overlay.className = 'ui-dialog-overlay';
     const panel = document.createElement('div');
-    panel.style.cssText = `
-        background: rgba(0, 0, 0, 0.85); border: 1px solid #555;
-        border-radius: 5px; padding: 15px; min-width: 280px;
-        max-width: 450px; max-height: 70vh; overflow-y: auto;
-        font-family: monospace; color: white;
-    `;
-    let html = `<h3 style="color:#88ccff;margin:0 0 12px 0;border-bottom:1px solid #444;padding-bottom:5px;">${title}</h3>`;
+    panel.className = 'ui-dialog';
+    let html = `<h3 class="ui-dialog-title">${title}</h3>`;
     if (items.length === 0) {
-        html += `<p style="color:#666;">列表为空</p>`;
+        html += `<p style="color:var(--text-dim);">${t('common.empty')}</p>`;
     } else {
-        html += `<div style="display:flex;flex-direction:column;gap:6px;">`;
+        html += `<div class="ui-list">`;
         items.forEach((item) => {
             const subtitle = item.subtitle || (item.timestamp ? new Date(item.timestamp).toLocaleString() : '');
             html += `
-                <button data-id="${item.id}" style="padding:8px 12px;background:#333;border:1px solid #555;border-radius:3px;color:#ddd;font-family:monospace;font-size:12px;cursor:pointer;text-align:left;">
-                    <div style="font-weight:bold;">${item.name}</div>
-                    ${subtitle ? `<div style="color:#666;font-size:11px;">${subtitle}</div>` : ''}
+                <button data-id="${item.id}" class="ui-list-item">
+                    <div class="ui-list-item-title">${item.name}</div>
+                    ${subtitle ? `<div class="ui-list-item-sub">${subtitle}</div>` : ''}
                 </button>
             `;
         });
         html += `</div>`;
     }
     html += `
-        <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end;">
-            <button id="dialogCancelBtn" style="padding:4px 12px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;cursor:pointer;">取消</button>
+        <div class="ui-dialog-actions" style="margin-top:12px;">
+            <button id="dialogCancelBtn" class="ui-btn">${t('common.cancel')}</button>
         </div>
     `;
     panel.innerHTML = html;
@@ -117,16 +79,6 @@ export function createDialog(title, items, onSelect, onCancel) {
     document.body.appendChild(overlay);
 
     panel.querySelectorAll('[data-id]').forEach(btn => {
-        btn.addEventListener('mouseenter', () => {
-            btn.style.background = 'rgba(136,204,255,0.15)';
-            btn.style.borderColor = '#555';
-            btn.style.color = '#88ccff';
-        });
-        btn.addEventListener('mouseleave', () => {
-            btn.style.background = '#333';
-            btn.style.borderColor = '#555';
-            btn.style.color = '#ddd';
-        });
         btn.addEventListener('click', () => {
             const id = btn.dataset.id;
             if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
@@ -152,26 +104,16 @@ export function createDialog(title, items, onSelect, onCancel) {
 // 输入对话框组件
 export function createInputDialog(title, placeholder, defaultValue, onConfirm, onCancel) {
     const overlay = document.createElement('div');
-    overlay.style.cssText = `
-        position: fixed; inset: 0; background: rgba(0,0,0,0.8);
-        display: flex; align-items: center; justify-content: center;
-        z-index: 10000;
-    `;
+    overlay.className = 'ui-dialog-overlay';
     const panel = document.createElement('div');
-    panel.style.cssText = `
-        background: rgba(0, 0, 0, 0.85); border: 1px solid #555;
-        border-radius: 5px; padding: 15px; min-width: 280px;
-        max-width: 380px; font-family: monospace; color: white;
-    `;
+    panel.className = 'ui-dialog';
     panel.innerHTML = `
-        <h3 style="color:#88ccff;margin:0 0 12px 0;border-bottom:1px solid #444;padding-bottom:5px;">${title}</h3>
-        <input type="text" id="dialogInput" placeholder="${placeholder || ''}" 
-            style="width:100%;padding:6px 10px;margin-bottom:12px;box-sizing:border-box;
-            background:#333;color:#fff;font-family:monospace;font-size:12px;outline:none;border:1px solid #555;border-radius:3px;"
+        <h3 class="ui-dialog-title">${title}</h3>
+        <input type="text" id="dialogInput" class="ui-input" placeholder="${placeholder || ''}"
             value="${defaultValue || ''}">
-        <div style="display:flex;gap:8px;justify-content:flex-end;">
-            <button id="dialogCancelBtn" style="padding:4px 12px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;cursor:pointer;">取消</button>
-            <button id="dialogConfirmBtn" style="padding:4px 12px;background:rgba(136,204,255,0.2);color:#88ccff;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;cursor:pointer;">确定</button>
+        <div class="ui-dialog-actions">
+            <button id="dialogCancelBtn" class="ui-btn">${t('common.cancel')}</button>
+            <button id="dialogConfirmBtn" class="ui-btn" style="background:var(--accent-bg-strong);color:var(--accent);">${t('common.confirm')}</button>
         </div>
     `;
     overlay.appendChild(panel);
@@ -220,26 +162,18 @@ export function createInputDialog(title, placeholder, defaultValue, onConfirm, o
 
 // 确认对话框组件
 // 增加自定义按钮文字参数
-export function createConfirmDialog(title, message, onConfirm, onCancel, confirmText = '确认', cancelText = '取消') {
+export function createConfirmDialog(title, message, onConfirm, onCancel, confirmText = t('common.confirmDefault'), cancelText = t('common.cancel')) {
     const overlay = document.createElement('div');
-    overlay.style.cssText = `
-        position: fixed; inset: 0; background: rgba(0,0,0,0.8);
-        display: flex; align-items: center; justify-content: center;
-        z-index: 10000;
-    `;
+    overlay.className = 'ui-dialog-overlay';
     const panel = document.createElement('div');
-    panel.style.cssText = `
-        background: rgba(0, 0, 0, 0.85); border: 1px solid #555;
-        border-radius: 5px; padding: 15px; min-width: 280px;
-        max-width: 380px; font-family: monospace; color: white;
-    `;
+    panel.className = 'ui-dialog';
     // 使用自定义按钮文字
     panel.innerHTML = `
-        <h3 style="color:#ff6666;margin:0 0 10px 0;border-bottom:1px solid #444;padding-bottom:5px;">${title}</h3>
-        <p style="color:#aaa;margin:0 0 15px 0;font-size:12px;">${message}</p>
-        <div style="display:flex;gap:8px;justify-content:flex-end;">
-            <button id="dialogCancelBtn" style="padding:4px 12px;background:#333;color:white;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;cursor:pointer;">${cancelText}</button>
-            <button id="dialogConfirmBtn" style="padding:4px 12px;background:rgba(255,80,80,0.2);color:#ff6666;border:1px solid #555;border-radius:3px;font-family:monospace;font-size:12px;cursor:pointer;">${confirmText}</button>
+        <h3 class="ui-dialog-title-danger">${title}</h3>
+        <p class="ui-dialog-body">${message}</p>
+        <div class="ui-dialog-actions">
+            <button id="dialogCancelBtn" class="ui-btn">${cancelText}</button>
+            <button id="dialogConfirmBtn" class="ui-btn-danger-solid">${confirmText}</button>
         </div>
     `;
     overlay.appendChild(panel);
@@ -270,6 +204,16 @@ export function createConfirmDialog(title, message, onConfirm, onCancel, confirm
     return overlay;
 }
 
+// 辅助：HTML 转义（用户输入内容拼 innerHTML 前必须转义，防 XSS）
+export function escapeHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 // 辅助：将 textureKey 转为 PNG <img> HTML 字符串，纹理未就绪时返回 fallback Emoji
 export function renderIconHtml(textureKey, fallbackEmoji, sizePx) {
     if (!textureKey) return fallbackEmoji || '';
@@ -279,4 +223,40 @@ export function renderIconHtml(textureKey, fallbackEmoji, sizePx) {
         return `<img src="${tex.src}" style="width:${s}px;height:${s}px;object-fit:contain;vertical-align:middle;">`;
     }
     return fallbackEmoji || '';
+}
+
+// 燃料分槽进度条（0.2.0 阶段4）— 每种推进剂独立一条 bar，供各面板复用
+// 结构：资源名 [进度条] 存量/容量；无 resources 时回退单一燃料条
+export function renderFuelBarsHtml(ship, opts = {}) {
+    if (!ship) return '';
+    const color = opts.color || 'var(--accent)';
+
+    const rows = [];
+    if (ship.resources) {
+        for (const [resId, slot] of Object.entries(ship.resources)) {
+            if (!slot) continue;
+            const def = getResourceType(resId);
+            rows.push({
+                name: def ? def.name : resId,
+                amount: slot.amount || 0,
+                capacity: slot.capacity || 0
+            });
+        }
+    } else if (typeof ship.fuel === 'number') {
+        rows.push({ name: t('common.fuel'), amount: ship.fuel, capacity: ship.fuelCapacity ?? ship.fuel });
+    }
+
+    let html = '';
+    for (const r of rows) {
+        const pct = r.capacity > 0 ? Math.min(100, Math.max(0, r.amount / r.capacity * 100)) : 0;
+        html += '<div style="display:flex;align-items:center;gap:6px;">'
+            + '<span style="width:64px;flex-shrink:0;color:#888;font-size:10px;text-align:right;'
+            + 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + r.name + '</span>'
+            + '<span style="flex:1;display:inline-block;height:6px;background:#333;border-radius:3px;overflow:hidden;">'
+            + '<span style="display:block;width:' + pct + '%;height:100%;background:' + color + ';border-radius:3px;"></span></span>'
+            + '<span style="width:84px;flex-shrink:0;color:#888;font-size:10px;white-space:nowrap;">'
+            + Math.floor(r.amount) + ' / ' + Math.floor(r.capacity) + '</span>'
+            + '</div>';
+    }
+    return html;
 }

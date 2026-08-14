@@ -1,0 +1,400 @@
+/* ============================================================
+   tracking.css — 追踪站(信息窗口 / 左侧导航栏)
+   0.2.5 改版:分组卡片 + 两列数据网格 + 可折叠 Section
+   ============================================================ */
+
+/* ---- 追踪信息窗口 ---- */
+#trackingInfo {
+    display: none;
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 320px;
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    background: var(--panel-bg);
+    color: var(--text-bright);
+    padding: 14px 16px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    border: 1px solid var(--border-dark);
+    border-radius: 5px;
+    z-index: 1000;
+    box-sizing: border-box;
+}
+
+#trackingInfo .tracking-name {
+    font-family: var(--font-mono-bold);
+    font-weight: bold;
+    font-size: 15px;
+    color: var(--accent);
+}
+
+/* 名称下方的小类型标签 */
+#trackingInfo .tracking-type-tag {
+    display: inline-block;
+    margin-top: 5px;
+    padding: 1px 8px;
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: var(--text-mid);
+    background: var(--panel-bg-soft);
+    border: 1px solid var(--border-dark);
+    border-radius: 3px;
+}
+
+/* 顶部操作按钮网格(聚焦/控制/摧毁,1~3 个自适应) */
+#trackingInfo .tracking-btn-grid {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-dark);
+}
+
+#trackingInfo .tracking-btn-grid button {
+    flex: 1;
+}
+
+#trackingInfo .tracking-btn-grid .tracking-control-btn {
+    padding: 5px 0;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    background: var(--success-bg);
+    color: var(--success);
+    border: 1px solid var(--success-border);
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+#trackingInfo .tracking-btn-grid .tracking-control-btn:hover {
+    background: var(--accent-bg);
+    color: var(--accent);
+}
+
+#trackingInfo .tracking-btn-grid .tracking-destroy-btn {
+    padding: 5px 0;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    background: var(--danger-solid-bg);
+    color: var(--danger-solid);
+    border: 1px solid var(--danger-solid);
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+#trackingInfo .tracking-btn-grid .tracking-destroy-btn:hover {
+    background: var(--danger-bg);
+    color: var(--danger);
+}
+
+/* ---- 可折叠分组(Section) ---- */
+#trackingInfo .tracking-section {
+    margin-top: 10px;
+}
+
+#trackingInfo .tracking-section-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 0;
+    cursor: pointer;
+    user-select: none;
+    color: var(--text-mid);
+    font-size: 11px;
+    letter-spacing: 1px;
+    border-bottom: 1px solid var(--border-dark);
+    transition: color 0.15s ease;
+}
+
+#trackingInfo .tracking-section-header:hover {
+    color: var(--accent);
+}
+
+#trackingInfo .tracking-section-toggle {
+    font-size: 9px;
+    width: 10px;
+    color: var(--text-dim);
+}
+
+#trackingInfo .tracking-section-content {
+    padding: 8px 0 2px 0;
+}
+
+/* ---- 两列 key-value 数据网格 ---- */
+#trackingInfo .tracking-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 14px;
+    row-gap: 8px;
+}
+
+#trackingInfo .tracking-data-item {
+    min-width: 0;
+}
+
+#trackingInfo .tracking-data-label {
+    color: var(--text-dim);
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#trackingInfo .tracking-data-value {
+    color: var(--text-bright);
+    font-family: var(--font-mono-bold);
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 值内嵌的上下标(质量科学计数法) */
+#trackingInfo .tracking-data-value sup {
+    font-size: 9px;
+}
+
+/* ---- 天体档案(介绍文本) ---- */
+#trackingInfo .tracking-synopsis {
+    color: var(--text-main);
+    font-size: 11px;
+    line-height: 1.7;
+    text-align: justify;
+}
+
+#trackingInfo .tracking-synopsis-empty {
+    color: var(--text-faint);
+    font-size: 10px;
+}
+
+/* ---- 模块 / 停靠飞船列表行 ---- */
+#trackingInfo .tracking-module-row {
+    color: var(--text-main);
+    font-size: 10px;
+    margin-bottom: 3px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+#trackingInfo .tracking-list-empty {
+    color: var(--text-faint);
+    font-size: 10px;
+    margin-bottom: 4px;
+}
+
+/* ---- 资源丰度进度条 ---- */
+#trackingInfo .tracking-res-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 5px;
+    font-size: 10px;
+}
+
+#trackingInfo .tracking-res-name {
+    flex: 0 0 72px;
+    color: var(--text-main);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#trackingInfo .tracking-res-bar {
+    flex: 1;
+    height: 6px;
+    background: var(--card-bg-dark);
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 0 8px;
+}
+
+#trackingInfo .tracking-res-fill {
+    height: 100%;
+    background: var(--success);
+    border-radius: 3px;
+}
+
+#trackingInfo .tracking-res-pct {
+    flex: 0 0 34px;
+    text-align: right;
+    color: var(--success);
+}
+
+/* career 模式扫描状态注脚 */
+#trackingInfo .tracking-scan-note {
+    color: var(--text-dim);
+    font-size: 10px;
+    margin-top: 6px;
+}
+
+/* ---- 追踪站左侧导航栏 ---- */
+#trackingNav {
+    position: fixed;
+    left: 15px;
+    top: 0;
+    bottom: 0;
+    width: 280px;
+    background: var(--panel-bg);
+    border-right: 1px solid var(--border);
+    padding: 15px;
+    display: none;
+    flex-direction: column;
+    gap: 2px;
+    z-index: 800;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    overflow-y: auto;
+    box-sizing: border-box;
+}
+
+#trackingNav .tracking-nav-title {
+    color: var(--accent);
+    margin-bottom: 10px;
+    font-size: 14px;
+    border-bottom: 1px solid var(--border-dark);
+    padding-bottom: 8px;
+}
+
+/* ---- 顶部横向分类 Tab（完整列表 / 航天器与聚落） ---- */
+#trackingNav .tracking-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 10px;
+}
+
+#trackingNav .tracking-tab {
+    flex: 1;
+    padding: 4px 0;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-mid);
+    background: transparent;
+    border: 1px solid var(--border-dark);
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+#trackingNav .tracking-tab:hover {
+    color: var(--accent);
+}
+
+#trackingNav .tracking-tab-active {
+    color: var(--accent);
+    background: var(--accent-bg);
+    border-color: var(--accent-border);
+}
+
+/* ---- 天体节点（统一文本色，不按类型着色） ---- */
+#trackingNav .tracking-node {
+    padding: 4px 8px;
+    cursor: pointer;
+    color: var(--text-main);
+    border-radius: 2px;
+    border-left: 2px solid transparent;
+    transition: background 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+#trackingNav .tracking-node:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+#trackingNav .tracking-node-selected {
+    background: var(--accent-bg);
+    border-left-color: var(--accent);
+}
+
+#trackingNav .tracking-node-selected:hover {
+    background: var(--accent-bg-strong);
+}
+
+#trackingNav .tracking-node-toggle {
+    cursor: pointer;
+    font-size: 10px;
+    color: var(--text-dim);
+    width: 12px;
+    flex: 0 0 12px;
+}
+
+#trackingNav .tracking-node-spacer {
+    width: 12px;
+    flex: 0 0 12px;
+    visibility: hidden;
+}
+
+/* ---- 卡片节点（飞船/设施：图标 + 名称 + 副标题） ---- */
+#trackingNav .tracking-node-card {
+    padding: 5px 8px;
+    margin: 2px 0 4px 0;
+    cursor: pointer;
+    border-radius: 3px;
+    border-left: 2px solid transparent;
+    border-bottom: 1px dashed var(--border-dark);
+    transition: background 0.2s;
+}
+
+#trackingNav .tracking-node-card:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+#trackingNav .tracking-node-main {
+    color: var(--text-main);
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#trackingNav .tracking-node-sub {
+    color: var(--text-dim);
+    font-size: 10px;
+    margin-top: 2px;
+    padding-left: 19px; /* 对齐图标(14px)后的名称 */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ---- "航天器与聚落" Tab 分组标题 ---- */
+#trackingNav .tracking-group-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 0 4px 0;
+    margin-top: 6px;
+    cursor: pointer;
+    user-select: none;
+    color: var(--text-mid);
+    font-size: 11px;
+    letter-spacing: 1px;
+    border-bottom: 1px solid var(--border-dark);
+    transition: color 0.15s ease;
+}
+
+#trackingNav .tracking-group-header:hover {
+    color: var(--accent);
+}
+
+#trackingNav .tracking-group-count {
+    margin-left: auto;
+    color: var(--text-dim);
+    font-size: 10px;
+}
+
+/* 导航栏空态提示（分组无内容时） */
+#trackingNav .tracking-list-empty {
+    color: var(--text-faint);
+    font-size: 10px;
+    padding: 6px 8px;
+}

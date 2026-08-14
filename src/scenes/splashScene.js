@@ -3,10 +3,11 @@
 import { sceneManager } from '../sceneManager.js';
 import { eventBus, Events } from '../eventBus.js';
 import { textureManager } from '../graphics/textureManager.js';
+import { t } from '../config/strings.js';
 
 const LOGO_SEQUENCE = [
     { type: 'image', textureKey: 'project_logo', maxWidthRatio: 0.45, fadeIn: 0.8, hold: 1.5, fadeOut: 0.8 },
-    { type: 'text', text: '本游戏为个人学习项目，不用于商业用途', fontSize: 24, fadeIn: 0.8, hold: 1.5, fadeOut: 0.8 }
+    { type: 'text', text: t('splash.text'), fontSize: 24, fadeIn: 0.8, hold: 1.5, fadeOut: 0.8 }
 ];
 
 let _canvas = null;
@@ -85,7 +86,7 @@ function _drawImageLogo(ctx, config, alpha) {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.font = '40px monospace';
-        ctx.fillText('【逃逸速度】', _canvas.width / 2, _canvas.height / 2);
+        ctx.fillText(t('splash.studio'), _canvas.width / 2, _canvas.height / 2);
         return;
     }
 

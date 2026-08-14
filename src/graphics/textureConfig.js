@@ -4,6 +4,11 @@ export const textureConfig = {
     title: 'assets/images/menu/title.png',
     menu_bg: 'assets/images/menu/background.png',
     project_logo: 'assets/images/menu/ev.png',
+
+    // 主菜单链接栏图标
+    link_qq: 'assets/images/menu/link_icons/icon_qq.png',
+    link_email: 'assets/images/menu/link_icons/icon_email.png',
+    link_github: 'assets/images/menu/link_icons/github.gif',
     facility: 'assets/images/facilities/facility.png',
 
     // 设施舱室图标
@@ -16,6 +21,10 @@ export const textureConfig = {
     // 飞船能力图标
     icon_deploy_facility: 'assets/images/ships/assembly_shop(ship).png',
 
+    // 飞船资源扫描/货运能力图标（0.2.0 阶段5：🔭/📦 的 PNG 替换，图片待美术补位）
+    icon_scan_resources: 'assets/images/ships/scanner.png',
+    icon_cargo_hold: 'assets/images/ships/cargo_hold.png',
+
     // 飞船模块图标
     mod_test_ballast: 'assets/images/ships/test_ballast.png',
     mod_construction_package: 'assets/images/ships/construction_package.png',
@@ -23,10 +32,6 @@ export const textureConfig = {
     // 飞船船体图标（飞行场景）
     ship_default_active: 'assets/images/ships/bodies/ship_default_active.png',
     ship_default_inactive: 'assets/images/ships/bodies/ship_default_inactive.png',
-
-    // 反馈渠道图标
-    icon_qq: 'assets/images/menu/icon_qq.png',
-    icon_email: 'assets/images/menu/icon_email.png',
 
     // 天体贴图
     kerbin_surface: 'assets/images/bodies/kerbin.png',

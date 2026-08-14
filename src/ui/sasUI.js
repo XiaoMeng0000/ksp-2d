@@ -9,6 +9,7 @@
 import { SASModeLabels } from '../ship/sasModes.js';
 import { eventBus, Events } from '../eventBus.js';
 import { textureManager } from '../graphics/textureManager.js';
+import { t } from '../config/strings.js';
 
 // EventBus — 缓存最近一帧飞船渲染数据（导航球姿态/方向，同 flightUI 模式）
 // 同时按"是否有活动飞船"控制按钮框显隐（设施操作模式无活动飞船 → 隐藏）
@@ -64,19 +65,19 @@ const BOTTOM_BTN_GAP_BELOW = 16;         // 圆盘底部到按钮框顶部间距
 // ========== 导航球四方向定义（注册表，为机动节点预留扩展位） ==========
 // key 与 RENDER_DATA.directions 字段名对应
 const NAV_DIRECTIONS = [
-    { key: 'prograde',   label: '顺向',   color: DIR_PROGRADE_COLOR },
-    { key: 'retrograde', label: '逆向',   color: DIR_PROGRADE_COLOR },
-    { key: 'radialIn',   label: '径向内', color: DIR_RADIAL_COLOR },
-    { key: 'radialOut',  label: '径向外', color: DIR_RADIAL_COLOR }
+    { key: 'prograde',   label: t('sas.prograde'),   color: DIR_PROGRADE_COLOR },
+    { key: 'retrograde', label: t('sas.retrograde'), color: DIR_PROGRADE_COLOR },
+    { key: 'radialIn',   label: t('sas.radialIn'),   color: DIR_RADIAL_COLOR },
+    { key: 'radialOut',  label: t('sas.radialOut'),  color: DIR_RADIAL_COLOR }
     // 未来：{ key: 'maneuverNode', label: '机动节点', color: '#4FC3F7' }
 ];
 
 // ========== SAS 圆盘方向按钮（X 斜角布局） ==========
 const DIR_CIRCLES = [
-    { mode: 'radial_in',  dx: -DIR_OFFSET, dy: -DIR_OFFSET, color: DIR_RADIAL_COLOR, label: '径向内' },
-    { mode: 'prograde',   dx:  DIR_OFFSET, dy: -DIR_OFFSET, color: DIR_PROGRADE_COLOR, label: '顺向' },
-    { mode: 'retrograde', dx: -DIR_OFFSET, dy:  DIR_OFFSET, color: DIR_PROGRADE_COLOR, label: '逆向' },
-    { mode: 'radial_out', dx:  DIR_OFFSET, dy:  DIR_OFFSET, color: DIR_RADIAL_COLOR, label: '径向外' }
+    { mode: 'radial_in',  dx: -DIR_OFFSET, dy: -DIR_OFFSET, color: DIR_RADIAL_COLOR, label: t('sas.radialIn') },
+    { mode: 'prograde',   dx:  DIR_OFFSET, dy: -DIR_OFFSET, color: DIR_PROGRADE_COLOR, label: t('sas.prograde') },
+    { mode: 'retrograde', dx: -DIR_OFFSET, dy:  DIR_OFFSET, color: DIR_PROGRADE_COLOR, label: t('sas.retrograde') },
+    { mode: 'radial_out', dx:  DIR_OFFSET, dy:  DIR_OFFSET, color: DIR_RADIAL_COLOR, label: t('sas.radialOut') }
 ];
 
 // ========== 动画时间常量 ==========
@@ -114,7 +115,10 @@ class SASUI {
      * @param {HTMLCanvasElement} canvas
      */
     updateLayout(canvas) {
-        this._scale = Math.min(canvas.width / 1920, canvas.height / 1080, 1.0);
+        // 缩放下限 0.15：canvas 尺寸为 0/极小的瞬间（预览面板 resize 等）会算得 _scale=0，
+        // 导致导航球装饰环 R-21/R-23 等硬编码偏移变成负半径，ctx.arc 抛 IndexSizeError。
+        // 下限 0.15 保证 R=175×0.15=26.25 > 23，所有装饰偏移均为正。
+        this._scale = Math.max(0.15, Math.min(canvas.width / 1920, canvas.height / 1080, 1.0));
         const margin = MARGIN * this._scale;
         // 底部预留：取两个约束较大者（均在屏幕外不再画，只影响导航球上移量）
         //  a) 节流阀弧外缘(210)距底 ≥ 16
@@ -382,7 +386,7 @@ class SASUI {
         let tipX, tipY;
 
         if (this._hovered === 'center') {
-            text = '姿态保持';
+            text = t('sas.stability');
             tipX = cx;
             tipY = cy - (SAS_PANEL_CENTER_RADIUS + 12) * s;
         } else {
@@ -679,10 +683,10 @@ class SASUI {
      */
     _getBottomBtnDefs() {
         return [
-            { id: 'sas',          label: 'SAS',   emoji: '🛰', tex: 'icon_sas',          main: true },
-            { id: 'node',         label: '节点',  emoji: '⭐', tex: 'icon_node',         main: false },
-            { id: 'target_plus',  label: '目标+', emoji: '🎯', tex: 'icon_target_plus',  main: false },
-            { id: 'target_minus', label: '目标-', emoji: '🎯', tex: 'icon_target_minus', main: false }
+            { id: 'sas',          label: t('sas.main'),          emoji: '🛰', tex: 'icon_sas',          main: true },
+            { id: 'node',         label: t('sas.node'),          emoji: '⭐', tex: 'icon_node',         main: false },
+            { id: 'target_plus',  label: t('sas.targetPlus'),    emoji: '🎯', tex: 'icon_target_plus',  main: false },
+            { id: 'target_minus', label: t('sas.targetMinus'),   emoji: '🎯', tex: 'icon_target_minus', main: false }
         ];
     }
 
@@ -693,23 +697,11 @@ class SASUI {
         if (this._bottomButtons) return;
 
         const wrap = document.createElement('div');
-        wrap.style.cssText = `
-            position:fixed;z-index:900;display:none;
-            display:flex;align-items:center;justify-content:center;
-            background:rgba(0,0,0,0.85);border:1px solid #555;border-radius:5px;
-            padding:${BOTTOM_FRAME_PAD}px;
-            user-select:none;
-        `;
+        wrap.id = 'sasBottomButtons';
+        wrap.style.display = 'none';
 
         for (const def of this._getBottomBtnDefs()) {
-            const size = def.main ? BOTTOM_MAIN_SIZE : BOTTOM_SUB_SIZE;
             const btn = document.createElement('button');
-            btn.style.cssText = `
-                width:${size}px;height:${size}px;padding:0;
-                background:rgba(0,0,0,0.85);border:1px solid #555;border-radius:4px;
-                cursor:pointer;display:flex;align-items:center;justify-content:center;
-                flex-shrink:0;box-sizing:border-box;overflow:hidden;
-            `;
             btn.title = def.label;
             btn.dataset.btnId = def.id;
             btn.dataset.btnMain = def.main ? '1' : '0';
@@ -728,14 +720,6 @@ class SASUI {
                 btn.appendChild(span);
             }
 
-            // hover 高亮（与左侧工具栏一致）
-            btn.addEventListener('mouseenter', () => {
-                btn.style.background = 'rgba(136,204,255,0.15)';
-            });
-            btn.addEventListener('mouseleave', () => {
-                btn.style.background = 'rgba(0,0,0,0.85)';
-            });
-
             btn.addEventListener('click', () => {
                 const ship = window.__shipSystem?.getActiveShip?.();
                 if (def.id === 'sas') {
@@ -743,7 +727,7 @@ class SASUI {
                         ship.sasMode = ship.sasMode === 'off' ? 'stability' : 'off';
                     }
                 } else if (typeof window.showNotification === 'function') {
-                    window.showNotification('功能开发中', 'info');
+                    window.showNotification(t('sas.wip'), 'info');
                 }
             });
 
@@ -753,9 +737,7 @@ class SASUI {
                 // 主开关与副钮组之间的竖分隔线（追踪站导航栏同款：#555 1px 竖线）
                 const divider = document.createElement('div');
                 divider.dataset.divider = '1';
-                divider.style.cssText = `
-                    width:1px;height:28px;background:#555;flex-shrink:0;align-self:center;
-                `;
+                divider.style.cssText = `width:1px;height:28px;background:var(--border);flex-shrink:0;align-self:center;`;
                 wrap.appendChild(divider);
             }
         }
@@ -869,61 +851,47 @@ class SASUI {
     }
 
     /**
-     * 构建 DOM 结构（只执行一次）
+     * 构建 DOM 结构（只执行一次）——样式见 flight.css #visibilityPanel
      */
     _createVisibilityPanel() {
         const panel = document.createElement('div');
-        panel.style.cssText = `
-            position:fixed;right:10px;bottom:10px;z-index:1000;
-            font-family:monospace;font-size:11px;color:#ddd;
-        `;
+        panel.id = 'visibilityPanel';
 
         // 折叠按钮
         const toggleBtn = document.createElement('div');
-        toggleBtn.style.cssText = `
-            width:28px;height:28px;background:rgba(0,0,0,0.75);
-            border:1px solid #555;border-radius:4px;
-            display:flex;align-items:center;justify-content:center;
-            cursor:pointer;user-select:none;font-size:14px;
-            margin-left:auto;
-        `;
+        toggleBtn.className = 'vis-toggle-btn';
         toggleBtn.textContent = '👁';
-        toggleBtn.title = '显示筛选';
+        toggleBtn.title = t('sas.showFilter');
         toggleBtn.addEventListener('click', () => {
             this._visibilityExpanded = !this._visibilityExpanded;
             if (this._visibilityExpanded) {
                 this._visibilityContent.style.display = 'flex';
-                toggleBtn.style.borderColor = '#88ccff';
+                toggleBtn.classList.add('active');
             } else {
                 this._visibilityContent.style.display = 'none';
-                toggleBtn.style.borderColor = '#555';
+                toggleBtn.classList.remove('active');
             }
         });
         panel.appendChild(toggleBtn);
 
         // 展开内容区
         const content = document.createElement('div');
-        content.style.cssText = `
-            display:none;flex-direction:column;gap:4px;
-            margin-top:4px;padding:6px 8px;
-            background:rgba(0,0,0,0.85);border:1px solid #555;
-            border-radius:4px;min-width:80px;
-        `;
+        content.className = 'vis-content';
 
         // 飞船 toggle
-        const shipsLabel = this._makeCheckbox('ships', '飞船');
+        const shipsLabel = this._makeCheckbox('ships', t('sas.ships'));
         content.appendChild(shipsLabel);
 
         // 设施 toggle
-        const facilitiesLabel = this._makeCheckbox('facilities', '设施');
+        const facilitiesLabel = this._makeCheckbox('facilities', t('sas.facilities'));
         content.appendChild(facilitiesLabel);
 
         // 设施范围 toggle
-        const rangeLabel = this._makeCheckbox('facilityRange', '设施范围');
+        const rangeLabel = this._makeCheckbox('facilityRange', t('sas.facilityRange'));
         content.appendChild(rangeLabel);
 
         // 天体轨道 toggle
-        const orbitsLabel = this._makeCheckbox('bodyOrbits', '天体轨道');
+        const orbitsLabel = this._makeCheckbox('bodyOrbits', t('sas.bodyOrbits'));
         content.appendChild(orbitsLabel);
 
         panel.appendChild(content);
@@ -934,14 +902,10 @@ class SASUI {
     }
 
     /**
-     * 创建一个 checkbox label
+     * 创建一个 checkbox label（样式见 flight.css #visibilityPanel label）
      */
     _makeCheckbox(type, labelText) {
         const label = document.createElement('label');
-        label.style.cssText = `
-            display:flex;align-items:center;gap:4px;
-            cursor:pointer;user-select:none;padding:2px 0;
-        `;
 
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';

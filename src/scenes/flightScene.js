@@ -14,7 +14,12 @@ import { sasUI } from '../ui/sasUI.js';
 import { facilitySystem } from '../facility/facilitySystem.js';
 import { getModuleDef } from '../ship/moduleTypes.js';
 import { getFacilityType } from '../facility/facilityTypes.js';
+import { getTotalMass, getResource, getFuelAmount, getFuelCapacity } from '../resources/resourceSystem.js';
+import { updateScanProgress } from '../resources/scanSystem.js';
+import { getEngineType } from '../resources/engineConfig.js';
+import { consumeCargo, hasCargoHold, getCargoAmount } from '../resources/cargoSystem.js';
 import { timeWarp } from '../timeWarp.js';
+import { t } from '../config/strings.js';
 
 // 由 main.js 在注册时注入的依赖
 let _throttleRate = 1.0;
@@ -148,20 +153,30 @@ eventBus.on(Events.SHIP_COMMAND, ({ action, params }) => {
                 return def?.capability === 'deploy_facility';
             });
             if (!hasModule) {
-                window.showNotification('未挂载建设集成模块', 'warning');
+                window.showNotification(t('deploy.noModule'), 'warning');
+                break;
+            }
+
+            // 0.2.0 阶段5：部署设施消耗材料套装（从部署飞船货仓扣除）
+            // 修复：扣费校验前置但实际扣除后移 —— 原实现在所有轨道校验之前扣费，
+            // 校验失败（逃逸轨道/危险区）时材料套装已被扣但设施未部署（资源丢失）
+            const deployTypeCfg = getFacilityType(typeId);
+            const deployCost = (deployTypeCfg && deployTypeCfg.cost) || 0;
+            if (deployCost > 0 && (!hasCargoHold(ship) || getCargoAmount(ship, 'materialKits') < deployCost)) {
+                window.showNotification(t('deploy.noKits'), 'warning');
                 break;
             }
 
             // 检查在宿主 SOI 内且在轨
             if (!ship.currentSOI || ship.mode !== 'on_rails') {
-                window.showNotification('必须在稳定轨道上才能部署设施', 'warning');
+                window.showNotification(t('deploy.needStableOrbit'), 'warning');
                 break;
             }
 
             // 检查是否为稳定轨道（禁止逃逸轨道上部署，防止设施 SOI 切换 Bug）
             // 双曲线轨道 kepler.a < 0（e>=1 无椭圆解），椭圆/圆轨道 a > 0
             if (!ship.kepler || ship.kepler.a < 0) {
-                window.showNotification('逃逸轨道上无法部署设施，需在椭圆/圆轨道上进行', 'warning');
+                window.showNotification(t('deploy.noEscapeTrajectory'), 'warning');
                 break;
             }
 
@@ -176,10 +191,29 @@ eventBus.on(Events.SHIP_COMMAND, ({ action, params }) => {
                     ? hostBody.radius + hostBody.atmosphereHeight
                     : hostBody.radius;
                 if (shipDist < hazardBoundary) {
-                    window.showNotification('无法在危险区域内部署设施（大气层/表面范围内）', 'warning');
+                    window.showNotification(t('deploy.dangerZone'), 'warning');
                     break;
                 }
             }
+
+            // 创建设施（createFacility 期望绝对世界坐标，需从相对坐标转换）
+            const absPos = getAbsolutePosition(ship);
+            const typeCfg = getFacilityType(typeId);
+            const facilityName = params?.facilityName || (typeCfg ? t('deploy.newName', { name: typeCfg.name }) : t('deploy.newFacility'));
+            const facility = facilitySystem.createFacility(
+                typeId,
+                facilityName,
+                { x: absPos.x, y: absPos.y },
+                { x: ship.vel.x, y: ship.vel.y },
+                ship.currentSOI
+            );
+
+            // 设施创建成功后才真正扣费 + 消耗建设模块（避免失败时资源/模块丢失）
+            if (!facility) {
+                window.showNotification(t('deploy.failed'), 'error');
+                break;
+            }
+            if (deployCost > 0) consumeCargo(ship, 'materialKits', deployCost);
 
             // 消耗建设模块（移除第一个匹配的）
             const modIndex = ship.modules.findIndex(m => {
@@ -194,46 +228,31 @@ eventBus.on(Events.SHIP_COMMAND, ({ action, params }) => {
             }
             shipSystem.persistShip(ship);
 
-            // 创建设施（createFacility 期望绝对世界坐标，需从相对坐标转换）
-            const absPos = getAbsolutePosition(ship);
-            const typeCfg = getFacilityType(typeId);
-            const facilityName = params?.facilityName || (typeCfg ? '新建' + typeCfg.name : '新建设施');
-            const facility = facilitySystem.createFacility(
-                typeId,
-                facilityName,
-                { x: absPos.x, y: absPos.y },
-                { x: ship.vel.x, y: ship.vel.y },
-                ship.currentSOI
-            );
-
-            if (facility) {
-                window.showNotification(`${facilityName} 部署成功`, 'success');
-            } else {
-                window.showNotification('设施部署失败', 'error');
-            }
+            window.showNotification(t('deploy.success', { name: facilityName }), 'success');
             break;
         }
         case 'deployToBody': {
             const targetBody = celestialBodies.find(b => b.name === params.targetBody);
             if (!targetBody) {
-                window.showNotification('目标天体不存在', 'error');
+                window.showNotification(t('deploy.noTargetBody'), 'error');
                 break;
             }
             const orbitR = targetBody.radius + params.altitude;
             if (orbitR >= targetBody.soiRadius) {
-                window.showNotification('轨道高度超出天体引力范围', 'error');
+                window.showNotification(t('deploy.altitudeOutOfRange'), 'error');
                 break;
             }
             ship.pos = { x: orbitR, y: 0 };
             const v = Math.sqrt(targetBody.gm / orbitR);
-            ship.vel = { x: 0, y: -v };
+            // 顺行（逆时针，与天体公转同向）：pos 在 +x 时速度沿 +y
+            ship.vel = { x: 0, y: v };
             ship.currentSOI = targetBody.name;
             ship.currentGM = targetBody.gm;
             ship.kepler = stateToKepler(ship.pos, ship.vel, targetBody.gm);
             ship.orbitTime = 0;
             ship.mode = 'on_rails';
             ship.thrust = { ax: 0, ay: 0 };
-            window.showNotification(`已部署到 ${targetBody.name} 轨道，高度 ${params.altitude}`, 'success');
+            window.showNotification(t('deploy.deployedAt', { name: targetBody.name, altitude: params.altitude }), 'success');
             break;
         }
     }
@@ -514,6 +533,9 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             updateCelestialBodies(_getCelestialTime());
             eventBus.emit(Events.CELESTIAL_TIME_UPDATED, { time: _getCelestialTime(), dt: simDt });
 
+            // 0.2.0 阶段6：扫描任务推进（随 simDt，时间加速下同步加速）
+            updateScanProgress(simDt);
+
             // 物理推进
             for (const s of allShips) {
                 const isActive = s.id === activeId;
@@ -546,9 +568,9 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             if (inputManager.justPressed('KeyB') && _nearFacility && activeShip) {
                 const result = facilitySystem.dockShip(_nearFacility.id, activeShip.id);
                 if (result) {
-                    window.showNotification('对接成功', 'success');
+                    window.showNotification(t('dock.success'), 'success');
                 } else {
-                    window.showNotification('对接失败（对接口已满或其他原因）', 'warning');
+                    window.showNotification(t('dock.failFull'), 'warning');
                 }
             }
 
@@ -564,7 +586,7 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 facilitySystem.lastDockedFacilityId = null;
             }
 
-            // 5d. 对接弹窗状态驱动（委托 ui.js 管理 HTML DOM，渲染函数不碰 UI）
+            // 5d. 对接弹窗状态驱动（委托 UI 模块管理 HTML DOM，渲染函数不碰 UI）
             if (_nearFacility && activeShip) {
                 if (_dockPromptFacId !== _nearFacility.id) {
                     if (_dockPromptFacId) window.hideDockPrompt();
@@ -574,9 +596,9 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                         if (ship && _nearFacility) {
                             const result = facilitySystem.dockShip(facId, ship.id);
                             if (result) {
-                                window.showNotification('对接成功', 'success');
+                                window.showNotification(t('dock.success'), 'success');
                             } else {
-                                window.showNotification('对接失败（对接口已满或其他原因）', 'warning');
+                                window.showNotification(t('dock.failFull'), 'warning');
                             }
                         }
                     });
@@ -655,6 +677,10 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 if (inputManager.isDown('KeyZ')) activeShip.throttle = 1;
                 if (inputManager.isDown('KeyX')) activeShip.throttle = 0;
                 activeShip.throttle = Math.max(0, Math.min(1, activeShip.throttle));
+                // 0.2.0 阶段2：引擎停机（燃料耗尽）时禁止点火，油门强制归零
+                if (activeShip.engineOut) {
+                    activeShip.throttle = 0;
+                }
             }
 
             // 推力模式自动切换（油门驱动）
@@ -677,8 +703,9 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             }
 
             // 推力向量计算 + 燃料消耗（活动飞船，每帧）
-            if (activeShip && activeShip.throttle > 0) {
-                const totalMass = activeShip.dryMass + activeShip.fuel;
+            if (activeShip && activeShip.throttle > 0 && !activeShip.engineOut) {
+                // 0.2.0：总质量 = 干质量 + 全部推进剂存量（资源模型）
+                const totalMass = getTotalMass(activeShip);
                 const thrustAccel = activeShip.throttle * activeShip.maxThrust / totalMass;
                 activeShip.thrust = {
                     ax: Math.sin(activeShip.heading) * thrustAccel,
@@ -686,14 +713,37 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 };
 
                 // 燃料消耗（火箭方程：质量流量 = 推力 / (比冲 × g0)）
+                // 0.2.0 阶段2：按引擎配方向各推进剂槽独立分配消耗（chemical: 氢:氧 = 1:8）
                 const massFlow = activeShip.throttle * activeShip.maxThrust / (activeShip.isp * 9.81);
-                activeShip.fuel -= massFlow * simDt;
-                if (activeShip.fuel <= 0) {
-                    activeShip.fuel = 0;
-                    activeShip.throttle = 0;
-                    activeShip.mode = 'on_rails';
-                    activeShip.maxThrust = 0;
-                    activeShip.thrust = { ax: 0, ay: 0 };
+                const engineDef = getEngineType(activeShip.engineType) || getEngineType('chemical');
+                if (engineDef && engineDef.props.length > 0) {
+                    const totalRatio = engineDef.props.reduce((sum, p) => sum + p.ratio, 0);
+                    for (const prop of engineDef.props) {
+                        const slot = getResource(activeShip, prop.id);
+                        if (slot) {
+                            slot.amount = Math.max(0, slot.amount - massFlow * prop.ratio / totalRatio * simDt);
+                        }
+                    }
+                    // 任一配方燃料耗尽 → 引擎停机（不修改 maxThrust，修复 B1）
+                    const anyEmpty = engineDef.props.some(prop => {
+                        const slot = getResource(activeShip, prop.id);
+                        return !slot || slot.amount <= 0;
+                    });
+                    if (anyEmpty) {
+                        activeShip.engineOut = true;
+                        activeShip.throttle = 0;
+                        activeShip.mode = 'on_rails';
+                        activeShip.thrust = { ax: 0, ay: 0 };
+                        // 停机时从当前 pos/vel 重算 kepler（与手动熄火一致，避免旧轨道跳变）
+                        const host = getSOIHost(getAbsolutePosition(activeShip));
+                        if (host) {
+                            activeShip.kepler = stateToKepler(activeShip.pos, activeShip.vel, host.gm) || null;
+                            activeShip.orbitTime = 0;
+                        } else {
+                            activeShip.kepler = null;
+                        }
+                        eventBus.emit(Events.SHIP_THRUST_ENDED, { shipId: activeShip.id, reason: 'out_of_fuel' });
+                    }
                 }
             } else if (activeShip && activeShip.throttle === 0) {
                 activeShip.thrust = { ax: 0, ay: 0 };
@@ -783,11 +833,17 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 kepler: activeShip?.kepler ?? null,
                 vel: activeShip?.vel ?? { x: 0, y: 0 },
                 pos: activeShip?.pos ?? { x: 0, y: 0 },
-                fuel: activeShip?.fuel ?? 0,
+                fuel: getFuelAmount(activeShip),
+                // 0.2.0：修复 B2 — 广播推进剂总容量与资源槽，供 UI 正确显示
+                fuelCapacity: getFuelCapacity(activeShip),
+                resources: activeShip?.resources ?? null,
+                isp: activeShip?.isp ?? 0,
                 dryMass: activeShip?.dryMass ?? 0,
                 maxThrust: activeShip?.maxThrust ?? 0,
                 heading: activeShip?.heading ?? 0,
                 throttle: activeShip?.throttle ?? 0,
+                // 0.2.0 阶段2：引擎停机状态（燃料耗尽），供 UI 显示
+                engineOut: activeShip?.engineOut ?? false,
                 controlsLocked: activeShip?.controlsLocked ?? false,
                 displayName: activeShip?.displayName ?? '',
                 nearFacilityId: _nearFacility?.id ?? null,

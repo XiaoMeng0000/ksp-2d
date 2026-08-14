@@ -1,0 +1,292 @@
+/* ============================================================
+   flight.css — 飞行场景 HUD(左侧工具栏 / 舱室面板 / 对接提示 /
+   时间加速面板 / SAS 底部按钮区 / 可见性筛选)
+   ============================================================ */
+
+/* ---- 左侧工具栏(设施模式图标列) ---- */
+#leftToolbar {
+    position: fixed;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 75vh;
+    overflow-y: auto;
+    z-index: 900;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    font-family: var(--font-mono);
+}
+
+#leftToolbar .toolbar-icon-btn {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    background: var(--panel-bg);
+    color: var(--accent);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+#leftToolbar .toolbar-icon-btn:hover {
+    background: var(--accent-bg);
+}
+
+/* ---- 舱室内容浮层面板(工具栏右侧) ---- */
+#toolbarPanel {
+    display: none;
+    position: fixed;
+    left: 70px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 12px 15px;
+    width: 550px;
+    box-sizing: border-box;
+    max-height: 70vh;
+    overflow-y: auto;
+    z-index: 998;
+    font-family: var(--font-mono);
+    color: var(--text-mid);
+    font-size: 12px;
+}
+
+#toolbarPanel .ui-panel-header {
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+}
+
+#toolbarPanelTitle {
+    color: var(--accent);
+    font-size: 13px;
+}
+
+/* ---- 对接提示弹窗 ---- */
+#dockPrompt {
+    display: none;
+    position: fixed;
+    left: 50%;
+    top: calc(50% + 45px);
+    transform: translateX(-50%);
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 10px 14px;
+    z-index: 990;
+    font-family: var(--font-mono);
+}
+
+#dockPromptFacName {
+    color: #888;
+    font-size: 10px;
+}
+
+#dockPrompt .ui-btn {
+    padding: 5px 14px;
+    background: var(--accent-bg);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    font-size: 13px;
+}
+
+/* ---- 时间加速面板（timeWarpUI.js 单例，结构与状态色由 JS 动态控制） ---- */
+#timeWarpWrap {
+    display: none;
+    position: fixed;
+    left: 70%;
+    bottom: 18px;
+    transform: translateX(-50%) scale(0.75);
+    transform-origin: center center;
+    z-index: 950;
+    flex-direction: column;
+    user-select: none;
+    font-family: var(--font-mono);
+    color: var(--text-bright);
+}
+
+#timeWarpPanel {
+    display: flex;
+    flex-direction: column;
+    background: var(--panel-bg);
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    padding: 0;
+    min-width: 280px;
+}
+
+#timeWarpHeader {
+    font-size: 11px;
+    font-weight: bold;
+    color: var(--accent);
+    padding: 3px 12px;
+    text-align: center;
+    letter-spacing: 2px;
+    border-bottom: 1px solid rgba(120, 140, 180, 0.25);
+    cursor: pointer;
+}
+
+.timewarp-body {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 10px 3px 10px;
+}
+
+.timewarp-ut-badge {
+    font-size: 10px;
+    font-weight: bold;
+    color: var(--ut-gold);
+    border: 1px solid var(--ut-gold-border);
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 1px 6px;
+    letter-spacing: 1px;
+    flex-shrink: 0;
+}
+
+.timewarp-ut {
+    font-size: 12px;
+    color: #9ecbff;
+    cursor: pointer;
+    letter-spacing: 1px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.timewarp-cells {
+    display: flex;
+    gap: 1px;
+    justify-content: flex-end;
+    flex: 1;
+}
+
+.timewarp-cell {
+    padding: 0;
+    background: rgba(0, 0, 0, 0.55);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+.timewarp-cell-img {
+    width: 82%;
+    height: 82%;
+    object-fit: contain;
+    display: none;
+}
+
+.timewarp-cell-fb {
+    font-size: 12px;
+    font-weight: bold;
+    line-height: 1;
+    display: none;
+}
+
+.timewarp-footer {
+    font-size: 9px;
+    color: #bbbbbb;
+    text-align: center;
+    letter-spacing: 2px;
+    padding: 1px 0 3px 0;
+}
+
+/* ---- SAS 底部按钮区 ---- */
+#sasBottomButtons {
+    position: fixed;
+    z-index: 900;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 8px;
+    user-select: none;
+}
+
+#sasBottomButtons button {
+    padding: 0;
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+#sasBottomButtons button:hover {
+    background: var(--accent-bg);
+}
+
+/* ---- 可见性筛选面板(右下角) ---- */
+#visibilityPanel {
+    position: fixed;
+    right: 10px;
+    bottom: 10px;
+    z-index: 1000;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-main);
+}
+
+#visibilityPanel .vis-toggle-btn {
+    width: 28px;
+    height: 28px;
+    background: rgba(0, 0, 0, 0.75);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    user-select: none;
+    font-size: 14px;
+    margin-left: auto;
+}
+#visibilityPanel .vis-toggle-btn.active {
+    border-color: var(--accent);
+}
+
+#visibilityPanel .vis-content {
+    display: none;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 4px;
+    padding: 6px 8px;
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    min-width: 80px;
+}
+
+#visibilityPanel label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    user-select: none;
+    padding: 2px 0;
+}

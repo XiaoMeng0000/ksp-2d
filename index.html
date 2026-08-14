@@ -3,6 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <link rel="icon" href="favicon.ico">
+    <link rel="stylesheet" href="src/ui/styles/root.css">
+    <link rel="stylesheet" href="src/ui/styles/theme.css">
+    <link rel="stylesheet" href="src/ui/styles/main_menu.css">
+    <link rel="stylesheet" href="src/ui/styles/dialogs.css">
+    <link rel="stylesheet" href="src/ui/styles/settings.css">
+    <link rel="stylesheet" href="src/ui/styles/tracking.css">
+    <link rel="stylesheet" href="src/ui/styles/flight.css">
+    <link rel="stylesheet" href="src/ui/styles/ship_builder.css">
+    <link rel="stylesheet" href="src/ui/styles/facility.css">
+    <link rel="stylesheet" href="src/ui/styles/scenes.css">
+    <link rel="stylesheet" href="src/ui/styles/start_game.css">
+    <link rel="stylesheet" href="src/ui/styles/esc_menu.css">
     <style>
         * { margin: 0; padding: 0; }
         html, body { width: 100%; height: 100%; overflow: hidden; }
@@ -85,6 +97,27 @@
             font-family: monospace;
             font-size: 14px;
         }
+        /* 字体加载进度条 */
+        #loadingFontProgressBarOuter {
+            width: 500px;
+            height: 8px;
+            background: #222;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 12px;
+            margin-bottom: 8px;
+        }
+        #loadingFontProgressBarInner {
+            height: 100%;
+            width: 0%;
+            background: #ffcc66;
+            transition: width 0.15s ease;
+        }
+        #loadingFontProgressText {
+            color: #fff;
+            font-family: monospace;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
@@ -92,7 +125,7 @@
 
     <!-- 启动加载画面 -->
     <div id="loadingScreen">
-        <div id="loadingTitle">首次启动 游戏正在加载图片与音频 请耐心等待</div>
+        <div id="loadingTitle">首次启动 游戏正在加载图片、音频与字体 请耐心等待</div>
         <div id="loadingLogBox">
             <div id="loadingLogContent"></div>
         </div>
@@ -104,6 +137,10 @@
             <div id="loadingAudioProgressBarInner"></div>
         </div>
         <div id="loadingAudioProgressText">0/0 (0%)</div>
+        <div id="loadingFontProgressBarOuter">
+            <div id="loadingFontProgressBarInner"></div>
+        </div>
+        <div id="loadingFontProgressText">0/0 (0%)</div>
     </div>
 
     <script type="module" src="main.js"></script>
