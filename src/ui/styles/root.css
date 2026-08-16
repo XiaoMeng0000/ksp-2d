@@ -6,12 +6,17 @@
 /* 字体引用 */
 @font-face {
     font-family: 'JetBrainsMono-Regular';
-    src: url('../../../assets/fonts/JetBrainsMapleMono-Regular.ttf') format('truetype');
+    src: url('../../../assets/fonts/JetBrainsMapleMono/JetBrainsMapleMono-Regular.ttf') format('truetype');
+}
+    
+@font-face {
+    font-family: 'JetBrainsMono-Bold';
+    src: url('../../../assets/fonts/JetBrainsMapleMono/JetBrainsMapleMono-Bold.ttf') format('truetype');
 }
 
 @font-face {
-    font-family: 'JetBrainsMono-Bold';
-    src: url('../../../assets/fonts/JetBrainsMapleMono-Bold.ttf') format('truetype');
+    font-family: 'PixeledFont';
+    src: url('../../../assets/fonts/dosvga.ttf') format('truetype');
 }
 
 :root {
@@ -76,6 +81,7 @@
     /* ---- 字体变量 ---- */
     --font-mono: 'JetBrainsMono-Regular', monospace;
     --font-mono-bold: 'JetBrainsMono-Bold', monospace;
+    --font-pixel: 'PixeledFont', monospace;
 }
 
 /* ============================================================

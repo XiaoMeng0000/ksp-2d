@@ -14,22 +14,37 @@
 // 示例图无 Campaign Statistics / Report Redux Bug / Quit Game 概念，不列入
 
 export const ESC_ACTIONS = [
-    // --- main: 主操作（动作词彩色 + "游戏"白色） ---
-    { id: 'resume',       section: 'main',       labelKey: 'esc.resume',  labelKey2: 'esc.gameWord', icon: '▶',  tone: 'accent',   action: 'esc-resume' },
-    { id: 'save',         section: 'main',       labelKey: 'esc.save',    labelKey2: 'esc.gameWord', icon: '💾', tone: 'success',  action: 'esc-save' },
-    { id: 'load',         section: 'main',       labelKey: 'esc.load',    labelKey2: 'esc.gameWord', icon: '📂', tone: 'accent',   action: 'esc-load' },
+    // --- main: 主操作 ---
+    {
+        id: 'resume', section: 'main', labelKey: 'esc.resume', labelKey2: 'esc.gameWord',
+        icon: '▶', iconKey: 'icon_continue', tone: 'accent', action: 'esc-resume'
+    },
+    {
+        id: 'save', section: 'main', labelKey: 'esc.save', labelKey2: 'esc.gameWord',
+        icon: '💾', iconKey: 'icon_save', tone: 'success', action: 'esc-save'
+    },
+    {
+        id: 'load', section: 'main', labelKey: 'esc.load', labelKey2: 'esc.gameWord',
+        icon: '📂', iconKey: 'icon_load', tone: 'accent', action: 'esc-load'
+    },
 
     // --- facilities: 设施组 ---
-    { id: 'tracking',     section: 'facilities', labelKey: 'esc.openTracking', icon: '🛰', tone: 'facility', action: 'esc-tracking' },
-    // TODO: 百科场景（encyclopediaScene）的返回目标当前固定为主菜单，
-    // 从飞行/追踪场景进入会导致流程断裂，待其支持返回原场景后启用
-    { id: 'encyclopedia', section: 'facilities', labelKey: 'esc.encyclopedia', icon: '📖', tone: 'facility', action: 'esc-encyclopedia', disabled: true },
-    // TODO: 生涯模式任务中心，暂未实现
-    { id: 'missions',     section: 'facilities', labelKey: 'esc.missions',     icon: '🎯', tone: 'facility', action: 'esc-missions', disabled: true },
+    {
+        id: 'tracking', section: 'facilities', labelKey: 'esc.openTracking',
+        icon: '🛰', iconKey: 'icon_tracking_station', tone: 'facility', action: 'esc-tracking'
+    },
+    {
+        id: 'encyclopedia', section: 'facilities', labelKey: 'esc.encyclopedia',
+        icon: '📖', iconKey: 'icon_wiki', tone: 'facility', action: 'esc-encyclopedia', disabled: true
+    },
+    {
+        id: 'missions', section: 'facilities', labelKey: 'esc.missions',
+        icon: '🎯', iconKey: 'icon_missions', tone: 'facility', action: 'esc-missions', disabled: true
+    },
 
-    // --- footer: 底部工具（无图标、无色调，与示例图一致） ---
-    { id: 'settings',     section: 'footer',     labelKey: 'common.settings',  icon: null, tone: 'plain',    action: 'esc-settings' },
-    { id: 'quitToMenu',   section: 'footer',     labelKey: 'esc.quitToMenu',   icon: null, tone: 'plain',    action: 'esc-quit' }
+    // --- footer: 底部工具（plain 行不显示图标，无需 iconKey） ---
+    { id: 'settings', section: 'footer', labelKey: 'common.settings', icon: null, tone: 'plain', action: 'esc-settings' },
+    { id: 'quitToMenu', section: 'footer', labelKey: 'esc.quitToMenu', icon: null, tone: 'plain', action: 'esc-quit' }
 ];
 
 // 分组元信息：
@@ -38,7 +53,7 @@ export const ESC_ACTIONS = [
 //                  footer 组开始前由 escMenuUI.js 插入 .esc-fill 弹性空白（CSS flex:1），
 //                  把 设置/退出/版本号 整体压到面板底部，适配任意屏高
 export const ESC_SECTIONS = {
-    main:       { titleKey: null,                 emptyRowsAfter: 1 },
+    main: { titleKey: null, emptyRowsAfter: 1 },
     facilities: { titleKey: 'esc.sectionFacilities', emptyRowsAfter: 8 },
-    footer:     { titleKey: null,                 emptyRowsAfter: 0 }
+    footer: { titleKey: null, emptyRowsAfter: 0 }
 };

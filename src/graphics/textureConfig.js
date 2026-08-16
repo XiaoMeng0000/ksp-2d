@@ -11,6 +11,15 @@ export const textureConfig = {
     link_github: 'assets/images/menu/link_icons/github.gif',
     facility: 'assets/images/facilities/facility.png',
 
+    // esc界面图标
+    icon_continue: 'assets/images/ui/icon_escMenu/icon_continue.svg',
+    icon_save: 'assets/images/ui/icon_escMenu/icon_save.svg',
+    icon_load: 'assets/images/ui/icon_escMenu/icon_load.svg',
+    icon_tracking_station: 'assets/images/ui/icon_escMenu/icon_trasta.svg',
+    icon_back_to_ship: 'assets/images/ui/icon_escMenu/icon_back.svg',
+    icon_wiki: 'assets/images/ui/icon_escMenu/icon_wiki.svg',
+    icon_missions: 'assets/images/ui/icon_escMenu/icon_missions.svg',
+
     // 设施舱室图标
     comp_bridge: 'assets/images/facilities/compartments/bridge.png',
     comp_dock_hub: 'assets/images/facilities/compartments/dock_hub.png',

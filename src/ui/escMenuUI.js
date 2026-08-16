@@ -2,7 +2,7 @@
 
 import { uiManager } from './uiManager.js';
 import { eventBus, Events } from '../eventBus.js';
-import { createDialog, createConfirmDialog } from './uiComponents.js';
+import { createDialog, createConfirmDialog, renderIconHtml } from './uiComponents.js';  
 import { sceneManager } from '../sceneManager.js';
 import { saveManager } from '../saveManager.js';
 import { gameState } from '../gameState.js';
@@ -57,10 +57,10 @@ function _renderDash() {
 
 // 一行元信息（左 label + 中间 ···· + 右 value）
 function _renderMetaRow(labelKey) {
-    return `<div class="esc-meta-row">
+    return `<div class="esc-meta-row flightdata">
         <span class="esc-meta-label">${t(labelKey)}</span>
         <span class="esc-meta-dots">${'.'.repeat(40)}</span>
-        <span class="esc-meta-value"></span>
+        <span class="esc-meta-value flightdata"></span>
     </div>`;
 }
 
@@ -73,17 +73,30 @@ function _padLine(n) {
 // - labelKey2 存在时拆双色标签：动作词（继承行 tone）+ 名词（白色）
 // - plain 行（footer）不渲染 .esc-icon span
 function _renderRow(item, lineNum, scene) {
-    // 场景自适应：追踪站场景下设施组的 tracking 行替换为"回到飞行器"
+    // 场景自适应：tracking 场景下设施组的 tracking 行替换为"回到飞行器"
     let labelKey = item.labelKey;
     let icon = item.icon;
+    let iconKey = item.iconKey;    // 新增
     let action = item.action;
     if (item.id === 'tracking' && scene === 'tracking') {
         labelKey = 'esc.backToFlight';
         icon = '🚀';
+        iconKey = 'icon_back_to_ship';
         action = 'esc-back-to-flight';
     }
     const disabledCls = item.disabled ? ' esc-row-disabled' : '';
-    const iconHtml = item.tone === 'plain' ? '' : `<span class="esc-icon">${icon || ''}</span>`;
+    
+    // 图标渲染：优先使用 iconKey（调用 renderIconHtml），否则直接显示 icon 字符串
+    let iconHtml = '';
+    if (item.tone !== 'plain') {   // plain 行不渲染图标
+        if (iconKey) {
+            // 尺寸可根据设计调整，这里用 24px
+            iconHtml = renderIconHtml(iconKey, icon, 24);
+        } else if (icon) {
+            iconHtml = `<span class="esc-icon">${icon}</span>`;
+        }
+    }
+    
     const label2Html = item.labelKey2 ? `<span class="esc-label-2">${t(item.labelKey2)}</span>` : '';
     return `<div class="esc-row esc-row-tone-${item.tone}${disabledCls}" data-action="${action}">
         <span class="esc-line-num">${_padLine(lineNum)}</span>
@@ -111,12 +124,27 @@ function _renderGroupTitle(title, lineNum) {
 function renderMenu() {
     const scene = sceneManager.getCurrentScene();
 
+    // ---- 计算容器最大行数 ----
+    const containerHeight = container.clientHeight;
+    const style = getComputedStyle(container);
+    const lineHeight = parseFloat(style.getPropertyValue('--esc-line-height')) || 28;
+    const maxRows = Math.max(Math.floor(containerHeight / lineHeight), 1);
+
     let rowsHtml = '';
+    let footerItems = [];        // 存放底部控件（section === 'footer'）
     let lineNum = 0;
     let lastSection = null;
+
+    // ---- 第一次遍历：处理除 footer 组以外的所有行 ----
     for (const item of ESC_ACTIONS) {
-        // 跨入新分组：先渲染上一分组的尾随空行，再渲染新分组标题
+        if (item.section === 'footer') {
+            footerItems.push(item);   // 暂存，不立即渲染
+            continue;
+        }
+
+        // 跨分组处理（非 footer 组之间的切换）
         if (item.section !== lastSection) {
+            // 上一组尾随空行
             const prevSection = lastSection ? ESC_SECTIONS[lastSection] : null;
             if (prevSection && prevSection.emptyRowsAfter > 0) {
                 for (let i = 0; i < prevSection.emptyRowsAfter; i++) {
@@ -124,29 +152,54 @@ function renderMenu() {
                     lineNum++;
                 }
             }
+            // 当前分组标题
             const section = ESC_SECTIONS[item.section];
             if (section && section.titleKey) {
                 rowsHtml += _renderGroupTitle(t(section.titleKey), lineNum);
                 lineNum++;
             }
-            // footer 组开始前插入弹性空白（flex:1），把 设置/退出/版本号 整体压到面板底部
-            if (item.section === 'footer') {
-                rowsHtml += '<div class="esc-fill"></div>';
-            }
             lastSection = item.section;
         }
+
         rowsHtml += _renderRow(item, lineNum, scene);
         lineNum++;
     }
-    // 最后一组（footer）的尾随空行
-    const lastSectionCfg = ESC_SECTIONS[lastSection];
-    if (lastSectionCfg && lastSectionCfg.emptyRowsAfter > 0) {
-        for (let i = 0; i < lastSectionCfg.emptyRowsAfter; i++) {
+
+    // 处理最后一个非 footer 组的尾随空行
+    if (lastSection && ESC_SECTIONS[lastSection] && ESC_SECTIONS[lastSection].emptyRowsAfter > 0) {
+        for (let i = 0; i < ESC_SECTIONS[lastSection].emptyRowsAfter; i++) {
             rowsHtml += _renderEmptyRow(lineNum);
             lineNum++;
         }
     }
 
+    // ---- 填充空行至底部（留出底部控件 + 版本行） ----
+    const footerCount = footerItems.length;
+    const remaining = maxRows - lineNum - footerCount - 1;   // 减 1 给版本行
+    if (remaining > 0) {
+        for (let i = 0; i < remaining; i++) {
+            rowsHtml += _renderEmptyRow(lineNum);
+            lineNum++;
+        }
+    } else if (remaining < 0) {
+        console.warn('[ESC] 菜单内容行数超过容器容量，可能溢出');
+    }
+
+    // ---- 渲染底部控件（设置、返回菜单等） ----
+    for (const item of footerItems) {
+        rowsHtml += _renderRow(item, lineNum, scene);
+        lineNum++;
+    }
+
+    // ---- 版本行（固定在最后） ----
+    const versionHtml = `
+        <div class="esc-version">
+            <span class="esc-line-num">${_padLine(lineNum)}</span>
+            <span>${VERSION_TEXT}</span>
+        </div>
+    `;
+
+    // ---- 组装完整面板 ----
     container.innerHTML = `
         <div class="esc-header">
             <span class="esc-agency"></span>
@@ -159,13 +212,10 @@ function renderMenu() {
         </div>
         ${_renderDash()}
         ${rowsHtml}
-        <div class="esc-version">
-            <span class="esc-line-num">${_padLine(lineNum)}</span>
-            <span>${VERSION_TEXT}</span>
-        </div>
+        ${versionHtml}
     `;
 
-    // 用户输入/动态值用 DOM API 填充（防 XSS）
+    // 动态文本填充（防 XSS）
     container.querySelector('.esc-agency').textContent = t('esc.agencyTitle');
     const metaValues = container.querySelectorAll('.esc-meta-value');
     metaValues[0].textContent = formatUniverseTime(_universeTime);
@@ -187,13 +237,13 @@ container.addEventListener('click', (e) => {
 
 function handleAction(action) {
     switch (action) {
-        case 'esc-resume':         hideEscMenu(); break;
-        case 'esc-save':           saveGame(); break;
-        case 'esc-load':           loadGame(); break;
-        case 'esc-tracking':       openTrackingStation(); break;
+        case 'esc-resume': hideEscMenu(); break;
+        case 'esc-save': saveGame(); break;
+        case 'esc-load': loadGame(); break;
+        case 'esc-tracking': openTrackingStation(); break;
         case 'esc-back-to-flight': backToFlight(); break;
-        case 'esc-settings':       window.openSettings(); break;
-        case 'esc-quit':           quitToMenu(); break;
+        case 'esc-settings': window.openSettings(); break;
+        case 'esc-quit': quitToMenu(); break;
         // 未知 action（含未来取消 disabled 的 encyclopedia/missions 占位）：提示而非静默
         default:
             window.showNotification(t('esc.notReady'), 'info');
@@ -225,8 +275,24 @@ uiManager.registerPanel('esc', {
     hide: () => {
         container.style.display = 'none';
     },
-    render: () => {}
+    render: () => { }
 });
+
+// ---- 窗口 resize 动态更新行数 ----
+let resizeTimer = null;
+function onWindowResize() {
+    if (resizeTimer) {
+        clearTimeout(resizeTimer);
+    }
+    resizeTimer = setTimeout(() => {
+        resizeTimer = null;
+        // 仅当 ESC 菜单可见时重新渲染
+        if (uiManager.isPanelVisible('esc')) {
+            renderMenu();
+        }
+    }, 100);
+}
+window.addEventListener('resize', onWindowResize);
 
 // ---- 全局按键（ESC 切换菜单 / 菜单打开时屏蔽其他快捷键 / F1 调试面板） ----
 

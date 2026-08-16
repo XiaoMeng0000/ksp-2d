@@ -85,9 +85,9 @@ const STRINGS = {
     'esc.quitDirect': '直接退出',
     // 0.2.5 ESC 菜单改版（独立组件 escMenuUI）
     'esc.facilities': '设施',
-    'esc.universeTime': '宇宙时间',
-    'esc.gameMode': '游戏模式',
-    'esc.encyclopedia': '游戏百科',
+    'esc.universeTime': 'UNIVERSE TIME  ',
+    'esc.gameMode': 'GAME MODE',
+    'esc.encyclopedia': '百科',
     'esc.missions': '任务中心',
     'esc.notReady': '功能尚未开放',
     'esc.sectionFacilities': 'FACILITIES',
