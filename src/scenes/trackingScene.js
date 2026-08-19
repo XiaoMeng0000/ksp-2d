@@ -195,13 +195,12 @@ export function renderTrackingNav(tree) {
     }
 
     // 卡片节点（飞船/设施）：图标 + 名称 + 副标题（类型 · SOI），整卡可点击
-    function renderCardNode(node, depth = 0) {
+    function renderCardNode(node, depth = 0, parentContainer = container) {
         const isSelected = node.id === trackingSelectedId;
         const typeLabel = node.type === 'ship' ? t('tracking.typeShip') : t('tracking.typeFacility');
 
         const div = document.createElement('div');
         div.className = 'tracking-node-card' + (isSelected ? ' tracking-node-selected' : '');
-        // 完整列表中保留层级缩进（动态布局，JS 内联）
         if (depth > 0) div.style.marginLeft = (depth * 15) + 'px';
 
         const main = document.createElement('div');
@@ -215,20 +214,25 @@ export function renderTrackingNav(tree) {
         div.appendChild(sub);
 
         div.addEventListener('click', () => selectNode(node));
-        container.appendChild(div);
+        parentContainer.appendChild(div);
     }
 
     // 天体节点：折叠箭头 + 名称（统一文本色）
-    function renderBodyNode(node, depth = 0) {
+    // 在 renderTrackingNav 内部定义（或修改外部函数签名）
+    function renderBodyNode(node, depth = 0, parentContainer = container) {
         const isCollapsed = trackingCollapsed[node.id] || false;
         const hasChildren = node.children && node.children.length > 0;
 
-        const div = document.createElement('div');
-        div.className = 'tracking-node' + (node.id === trackingSelectedId ? ' tracking-node-selected' : '');
-        // 缩进依赖层级深度，属动态布局，保留 JS 内联
-        div.style.marginLeft = (depth * 15) + 'px';
+        // 整个节点包裹（行 + 子列表）
+        const wrapper = document.createElement('div');
+        wrapper.className = 'tracking-node-wrapper';
 
-        // 折叠按钮（如果有子节点）
+        // ---- 节点行 ----
+        const row = document.createElement('div');
+        row.className = 'tracking-node' + (node.id === trackingSelectedId ? ' tracking-node-selected' : '');
+        row.style.marginLeft = (depth * 15) + 'px';
+
+        // 折叠按钮
         if (hasChildren) {
             const toggle = document.createElement('span');
             toggle.className = 'tracking-node-toggle';
@@ -236,33 +240,43 @@ export function renderTrackingNav(tree) {
             toggle.addEventListener('click', (e) => {
                 e.stopPropagation();
                 trackingCollapsed[node.id] = !isCollapsed;
-                renderTrackingNav(tree);
+                renderTrackingNav(tree); // 重绘
             });
-            div.appendChild(toggle);
+            row.appendChild(toggle);
         } else {
             const spacer = document.createElement('span');
             spacer.className = 'tracking-node-spacer';
-            div.appendChild(spacer);
+            row.appendChild(spacer);
         }
 
-        // 节点名称（hover 效果由 CSS :hover 处理）
         const nameSpan = document.createElement('span');
         nameSpan.textContent = node.name;
-        nameSpan.addEventListener('click', () => selectNode(node));
-        div.appendChild(nameSpan);
+        row.appendChild(nameSpan);
 
-        container.appendChild(div);
+        // 点击行选择节点
+        row.addEventListener('click', () => selectNode(node));
+        wrapper.appendChild(row);
 
-        // 递归渲染子节点（如果不折叠）：天体继续层级，飞船/设施用卡片
-        if (!isCollapsed && hasChildren) {
+        // ---- 子节点列表容器（仅在展开且有子时添加） ----
+        if (hasChildren && !isCollapsed) {
+            const subContainer = document.createElement('div');
+            subContainer.className = 'subnodes_container';
+            // 设置虚线缩进位置（与当前缩进 + 一个单位对齐）
+            const indent = (depth + 1) * 15; // 子节点缩进量
+            subContainer.style.setProperty('--deepth', indent + 'px');
+            // 递归渲染子节点，传入 subContainer 作为父容器
             node.children.forEach(child => {
                 if (child.type === 'ship' || child.type === 'facility') {
-                    renderCardNode(child, depth + 1);
+                    // 卡片节点同样传入容器参数（需修改 renderCardNode 签名）
+                    renderCardNode(child, depth + 1, subContainer);
                 } else {
-                    renderBodyNode(child, depth + 1);
+                    renderBodyNode(child, depth + 1, subContainer);
                 }
             });
+            wrapper.appendChild(subContainer);
         }
+
+        parentContainer.appendChild(wrapper);
     }
 
     // "航天器与聚落" Tab：分组标题（可折叠）+ 平铺卡片

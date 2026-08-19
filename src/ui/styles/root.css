@@ -21,6 +21,7 @@
 
 :root {
     /* ---- 配色 ---- */
+    --panel-bg-dark: #0C0E16;
     --panel-bg: rgba(0, 0, 0, 0.85);
     /* 面板半透明黑底 */
     --panel-bg-deep: rgba(0, 0, 0, 0.92);
@@ -32,6 +33,8 @@
     --card-bg-dark: #222;
     /* 更深卡片底(槽位) */
     --card-bg-light: #2a2a3a;
+
+    --card-bg-pri: #2A303A;
     /* 悬停高亮底 */
 
     --border: #555;
@@ -58,10 +61,10 @@
     --warn: #ffaa44;
     /* 警告橙 */
 
-    --success: #4c4;
+    --success: #6775FB;
     /* 成功绿 */
-    --success-bg: rgba(68, 170, 68, 0.15);
-    --success-border: #4c4;
+    --success-bg: transparent;
+    --success-border: #6775FB;
 
     --refuel: #cc4;
     /* 补给黄 */
@@ -73,6 +76,10 @@
     --text-dim: #666;
     --text-faint: #555;
     --text-danger: #ff5566;
+    --text-heighlighted: #a1894d;
+
+    --theme-color: #6775FB;
+    --theme-color-pri: #2F3663;
 
     --ut-gold: #d4c86a;
     /* 时间标签金 */

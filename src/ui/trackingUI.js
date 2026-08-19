@@ -410,13 +410,27 @@ window.hideTrackingInfo = function() {
 // 追踪站 - 导航栏（标题 + 顶部横向分类 Tab + 树容器）
 const trackingNav = document.createElement('div');
 trackingNav.id = 'trackingNav';
+
+// 从纹理管理器获取图标路径（确保纹理已加载，或使用后备路径）
+const textureMgr = window.__textureManager;
+const allIconSrc = textureMgr?.get('icon_tracking_all')?.src || 'assets/images/ui/tracking_station/all.svg';
+const vesselIconSrc = textureMgr?.get('icon_tracking_ship')?.src || 'assets/images/ui/tracking_station/ship_port.svg';
+
 trackingNav.innerHTML = `
     <div class="tracking-nav-title">${t('tracking.stationName')}</div>
-    <div class="tracking-tabs">
-        <button class="tracking-tab tracking-tab-active" data-nav-tab="all">${t('tracking.tabAll')}</button>
-        <button class="tracking-tab" data-nav-tab="vessels">${t('tracking.tabVessels')}</button>
+    <div class="container">
+        <div class="tracking-tabs">
+            <button class="tracking-tab tracking-tab-active" data-nav-tab="all" tip>
+                <span class="tracking-tab-icon" 
+                      style="mask-image: url(${allIconSrc}); -webkit-mask-image: url(${allIconSrc});"></span>
+            </button>
+            <button class="tracking-tab" data-nav-tab="vessels">
+                <span class="tracking-tab-icon" 
+                      style="mask-image: url(${vesselIconSrc}); -webkit-mask-image: url(${vesselIconSrc});"></span>
+            </button>
+        </div>
+        <div id="trackingTree"></div>
     </div>
-    <div id="trackingTree"></div>
 `;
 document.body.appendChild(trackingNav);
 

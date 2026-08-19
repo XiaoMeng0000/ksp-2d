@@ -20,6 +20,10 @@ export const textureConfig = {
     icon_wiki: 'assets/images/ui/icon_escMenu/icon_wiki.svg',
     icon_missions: 'assets/images/ui/icon_escMenu/icon_missions.svg',
 
+    // tracking station
+    icon_tracking_all: 'assets/images/ui/tracking_station/all.svg',
+    icon_tracking_ship: 'assets/images/ui/tracking_station/ship_port.svg',
+
     // 设施舱室图标
     comp_bridge: 'assets/images/facilities/compartments/bridge.png',
     comp_dock_hub: 'assets/images/facilities/compartments/dock_hub.png',
