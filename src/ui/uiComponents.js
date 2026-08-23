@@ -113,7 +113,7 @@ export function createInputDialog(title, placeholder, defaultValue, onConfirm, o
             value="${defaultValue || ''}">
         <div class="ui-dialog-actions">
             <button id="dialogCancelBtn" class="ui-btn">${t('common.cancel')}</button>
-            <button id="dialogConfirmBtn" class="ui-btn" style="background:var(--accent-bg-strong);color:var(--accent);">${t('common.confirm')}</button>
+            <button id="dialogConfirmBtn" class="ui-btn">${t('common.confirm')}</button>
         </div>
     `;
     overlay.appendChild(panel);

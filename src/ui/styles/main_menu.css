@@ -67,3 +67,35 @@
     color: rgba(255, 255, 255, 0.3);
     font-size: 11px;
 }
+
+/* ---- 固定链接栏（0.2.6 从 settings.css 移入：主菜单归属） ---- */
+.mm-links {
+    pointer-events: auto;
+    position: absolute;
+    bottom: 80px;
+    left: 50px;
+    display: flex;
+    gap: 20px;
+    z-index: 10;
+}
+
+.mm-link-btn {
+    background: transparent;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s ease;
+}
+
+.mm-link-icon {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+    filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.5));
+}

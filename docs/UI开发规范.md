@@ -89,8 +89,8 @@ src/
 | CSS 文件 | 覆盖 | 主要 id/class 前缀 |
 |----------|------|--------------------|
 | `main_menu.css` | 主菜单 | `#mainMenuContainer` / `.mm-*` |
-| `dialogs.css` | 对话框/通知/ESC 菜单/存档管理 | `.ui-dialog*` / `#escMenu` / `.ui-notification*` |
-| `settings.css` | 设置页 | `#settings*` / `.settings-*` |
+| `dialogs.css` | 通知 / 存档管理面板（0.2.6 对话框组件迁入 ksp2_panels.css） | `.ui-notification*` / `#archiveManagerPanel` |
+| `ksp2_panels.css` | KSP2 覆盖式面板：设置页 / 开始游戏面板 / 通用对话框组件（0.2.6 由 settings.css + start_game.css 合并，并迁入 uiComponents 对话框样式） | `#settings*` / `.settings-*` / `#startGamePanel` / `.sgp-*` / `#newCampaignDialog` / `.nc-*` / `.ui-dialog*` / `.ui-list*` / `.ui-input` |
 | `tracking.css` | 追踪站 | `#tracking*` / `.tracking-*` |
 | `flight.css` | 飞行 HUD | `#leftToolbar` / `#toolbarPanel` / `#timeWarp*` / `#sasBottomButtons` / `#visibilityPanel` |
 | `ship_builder.css` | 飞船建造 | `#shipBuilderPanel` / `.builder-*` |

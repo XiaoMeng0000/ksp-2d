@@ -1,0 +1,746 @@
+/* ============================================================
+   ksp2_panels.css — KSP2 风格覆盖式面板（设置页 / 开始游戏面板）
+   0.2.6 合并自 settings.css + start_game.css（纯物理合并，不改样式值）
+   共用 theme.css 的 --theme-* 变量（实色深底，不透明）
+   · 设置页：#settingsContainer（左侧分类导航 + 右侧内容区）
+   · 开始游戏：#startGamePanel（战役/游戏双列）+ #newCampaignDialog 创建新战役对话框
+   主菜单链接栏 .mm-links 已顺移入 main_menu.css
+   ============================================================ */
+
+/* ============================================================
+   第一部分：设置页
+   ============================================================ */
+
+#settingsContainer {
+    position: fixed;
+    border-radius: 5px;
+    top: 10px;
+    left: 10px;
+    width: 60vw;
+    min-width: 1000px;
+    height: calc(100vh - 20px);
+    background: var(--theme-bg);
+    z-index: 1000;
+    display: flex;
+    font-family: var(--font-mono);
+    color: var(--text-bright);
+    backdrop-filter: blur(4px);
+}
+
+/* 左侧导航栏 */
+#settingsNav {
+    border-radius: 5px;
+    margin: 15px;
+    margin-right: 0px;
+    width: 240px;
+    min-width: 240px;
+    background: var(--theme-panel);
+    padding: 5px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 14px;
+    overflow-y: auto;
+    box-sizing: border-box;
+}
+
+#settingsNav .settings-nav-title {
+    color: var(--text-bright);
+    text-align: center;
+    margin-bottom: 5px;
+    font-size: 18px;
+    padding-bottom: 8px;
+}
+
+#settingsNav .settings-cat {
+    text-align: center;
+    position: relative;
+    padding: 6px 10px;
+    font-size: 13px;
+    background: var(--theme-panel-deep);
+}
+
+#settingsNav .settings-cat::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 5px;
+    height: calc(100% - 4px);
+    border: 2px solid var(--border);
+    border-right-width: 0px;
+}
+
+#settingsNav .settings-cat::before {
+    content: "";
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 5px;
+    height: calc(100% - 4px);
+    border: 2px solid var(--border);
+    border-left-width: 0px;
+}
+
+#settingsNav .settings-cat.active {
+    color: var(--text-bright);
+    background: var(--theme-active-bg);
+}
+
+#settingsNav .settings-cat.active::after {
+    display: none;
+}
+
+#settingsNav .settings-cat.active::before {
+    display: none;
+}
+
+#settingsNav .settings-cat.disabled {
+    filter: brightness(0.5);
+}
+
+/* 底部返回按钮 */
+#settingsNav .settings-back-btn {
+    padding: 6px 10px;
+    cursor: pointer;
+    color: var(--text-bright);
+    background-color: var(--theme-btn-bg);
+    border: 1px solid var(--theme-border);
+    border-radius: 5px;
+    text-align: center;
+    font-size: 12px;
+}
+
+#settingsNav .settings-back-btn:hover {
+    border-color: var(--theme-border-hover);
+}
+
+/* 右侧内容区 */
+#settingsContent {
+    border-radius: 5px;
+    margin: 15px;
+    background: var(--theme-panel);
+    flex: 1;
+    padding: 12px;
+    overflow-y: auto;
+}
+
+#settingsContent .settings-content-title {
+    color: var(--accent);
+    font-size: 16px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 8px;
+}
+
+#settingsContent .settings-group-header {
+    background: var(--header-bg);
+    color: var(--text-bright);
+    padding: 5px 10px;
+    font-size: 14px;
+    margin-top: 12px;
+}
+
+#settingsContent .settings-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px;
+    border-bottom: 1px solid var(--theme-border-row);
+}
+
+#settingsContent .settings-row:hover {
+    background-color: var(--theme-hover);
+}
+
+#settingsContent .settings-row-label {
+    color: var(--text-main);
+    font-size: 12px;
+}
+
+#settingsContent .settings-row-control {
+    flex: 0 0 55%;
+}
+
+#settingsContent .settings-btn-group {
+    display: flex;
+    gap: 4px;
+}
+
+.settings-btn {
+    font-family: var(--font-mono);
+    height: 26px;
+    flex: 1;
+    color: var(--text-bright);
+    background-color: var(--theme-btn-bg);
+    border: 1px var(--border-light) solid;
+    border-radius: 5px;
+    font-size: 12px;
+}
+
+.settings-btn:hover {
+    border-color: var(--theme-border-hover);
+}
+
+.settings-btn.selected {
+    background-color: var(--theme-btn-selected);
+    border: 1px var(--theme-btn-selected) solid;
+}
+
+/* ============================================================
+   第二部分：开始游戏综合面板
+   ============================================================ */
+
+/* ---- 内嵌式综合面板（与设置页/追踪站同款：左上角定位 + 圆角深底） ---- */
+#startGamePanel.start-game-panel {
+    display: none;
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    height: calc(100vh - 20px);
+    width: 62vw;
+    max-width: 860px;
+    background: var(--theme-bg);
+    border-radius: 5px;
+    box-sizing: border-box;
+    flex-direction: column;
+    z-index: 950;
+    font-family: var(--font-mono);
+    color: var(--text-bright);
+    overflow: hidden;
+}
+
+#startGamePanel .sgp-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 14px 14px 0 14px;
+    padding: 10px 14px;
+    background: var(--theme-panel);
+    border-radius: 5px;
+    flex: 0 0 auto;
+}
+
+#startGamePanel .sgp-title {
+    color: var(--text-bright);
+    font-size: 15px;
+    font-family: var(--font-mono-bold);
+}
+
+#startGamePanel .sgp-close {
+    height: 26px;
+    padding: 0 10px;
+    background: var(--theme-btn-bg);
+    color: var(--text-bright);
+    border: 1px solid var(--border-light);
+    border-radius: 5px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+/* 双列主体：外层底色 + 内部圆角面板块 */
+#startGamePanel .sgp-body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    gap: 14px;
+    padding: 14px;
+    box-sizing: border-box;
+}
+
+#startGamePanel .sgp-col {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    padding: 14px;
+    box-sizing: border-box;
+    background: var(--theme-panel);
+    border-radius: 5px;
+}
+
+#startGamePanel .sgp-col-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: var(--text-mid);
+    font-size: 11px;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+}
+
+#startGamePanel .sgp-count {
+    color: var(--text-dim);
+    font-size: 10px;
+}
+
+/* 创建新战役按钮（与"加载游戏"同一中性配色，对齐设置页按钮） */
+#startGamePanel .sgp-new-campaign {
+    height: 26px;
+    padding: 0;
+    margin-bottom: 10px;
+    background: var(--theme-btn-bg);
+    color: var(--text-bright);
+    border: 1px solid var(--border-light);
+    border-radius: 5px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+/* 列表区 */
+#startGamePanel .sgp-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+#startGamePanel .sgp-world-row,
+#startGamePanel .sgp-cp-row {
+    padding: 8px 10px;
+    margin-bottom: 4px;
+    background: var(--theme-panel-deep);
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+#startGamePanel .sgp-world-row:hover,
+#startGamePanel .sgp-cp-row:hover {
+    background: var(--theme-hover);
+}
+
+#startGamePanel .sgp-world-row.sgp-selected,
+#startGamePanel .sgp-cp-row.sgp-selected {
+    background: var(--theme-active-bg);
+}
+
+#startGamePanel .sgp-world-name,
+#startGamePanel .sgp-cp-name {
+    color: var(--text-bright);
+    font-size: 13px;
+    margin-bottom: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#startGamePanel .sgp-world-sub,
+#startGamePanel .sgp-cp-sub {
+    color: var(--text-dim);
+    font-size: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 空态提示 */
+#startGamePanel .sgp-empty {
+    color: var(--text-faint);
+    font-size: 11px;
+    text-align: center;
+    padding: 24px 10px;
+}
+
+/* ---- 选中存档的元信息块（右列顶部） ---- */
+#startGamePanel .sgp-meta-card {
+    flex: 0 0 auto;
+    margin-bottom: 10px;
+    padding: 10px 12px;
+    background: var(--theme-panel-deep);
+    border-radius: 5px;
+}
+
+#startGamePanel .sgp-meta-name {
+    color: var(--text-bright);
+    font-size: 14px;
+    font-family: var(--font-mono-bold);
+    margin-bottom: 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#startGamePanel .sgp-meta-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 4px 0;
+    font-size: 11px;
+    border-bottom: 1px solid var(--theme-border-row);
+}
+
+#startGamePanel .sgp-meta-item:last-child {
+    border-bottom: none;
+}
+
+#startGamePanel .sgp-meta-label {
+    color: var(--text-dim);
+    flex: 0 0 auto;
+}
+
+#startGamePanel .sgp-meta-value {
+    color: var(--text-bright);
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 列底部操作区 */
+#startGamePanel .sgp-col-footer {
+    flex: 0 0 auto;
+    margin-top: 10px;
+    padding-top: 10px;
+    display: flex;
+    gap: 6px;
+}
+
+/* 底部按钮（加载游戏 / 删除战役 / 删除）— 对齐设置页按钮 */
+#startGamePanel .sgp-col-footer .ui-btn,
+#startGamePanel .sgp-col-footer .ui-btn-danger {
+    flex: 1;
+    height: 26px;
+    padding: 0;
+    background: var(--theme-btn-bg);
+    color: var(--text-bright);
+    border: 1px solid var(--border-light);
+    border-radius: 5px;
+}
+
+/* 禁用态（无选中项时） */
+#startGamePanel .sgp-col-footer .ui-btn:disabled,
+#startGamePanel .sgp-col-footer .ui-btn-danger:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+#startGamePanel .sgp-col-footer .ui-btn:disabled:hover,
+#startGamePanel .sgp-col-footer .ui-btn-danger:disabled:hover {
+    background: var(--theme-btn-bg);
+    color: var(--text-bright);
+    border-color: var(--border-light);
+}
+
+/* 悬停统一（与设置页 .settings-btn:hover 一致）：边框高亮为 --theme-border-hover */
+#startGamePanel .sgp-close:hover,
+#startGamePanel .sgp-new-campaign:hover,
+#startGamePanel .sgp-col-footer .ui-btn:not(:disabled):hover,
+#startGamePanel .sgp-col-footer .ui-btn-danger:not(:disabled):hover,
+#newCampaignDialog .nc-actions .ui-btn:hover,
+#newCampaignDialog .nc-actions .ui-btn-primary:hover {
+    border-color: var(--theme-border-hover);
+}
+
+/* ============================================================
+   第三部分：创建新战役对话框（覆盖层）
+   ============================================================ */
+#newCampaignDialog.nc-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.8);
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    font-family: var(--font-mono);
+}
+
+#newCampaignDialog .nc-dialog {
+    width: min(720px, 88vw);
+    max-height: 80vh;
+    overflow-y: auto;
+    background: var(--theme-bg);
+    border: 1px solid var(--theme-border);
+    border-radius: 5px;
+    padding: 14px;
+    box-sizing: border-box;
+    color: var(--text-bright);
+}
+
+/* 标题：accent + 下边框 */
+#newCampaignDialog .nc-title {
+    color: var(--accent);
+    font-size: 16px;
+    font-family: var(--font-mono-bold);
+    padding-bottom: 8px;
+    margin: 0 14px 14px 14px;
+    border-bottom: 1px solid var(--theme-border);
+}
+
+/* 主体双列：左表单 / 右模式卡片，各为独立圆角块 */
+#newCampaignDialog .nc-body {
+    display: flex;
+    gap: 14px;
+    padding: 0 14px;
+    margin-bottom: 14px;
+    box-sizing: border-box;
+}
+
+#newCampaignDialog .nc-form,
+#newCampaignDialog .nc-mode-cards {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--theme-panel);
+    border: 1px solid var(--theme-border-row);
+    border-radius: 5px;
+}
+
+#newCampaignDialog .nc-form {
+    gap: 16px;
+    padding: 14px;
+}
+
+/* 字段标签 */
+#newCampaignDialog .nc-label {
+    color: var(--text-main);
+    font-size: 12px;
+    margin-bottom: 6px;
+}
+
+#newCampaignDialog .nc-input {
+    padding: 6px 8px;
+    background: var(--theme-btn-bg);
+    color: var(--text-bright);
+    border: 1px solid var(--border-light);
+    border-radius: 5px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    outline: none;
+}
+
+#newCampaignDialog .nc-input:focus {
+    border-color: var(--theme-border-hover);
+}
+
+/* 模式回显框（左列下方，随选中卡片联动） */
+#newCampaignDialog .nc-form-input {
+    padding: 6px 8px;
+    background: var(--theme-btn-bg);
+    color: var(--accent);
+    border: 1px solid var(--border-light);
+    border-radius: 5px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+}
+
+/* 右列模式预览卡片（深底 + 圆角，选中高亮） */
+#newCampaignDialog .nc-mode-cards {
+    gap: 10px;
+    padding: 12px;
+}
+
+#newCampaignDialog .nc-mode-card {
+    padding: 12px 14px;
+    background: var(--theme-panel-deep);
+    border: 1px solid var(--theme-border-row);
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+#newCampaignDialog .nc-mode-card:hover {
+    background: var(--theme-hover);
+}
+
+#newCampaignDialog .nc-mode-card.nc-mode-selected {
+    background: var(--theme-active-bg);
+    border-color: var(--theme-border-hover);
+}
+
+#newCampaignDialog .nc-mode-title {
+    color: var(--text-bright);
+    font-size: 14px;
+    font-family: var(--font-mono-bold);
+    margin-bottom: 6px;
+}
+
+#newCampaignDialog .nc-mode-desc {
+    color: var(--text-mid);
+    font-size: 11px;
+    line-height: 1.6;
+}
+
+/* 底部操作区 */
+#newCampaignDialog .nc-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 0 14px 4px 14px;
+}
+
+/* 操作区按钮（取消 / 开始新战役）— 对齐设置页按钮
+   需覆盖 root.css .ui-btn/.ui-btn-primary 的垂直 padding（8px/6px），
+   否则 height:26px 下内容区被压缩导致文字错位 */
+#newCampaignDialog .nc-actions .ui-btn,
+#newCampaignDialog .nc-actions .ui-btn-primary {
+    height: 26px;
+    padding: 0 12px;
+    box-sizing: border-box;
+    background: var(--theme-btn-bg);
+    border: 1px solid var(--border-light);
+    border-radius: 5px;
+    color: var(--text-bright);
+    font-family: var(--font-mono);
+    font-size: 12px;
+}
+
+/* ============================================================
+   第四部分：通用对话框组件（uiComponents.js createDialog 系列）
+   0.2.6 从 dialogs.css 迁入，统一为 KSP2 面板风格
+   覆盖：选择对话框 / 输入对话框 / 确认对话框
+   ============================================================ */
+.ui-dialog-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+}
+
+.ui-dialog {
+    background: var(--theme-panel);
+    border: 1px solid var(--theme-border);
+    border-radius: 5px;
+    padding: 0;
+    min-width: 400px;
+    max-width: 520px;
+    max-height: 70vh;
+    overflow: hidden;
+    font-family: var(--font-mono);
+    color: var(--text-bright);
+    display: flex;
+    flex-direction: column;
+}
+
+/* 标题（通用蓝 / 危险红）— 顶部条带：浅灰底 + 内边距（与正文靠明暗底色分区） */
+.ui-dialog-title {
+    color: var(--text-bright);
+    margin: 0;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-family: var(--font-mono-bold);
+    background: var(--theme-bg);
+}
+
+.ui-dialog-title-danger {
+    color: var(--text-bright);
+    margin: 0;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-family: var(--font-mono-bold);
+    background: var(--theme-bg);
+}
+
+/* 正文 — 中部深灰区（继承面板 --theme-panel 深灰底色） */
+.ui-dialog-body {
+    color: var(--text-main);
+    margin: 0;
+    padding: 16px 20px;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+/* 按钮行 — 底部条带：浅灰底 + 按钮左右各半（flex:1，与正文靠明暗底色分区） */
+.ui-dialog-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: stretch;
+    background: var(--theme-bg);
+    padding: 10px 20px;
+}
+
+/* 对话框按钮（取消/确认）— 对齐设置页按钮，覆盖 root.css .ui-btn 默认 padding */
+.ui-dialog-actions .ui-btn,
+.ui-dialog-actions .ui-btn-danger-solid {
+    flex: 1;
+    height: 32px;
+    padding: 0 12px;
+    box-sizing: border-box;
+    border-radius: 5px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.ui-dialog-actions .ui-btn {
+    background: var(--theme-btn-bg);
+    color: var(--text-bright);
+    border: 1px solid var(--border-light);
+}
+
+.ui-dialog-actions .ui-btn:hover {
+    border-color: var(--theme-border-hover);
+}
+
+/* 确认对话框删除按钮 — 与开始游戏面板删除按钮统一（中性配色） */
+.ui-dialog-actions .ui-btn-danger-solid {
+    background: var(--theme-btn-bg);
+    color: var(--text-bright);
+    border: 1px solid var(--border-light);
+}
+
+.ui-dialog-actions .ui-btn-danger-solid:hover {
+    border-color: var(--theme-border-hover);
+}
+
+/* 选择对话框列表 — 位于正文区，列表项背景与正文一致 */
+.ui-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 16px 20px;
+    max-height: 50vh;
+    overflow-y: auto;
+}
+
+.ui-list-item {
+    padding: 8px 12px;
+    background: var(--theme-panel-deep);
+    border-radius: 5px;
+    color: var(--text-main);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    cursor: pointer;
+    text-align: left;
+}
+
+.ui-list-item:hover {
+    background: var(--theme-hover);
+}
+
+/* 列表项标题/副标题 — 对齐开始游戏面板行（名称亮白 / 副标题暗灰） */
+.ui-list-item-title {
+    font-weight: bold;
+    color: var(--text-bright);
+}
+
+.ui-list-item-sub {
+    color: var(--text-dim);
+    font-size: 11px;
+}
+
+/* 文本输入框（输入对话框）— 位于正文区，宽度自适应 */
+.ui-input {
+    width: 100%;
+    padding: 8px 10px;
+    margin: 0;
+    box-sizing: border-box;
+    background: var(--theme-btn-bg);
+    color: var(--text-bright);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    outline: none;
+    border: 1px solid var(--border-light);
+    border-radius: 5px;
+}
+
+.ui-input:focus {
+    border-color: var(--theme-border-hover);
+}

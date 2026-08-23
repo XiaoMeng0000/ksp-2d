@@ -1,128 +1,9 @@
 /* ============================================================
-   dialogs.css — 通用对话框 / 通知 / ESC 菜单 / 存档管理面板
-   覆盖 uiComponents.js、menuUI.js、main.js 中动态创建的弹层
+   dialogs.css — 通知 / 存档管理面板
+   覆盖 uiComponents.js（通知）、menuUI.js（存档管理）动态创建的弹层
+   0.2.6：通用对话框组件（.ui-dialog* / .ui-list* / .ui-input）已迁入
+   ksp2_panels.css 第四部分，统一为 KSP2 面板风格
    ============================================================ */
-
-/* ---- 遮罩层 ---- */
-.ui-dialog-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.8);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 10000;
-}
-
-/* ---- 对话框面板 ---- */
-.ui-dialog {
-    background: var(--panel-bg);
-    border: 1px solid var(--border);
-    border-radius: 5px;
-    padding: 15px;
-    min-width: 280px;
-    max-width: 450px;
-    max-height: 70vh;
-    overflow-y: auto;
-    font-family: var(--font-mono);
-    color: var(--text-bright);
-}
-
-/* 红色实心确认按钮(确认对话框的"确认") */
-.ui-btn-danger-solid {
-    padding: 4px 12px;
-    background: rgba(255, 80, 80, 0.2);
-    color: var(--danger);
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    font-family: var(--font-mono);
-    font-size: 12px;
-    cursor: pointer;
-}
-.ui-btn-danger-solid:hover {
-    background: var(--danger-bg);
-}
-
-/* 对话框标题(通用蓝) */
-.ui-dialog-title {
-    color: var(--accent);
-    margin: 0 0 12px 0;
-    border-bottom: 1px solid var(--border-dark);
-    padding-bottom: 5px;
-}
-
-/* 对话框标题(危险红) */
-.ui-dialog-title-danger {
-    color: var(--text-danger);
-    margin: 0 0 10px 0;
-    border-bottom: 1px solid var(--border-dark);
-    padding-bottom: 5px;
-}
-
-/* 对话框正文 */
-.ui-dialog-body {
-    color: var(--text-mid);
-    margin: 0 0 15px 0;
-    font-size: 12px;
-}
-
-/* 按钮行(右对齐) */
-.ui-dialog-actions {
-    display: flex;
-    gap: 8px;
-    justify-content: flex-end;
-}
-
-/* 列表容器 */
-.ui-list {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-/* 列表项按钮 */
-.ui-list-item {
-    padding: 8px 12px;
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    color: var(--text-main);
-    font-family: var(--font-mono);
-    font-size: 12px;
-    cursor: pointer;
-    text-align: left;
-}
-.ui-list-item:hover {
-    background: var(--accent-bg);
-    border-color: var(--border);
-    color: var(--accent);
-}
-
-/* 列表项标题 */
-.ui-list-item-title {
-    font-weight: bold;
-}
-
-/* 列表项副标题 */
-.ui-list-item-sub {
-    color: var(--text-dim);
-    font-size: 11px;
-}
-
-/* 文本输入框 */
-.ui-input {
-    width: 100%;
-    padding: 6px 10px;
-    margin-bottom: 12px;
-    box-sizing: border-box;
-    background: var(--card-bg);
-    color: var(--text-bright);
-    font-family: var(--font-mono);
-    font-size: 12px;
-    outline: none;
-    border: 1px solid var(--border);
-    border-radius: 3px;
-}
 
 /* ---- 通知 ---- */
 #notification-container {
@@ -162,7 +43,8 @@
 /* ---- ESC 菜单 ----
    0.2.5 已抽离为独立组件，样式见 esc_menu.css（--esc-* 独立配色） */
 
-/* ---- 存档管理面板 ---- */
+/* ---- 存档管理面板 ----
+   0.2.6 面板/标题/列表等基础样式沿用 ksp2_panels.css 第四部分对话框组件 */
 #archiveManagerPanel {
     display: flex;
     align-items: center;
