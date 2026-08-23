@@ -1,32 +1,27 @@
 /* ============================================================
    start_game.css — 主菜单"开始游戏"综合面板 + 创建新战役对话框
-   0.2.5 新增：左侧滑出面板（战役/游戏双列）+ 覆盖式创建对话框
+   0.2.5 新增：内嵌式综合面板（战役/游戏双列）+ 覆盖式创建对话框
+   0.2.6 样式统一：滑出抽屉改为内嵌圆角面板；去除区块间近黑色边框，仅保留按钮/文本分隔线
    配色与设置页共用 theme.css 的 --theme-* 变量（实色深底，不透明）
    ============================================================ */
 
-/* ---- 左侧滑出综合面板 ---- */
+/* ---- 内嵌式综合面板（与设置页/追踪站同款：左上角定位 + 圆角深底） ---- */
 #startGamePanel.start-game-panel {
     display: none;
     position: fixed;
-    left: 0;
-    top: 0;
-    bottom: 0;
+    top: 10px;
+    left: 10px;
+    height: calc(100vh - 20px);
     width: 62vw;
     max-width: 860px;
     background: var(--theme-bg);
-    border-right: 1px solid var(--theme-border);
+    border-radius: 5px;
     box-sizing: border-box;
     flex-direction: column;
     z-index: 950;
     font-family: var(--font-mono);
     color: var(--text-bright);
-    animation: sgp-slide-in 0.25s ease;
-}
-
-/* 打开时由 JS 切换 display:flex 触发进入动画 */
-@keyframes sgp-slide-in {
-    from { transform: translateX(-100%); }
-    to   { transform: translateX(0); }
+    overflow: hidden;
 }
 
 #startGamePanel .sgp-header {
@@ -36,7 +31,6 @@
     margin: 14px 14px 0 14px;
     padding: 10px 14px;
     background: var(--theme-panel);
-    border: 1px solid var(--theme-border-row);
     border-radius: 5px;
     flex: 0 0 auto;
 }
@@ -52,7 +46,7 @@
     background: var(--theme-btn-bg);
     color: var(--text-mid);
     border: 1px solid var(--theme-border);
-    border-radius: 3px;
+    border-radius: 5px;
     font-family: var(--font-mono);
     font-size: 12px;
     cursor: pointer;
@@ -82,7 +76,6 @@
     padding: 14px;
     box-sizing: border-box;
     background: var(--theme-panel);
-    border: 1px solid var(--theme-border-row);
     border-radius: 5px;
 }
 
@@ -108,7 +101,7 @@
     background: var(--theme-btn-bg);
     color: var(--text-mid);
     border: 1px solid var(--theme-border);
-    border-radius: 3px;
+    border-radius: 5px;
     font-family: var(--font-mono);
     font-size: 12px;
     cursor: pointer;
@@ -132,8 +125,7 @@
     padding: 8px 10px;
     margin-bottom: 4px;
     background: var(--theme-panel-deep);
-    border: 1px solid var(--theme-border-row);
-    border-radius: 3px;
+    border-radius: 5px;
     cursor: pointer;
     transition: background 0.15s ease, border-color 0.15s ease;
 }
@@ -181,7 +173,6 @@
     margin-bottom: 10px;
     padding: 10px 12px;
     background: var(--theme-panel-deep);
-    border: 1px solid var(--theme-border-row);
     border-radius: 5px;
 }
 
@@ -227,7 +218,6 @@
     flex: 0 0 auto;
     margin-top: 10px;
     padding-top: 10px;
-    border-top: 1px solid var(--theme-border-row);
     display: flex;
     gap: 6px;
 }
@@ -236,6 +226,7 @@
 #startGamePanel .sgp-col-footer .ui-btn-danger {
     flex: 1;
     padding: 5px 0;
+    border-radius: 5px;
 }
 
 /* 底部按钮（加载游戏 / 删除战役 / 删除）统一中性配色 */

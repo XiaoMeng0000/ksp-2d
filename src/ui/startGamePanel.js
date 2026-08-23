@@ -9,7 +9,8 @@ import { formatGameTime, formatGameDate } from '../utils/format.js';
 import { openNewCampaignDialog } from './newCampaignDialog.js';
 
 // 开始游戏面板 — 0.2.5 新增
-// 主菜单"开始游戏"从左侧滑出的综合面板，整合原 game 子菜单的所有功能：
+// 主菜单"开始游戏"打开的内嵌式综合面板（0.2.6 由左侧滑出改为内嵌圆角，与设置页同款），
+// 整合原 game 子菜单的所有功能：
 //   - 左列「战役」：世界列表 + 创建新战役 / 删除战役
 //   - 右列「游戏」：选中世界的存档（检查点）列表 + 加载 / 删除
 // 复用了 saveManager 的世界/检查点查询与增删接口，不重复实现存档逻辑。

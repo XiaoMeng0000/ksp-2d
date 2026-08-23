@@ -8,6 +8,7 @@ import { getFacilityCompartments, getFacilityType, getCompartmentDef } from '../
 import { getModuleDef, getModuleCategories, getModulesByCategory, getCapabilityToolbar } from '../ship/moduleTypes.js';
 import { textureManager } from '../graphics/textureManager.js';
 import { renderIconHtml, renderFuelBarsHtml } from './uiComponents.js';
+import { showTooltip, hideTooltip } from './uiTooltip.js';
 import {
     getCargoCapacity, getCargoUsed, getCargoAmount, hasCargoHold,
     getStorageAmount, transferStorageToCargo, transferCargoToStorage,
@@ -46,7 +47,14 @@ function renderToolbarIcons(mode, data) {
     const createIcon = (icon, title, onClick, textureKey) => {
         const btn = document.createElement('button');
         btn.className = 'toolbar-icon-btn';
-        btn.title = title;
+
+        // 悬停提示：统一走全局 DOM tooltip（进入时触发一次，延迟显示、位置固定）
+        btn.addEventListener('mouseenter', (e) => {
+            showTooltip(title, e.clientX, e.clientY);
+        });
+        btn.addEventListener('mouseleave', () => {
+            hideTooltip();
+        });
 
         // PNG 纹理就绪时用 <img>，否则 fallback 到 Emoji
         if (textureKey) {

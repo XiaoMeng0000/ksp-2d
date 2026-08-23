@@ -12,6 +12,17 @@ import { eventBus, Events } from '../eventBus.js';
 import { timeWarp, PANEL_RATES } from '../timeWarp.js';
 import { textureManager } from '../graphics/textureManager.js';
 import { t } from '../config/strings.js';
+import { showTooltip, hideTooltip } from './uiTooltip.js';
+
+// 为元素绑定统一悬停提示（进入时触发一次，延迟显示、位置固定）
+function bindTooltip(el, text) {
+    el.addEventListener('mouseenter', (e) => {
+        showTooltip(text, e.clientX, e.clientY);
+    });
+    el.addEventListener('mouseleave', () => {
+        hideTooltip();
+    });
+}
 
 // ==== 纹理 key（textureConfig.js 已注册） ====
 const TEX_CELL_ACTIVE = 'timewarp_cell_active';   // 档位格·启用（绿）
@@ -92,7 +103,7 @@ class TimeWarpUI {
         // 顶栏状态文字（点击切换暂停/恢复，替代原大圆按钮入口）——样式见 flight.css #timeWarpHeader
         const header = document.createElement('div');
         header.id = 'timeWarpHeader';
-        header.title = t('timewarp.pauseTip');
+        bindTooltip(header, t('timewarp.pauseTip'));
         header.addEventListener('click', () => {
             timeWarp.togglePause();
         });
@@ -110,7 +121,7 @@ class TimeWarpUI {
         const ut = document.createElement('div');
         ut.className = 'timewarp-ut';
         ut.textContent = 'T+000y 000d 00:00:00';
-        ut.title = t('timewarp.utTip');
+        bindTooltip(ut, t('timewarp.utTip'));
         ut.addEventListener('click', () => {
             if (typeof window.showNotification === 'function') {
                 window.showNotification(t('timewarp.wip'), 'info');
@@ -126,7 +137,7 @@ class TimeWarpUI {
             cell.className = 'timewarp-cell';
             cell.style.width = CELL_SIZE + 'px';
             cell.style.height = CELL_SIZE + 'px';
-            cell.title = rate + 'x';
+            bindTooltip(cell, rate + 'x');
             const img = document.createElement('img');
             img.className = 'timewarp-cell-img';
             const fb = document.createElement('span');

@@ -57,20 +57,7 @@
     color: var(--esc-fg);
     font-size: 14px;
     line-height: 1.4;
-    animation: esc-slide-in 0.18s ease-out;
     user-select: none;
-}
-
-@keyframes esc-slide-in {
-    from {
-        transform: translateX(-12px);
-        opacity: 0;
-    }
-
-    to {
-        transform: translateX(0);
-        opacity: 1;
-    }
 }
 
 /* ---- 顶部：机构名 + 右上角小 logo ---- */
@@ -88,6 +75,10 @@
     font-family: var(--font-mono-bold);
     font-size: 18px;
     letter-spacing: 1px;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 #escMenu .esc-agency-logo {

@@ -112,6 +112,28 @@ textarea,
 }
 
 /* ============================================================
+   全局悬停提示 .game-tooltip（uiTooltip.js 统一管理定位与显隐）
+   视觉样式在此收敛：黑底、#555 边框、圆角、等宽小字、不拦截鼠标
+   ============================================================ */
+.game-tooltip {
+    position: fixed;
+    z-index: 10002;
+    background: var(--panel-bg-deep);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 5px 9px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-main);
+    white-space: nowrap;
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* ============================================================
    通用组件 class
    布局定位(display/position/left/top)由 JS 内联控制,
    视觉样式(底色/边框/圆角/字体/字号)统一走 class

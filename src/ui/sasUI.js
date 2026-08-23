@@ -6,10 +6,10 @@
 // Step4：节流阀弧形（导航球外圈左侧，Canvas 绘制，连续拖动）
 // Step5：导航球下方按钮区（DOM：SAS 开关 + 机动节点/目标预留按钮）
 
-import { SASModeLabels } from '../ship/sasModes.js';
 import { eventBus, Events } from '../eventBus.js';
 import { textureManager } from '../graphics/textureManager.js';
 import { t } from '../config/strings.js';
+import { showTooltip, hideTooltip } from './uiTooltip.js';
 
 // EventBus — 缓存最近一帧飞船渲染数据（导航球姿态/方向，同 flightUI 模式）
 // 同时按"是否有活动飞船"控制按钮框显隐（设施操作模式无活动飞船 → 隐藏）
@@ -92,7 +92,6 @@ class SASUI {
         this._scale = 1.0;
         this._isDragging = false;
         this._hovered = null;      // 当前悬停目标: 'center' | 方向 mode 名 | null
-        this._tooltipTimer = 0;    // 悬停累计时间（秒）
         this._visibilityExpanded = false;  // 可见性筛选面板是否展开
         this._visibilityPanel = null;      // DOM 容器
         this._visibilityContent = null;    // 展开后的内容区
@@ -160,11 +159,6 @@ class SASUI {
             this._pulsePhase -= 2.0 * Math.PI;
         }
 
-        // 悬停计时（超过阈值后显示提示）
-        if (this._hovered !== null) {
-            this._tooltipTimer += dt;
-        }
-
         // 下方按钮区 SAS 激活态同步（值变化才写 DOM）
         this._updateBottomButtonsState(sasMode);
     }
@@ -204,10 +198,7 @@ class SASUI {
         // SAS 控制圆盘（导航球右侧，本步仅渲染）
         this._drawSasPanel(ctx, this._panelCenter.x, this._panelCenter.y, s, sasMode, heading);
 
-        // 悬停提示（延迟 0.3 秒后显示）
-        if (this._hovered !== null && this._tooltipTimer >= 0.3) {
-            this._drawTooltip(ctx, s);
-        }
+        // 悬停提示已迁移到全局 DOM tooltip（uiTooltip.js），由 flightScene 的 mousemove 驱动
     }
 
     /**
@@ -374,67 +365,6 @@ class SASUI {
         }
     }
 
-    /**
-     * 绘制悬停提示框（延迟 0.3 秒后显示）
-     * @param {CanvasRenderingContext2D} ctx
-     * @param {number} s - 缩放比例
-     */
-    _drawTooltip(ctx, s) {
-        const cx = this._panelCenter.x;
-        const cy = this._panelCenter.y;
-        let text;
-        let tipX, tipY;
-
-        if (this._hovered === 'center') {
-            text = t('sas.stability');
-            tipX = cx;
-            tipY = cy - (SAS_PANEL_CENTER_RADIUS + 12) * s;
-        } else {
-            const dir = DIR_CIRCLES.find(d => d.mode === this._hovered);
-            if (!dir) return;
-            text = SASModeLabels[this._hovered] || this._hovered;
-            tipX = cx + dir.dx * s;
-            tipY = cy + dir.dy * s - (DIR_BTN_RADIUS + 10) * s;
-        }
-
-        // 测量文字宽度
-        ctx.font = `${14 * s}px monospace`;
-        const textWidth = ctx.measureText(text).width;
-        const paddingH = 10 * s;
-        const paddingV = 6 * s;
-        const boxW = textWidth + paddingH * 2;
-        const boxH = 14 * s + paddingV * 2;
-        const boxX = tipX - boxW / 2;
-        const boxY = tipY - boxH + paddingV;
-
-        // 背景（与建造菜单统一：rgba(0,0,0,0.92) + #555 边框 + 4px 圆角）
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.92)';
-        ctx.beginPath();
-        const r = 4 * s;
-        ctx.moveTo(boxX + r, boxY);
-        ctx.lineTo(boxX + boxW - r, boxY);
-        ctx.arcTo(boxX + boxW, boxY, boxX + boxW, boxY + r, r);
-        ctx.lineTo(boxX + boxW, boxY + boxH - r);
-        ctx.arcTo(boxX + boxW, boxY + boxH, boxX + boxW - r, boxY + boxH, r);
-        ctx.lineTo(boxX + r, boxY + boxH);
-        ctx.arcTo(boxX, boxY + boxH, boxX, boxY + boxH - r, r);
-        ctx.lineTo(boxX, boxY + r);
-        ctx.arcTo(boxX, boxY, boxX + r, boxY, r);
-        ctx.closePath();
-        ctx.fill();
-
-        // 边框
-        ctx.strokeStyle = '#555';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-
-        // 文字
-        ctx.fillStyle = '#88ccff';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'bottom';
-        ctx.fillText(text, tipX, tipY);
-    }
-
     // ========== 悬停检测（SAS 圆盘交互） ==========
 
     /**
@@ -442,6 +372,8 @@ class SASUI {
      * @param {number} x - 鼠标相对 canvas 的 X 坐标
      * @param {number} y - 鼠标相对 canvas 的 Y 坐标
      * @param {string} currentSasMode - 当前 SAS 模式
+     * @returns {{ label: string|null, changed: boolean }} label=提示文本（无目标为 null）；
+     *          changed=悬停目标是否发生变化（调用方据此只在变化时刷新 tooltip，保证位置不变）
      */
     handleHover(x, y, currentSasMode) {
         const cx = this._panelCenter.x;
@@ -451,8 +383,7 @@ class SASUI {
         // 圆盘中心
         const distCenter = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2);
         if (distCenter < SAS_PANEL_CENTER_RADIUS * s + 4 * s) {
-            this._setHovered('center');
-            return;
+            return this._setHovered('center');
         }
 
         // 四方向按钮
@@ -461,23 +392,32 @@ class SASUI {
             const by = cy + dir.dy * s;
             const dist = Math.sqrt((x - bx) ** 2 + (y - by) ** 2);
             if (dist < DIR_BTN_RADIUS * s + 4 * s) {
-                this._setHovered(dir.mode);
-                return;
+                return this._setHovered(dir.mode);
             }
         }
 
         // 不在任何可悬停区域
-        this._setHovered(null);
+        return this._setHovered(null);
     }
 
     /**
-     * 设置悬停目标（若变化则重置计时器）
+     * 设置悬停目标并返回 { label, changed }：
+     *   label   目标提示文本（center → 姿态保持；方向 → DIR_CIRCLES label；无目标 null）
+     *   changed 目标是否变化（进入新目标为 true，同一目标内移动为 false）
+     * @param {string|null} target
+     * @returns {{ label: string|null, changed: boolean }}
      */
     _setHovered(target) {
-        if (this._hovered !== target) {
-            this._hovered = target;
-            this._tooltipTimer = 0;
+        const changed = this._hovered !== target;
+        this._hovered = target;
+        if (target === null) {
+            return { label: null, changed };
         }
+        if (target === 'center') {
+            return { label: t('sas.stability'), changed };
+        }
+        const dir = DIR_CIRCLES.find(d => d.mode === target);
+        return { label: dir ? dir.label : null, changed };
     }
 
     /**
@@ -485,7 +425,7 @@ class SASUI {
      */
     clearHover() {
         this._hovered = null;
-        this._tooltipTimer = 0;
+        hideTooltip();
     }
 
     // ========== 点击 / 右键（SAS 圆盘交互） ==========
@@ -702,9 +642,16 @@ class SASUI {
 
         for (const def of this._getBottomBtnDefs()) {
             const btn = document.createElement('button');
-            btn.title = def.label;
             btn.dataset.btnId = def.id;
             btn.dataset.btnMain = def.main ? '1' : '0';
+
+            // 悬停提示：统一走全局 DOM tooltip（进入时触发一次，延迟显示、位置固定）
+            btn.addEventListener('mouseenter', (e) => {
+                showTooltip(def.label, e.clientX, e.clientY);
+            });
+            btn.addEventListener('mouseleave', () => {
+                hideTooltip();
+            });
 
             // 内容：纹理就绪用 1:1 图片（预留接口），否则 emoji 占位
             const tex = def.tex ? textureManager.get(def.tex) : null;

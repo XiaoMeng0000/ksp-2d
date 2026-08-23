@@ -11,6 +11,7 @@ import { gameState } from '../gameState.js';
 import { SASController } from '../ship/sasController.js';
 import { SAS_CYCLE_ORDER, SAS_DIRECTION_ORDER, computeNavballDirections as computeSasDirections } from '../ship/sasModes.js';
 import { sasUI } from '../ui/sasUI.js';
+import { showTooltip, hideTooltip } from '../ui/uiTooltip.js';
 import { facilitySystem } from '../facility/facilitySystem.js';
 import { getModuleDef } from '../ship/moduleTypes.js';
 import { getFacilityType } from '../facility/facilityTypes.js';
@@ -404,10 +405,17 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                         if (ship) ship.throttle = result.throttle;
                     }
                 } else {
-                    // 非拖拽时检测悬停目标
+                    // 非拖拽时检测悬停目标；仅在悬停目标变化时触发全局 tooltip（延迟显示、位置固定）
                     const ship = shipSystem.getActiveShip();
                     if (ship) {
-                        sasUI.handleHover(x, y, ship.sasMode || 'off');
+                        const res = sasUI.handleHover(x, y, ship.sasMode || 'off');
+                        if (res.label && res.changed) {
+                            showTooltip(res.label, e.clientX, e.clientY);
+                        } else if (!res.label) {
+                            hideTooltip();
+                        }
+                    } else {
+                        hideTooltip();
                     }
                 }
             };
@@ -454,6 +462,9 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
 
             // 隐藏可见性筛选面板
             sasUI.hideVisibilityPanel();
+
+            // 隐藏悬停提示（防切场景后 tooltip 残留）
+            hideTooltip();
 
             // SAS 集成 — 清理 Canvas 事件监听
             if (_canvas._sasClickHandler) {

@@ -48,6 +48,14 @@ function getGameModeText() {
         : t('common.modeSandbox');
 }
 
+// 当前存档（世界）名称 — ESC 菜单头部显示；无当前世界时回退机构名
+function getCurrentWorldName() {
+    const worldId = window.currentWorldId;
+    if (!worldId) return t('esc.agencyTitle');
+    const world = saveManager.getWorldList().find(w => w.id === worldId);
+    return world ? world.name : t('esc.agencyTitle');
+}
+
 // ---- 数据驱动渲染 ----
 
 // 虚线分隔条（例图标志性元素：标题下/元信息下/footer 上方）
@@ -215,8 +223,8 @@ function renderMenu() {
         ${versionHtml}
     `;
 
-    // 动态文本填充（防 XSS）
-    container.querySelector('.esc-agency').textContent = t('esc.agencyTitle');
+    // 动态文本填充（防 XSS）：头部显示当前存档（世界）名称
+    container.querySelector('.esc-agency').textContent = getCurrentWorldName();
     const metaValues = container.querySelectorAll('.esc-meta-value');
     metaValues[0].textContent = formatUniverseTime(_universeTime);
     metaValues[1].textContent = getGameModeText();
@@ -227,6 +235,8 @@ function renderMenu() {
 container.addEventListener('click', (e) => {
     const row = e.target.closest('.esc-row');
     if (!row) return;
+    // 非操作行（如分组标题行）：没有 data-action，点击直接忽略，不弹任何提示
+    if (!row.dataset.action) return;
     // 占位行：仅提示，不执行
     if (row.classList.contains('esc-row-disabled')) {
         window.showNotification(t('esc.notReady'), 'info');
