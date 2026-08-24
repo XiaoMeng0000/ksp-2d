@@ -114,7 +114,7 @@ function renderShipBuilderCategories() {
                     <span>${isExpanded ? '-' : '+'}</span>
                 </div>
                 <div id="cat-${cat.id}" style="display:${isExpanded ? 'block' : 'none'};">
-                    ${ships.length === 0 ? '<div style="padding:6px 10px;color:#666;font-size:11px;">' + t('build.noShips') + '</div>' : 
+                    ${ships.length === 0 ? '<div style="padding:6px 10px;color:var(--text-dim);font-size:11px;">' + t('build.noShips') + '</div>' : 
                         ships.map(ship => `
                             <button data-action="select-ship" 
                                 class="builder-ship-btn" 
@@ -199,34 +199,34 @@ function updateShipBuilderStats() {
         ? ship.dryMass.toFixed(1) + ' t'
         : '-';
     const bonusMassStr = hasBonus
-        ? ` <span style="color:#666;">(${totalMassBonus > 0 ? '+' : ''}${totalMassBonus.toFixed(1)} t)</span>`
+        ? ` <span style="color:var(--text-dim);">(${totalMassBonus > 0 ? '+' : ''}${totalMassBonus.toFixed(1)} t)</span>`
         : '';
 
     const moiStr = ship.momentOfInertia != null
         ? ship.momentOfInertia.toFixed(0) + ' kg·m²'
         : '-';
     const bonusMoiStr = hasBonus && ship.momentOfInertia != null
-        ? ` <span style="color:#666;">(${totalMoiBonus > 0 ? '+' : ''}${totalMoiBonus.toFixed(0)})</span>`
+        ? ` <span style="color:var(--text-dim);">(${totalMoiBonus > 0 ? '+' : ''}${totalMoiBonus.toFixed(0)})</span>`
         : '';
 
     // 简介行（有 description 时才显示 + 分隔线）
     const descHtml = ship.description
-        ? `<div style="color:#aaa;font-size:11px;margin-bottom:6px;">${ship.description}</div>
-        <hr style="border:none;border-top:1px solid #444;margin:6px 0 8px 0;">`
+        ? `<div style="color:var(--text-mid);font-size:11px;margin-bottom:6px;">${ship.description}</div>
+        <hr style="border:none;border-top:1px solid var(--theme-border-row);margin:6px 0 8px 0;">`
         : '';
 
     const statsEl = document.getElementById('shipBuilderStats');
     const totalCost = (ship.cost || 0) + totalModuleCost;
     statsEl.innerHTML = `
-        <div style="color:#88ccff;font-weight:bold;margin-bottom:4px;font-size:13px;">${ship.name}</div>
+        <div style="color:var(--accent);font-weight:bold;margin-bottom:4px;font-size:13px;">${ship.name}</div>
         ${descHtml}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-            <div><span style="color:#666;">${t('build.dryMass')}</span> <span style="color:#fff;">${massStr}${bonusMassStr}</span></div>
-            <div><span style="color:#666;">${t('build.thrust')}</span> <span style="color:#fff;">${ship.maxThrust != null ? ship.maxThrust.toFixed(0) : '-'} N</span></div>
-            <div><span style="color:#666;">${t('build.dv')}</span> <span style="color:#fff;">${computeTemplateDeltaV(ship, totalMassBonus).toFixed(0)} m/s</span></div>
-            <div><span style="color:#666;">${t('build.fuel')}</span> <span style="color:#fff;">${getTemplateFuelTotal(ship).toFixed(0)}</span></div>
-            <div><span style="color:#666;">${t('build.moi')}</span> <span style="color:#fff;">${moiStr}${bonusMoiStr}</span></div>
-            <div><span style="color:#666;">${t('build.slots')}</span> <span style="color:#fff;">${ship.moduleSlots != null ? ship.moduleSlots : '-'}</span></div>
+            <div><span style="color:var(--text-dim);">${t('build.dryMass')}</span> <span style="color:var(--text-bright);">${massStr}${bonusMassStr}</span></div>
+            <div><span style="color:var(--text-dim);">${t('build.thrust')}</span> <span style="color:var(--text-bright);">${ship.maxThrust != null ? ship.maxThrust.toFixed(0) : '-'} N</span></div>
+            <div><span style="color:var(--text-dim);">${t('build.dv')}</span> <span style="color:var(--text-bright);">${computeTemplateDeltaV(ship, totalMassBonus).toFixed(0)} m/s</span></div>
+            <div><span style="color:var(--text-dim);">${t('build.fuel')}</span> <span style="color:var(--text-bright);">${getTemplateFuelTotal(ship).toFixed(0)}</span></div>
+            <div><span style="color:var(--text-dim);">${t('build.moi')}</span> <span style="color:var(--text-bright);">${moiStr}${bonusMoiStr}</span></div>
+            <div><span style="color:var(--text-dim);">${t('build.slots')}</span> <span style="color:var(--text-bright);">${ship.moduleSlots != null ? ship.moduleSlots : '-'}</span></div>
         </div>
         <div style="margin-top:8px;font-size:11px;color:#cc8;">${t('economy.buildCost', { cost: totalCost })}${totalModuleCost > 0 ? t('build.costIncludesModules', { cost: totalModuleCost }) : ''}</div>
     `;
@@ -244,9 +244,9 @@ function showModuleSelector(slotIndex, slotElement) {
     popup.className = 'module-selector-popup';
     popup.style.cssText = `
         position:fixed;left:${rect.right + 8}px;top:${rect.top}px;
-        background:rgba(0,0,0,0.92);border:1px solid #555;border-radius:4px;
+        background:var(--theme-bg);border:1px solid var(--theme-border);border-radius:5px;
         padding:6px 0;min-width:180px;max-height:300px;overflow-y:auto;
-        z-index:10001;font-family:monospace;font-size:12px;color:#ddd;
+        z-index:10001;font-family:var(--font-mono);font-size:12px;color:var(--text-main);
     `;
 
     const currentModuleId = selectedModules[slotIndex];
@@ -256,8 +256,8 @@ function showModuleSelector(slotIndex, slotElement) {
         const def = getModuleDef(currentModuleId);
         if (def) {
             const installedRow = document.createElement('div');
-            installedRow.style.cssText = 'padding:4px 10px;color:#666;border-bottom:1px solid #444;margin-bottom:4px;';
-            installedRow.innerHTML = `${t('build.installed')}<span style="color:#88ccff;">${renderIconHtml(def.iconTextureKey, def.icon)} ${def.name}</span>`;
+            installedRow.style.cssText = 'padding:4px 10px;color:var(--text-dim);border-bottom:1px solid var(--theme-border-row);margin-bottom:4px;';
+            installedRow.innerHTML = `${t('build.installed')}<span style="color:var(--accent);">${renderIconHtml(def.iconTextureKey, def.icon)} ${def.name}</span>`;
             popup.appendChild(installedRow);
         }
     }
@@ -274,9 +274,9 @@ function showModuleSelector(slotIndex, slotElement) {
         header.style.cssText = `
             padding:4px 10px;cursor:pointer;display:flex;
             align-items:center;justify-content:space-between;
-            color:#88ccff;font-size:11px;user-select:none;
+            color:var(--accent);font-size:11px;user-select:none;
         `;
-        header.innerHTML = `<span>${cat.name}</span><span style="color:#666;font-size:10px;">-</span>`;
+        header.innerHTML = `<span>${cat.name}</span><span style="color:var(--text-dim);font-size:10px;">-</span>`;
         popup.appendChild(header);
 
         // 模块列表容器
@@ -299,7 +299,7 @@ function showModuleSelector(slotIndex, slotElement) {
                 padding:4px 10px;cursor:pointer;display:flex;
                 align-items:center;gap:4px;font-size:11px;
             `;
-            row.innerHTML = `${renderIconHtml(modDef.iconTextureKey, modDef.icon)} ${modDef.name} <span style="color:#666;font-size:10px;">${t('build.bonusShort', { mass: modDef.massBonus.toFixed(1), moi: modDef.momentOfInertiaBonus.toFixed(0) })}${modDef.price ? t('build.modulePriceSuffix', { price: modDef.price }) : ''}</span>`;
+            row.innerHTML = `${renderIconHtml(modDef.iconTextureKey, modDef.icon)} ${modDef.name} <span style="color:var(--text-dim);font-size:10px;">${t('build.bonusShort', { mass: modDef.massBonus.toFixed(1), moi: modDef.momentOfInertiaBonus.toFixed(0) })}${modDef.price ? t('build.modulePriceSuffix', { price: modDef.price }) : ''}</span>`;
 
             // Tooltip
             let tooltip = null;
@@ -308,16 +308,16 @@ function showModuleSelector(slotIndex, slotElement) {
                 tooltip.className = 'module-tooltip';
                 tooltip.style.cssText = `
                     position:fixed;z-index:10002;
-                    background:rgba(0,0,0,0.92);border:1px solid #555;
-                    border-radius:4px;padding:8px 10px;min-width:160px;
-                    font-family:monospace;font-size:11px;color:#ddd;
+                    background:var(--theme-bg);border:1px solid var(--theme-border);
+                    border-radius:5px;padding:8px 10px;min-width:160px;
+                    font-family:var(--font-mono);font-size:11px;color:var(--text-main);
                     pointer-events:none;
                 `;
                 tooltip.innerHTML = `
-                    <div style="color:#88ccff;font-weight:bold;margin-bottom:4px;">${modDef.name}</div>
-                    <div style="color:#aaa;margin-bottom:4px;">${modDef.description}</div>
-                    <div style="color:#666;">${t('build.massBonus', { v: modDef.massBonus.toFixed(1) })}</div>
-                    <div style="color:#666;">${t('build.moiBonus', { v: modDef.momentOfInertiaBonus.toFixed(0) })}</div>
+                    <div style="color:var(--accent);font-weight:bold;margin-bottom:4px;">${modDef.name}</div>
+                    <div style="color:var(--text-mid);margin-bottom:4px;">${modDef.description}</div>
+                    <div style="color:var(--text-dim);">${t('build.massBonus', { v: modDef.massBonus.toFixed(1) })}</div>
+                    <div style="color:var(--text-dim);">${t('build.moiBonus', { v: modDef.momentOfInertiaBonus.toFixed(0) })}</div>
                 `;
                 document.body.appendChild(tooltip);
                 const rowRect = row.getBoundingClientRect();
@@ -340,7 +340,7 @@ function showModuleSelector(slotIndex, slotElement) {
 
             // hover 样式
             row.addEventListener('mouseenter', () => {
-                row.style.background = 'rgba(136,204,255,0.1)';
+                row.style.background = 'var(--accent-bg)';
             });
             row.addEventListener('mouseleave', () => {
                 row.style.background = 'transparent';
@@ -354,12 +354,12 @@ function showModuleSelector(slotIndex, slotElement) {
     if (currentModuleId) {
         const uninstallRow = document.createElement('div');
         uninstallRow.style.cssText = `
-            padding:4px 10px;color:#c44;cursor:pointer;border-top:1px solid #444;
+            padding:4px 10px;color:var(--danger);cursor:pointer;border-top:1px solid var(--theme-border-row);
             margin-top:4px;font-size:11px;
         `;
         uninstallRow.textContent = t('build.uninstall');
         uninstallRow.addEventListener('mouseenter', () => {
-            uninstallRow.style.background = 'rgba(170,68,68,0.15)';
+            uninstallRow.style.background = 'var(--danger-bg)';
         });
         uninstallRow.addEventListener('mouseleave', () => {
             uninstallRow.style.background = 'transparent';
@@ -405,7 +405,7 @@ function renderShipBuilderSlots() {
     const slots = selectedModules;
     
     if (!slots || slots.length === 0) {
-        slotsEl.innerHTML = '<div style="color:#666;font-size:11px;">' + t('build.noSlots') + '</div>';
+        slotsEl.innerHTML = '<div style="color:var(--text-dim);font-size:11px;">' + t('build.noSlots') + '</div>';
         return;
     }
     

@@ -60,7 +60,7 @@ function renderFacilityDeployCategories() {
                     <span>${isExpanded ? '-' : '+'}</span>
                 </div>
                 <div id="fcat-${cat.id}" style="display:${isExpanded ? 'block' : 'none'};">
-                    ${facilities.length === 0 ? '<div style="padding:6px 10px;color:#666;font-size:11px;">' + t('facility.noFacilities') + '</div>' :
+                    ${facilities.length === 0 ? '<div style="padding:6px 10px;color:var(--text-dim);font-size:11px;">' + t('facility.noFacilities') + '</div>' :
                         facilities.map(fac => `
                             <button class="deploy-facility-btn" data-action="select-facility"
                                 data-facility-id="${fac.id}">${renderIconHtml(fac.iconTextureKey, fac.icon)} ${fac.name}</button>
@@ -118,21 +118,21 @@ function renderFacilityDeployDetail(type) {
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
             ${renderIconHtml(type.iconTextureKey, type.icon, 32)}
             <div>
-                <div style="color:#88ccff;font-size:13px;font-weight:bold;">${type.name}</div>
+                <div style="color:var(--accent);font-size:13px;font-weight:bold;">${type.name}</div>
                 <div style="color:#${type.color.slice(1)};font-size:11px;">
                     ${t('facility.docksLabel')}${type.baseDocks}
                 </div>
             </div>
         </div>
-        <div style="color:#aaa;font-size:11px;margin-bottom:10px;line-height:1.5;">
+        <div style="color:var(--text-mid);font-size:11px;margin-bottom:10px;line-height:1.5;">
             ${type.description}
         </div>
         <div style="margin-bottom:8px;">
-            <div style="color:#666;font-size:10px;margin-bottom:3px;">${t('facility.compartmentsLabel')}</div>
+            <div style="color:var(--text-dim);font-size:10px;margin-bottom:3px;">${t('facility.compartmentsLabel')}</div>
             <div>${compartmentsHtml}</div>
         </div>
         <div>
-            <div style="color:#666;font-size:10px;margin-bottom:3px;">${t('facility.servicesLabel')}</div>
+            <div style="color:var(--text-dim);font-size:10px;margin-bottom:3px;">${t('facility.servicesLabel')}</div>
             <div>${servicesHtml}</div>
         </div>
     `;

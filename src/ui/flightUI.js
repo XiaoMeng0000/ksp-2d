@@ -146,11 +146,11 @@ function storageRowHtml(resId, amount, capacity, opts = {}) {
     const rightHtml = opts.right || '';
     const capText = capacity > 0 ? ' / ' + Math.floor(capacity) : '';
     return '<div style="display:flex;align-items:center;gap:6px;">'
-        + '<span style="width:88px;flex-shrink:0;color:#888;font-size:11px;text-align:right;'
+        + '<span style="width:88px;flex-shrink:0;color:var(--text-mid);font-size:11px;text-align:right;'
         + 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + name + '</span>'
-        + '<span style="flex:1;display:inline-block;height:6px;background:#333;border-radius:3px;overflow:hidden;">'
+        + '<span style="flex:1;display:inline-block;height:6px;background:var(--theme-panel-deep);border-radius:3px;overflow:hidden;">'
         + '<span style="display:block;width:' + pct + '%;height:100%;background:' + color + ';border-radius:3px;"></span></span>'
-        + '<span style="width:70px;flex-shrink:0;color:#888;font-size:10px;white-space:nowrap;">'
+        + '<span style="width:70px;flex-shrink:0;color:var(--text-mid);font-size:10px;white-space:nowrap;">'
         + Math.floor(amount) + capText + '</span>'
         + rightHtml
         + '</div>';
@@ -170,7 +170,7 @@ function buildShipCargoContent(ship) {
 
     const cargoEntries = Object.entries(ship.cargo || {}).filter(([, slot]) => slot && slot.amount > 0);
     if (cargoEntries.length === 0) {
-        html += '<div style="color:#555;font-size:11px;text-align:center;padding:14px 0;">' + t('cargo.empty') + '</div>';
+        html += '<div style="color:var(--text-faint);font-size:11px;text-align:center;padding:14px 0;">' + t('cargo.empty') + '</div>';
     } else {
         html += '<div style="display:flex;flex-direction:column;gap:4px;">';
         for (const [resId, slot] of cargoEntries) {
@@ -179,92 +179,93 @@ function buildShipCargoContent(ship) {
         html += '</div>';
     }
     // 明确提示：自带燃料（燃料罐）不在货仓
-    html += '<div style="color:#555;font-size:10px;margin-top:10px;">' + t('cargo.fuelNote') + '</div>';
+    html += '<div style="color:var(--text-faint);font-size:10px;margin-top:10px;">' + t('cargo.fuelNote') + '</div>';
     return html;
 }
 
-// 扫描菜单内容（0.2.0 阶段6：当前星球图标 + 资源丰度条 + 开始扫描/进度）
+// 扫描菜单内容（0.2.0 阶段6；0.2.7 分区布局整改：目标卡 + 资源行 + 操作区）
 function buildScanContent(ship) {
     const bodyId = ship.currentSOI;
     const body = celestialBodies.find(b => b.name === bodyId);
 
-    // 深空无宿主 → 提示
+    // 深空无宿主 → 卡片内提示
     if (!bodyId || !body) {
-        return '<div style="color:#555;font-size:12px;text-align:center;padding:20px 0;">' + t('scan.deepSpace') + '</div>';
+        return '<div class="tkp-section">' + t('scan.targetSection') + '</div>'
+            + '<div class="tkp-card"><div class="tkp-hint" style="margin:0;">' + t('scan.deepSpace') + '</div></div>';
     }
 
     const tier = getShipScanTier(ship);
     const bodyTexKey = body.textureKey ? body.textureKey + '_surface' : null;
 
-    // 头部：星球图标 + 名称
-    let html = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">'
-        + '<span style="width:40px;height:40px;display:inline-flex;align-items:center;justify-content:center;'
-        + 'flex-shrink:0;">' + renderIconHtml(bodyTexKey, '🪐', 36) + '</span>'
-        + '<div>'
-        + '<div style="color:var(--accent);font-size:14px;font-weight:bold;">' + body.name + '</div>'
-        + '<div style="color:var(--text-dim);font-size:10px;">' + t('scan.scannerTier', { tier: tier }) + '</div>'
+    // 分区一：扫描目标大卡片（左图右文，对齐参考图 IdentityCard）
+    let html = '<div class="tkp-section">' + t('scan.targetSection') + '</div>'
+        + '<div class="tkp-card">'
+        + '<div class="tkp-card-main">'
+        + '<div class="tkp-card-icon">' + renderIconHtml(bodyTexKey, '🪐', 72) + '</div>'
+        + '<div class="tkp-card-info">'
+        + '<div class="tkp-card-title">' + body.name + '</div>'
+        + '<div class="tkp-sub">' + t('scan.scannerTier', { tier: tier }) + '</div>'
+        + '<div class="tkp-desc">' + t('scan.cardDesc') + '</div>'
+        + '</div>'
         + '</div>'
         + '</div>';
-    html += '<hr class="ui-divider" style="margin:8px 0;">';
 
-    // 资源丰度列表（扫描等级内可见的资源，+++++ 条 + 百分比）
+    // 分区二：资源丰度列表（扫描等级内可见的资源，+++++ 条 + 百分比）
+    // 行列表放入次级卡片（二级背景），与目标卡形成层级
+    html += '<div class="tkp-section">' + t('scan.resourcesSection') + '</div>';
     const visible = getVisibleBodyResources(bodyId);
     const entries = Object.entries(visible);
     if (entries.length === 0) {
-        html += '<div style="color:#555;font-size:11px;text-align:center;padding:14px 0;">' + t('scan.noResources') + '</div>';
+        html += '<div class="tkp-card-sm"><div class="tkp-hint" style="margin:0;">' + t('scan.noResources') + '</div></div>';
     } else {
-        html += '<div style="display:flex;flex-direction:column;gap:5px;margin-bottom:10px;">';
+        html += '<div class="tkp-card-sm"><div class="tkp-rows">';
         for (const [resId, info] of entries) {
             const def = getResourceType(resId);
             const name = def ? def.name : resId;
             const pct = Math.round((info.abundance ?? 0) * 100);
             const barLen = Math.max(0, Math.round(pct / 10));   // 每 10% 一个 +
             const bar = '+'.repeat(barLen);
-            html += '<div style="display:flex;align-items:center;gap:8px;">'
-                + '<span style="width:80px;flex-shrink:0;color:#888;font-size:11px;text-align:right;'
-                + 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + name + '</span>'
+            // 资源绿 #8c8：纯状态色、无对应变量，按规范允许内联例外（与旧实现一致）
+            html += '<div class="tkp-row">'
+                + '<span class="tkp-row-label">' + name + '</span>'
                 + '<span style="flex:1;color:#8c8;font-family:var(--font-mono-bold);font-size:11px;'
                 + 'letter-spacing:1px;white-space:nowrap;overflow:hidden;">' + bar + '</span>'
-                + '<span style="width:44px;flex-shrink:0;color:#8c8;font-size:11px;text-align:right;">' + pct + '%</span>'
+                + '<span class="tkp-row-value" style="width:44px;color:#8c8;text-align:right;">' + pct + '%</span>'
                 + '</div>';
         }
-        html += '</div>';
+        html += '</div>';   // 关闭 .tkp-rows
+        html += '</div>';   // 关闭 .tkp-card-sm
     }
 
-    // 扫描状态区：进行中显示进度条；否则显示开始扫描按钮
+    // 扫描状态区：进行中显示进度条 + 取消；否则显示开始扫描按钮
     const progress = getScanProgress(bodyId);
     if (progress && progress.scanning) {
         const pct = progress.scanDuration > 0
             ? Math.min(100, progress.progress / progress.scanDuration * 100)
             : 0;
         const daysLeft = Math.max(0, (progress.scanDuration - progress.progress) / GAME_DAY_SECONDS);
-        html += '<hr class="ui-divider" style="margin:8px 0;">'
-            + '<div id="scanProgressSection" data-body-id="' + bodyId + '" style="display:flex;flex-direction:column;gap:5px;">'
-            + '<div style="display:flex;justify-content:space-between;color:var(--text-dim);font-size:10px;">'
+        html += '<div id="scanProgressSection" data-body-id="' + bodyId + '" class="tkp-progress-wrap">'
+            + '<div class="tkp-progress-head">'
             + '<span>' + t('scan.inProgress', { tier: progress.scanTier }) + '</span>'
             + '<span id="scanProgressText">' + pct.toFixed(1) + '% · ' + t('scan.daysLeft', { d: daysLeft.toFixed(2) }) + '</span>'
             + '</div>'
-            + '<div style="height:8px;background:#333;border-radius:4px;overflow:hidden;">'
-            + '<div id="scanProgressBar" style="width:' + pct + '%;height:100%;background:var(--accent);border-radius:4px;'
-            + 'transition:width 0.3s ease;"></div>'
+            + '<div class="tkp-progress">'
+            + '<div id="scanProgressBar" class="tkp-progress-bar" style="width:' + pct + '%;"></div>'
             + '</div>'
-            + '<button data-action="cancel-scan" style="margin-top:4px;padding:6px 0;background:var(--danger-solid-bg);'
-            + 'color:var(--danger-solid);border:1px solid var(--danger-solid-border);border-radius:3px;cursor:pointer;'
-            + 'font-family:var(--font-mono);font-size:11px;">' + t('scan.cancel') + '</button>'
+            + '</div>'
+            + '<div class="tkp-actions">'
+            + '<button data-action="cancel-scan" class="tkp-btn">' + t('scan.cancel') + '</button>'
             + '</div>';
     } else {
         const knownTier = gameState.getState().player.scannedBodies?.[bodyId]?.tiersScanned || 0;
         const duration = getScanDuration(bodyId, tier);
         const durationDays = duration / GAME_DAY_SECONDS;
-        html += '<button data-action="start-scan" style="'
-            + 'width:100%;padding:8px 0;background:var(--accent-bg);color:var(--accent);'
-            + 'border:1px solid var(--accent-border);border-radius:3px;cursor:pointer;'
-            + 'font-family:var(--font-mono);font-size:12px;'
-            + '">' + t('scan.startBtn', { d: durationDays.toFixed(1) }) + '</button>';
+        html += '<div class="tkp-actions">'
+            + '<button data-action="start-scan" class="tkp-btn-primary">' + t('scan.startBtn', { d: durationDays.toFixed(1) }) + '</button>'
+            + '</div>';
         // 已扫等级提示（可继续用更高级扫描仪深扫）
         if (knownTier > 0) {
-            html += '<div style="color:var(--text-dim);font-size:10px;text-align:center;margin-top:6px;">'
-                + t('scan.knownTier', { tier: knownTier }) + '</div>';
+            html += '<div class="tkp-hint-muted">' + t('scan.knownTier', { tier: knownTier }) + '</div>';
         }
     }
     return html;
@@ -287,7 +288,7 @@ function buildFacilityStorageContent(facility) {
     }
     html += '</div>';
     if (!any) {
-        html += '<div style="color:#555;font-size:11px;text-align:center;padding:14px 0;">' + t('cargo.empty') + '</div>';
+        html += '<div style="color:var(--text-faint);font-size:11px;text-align:center;padding:14px 0;">' + t('cargo.empty') + '</div>';
     }
     return html;
 }
@@ -341,29 +342,29 @@ function startFacilityTransfer(fromFacility, resId) {
 // 模块管理面板（对接枢纽入口）— 槽位列表，空槽安装 / 已装卸载
 function buildModuleManageContent(facility, shipId) {
     const ship = facility.dockedShips.find(s => s.id === shipId);
-    if (!ship) return '<div style="color:#555;">' + t('facility.unknownCompartment') + '</div>';
+    if (!ship) return '<div style="color:var(--text-faint);">' + t('facility.unknownCompartment') + '</div>';
 
     let html = '<div style="color:var(--text-dim);font-size:10px;margin-bottom:8px;">'
         + t('dock.moduleManageHint') + '</div>';
 
     const total = ship.moduleSlots || 0;
     if (total === 0) {
-        return '<div style="color:#555;font-size:11px;text-align:center;padding:14px 0;">' + t('build.noSlots') + '</div>';
+        return '<div style="color:var(--text-faint);font-size:11px;text-align:center;padding:14px 0;">' + t('build.noSlots') + '</div>';
     }
     html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">';
     for (let i = 0; i < total; i++) {
         const mod = ship.modules[i];
         if (mod) {
             const def = getModuleDef(mod.type);
-            html += '<div style="background:#2a2a2a;border:1px solid #555;border-radius:3px;padding:6px 8px;display:flex;align-items:center;justify-content:space-between;gap:6px;">'
-                + '<span style="font-size:11px;color:#ccc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'
+            html += '<div style="background:var(--theme-panel-deep);border:1px solid var(--theme-border-row);border-radius:3px;padding:6px 8px;display:flex;align-items:center;justify-content:space-between;gap:6px;">'
+                + '<span style="font-size:11px;color:var(--text-main);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'
                 + renderIconHtml(def?.iconTextureKey, def?.icon, 12) + ' ' + (def ? def.name : mod.type) + '</span>'
                 + '<button data-action="uninstall-module" data-ship-id="' + shipId + '" data-mod-id="' + mod.id + '" class="ui-btn-sm" style="padding:2px 8px;font-size:10px;flex-shrink:0;">' + t('build.uninstall') + '</button>'
                 + '</div>';
         } else {
             html += '<button data-action="install-module" data-ship-id="' + shipId + '" data-slot-index="' + i + '" '
-                + 'style="background:#222;border:1px dashed #555;border-radius:3px;padding:6px 8px;cursor:pointer;'
-                + 'color:#888;font-size:11px;font-family:var(--font-mono);">'
+                + 'style="background:var(--theme-panel);border:1px dashed var(--theme-border);border-radius:3px;padding:6px 8px;cursor:pointer;'
+                + 'color:var(--text-mid);font-size:11px;font-family:var(--font-mono);">'
                 + t('build.slotIndex', { i: i + 1 }) + ' · ' + t('dock.installModule') + '</button>';
         }
     }
@@ -381,9 +382,9 @@ function showFacilityModuleSelector(facility, shipId, anchorEl) {
     popup.className = 'module-selector-popup';
     popup.style.cssText = `
         position:fixed;left:${Math.min(rect.right + 8, window.innerWidth - 220)}px;top:${rect.top}px;
-        background:rgba(0,0,0,0.92);border:1px solid #555;border-radius:4px;
+        background:var(--theme-bg);border:1px solid var(--theme-border);border-radius:5px;
         padding:6px 0;min-width:200px;max-height:300px;overflow-y:auto;
-        z-index:10001;font-family:var(--font-mono);font-size:12px;color:#ddd;
+        z-index:10001;font-family:var(--font-mono);font-size:12px;color:var(--text-main);
     `;
 
     const closeHandler = () => { popup.remove(); document.removeEventListener('click', closeHandler); };
@@ -393,7 +394,7 @@ function showFacilityModuleSelector(facility, shipId, anchorEl) {
 
     for (const cat of getModuleCategories()) {
         const header = document.createElement('div');
-        header.style.cssText = 'padding:4px 10px;color:#88ccff;font-size:11px;';
+        header.style.cssText = 'padding:4px 10px;color:var(--accent);font-size:11px;';
         header.textContent = cat.name;
         popup.appendChild(header);
 
@@ -402,7 +403,7 @@ function showFacilityModuleSelector(facility, shipId, anchorEl) {
             row.style.cssText = 'padding:4px 10px;cursor:pointer;display:flex;justify-content:space-between;gap:8px;';
             row.innerHTML = '<span>' + renderIconHtml(def.iconTextureKey, def.icon) + ' ' + def.name + '</span>'
                 + '<span style="color:#cc8;font-size:10px;">' + (def.price > 0 ? def.price + t('economy.kitsUnit') : t('common.free')) + '</span>';
-            row.addEventListener('mouseenter', () => { row.style.background = 'rgba(136,204,255,0.1)'; });
+            row.addEventListener('mouseenter', () => { row.style.background = 'var(--accent-bg)'; });
             row.addEventListener('mouseleave', () => { row.style.background = 'transparent'; });
             row.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -430,7 +431,7 @@ function showFacilityModuleSelector(facility, shipId, anchorEl) {
 // 货仓调拨面板（对接枢纽入口，需飞船有货运模块）— 船舱 ↔ 设施存储 双向
 function buildCargoTransferContent(facility, shipId) {
     const ship = facility.dockedShips.find(s => s.id === shipId);
-    if (!ship) return '<div style="color:#555;">' + t('facility.unknownCompartment') + '</div>';
+    if (!ship) return '<div style="color:var(--text-faint);">' + t('facility.unknownCompartment') + '</div>';
 
     const cap = getCargoCapacity(ship);
     const used = getCargoUsed(ship);
@@ -451,18 +452,18 @@ function buildCargoTransferContent(facility, shipId) {
         const def = getResourceType(resId);
         const name = def ? def.name : resId;
         html += '<div style="display:flex;align-items:center;gap:6px;">'
-            + '<span style="width:76px;flex-shrink:0;color:#888;font-size:10px;text-align:right;'
+            + '<span style="width:76px;flex-shrink:0;color:var(--text-mid);font-size:10px;text-align:right;'
             + 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + name + '</span>'
-            + '<span style="flex:1;color:#aaa;font-size:10px;">' + t('cargo.facToShip', { fac: Math.floor(facAmount), ship: Math.floor(shipAmount) }) + '</span>'
+            + '<span style="flex:1;color:var(--text-mid);font-size:10px;">' + t('cargo.facToShip', { fac: Math.floor(facAmount), ship: Math.floor(shipAmount) }) + '</span>'
             + '<button data-action="load-cargo" data-ship-id="' + shipId + '" data-res-id="' + resId + '" class="ui-btn-sm" style="padding:2px 8px;font-size:10px;flex-shrink:0;">→</button>'
             + '<button data-action="unload-cargo" data-ship-id="' + shipId + '" data-res-id="' + resId + '" class="ui-btn-sm" style="padding:2px 8px;font-size:10px;flex-shrink:0;">←</button>'
             + '</div>';
     }
     html += '</div>';
     if (!any) {
-        html += '<div style="color:#555;font-size:11px;text-align:center;padding:14px 0;">' + t('cargo.empty') + '</div>';
+        html += '<div style="color:var(--text-faint);font-size:11px;text-align:center;padding:14px 0;">' + t('cargo.empty') + '</div>';
     }
-    html += '<div style="color:#555;font-size:10px;margin-top:10px;">' + t('cargo.fuelNote') + '</div>';
+    html += '<div style="color:var(--text-faint);font-size:10px;margin-top:10px;">' + t('cargo.fuelNote') + '</div>';
     return html;
 }
 
@@ -525,10 +526,10 @@ function openCompartmentPanel(facility, compartmentId) {
             html = buildSupplyTerminalContent(facility);
             break;
         case 'laboratory':
-            html = '<div style="display:flex;align-items:center;justify-content:center;height:120px;color:#555;font-size:13px;">' + t('facility.bridgeResearch') + '</div>';
+            html = '<div style="display:flex;align-items:center;justify-content:center;height:120px;color:var(--text-faint);font-size:13px;">' + t('facility.bridgeResearch') + '</div>';
             break;
         default:
-            html = '<div style="color:#555;">' + t('facility.unknownCompartment') + '</div>';
+            html = '<div style="color:var(--text-faint);">' + t('facility.unknownCompartment') + '</div>';
     }
 
     content.innerHTML = html;
@@ -554,11 +555,11 @@ function buildBridgeContent(facility) {
 
     let html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">';
     html += card(t('facility.nameLabel'), facility.name);
-    html += card(t('facility.typeLabel'), typeName, '#88ccff');
+    html += card(t('facility.typeLabel'), typeName, 'var(--accent)');
     html += card(t('facility.dockLabel'),
-        `<span style="display:inline-block;width:80px;height:6px;background:#333;border-radius:3px;vertical-align:middle;margin-right:6px;">
-            <span style="display:inline-block;width:${pct}%;height:100%;background:#88ccff;border-radius:3px;"></span>
-        </span> ${docksUsed} / ${docksMax}`, '#88ccff');
+        `<span style="display:inline-block;width:80px;height:6px;background:var(--theme-panel-deep);border-radius:3px;vertical-align:middle;margin-right:6px;">
+            <span style="display:inline-block;width:${pct}%;height:100%;background:var(--accent);border-radius:3px;"></span>
+        </span> ${docksUsed} / ${docksMax}`, 'var(--accent)');
     html += card(t('facility.upgradeLabel'), (facility.upgradeLevel || 1) + t('facility.levelSuffix'));
     html += '</div>';
 
@@ -572,8 +573,8 @@ function buildBridgeContent(facility) {
     if (_controlledDockedShipId) {
         const ship = facility.dockedShips?.find(s => s.id === _controlledDockedShipId);
         if (ship) {
-            html += '<hr style="border:none;border-top:1px solid #444;margin:12px 0;">';
-            html += `<div style="color:#88ccff;font-size:13px;margin-bottom:8px;">${renderIconHtml('ship_default_active', '🚀', 12)} ${t('facility.currentControl')}${ship.displayName || ship.id}</div>`;
+            html += '<hr style="border:none;border-top:1px solid var(--theme-border-row);margin:12px 0;">';
+            html += `<div style="color:var(--accent);font-size:13px;margin-bottom:8px;">${renderIconHtml('ship_default_active', '🚀', 12)} ${t('facility.currentControl')}${ship.displayName || ship.id}</div>`;
             html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">';
             html += card(t('facility.dryMassLabel'), (ship.dryMass ?? '-') + ' t');
             html += card(t('facility.modulesLabel'), (ship.modules?.length || 0) + t('common.unitCount'));
@@ -584,7 +585,7 @@ function buildBridgeContent(facility) {
                 + '</div>';
             html += '</div>';
             html += `<button data-action="release-control" style="
-                padding:5px 16px;background:#333;color:#ccc;border:1px solid #555;
+                padding:5px 16px;background:var(--theme-panel-deep);color:var(--text-main);border:1px solid var(--theme-border-row);
                 border-radius:3px;cursor:pointer;font-family:monospace;font-size:12px;
             ">${t('facility.backToOverview')}</button>`;
         }
@@ -600,46 +601,46 @@ function buildDockHubContent(facility) {
     // 对接操作区
     if (activeShip && freeDocks > 0) {
         html += '<button id="dockCurrentShipBtn" style="'
-            + 'width:100%;padding:8px;background:rgba(68,136,255,0.15);color:#88ccff;'
-            + 'border:1px solid #448;border-radius:3px;cursor:pointer;'
+            + 'width:100%;padding:8px;background:var(--accent-bg);color:var(--accent);'
+            + 'border:1px solid var(--accent-border);border-radius:3px;cursor:pointer;'
             + 'font-family:monospace;font-size:12px;margin-bottom:12px;'
             + '">' + t('dock.dockCurrentShip', { name: (activeShip.displayName || activeShip.id), free: freeDocks }) + '</button>';
     } else if (activeShip && freeDocks <= 0) {
-        html += '<div style="color:#c44;font-size:12px;margin-bottom:12px;padding:6px 10px;'
-            + 'background:rgba(170,68,68,0.1);border:1px solid #644;border-radius:3px;">'
+        html += '<div style="color:var(--danger);font-size:12px;margin-bottom:12px;padding:6px 10px;'
+            + 'background:var(--danger-bg);border:1px solid var(--danger-border);border-radius:3px;">'
             + t('dock.docksFull', { max: (facility.maxDocks || 0) }) + '</div>';
     } else if (!activeShip) {
-        html += '<div style="color:#666;font-size:11px;margin-bottom:10px;padding:4px 0;">' + t('dock.approachHint') + '</div>';
+        html += '<div style="color:var(--text-dim);font-size:11px;margin-bottom:10px;padding:4px 0;">' + t('dock.approachHint') + '</div>';
     }
 
     const dockedShips = facility.dockedShips || [];
     if (dockedShips.length === 0) {
-        html += '<div style="color:#555;font-size:12px;text-align:center;padding:20px;">' + t('dock.noDockedShips') + '</div>';
+        html += '<div style="color:var(--text-faint);font-size:12px;text-align:center;padding:20px;">' + t('dock.noDockedShips') + '</div>';
     } else {
-        html += '<div style="color:#666;font-size:11px;margin-bottom:8px;">' + t('dock.dockedShips', { n: dockedShips.length }) + '</div>';
+        html += '<div style="color:var(--text-dim);font-size:11px;margin-bottom:8px;">' + t('dock.dockedShips', { n: dockedShips.length }) + '</div>';
         html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">';
         for (const ship of dockedShips) {
-            html += '<div style="background:#333;border:1px solid #555;border-radius:3px;padding:10px 12px;">'
-                + '<div style="font-size:13px;color:#aaa;margin-bottom:6px;font-weight:bold;">' + renderIconHtml('ship_default_active', '🚀', 12) + ' ' + (ship.displayName || ship.id) + '</div>'
+            html += '<div style="background:var(--theme-panel-deep);border:1px solid var(--theme-border-row);border-radius:3px;padding:10px 12px;">'
+                + '<div style="font-size:13px;color:var(--text-mid);margin-bottom:6px;font-weight:bold;">' + renderIconHtml('ship_default_active', '🚀', 12) + ' ' + (ship.displayName || ship.id) + '</div>'
                 + '<div style="margin-bottom:6px;display:flex;flex-direction:column;gap:4px;">'
                 + renderFuelBarsHtml(ship)
                 + '</div>'
-                + '<div style="font-size:10px;color:#666;">' + t('dock.modulesCount', { n: ship.modules?.length || 0 }) + '</div>';
+                + '<div style="font-size:10px;color:var(--text-dim);">' + t('dock.modulesCount', { n: ship.modules?.length || 0 }) + '</div>';
             if (!activeShip) {
                 // 0.2.0 阶段5：切换控制改为模块管理 + 起飞；有货运模块的船追加货仓调拨入口
                 html += '<div style="display:flex;gap:6px;margin-top:6px;">'
                     + '<button data-action="module-manage" data-ship-id="' + ship.id + '" style="'
-                    + 'flex:1;padding:5px 0;background:#333;color:#ccc;border:1px solid #555;'
+                    + 'flex:1;padding:5px 0;background:var(--theme-panel-deep);color:var(--text-main);border:1px solid var(--theme-border-row);'
                     + 'border-radius:3px;cursor:pointer;font-family:var(--font-mono);font-size:11px;'
                     + '">' + t('dock.moduleManage') + '</button>'
                     + '<button data-action="undock-ship" data-ship-id="' + ship.id + '" style="'
-                    + 'flex:1;padding:5px 0;background:#333;color:#8f8;border:1px solid #484;'
+                    + 'flex:1;padding:5px 0;background:var(--theme-panel-deep);color:#8f8;border:1px solid #484;'
                     + 'border-radius:3px;cursor:pointer;font-family:var(--font-mono);font-size:11px;'
                     + '">' + t('dock.takeoff') + '</button>'
                     + '</div>';
                 if (hasCargoHold(ship)) {
                     html += '<button data-action="cargo-transfer" data-ship-id="' + ship.id + '" style="'
-                        + 'width:100%;margin-top:6px;padding:5px 0;background:#333;color:#8c8;border:1px solid #484;'
+                        + 'width:100%;margin-top:6px;padding:5px 0;background:var(--theme-panel-deep);color:#8c8;border:1px solid #484;'
                         + 'border-radius:3px;cursor:pointer;font-family:var(--font-mono);font-size:11px;'
                         + '">' + t('dock.cargoHold') + '</button>';
                 }
@@ -672,24 +673,24 @@ function buildSupplyTerminalContent(facility) {
     let html = '';
     const dockedShips = facility.dockedShips || [];
     if (dockedShips.length === 0) {
-        html += '<div style="color:#555;font-size:12px;text-align:center;padding:20px;">' + t('dock.noDockedShipsRefuel') + '</div>';
+        html += '<div style="color:var(--text-faint);font-size:12px;text-align:center;padding:20px;">' + t('dock.noDockedShipsRefuel') + '</div>';
     } else {
-        html += '<div style="color:#666;font-size:11px;margin-bottom:8px;">' + t('dock.refuelableShips', { n: dockedShips.length }) + '</div>';
+        html += '<div style="color:var(--text-dim);font-size:11px;margin-bottom:8px;">' + t('dock.refuelableShips', { n: dockedShips.length }) + '</div>';
         html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">';
         for (const ship of dockedShips) {
-            html += '<div style="background:#333;border:1px solid #555;border-radius:3px;padding:10px 12px;">'
-                + '<div style="font-size:13px;color:#aaa;margin-bottom:6px;font-weight:bold;">' + renderIconHtml('ship_default_active', '🚀', 12) + ' ' + (ship.displayName || ship.id) + '</div>'
+            html += '<div style="background:var(--theme-panel-deep);border:1px solid var(--theme-border-row);border-radius:3px;padding:10px 12px;">'
+                + '<div style="font-size:13px;color:var(--text-mid);margin-bottom:6px;font-weight:bold;">' + renderIconHtml('ship_default_active', '🚀', 12) + ' ' + (ship.displayName || ship.id) + '</div>'
                 + '<div style="margin-bottom:8px;display:flex;flex-direction:column;gap:4px;">'
                 + renderFuelBarsHtml(ship)
                 + (ship.engineOut
-                    ? '<div style="font-size:10px;color:#e66;">' + t('dock.engineOut') + '</div>'
+                    ? '<div style="font-size:10px;color:var(--danger);">' + t('dock.engineOut') + '</div>'
                     : '')
                 + '</div>'
                 + '<button data-action="refuel-ship" data-ship-id="' + ship.id + '" style="'
-                + 'width:100%;padding:6px 0;background:#333;color:#cc4;border:1px solid #554;'
+                + 'width:100%;padding:6px 0;background:var(--theme-btn-bg);color:var(--refuel);border:1px solid var(--refuel-border);'
                 + 'border-radius:3px;cursor:pointer;font-family:monospace;font-size:11px;'
                 + '">' + t('dock.refuel') + '</button>'
-                + '<div style="font-size:9px;color:#666;text-align:center;margin-top:4px;">' + t('dock.refuelCost') + '</div>'
+                + '<div style="font-size:9px;color:var(--text-dim);text-align:center;margin-top:4px;">' + t('dock.refuelCost') + '</div>'
                 + '</div>';
         }
         html += '</div>';
@@ -802,14 +803,14 @@ window.hideDockPrompt = function() {
     _dockCallback = null;
 };
 
-// 统一工具栏 — 浮层面板（舱室内容显示容器）
+// 统一工具栏 — 浮层面板（舱室内容显示容器，0.2.7 页头升级为 KSP2 风格 .tkp-header）
 const toolbarPanel = document.createElement('div');
 toolbarPanel.id = 'toolbarPanel';
 toolbarPanel.style.display = 'none';
 toolbarPanel.innerHTML = `
-    <div class="ui-panel-header">
-        <span id="toolbarPanelTitle">${t('facility.typeName')}</span>
-        <button id="toolbarPanelCloseBtn" class="ui-btn-sm">✕</button>
+    <div class="tkp-header">
+        <span id="toolbarPanelTitle" class="tkp-title">${t('facility.typeName')}</span>
+        <button id="toolbarPanelCloseBtn" class="tkp-close">✕</button>
     </div>
     <div id="toolbarPanelContent"></div>
 `;

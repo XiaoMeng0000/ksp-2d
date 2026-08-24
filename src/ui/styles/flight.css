@@ -45,37 +45,6 @@
     background: var(--accent-bg);
 }
 
-/* ---- 舱室内容浮层面板(工具栏右侧) ---- */
-#toolbarPanel {
-    display: none;
-    position: fixed;
-    left: 70px;
-    top: 50%;
-    transform: translateY(-50%);
-    background: var(--panel-bg);
-    border: 1px solid var(--border);
-    border-radius: 5px;
-    padding: 12px 15px;
-    width: 550px;
-    box-sizing: border-box;
-    max-height: 70vh;
-    overflow-y: auto;
-    z-index: 998;
-    font-family: var(--font-mono);
-    color: var(--text-mid);
-    font-size: 12px;
-}
-
-#toolbarPanel .ui-panel-header {
-    margin-bottom: 10px;
-    padding-bottom: 6px;
-}
-
-#toolbarPanelTitle {
-    color: var(--accent);
-    font-size: 13px;
-}
-
 /* ---- 对接提示弹窗 ---- */
 #dockPrompt {
     display: none;

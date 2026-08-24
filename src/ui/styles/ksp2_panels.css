@@ -744,3 +744,251 @@
 .ui-input:focus {
     border-color: var(--theme-border-hover);
 }
+
+/* ============================================================
+   第五部分：飞行工具面板（flightUI #toolbarPanel 内容页）
+   0.2.7 新增：模块/舱室内容页统一为 KSP2 分区布局（扫描页样板先行）
+   全部引用 --theme-*(theme.css)与 root.css 变量，不新增色值
+   结构：页头(.tkp-header) → 分区标题(.tkp-section) → 卡片/行 → 操作区(.tkp-actions)
+   ============================================================ */
+
+/* ---- 面板外壳（原 flight.css #toolbarPanel 视觉迁移，保持浮层定位） ---- */
+#toolbarPanel {
+    display: none;
+    position: fixed;
+    left: 70px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--theme-bg);
+    border: 1px solid var(--theme-border);
+    border-radius: 5px;
+    padding: 14px;
+    width: 550px;
+    box-sizing: border-box;
+    max-height: 70vh;
+    overflow-y: auto;
+    z-index: 998;
+    font-family: var(--font-mono);
+    color: var(--text-bright);
+}
+
+/* ---- 页头（对齐开始游戏面板 .sgp-header） ---- */
+#toolbarPanel .tkp-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    padding: 10px 14px;
+    background: var(--theme-panel);
+    border-radius: 5px;
+}
+
+#toolbarPanel .tkp-title {
+    color: var(--text-bright);
+    font-family: var(--font-mono-bold);
+    font-weight: normal;
+    font-size: 14px;
+}
+
+#toolbarPanel .tkp-close {
+    height: 26px;
+    padding: 0 10px;
+    background: var(--theme-btn-bg);
+    color: var(--text-bright);
+    border: 1px solid var(--border-light);
+    border-radius: 5px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+#toolbarPanel .tkp-close:hover {
+    border-color: var(--theme-border-hover);
+}
+
+/* ---- 分区标题条（// 前缀为纯视觉装饰，文本走 strings；accent 蓝） ---- */
+#toolbarPanel .tkp-section {
+    color: var(--accent);
+    font-size: 12px;
+    letter-spacing: 1px;
+    margin: 12px 0 8px 0;
+    padding: 4px 10px;
+    background: var(--theme-panel);
+    border-radius: 3px;
+}
+
+#toolbarPanel .tkp-section::before {
+    content: '// ';
+    opacity: 0.7;
+}
+
+/* ---- 大卡片（IdentityCard 式：左图右文） ---- */
+#toolbarPanel .tkp-card {
+    background: var(--theme-panel-deep);
+    border: 1px solid var(--theme-border-row);
+    border-radius: 5px;
+    padding: 14px;
+}
+
+/* 次级卡片（分区内的第二级背景，如资源行列表）— 与 .tkp-card 同底，内边距收紧 */
+#toolbarPanel .tkp-card-sm {
+    background: var(--theme-panel-deep);
+    border: 1px solid var(--theme-border-row);
+    border-radius: 5px;
+    padding: 10px 12px;
+}
+
+#toolbarPanel .tkp-card-main {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+}
+
+#toolbarPanel .tkp-card-icon {
+    flex-shrink: 0;
+    width: 88px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#toolbarPanel .tkp-card-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+#toolbarPanel .tkp-card-title {
+    color: var(--text-bright);
+    font-size: 16px;
+    font-family: var(--font-mono-bold);
+    font-weight: normal;
+}
+
+#toolbarPanel .tkp-sub {
+    color: var(--text-dim);
+    font-size: 10px;
+}
+
+#toolbarPanel .tkp-desc {
+    color: var(--text-main);
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+/* ---- 数据行（资源/条目列表） ---- */
+#toolbarPanel .tkp-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+#toolbarPanel .tkp-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#toolbarPanel .tkp-row-label {
+    width: 80px;
+    flex-shrink: 0;
+    color: var(--text-mid);
+    font-size: 11px;
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#toolbarPanel .tkp-row-value {
+    flex-shrink: 0;
+    color: var(--text-mid);
+    font-size: 10px;
+    white-space: nowrap;
+}
+
+/* ---- 操作区按钮（主按钮紫色 = --theme-btn-selected，对齐参考图） ---- */
+#toolbarPanel .tkp-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+#toolbarPanel .tkp-btn,
+#toolbarPanel .tkp-btn-primary {
+    flex: 1;
+    height: 28px;
+    padding: 0 12px;
+    box-sizing: border-box;
+    border-radius: 5px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+#toolbarPanel .tkp-btn {
+    background: var(--theme-btn-bg);
+    color: var(--text-bright);
+    border: 1px solid var(--border-light);
+}
+
+#toolbarPanel .tkp-btn:hover {
+    border-color: var(--theme-border-hover);
+}
+
+#toolbarPanel .tkp-btn-primary {
+    background: var(--theme-btn-selected);
+    color: var(--text-bright);
+    border: 1px solid var(--theme-btn-selected);
+}
+
+#toolbarPanel .tkp-btn-primary:hover {
+    filter: brightness(1.15);
+}
+
+/* ---- 提示小字 ---- */
+#toolbarPanel .tkp-hint {
+    color: var(--warn);
+    font-size: 11px;
+    text-align: center;
+    margin-top: 10px;
+}
+
+#toolbarPanel .tkp-hint-muted {
+    color: var(--text-dim);
+    font-size: 10px;
+    text-align: center;
+    margin-top: 6px;
+}
+
+/* ---- 扫描进度区（id 供 flightUI setInterval 实时刷新） ---- */
+#toolbarPanel .tkp-progress-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-top: 12px;
+}
+
+#toolbarPanel .tkp-progress-head {
+    display: flex;
+    justify-content: space-between;
+    color: var(--text-dim);
+    font-size: 10px;
+}
+
+#toolbarPanel .tkp-progress {
+    height: 8px;
+    background: var(--theme-panel);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+#toolbarPanel .tkp-progress-bar {
+    width: 0;
+    height: 100%;
+    background: var(--progress-green);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}

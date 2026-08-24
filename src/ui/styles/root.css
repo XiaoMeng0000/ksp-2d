@@ -85,6 +85,9 @@
     /* 时间标签金 */
     --ut-gold-border: #a8984a;
 
+    --progress-green: #3dff3d;
+    /* 进度条绿（参考 KSP 资源条，扫描进度条等） */
+
     /* ---- 字体变量 ---- */
     --font-mono: 'JetBrainsMono-Regular', monospace;
     --font-mono-bold: 'JetBrainsMono-Bold', monospace;

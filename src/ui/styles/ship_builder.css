@@ -1,5 +1,6 @@
 /* ============================================================
    ship_builder.css — 飞船建造面板
+   0.2.7 统一为 KSP2 面板风格（--theme-* 变量，与设置/追踪站/对话框一致）
    ============================================================ */
 
 #shipBuilderPanel {
@@ -8,21 +9,69 @@
     left: 70px;
     top: 50%;
     transform: translateY(-50%);
-    background: var(--panel-bg);
-    border: 1px solid var(--border);
+    background: var(--theme-bg);
+    border: 1px solid var(--theme-border);
     border-radius: 5px;
-    padding: 15px;
+    padding: 14px;
     width: 650px;
     max-height: 70vh;
     overflow: hidden;
     z-index: 999;
     font-family: var(--font-mono);
+    color: var(--text-bright);
+}
+
+/* 头部条带（与对话框标题条 / 开始游戏面板 sgp-header 一致） */
+#shipBuilderPanel .ui-panel-header {
+    background: var(--theme-panel);
+    border-radius: 5px;
+    padding: 10px 14px;
+    margin-bottom: 14px;
+    border-bottom: none;
+}
+
+#shipBuilderPanel .ui-panel-title {
+    color: var(--text-bright);
+    font-family: var(--font-mono-bold);
+    font-weight: normal;
+    font-size: 15px;
+}
+
+#shipBuilderPanel .ui-btn-sm {
+    height: 26px;
+    padding: 0 10px;
+    background: var(--theme-btn-bg);
+    color: var(--text-bright);
+    border: 1px solid var(--border-light);
+    border-radius: 5px;
+}
+
+#shipBuilderPanel .ui-btn-sm:hover {
+    border-color: var(--theme-border-hover);
+    color: var(--text-bright);
+    background: var(--theme-btn-bg);
+}
+
+/* 底部建造按钮（覆盖 root.css .ui-btn-primary 默认样式，对齐设置页按钮） */
+#shipBuilderPanel .ui-btn-primary {
+    height: 26px;
+    padding: 0 24px;
+    background: var(--theme-btn-bg);
+    color: var(--text-bright);
+    border: 1px solid var(--border-light);
+    border-radius: 5px;
+}
+
+#shipBuilderPanel .ui-btn-primary:hover {
+    border-color: var(--theme-border-hover);
+    background: var(--theme-btn-bg);
+    color: var(--text-bright);
 }
 
 #shipBuilderPanel .builder-body {
     display: flex;
     height: calc(100% - 80px);
-    gap: 15px;
+    gap: 14px;
 }
 
 #shipBuilderPanel .builder-left {
@@ -33,9 +82,9 @@
 }
 
 #shipBuilderPanel .builder-preview {
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 3px;
+    background: var(--theme-panel);
+    border: 1px solid var(--theme-border-row);
+    border-radius: 5px;
     padding: 10px;
     height: 80px;
     display: flex;
@@ -58,20 +107,20 @@
 }
 
 #shipBuilderPanel .builder-stats {
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    padding: 10px;
-    color: var(--text-dim);
+    background: var(--theme-panel);
+    border: 1px solid var(--theme-border-row);
+    border-radius: 5px;
+    padding: 12px;
+    color: var(--text-mid);
     font-size: 12px;
 }
 
 #shipBuilderPanel .builder-slots-box {
     flex: 1;
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    padding: 8px;
+    background: var(--theme-panel);
+    border: 1px solid var(--theme-border-row);
+    border-radius: 5px;
+    padding: 10px;
     overflow: hidden;
 }
 
@@ -90,14 +139,15 @@
 
 /* 分类折叠容器 */
 .builder-cat-box {
-    border: 1px solid var(--border);
-    border-radius: 3px;
+    border: 1px solid var(--theme-border-row);
+    border-radius: 5px;
     overflow: hidden;
+    margin-bottom: 6px;
 }
 
 .builder-cat-header {
-    padding: 8px;
-    background: var(--card-bg);
+    padding: 8px 10px;
+    background: var(--theme-panel-deep);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -105,7 +155,7 @@
 }
 
 .builder-cat-header span:first-child {
-    color: var(--accent);
+    color: var(--text-bright);
     font-size: 12px;
 }
 
@@ -119,29 +169,30 @@
     padding: 6px 10px;
     background: transparent;
     border: none;
-    border-bottom: 1px solid var(--border-dark);
+    border-bottom: 1px solid var(--theme-border-row);
     color: var(--text-main);
     font-family: var(--font-mono);
     font-size: 12px;
     cursor: pointer;
     text-align: left;
+    transition: background 0.15s ease;
 }
 .builder-ship-btn:hover {
-    background: var(--accent-bg);
-    color: var(--accent);
+    background: var(--theme-hover);
+    color: var(--text-bright);
 }
 .builder-ship-btn.selected {
-    background: #2a2a4a;
-    color: var(--accent);
+    background: var(--theme-active-bg);
+    color: var(--text-bright);
 }
 
 /* 模块槽 */
 .builder-slot {
     min-width: 80px;
     padding: 8px;
-    background: var(--card-bg-dark);
-    border: 1px solid var(--border);
-    border-radius: 3px;
+    background: var(--theme-panel-deep);
+    border: 1px solid var(--theme-border-row);
+    border-radius: 5px;
     text-align: center;
     color: var(--text-main);
     font-size: 11px;
@@ -150,8 +201,8 @@
     transition: all 0.2s ease;
 }
 .builder-slot:hover {
-    border-color: var(--accent);
-    background: var(--card-bg-light);
+    border-color: var(--theme-border-hover);
+    background: var(--theme-panel);
 }
 
 .builder-slot-label {

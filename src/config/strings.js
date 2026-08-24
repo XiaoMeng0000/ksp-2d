@@ -402,8 +402,11 @@ const STRINGS = {
     'economy.insufficientKits': '材料套装不足，无法完成该操作！',
     'economy.buildCost': (p) => `建造耗材: ${p.cost} 套`,
 
-    // ---------- 扫描菜单（0.2.0 阶段6：主动扫描模型） ----------
+    // ---------- 扫描菜单（0.2.0 阶段6：主动扫描模型；0.2.7 分区布局） ----------
     'scan.menuTitle': '资源扫描',
+    'scan.targetSection': '扫描目标',
+    'scan.resourcesSection': '资源探测',
+    'scan.cardDesc': '对目标天体进行资源扫描，以探测可开采资源及其丰度，帮助规划采集行动。',
     'scan.deepSpace': '深空无宿主天体，无法扫描',
     'scan.scannerTier': (p) => `扫描仪等级: tier ${p.tier}`,
     'scan.noResources': '该天体未探测到可开采资源',
