@@ -98,8 +98,8 @@ function _renderRow(item, lineNum, scene) {
     let iconHtml = '';
     if (item.tone !== 'plain') {   // plain 行不渲染图标
         if (iconKey) {
-            // 尺寸可根据设计调整，这里用 24px
-            iconHtml = renderIconHtml(iconKey, icon, 24);
+            // 尺寸与操作行标签字号保持一致（.esc-label 13.5px）
+            iconHtml = renderIconHtml(iconKey, icon, 13.5);
         } else if (icon) {
             iconHtml = `<span class="esc-icon">${icon}</span>`;
         }

@@ -238,18 +238,18 @@
     min-height: 0;
 }
 
-/* 行内图标（plain 行不渲染） */
+/* 行内图标（plain 行不渲染）；尺寸与 .esc-label 字号保持一致（13.5px） */
 #escMenu .esc-icon {
     flex: 0 0 18px;
     text-align: center;
-    font-size: 12px;
+    font-size: 13.5px;
     line-height: 1;
 }
 
 /* 标签（label-1 动作词继承行 tone 颜色；label-2 名词固定白色） */
 #escMenu .esc-label {
     flex: 1;
-    font-size: 18px;
+    font-size: 13.5px;
 }
 
 #escMenu .esc-label-2 {
