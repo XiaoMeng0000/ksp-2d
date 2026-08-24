@@ -12,6 +12,7 @@
 import { RESOURCE_TYPES, getResourceType } from './resourceTypes.js';
 import { getModuleDef } from '../ship/moduleTypes.js';
 import { getFacilityType } from '../facility/facilityTypes.js';
+import { isBalanceEnforced } from './modeRules.js';
 
 // 可存储资源（科技点为全局资源，不入货仓/设施存储）
 export const STORAGE_RESOURCE_IDS = RESOURCE_TYPES
@@ -72,10 +73,17 @@ export function addCargo(ship, resourceId, amount) {
     return accepted;
 }
 
-// 货仓消耗（余额不足返回 false 不扣）
+// 货仓消耗（余额不足返回 false 不扣；sandbox 兜底：有多少扣多少，扣到 0 仍成功）
 export function consumeCargo(ship, resourceId, amount) {
     if (!ship || amount <= 0) return true;
-    if (getCargoAmount(ship, resourceId) < amount) return false;
+    if (getCargoAmount(ship, resourceId) < amount) {
+        // 0.2.0 阶段7：自由模式余额不足不拦截（无限资源兜底），扣到 0 操作照常成功
+        if (!isBalanceEnforced()) {
+            if (ship.cargo && ship.cargo[resourceId]) delete ship.cargo[resourceId];
+            return true;
+        }
+        return false;
+    }
     ship.cargo[resourceId].amount -= amount;
     if (ship.cargo[resourceId].amount <= 0) delete ship.cargo[resourceId];
     return true;
@@ -115,10 +123,17 @@ export function addStorage(facility, resourceId, amount) {
     return accepted;
 }
 
-// 设施存储消耗（余额不足返回 false 不扣）
+// 设施存储消耗（余额不足返回 false 不扣；sandbox 兜底：有多少扣多少，扣到 0 仍成功）
 export function consumeStorage(facility, resourceId, amount) {
     if (!facility || amount <= 0) return true;
-    if (getStorageAmount(facility, resourceId) < amount) return false;
+    if (getStorageAmount(facility, resourceId) < amount) {
+        // 0.2.0 阶段7：自由模式余额不足不拦截（无限资源兜底），扣到 0 操作照常成功
+        if (!isBalanceEnforced()) {
+            if (facility.storage && facility.storage[resourceId]) facility.storage[resourceId].amount = 0;
+            return true;
+        }
+        return false;
+    }
     facility.storage[resourceId].amount -= amount;
     return true;
 }

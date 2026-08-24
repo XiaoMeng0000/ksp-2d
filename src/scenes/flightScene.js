@@ -19,6 +19,7 @@ import { getTotalMass, getResource, getFuelAmount, getFuelCapacity } from '../re
 import { updateScanProgress } from '../resources/scanSystem.js';
 import { getEngineType } from '../resources/engineConfig.js';
 import { consumeCargo, hasCargoHold, getCargoAmount } from '../resources/cargoSystem.js';
+import { isBalanceEnforced } from '../resources/modeRules.js';
 import { timeWarp } from '../timeWarp.js';
 import { t } from '../config/strings.js';
 
@@ -161,9 +162,10 @@ eventBus.on(Events.SHIP_COMMAND, ({ action, params }) => {
             // 0.2.0 阶段5：部署设施消耗材料套装（从部署飞船货仓扣除）
             // 修复：扣费校验前置但实际扣除后移 —— 原实现在所有轨道校验之前扣费，
             // 校验失败（逃逸轨道/危险区）时材料套装已被扣但设施未部署（资源丢失）
+            // 0.2.0 阶段7：自由模式跳过余额检查（不足不拦截），货仓存在性检查保留
             const deployTypeCfg = getFacilityType(typeId);
             const deployCost = (deployTypeCfg && deployTypeCfg.cost) || 0;
-            if (deployCost > 0 && (!hasCargoHold(ship) || getCargoAmount(ship, 'materialKits') < deployCost)) {
+            if (deployCost > 0 && (!hasCargoHold(ship) || (isBalanceEnforced() && getCargoAmount(ship, 'materialKits') < deployCost))) {
                 window.showNotification(t('deploy.noKits'), 'warning');
                 break;
             }

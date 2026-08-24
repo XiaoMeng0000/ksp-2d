@@ -5,7 +5,7 @@
 // holder 结构：{ resources: { resourceId: { amount, capacity } } }
 
 import { gameState } from '../gameState.js';
-import { isResourceCheckEnabled } from './modeRules.js';
+import { isResourceFree } from './modeRules.js';
 import { getCargoUsed } from './cargoSystem.js';
 
 // 获取资源槽（{amount, capacity}），不存在返回 null
@@ -106,9 +106,10 @@ export function addPlayerResource(resourceId, amount) {
 }
 
 // 玩家全局资源 - 尝试消耗（当前仅科技点；实体资源已迁至设施存储/飞船货仓，见 cargoSystem.js）
-// sandbox 免检保留给 science 类消耗（蓝图解锁等），余额不足返回 false 且不扣款
+// 0.2.0 阶段7：自由模式下科技点免扣（isResourceFree，蓝图全解锁）；其余资源严格扣费，
+// 余额不足返回 false 且不扣款。注意：实体资源的"余额不足不拦截"兜底在 cargoSystem 层。
 export function consumePlayerResource(resourceId, amount) {
-    if (!isResourceCheckEnabled()) return true;   // 自由模式资源免检
+    if (isResourceFree(resourceId)) return true;   // 自由模式科技点免扣
     const state = gameState.getState();
     const player = state.player;
     const slot = player.resources && player.resources[resourceId];
