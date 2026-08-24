@@ -2,7 +2,10 @@
 
 import { sceneManager } from '../sceneManager.js';
 import { ENCYCLOPEDIA } from '../config/encyclopediaConfig.js';
+import { t } from '../config/strings.js';
 
+// 游戏百科（0.2.7 KSP2 设计语言重构：居中窗口 + 左导航 + 内容条目卡）
+// 视觉全部走 scenes.css（#encyclopediaPanel / .enc-*），JS 只做数据渲染与分类交互
 function registerEncyclopediaScene() {
     let panel = null;
     let escHandler = null;
@@ -12,6 +15,7 @@ function registerEncyclopediaScene() {
         sceneManager.switchTo('menu');
     }
 
+    // 左导航：分类列表（选中项高亮）
     function _renderCategoryList(navEl, contentEl) {
         navEl.innerHTML = '';
 
@@ -19,63 +23,49 @@ function registerEncyclopediaScene() {
             const cat = ENCYCLOPEDIA[i];
             const item = document.createElement('div');
             item.textContent = cat.category;
-            item.style.cssText = ''
-                + 'padding:10px 16px;font-family:monospace;font-size:14px;'
-                + 'cursor:pointer;color:rgba(255,255,255,0.6);'
-                + 'transition:all 0.15s ease;'
-                + 'border-left:3px solid transparent;';
-
-            if (i === _selectedCategory) {
-                item.style.color = 'white';
-                item.style.background = 'rgba(80,80,160,0.4)';
-                item.style.borderLeftColor = '#A04040';
-            }
-
-            item.addEventListener('mouseenter', () => {
-                if (i !== _selectedCategory) {
-                    item.style.background = 'rgba(255,255,255,0.05)';
-                }
-            });
-            item.addEventListener('mouseleave', () => {
-                if (i !== _selectedCategory) {
-                    item.style.background = 'transparent';
-                }
-            });
+            item.className = 'enc-nav-item' + (i === _selectedCategory ? ' active' : '');
             item.addEventListener('click', () => {
                 _selectedCategory = i;
                 _renderContent(contentEl);
                 _renderCategoryList(navEl, contentEl);
             });
-
             navEl.appendChild(item);
         }
     }
 
+    // 右内容：分类标题 + 条目卡（紫头 + 深色卡体分段）
     function _renderContent(contentEl) {
         contentEl.innerHTML = '';
         const cat = ENCYCLOPEDIA[_selectedCategory];
         if (!cat) return;
 
+        const title = document.createElement('div');
+        title.textContent = cat.category;
+        title.className = 'enc-content-title';
+        contentEl.appendChild(title);
+
         for (const entry of cat.entries) {
-            const entryDiv = document.createElement('div');
-            entryDiv.style.cssText = 'margin-bottom:28px;';
+            const card = document.createElement('div');
+            card.className = 'enc-card';
 
-            const title = document.createElement('h3');
-            title.textContent = entry.title;
-            title.style.cssText = 'color:#A04040;font-family:monospace;font-size:16px;margin:0 0 8px 0;';
+            const cardTitle = document.createElement('h3');
+            cardTitle.textContent = entry.title;
+            cardTitle.className = 'enc-card-title';
+            card.appendChild(cardTitle);
 
-            entryDiv.appendChild(title);
+            const body = document.createElement('div');
+            body.className = 'enc-card-body';
 
             // 按空行拆分段落，逐段渲染
             const paragraphs = entry.content.split(/\r?\n\s*\r?\n/);
             for (const para of paragraphs) {
-                const body = document.createElement('p');
-                body.textContent = para;
-                body.style.cssText = 'color:#999;font-family:monospace;font-size:13px;line-height:1.8;margin:0 0 12px 0;';
-                entryDiv.appendChild(body);
+                const p = document.createElement('p');
+                p.textContent = para;
+                body.appendChild(p);
             }
 
-            contentEl.appendChild(entryDiv);
+            card.appendChild(body);
+            contentEl.appendChild(card);
         }
     }
 
@@ -85,55 +75,50 @@ function registerEncyclopediaScene() {
 
             panel = document.createElement('div');
             panel.id = 'encyclopediaPanel';
-            panel.style.cssText = ''
-                + 'position:fixed;inset:0;z-index:2000;'
-                + 'background:rgba(0,0,0,0.92);backdrop-filter:blur(12px);'
-                + 'display:flex;font-family:monospace;';
+            panel.className = 'scene-fullscreen';
 
-            // 左侧分类导航
-            const navEl = document.createElement('div');
-            navEl.id = 'encyclopediaNav';
-            navEl.style.cssText = ''
-                + 'width:200px;padding:60px 0 0 0;'
-                + 'border-right:1px solid #333;'
-                + 'overflow-y:auto;flex-shrink:0;';
+            // 居中大窗口（蓝灰壳 + 紫描边）
+            const windowEl = document.createElement('div');
+            windowEl.className = 'enc-window';
 
-            // 右侧内容区
-            const contentEl = document.createElement('div');
-            contentEl.id = 'encyclopediaContent';
-            contentEl.style.cssText = ''
-                + 'flex:1;padding:60px 80px 60px 60px;'
-                + 'overflow-y:auto;';
+            // 顶栏：标题 + 关闭
+            const topbar = document.createElement('div');
+            topbar.className = 'enc-topbar';
 
-            // 关闭按钮
+            const titleEl = document.createElement('span');
+            titleEl.textContent = t('encyclopedia.title');
+            titleEl.className = 'enc-title';
+            topbar.appendChild(titleEl);
+
             const closeBtn = document.createElement('button');
-            closeBtn.textContent = '关闭';
-            closeBtn.style.cssText = ''
-                + 'position:absolute;bottom:40px;right:40px;'
-                + 'padding:10px 36px;'
-                + 'background:rgba(30,30,30,0.8);color:white;'
-                + 'border:1px solid #A04040;border-radius:4px;'
-                + 'font-family:monospace;font-size:14px;'
-                + 'cursor:pointer;transition:all 0.2s ease;';
-            closeBtn.addEventListener('mouseenter', () => {
-                closeBtn.style.background = '#2a2a2a';
-                closeBtn.style.borderColor = '#c05050';
-            });
-            closeBtn.addEventListener('mouseleave', () => {
-                closeBtn.style.background = 'rgba(30,30,30,0.8)';
-                closeBtn.style.borderColor = '#A04040';
-            });
+            closeBtn.textContent = t('encyclopedia.close');
+            closeBtn.className = 'enc-close';
             closeBtn.addEventListener('click', () => {
                 _close();
             });
+            topbar.appendChild(closeBtn);
+
+            windowEl.appendChild(topbar);
+
+            // 主体：左导航 + 右内容
+            const bodyEl = document.createElement('div');
+            bodyEl.className = 'enc-body';
+
+            const navEl = document.createElement('div');
+            navEl.id = 'encyclopediaNav';
+
+            const contentEl = document.createElement('div');
+            contentEl.id = 'encyclopediaContent';
+
+            bodyEl.appendChild(navEl);
+            bodyEl.appendChild(contentEl);
+            windowEl.appendChild(bodyEl);
+
+            panel.appendChild(windowEl);
+            document.body.appendChild(panel);
 
             _renderCategoryList(navEl, contentEl);
             _renderContent(contentEl);
-
-            panel.appendChild(navEl);
-            panel.appendChild(contentEl);
-            panel.appendChild(closeBtn);
-            document.body.appendChild(panel);
 
             escHandler = (event) => {
                 if (event.key === 'Escape') {

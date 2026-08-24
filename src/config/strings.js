@@ -371,6 +371,10 @@ const STRINGS = {
     'galaxies.title': '星系图',
     'galaxies.summary': (p) => `// 已加载 ${p.galaxies} 个星系 · ${p.bodies} 个天体`,
 
+    // ---------- 游戏百科(0.2.7 KSP2 重构) ----------
+    'encyclopedia.title': '游戏百科',
+    'encyclopedia.close': '关闭',
+
     // ---------- 追踪站场景 ----------
     'tracking.stationName': '追踪站',
 
