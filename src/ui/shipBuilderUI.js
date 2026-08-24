@@ -4,10 +4,10 @@ import { uiManager } from './uiManager.js';
 import { eventBus, Events } from '../eventBus.js';
 import { SHIP_TEMPLATES } from '../ship/shipTemplates.js';
 import { SHIP_CATEGORIES } from '../ship/shipCategories.js';
-import { getModuleDef, getModuleCategories, getModulesByCategory } from '../ship/moduleTypes.js';
+import { getModuleDef } from '../ship/moduleTypes.js';
 import { stateToKepler } from '../physics/orbitalMechanics.js';
 import { textureManager } from '../graphics/textureManager.js';
-import { renderIconHtml } from './uiComponents.js';
+import { renderIconHtml, showModuleSelectorPopup } from './uiComponents.js';
 import { sceneManager } from '../sceneManager.js';
 import { consumeStorage } from '../resources/cargoSystem.js';
 import { t } from '../config/strings.js';
@@ -232,169 +232,24 @@ function updateShipBuilderStats() {
     `;
 }
 
-// 模块系统 - 模块选择弹窗
+// 模块系统 - 模块选择弹窗（0.2.7 统一走共享组件 showModuleSelectorPopup）
 function showModuleSelector(slotIndex, slotElement) {
-    // 移除已有弹窗
-    const existing = document.querySelector('.module-selector-popup');
-    if (existing) existing.remove();
-
-    const rect = slotElement.getBoundingClientRect();
-
-    const popup = document.createElement('div');
-    popup.className = 'module-selector-popup';
-    popup.style.cssText = `
-        position:fixed;left:${rect.right + 8}px;top:${rect.top}px;
-        background:var(--theme-bg);border:1px solid var(--theme-border);border-radius:5px;
-        padding:6px 0;min-width:180px;max-height:300px;overflow-y:auto;
-        z-index:10001;font-family:var(--font-mono);font-size:12px;color:var(--text-main);
-    `;
-
-    const currentModuleId = selectedModules[slotIndex];
-
-    // 已安装提示
-    if (currentModuleId) {
-        const def = getModuleDef(currentModuleId);
-        if (def) {
-            const installedRow = document.createElement('div');
-            installedRow.style.cssText = 'padding:4px 10px;color:var(--text-dim);border-bottom:1px solid var(--theme-border-row);margin-bottom:4px;';
-            installedRow.innerHTML = `${t('build.installed')}<span style="color:var(--accent);">${renderIconHtml(def.iconTextureKey, def.icon)} ${def.name}</span>`;
-            popup.appendChild(installedRow);
-        }
-    }
-
-    // 分类分组
-    const categories = getModuleCategories();
-    const allExpanded = {};
-
-    categories.forEach((cat, catIdx) => {
-        allExpanded[cat.id] = true;
-
-        // 分类标题行
-        const header = document.createElement('div');
-        header.style.cssText = `
-            padding:4px 10px;cursor:pointer;display:flex;
-            align-items:center;justify-content:space-between;
-            color:var(--accent);font-size:11px;user-select:none;
-        `;
-        header.innerHTML = `<span>${cat.name}</span><span style="color:var(--text-dim);font-size:10px;">-</span>`;
-        popup.appendChild(header);
-
-        // 模块列表容器
-        const listContainer = document.createElement('div');
-        listContainer.style.display = 'block';
-        popup.appendChild(listContainer);
-
-        const modules = getModulesByCategory(cat.id);
-        const toggleSpan = header.querySelector('span:last-child');
-
-        header.addEventListener('click', () => {
-            allExpanded[cat.id] = !allExpanded[cat.id];
-            listContainer.style.display = allExpanded[cat.id] ? 'block' : 'none';
-            toggleSpan.textContent = allExpanded[cat.id] ? '-' : '+';
-        });
-
-        modules.forEach(modDef => {
-            const row = document.createElement('div');
-            row.style.cssText = `
-                padding:4px 10px;cursor:pointer;display:flex;
-                align-items:center;gap:4px;font-size:11px;
-            `;
-            row.innerHTML = `${renderIconHtml(modDef.iconTextureKey, modDef.icon)} ${modDef.name} <span style="color:var(--text-dim);font-size:10px;">${t('build.bonusShort', { mass: modDef.massBonus.toFixed(1), moi: modDef.momentOfInertiaBonus.toFixed(0) })}${modDef.price ? t('build.modulePriceSuffix', { price: modDef.price }) : ''}</span>`;
-
-            // Tooltip
-            let tooltip = null;
-            row.addEventListener('mouseenter', () => {
-                tooltip = document.createElement('div');
-                tooltip.className = 'module-tooltip';
-                tooltip.style.cssText = `
-                    position:fixed;z-index:10002;
-                    background:var(--theme-bg);border:1px solid var(--theme-border);
-                    border-radius:5px;padding:8px 10px;min-width:160px;
-                    font-family:var(--font-mono);font-size:11px;color:var(--text-main);
-                    pointer-events:none;
-                `;
-                tooltip.innerHTML = `
-                    <div style="color:var(--accent);font-weight:bold;margin-bottom:4px;">${modDef.name}</div>
-                    <div style="color:var(--text-mid);margin-bottom:4px;">${modDef.description}</div>
-                    <div style="color:var(--text-dim);">${t('build.massBonus', { v: modDef.massBonus.toFixed(1) })}</div>
-                    <div style="color:var(--text-dim);">${t('build.moiBonus', { v: modDef.momentOfInertiaBonus.toFixed(0) })}</div>
-                `;
-                document.body.appendChild(tooltip);
-                const rowRect = row.getBoundingClientRect();
-                tooltip.style.left = (rowRect.right + 8) + 'px';
-                tooltip.style.top = rowRect.top + 'px';
-            });
-            row.addEventListener('mouseleave', () => {
-                if (tooltip) { tooltip.remove(); tooltip = null; }
-            });
-
-            // 点击安装/替换
-            row.addEventListener('click', (e) => {
-                e.stopPropagation();
-                selectedModules[slotIndex] = modDef.id;
-                popup.remove();
-                if (tooltip) tooltip.remove();
-                renderShipBuilderSlots();
-                updateShipBuilderStats();
-            });
-
-            // hover 样式
-            row.addEventListener('mouseenter', () => {
-                row.style.background = 'var(--accent-bg)';
-            });
-            row.addEventListener('mouseleave', () => {
-                row.style.background = 'transparent';
-            });
-
-            listContainer.appendChild(row);
-        });
-    });
-
-    // 卸载选项（仅已安装时）
-    if (currentModuleId) {
-        const uninstallRow = document.createElement('div');
-        uninstallRow.style.cssText = `
-            padding:4px 10px;color:var(--danger);cursor:pointer;border-top:1px solid var(--theme-border-row);
-            margin-top:4px;font-size:11px;
-        `;
-        uninstallRow.textContent = t('build.uninstall');
-        uninstallRow.addEventListener('mouseenter', () => {
-            uninstallRow.style.background = 'var(--danger-bg)';
-        });
-        uninstallRow.addEventListener('mouseleave', () => {
-            uninstallRow.style.background = 'transparent';
-        });
-        uninstallRow.addEventListener('click', (e) => {
-            e.stopPropagation();
-            selectedModules[slotIndex] = null;
-            popup.remove();
+    showModuleSelectorPopup({
+        anchorEl: slotElement,
+        onSelect: (modDef) => {
+            selectedModules[slotIndex] = modDef.id;
             renderShipBuilderSlots();
             updateShipBuilderStats();
-        });
-        popup.appendChild(uninstallRow);
-    }
-
-    document.body.appendChild(popup);
-
-    // 关闭逻辑
-    const closeHandler = (e) => {
-        if (!popup.contains(e.target) && e.target !== slotElement) {
-            popup.remove();
-            document.removeEventListener('click', closeHandler);
-            document.removeEventListener('keydown', escHandler);
-        }
-    };
-    const escHandler = (e) => {
-        if (e.key === 'Escape') {
-            popup.remove();
-            document.removeEventListener('click', closeHandler);
-            document.removeEventListener('keydown', escHandler);
-        }
-    };
-    setTimeout(() => {
-        document.addEventListener('click', closeHandler);
-        document.addEventListener('keydown', escHandler);
-    }, 0);
+        },
+        onUninstall: () => {
+            selectedModules[slotIndex] = null;
+            renderShipBuilderSlots();
+            updateShipBuilderStats();
+        },
+        installedModuleId: selectedModules[slotIndex],
+        showBonuses: true,
+        showTooltip: true
+    });
 }
 
 // 模块系统 - 渲染模块槽（读取 selectedModules）

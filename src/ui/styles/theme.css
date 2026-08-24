@@ -31,4 +31,10 @@
     --theme-border: #676767;
     --theme-border-hover: #4B758A;
     --theme-border-row: #060709;
+
+    /* 工具卡描线（0.2.7 飞行工具面板 .tkp-* 卡片边框，深蓝紫） */
+    --theme-card-border: #2E3555;
+
+    /* 工具菜单外描边（0.2.7 面板外壳 #toolbarPanel / 建造 / 部署面板，亮紫罗兰线） */
+    --theme-menu-border: #5A5FCF;
 }

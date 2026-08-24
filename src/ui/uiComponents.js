@@ -3,6 +3,7 @@
 import { textureManager } from '../graphics/textureManager.js';
 import { t } from '../config/strings.js';
 import { getResourceType } from '../resources/resourceTypes.js';
+import { getModuleDef, getModuleCategories, getModulesByCategory } from '../ship/moduleTypes.js';
 
 export function createNotification(message, type = 'info', duration = 2000) {
     // 创建或获取通知容器
@@ -226,10 +227,10 @@ export function renderIconHtml(textureKey, fallbackEmoji, sizePx) {
 }
 
 // 燃料分槽进度条（0.2.0 阶段4）— 每种推进剂独立一条 bar，供各面板复用
-// 结构：资源名 [进度条] 存量/容量；无 resources 时回退单一燃料条
+// 0.2.7 v2：标签/数量在条外（条内无文字），空槽常显（0 量不消失），默认绿
 export function renderFuelBarsHtml(ship, opts = {}) {
     if (!ship) return '';
-    const color = opts.color || 'var(--accent)';
+    const color = opts.color || 'var(--progress-green)';
 
     const rows = [];
     if (ship.resources) {
@@ -238,25 +239,144 @@ export function renderFuelBarsHtml(ship, opts = {}) {
             const def = getResourceType(resId);
             rows.push({
                 name: def ? def.name : resId,
+                unit: def ? def.unit : '',
                 amount: slot.amount || 0,
                 capacity: slot.capacity || 0
             });
         }
     } else if (typeof ship.fuel === 'number') {
-        rows.push({ name: t('common.fuel'), amount: ship.fuel, capacity: ship.fuelCapacity ?? ship.fuel });
+        rows.push({ name: t('common.fuel'), unit: '', amount: ship.fuel, capacity: ship.fuelCapacity ?? ship.fuel });
     }
 
     let html = '';
     for (const r of rows) {
         const pct = r.capacity > 0 ? Math.min(100, Math.max(0, r.amount / r.capacity * 100)) : 0;
-        html += '<div style="display:flex;align-items:center;gap:6px;">'
-            + '<span style="width:64px;flex-shrink:0;color:#888;font-size:10px;text-align:right;'
-            + 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + r.name + '</span>'
-            + '<span style="flex:1;display:inline-block;height:6px;background:#333;border-radius:3px;overflow:hidden;">'
-            + '<span style="display:block;width:' + pct + '%;height:100%;background:' + color + ';border-radius:3px;"></span></span>'
-            + '<span style="width:84px;flex-shrink:0;color:#888;font-size:10px;white-space:nowrap;">'
-            + Math.floor(r.amount) + ' / ' + Math.floor(r.capacity) + '</span>'
+        html += '<div class="tkp-res-row" style="gap:4px;">'
+            + '<span class="tkp-res-name" style="width:64px;text-align:left;">' + r.name + '</span>'
+            + '<span class="tkp-res-track"><span class="tkp-res-fill" style="width:' + pct + '%;background:' + color + ';"></span></span>'
+            + '<span class="tkp-res-amount">' + Math.floor(r.amount) + ' / ' + Math.floor(r.capacity) + (r.unit ? ' ' + r.unit : '') + '</span>'
             + '</div>';
     }
     return html;
+}
+
+// 模块选择弹窗（0.2.7 共享组件：统一飞船建造 showModuleSelector 与设施模块管理 showFacilityModuleSelector）
+// opts:
+//   anchorEl          锚定元素（弹窗跟随其右侧弹出）
+//   onSelect(modDef)  必填，点击模块行（安装/替换）
+//   onUninstall()     可选，提供则弹窗底部显示"卸载"危险行
+//   installedModuleId 可选，显示"已安装"提示行
+//   showBonuses       可选，行尾显示加成+价格（飞船建造用）
+//   showTooltip       可选，悬停显示模块详情（飞船建造用）
+// 视觉统一走 ksp2_panels.css（.module-selector-popup / .msp-*）
+export function showModuleSelectorPopup(opts) {
+    const existing = document.querySelector('.module-selector-popup');
+    if (existing) existing.remove();
+
+    const rect = opts.anchorEl.getBoundingClientRect();
+    const popup = document.createElement('div');
+    popup.className = 'module-selector-popup';
+    popup.style.cssText = `
+        position:fixed;left:${Math.min(rect.right + 8, window.innerWidth - 240)}px;top:${rect.top}px;
+    `;
+
+    const closeHandler = () => { popup.remove(); document.removeEventListener('click', closeHandler); };
+    const escHandler = (e) => {
+        if (e.key === 'Escape') { popup.remove(); document.removeEventListener('click', closeHandler); }
+    };
+
+    // 已安装提示（飞船建造：当前槽位已有模块）
+    const installedDef = opts.installedModuleId ? getModuleDef(opts.installedModuleId) : null;
+    if (installedDef) {
+        const installedRow = document.createElement('div');
+        installedRow.className = 'msp-installed';
+        installedRow.innerHTML = t('build.installed')
+            + '<span style="color:var(--accent);">' + renderIconHtml(installedDef.iconTextureKey, installedDef.icon) + ' ' + installedDef.name + '</span>';
+        popup.appendChild(installedRow);
+    }
+
+    // 分类卡（紫头顶条，点击折叠仅剩顶头）
+    for (const cat of getModuleCategories()) {
+        const card = document.createElement('div');
+        card.className = 'msp-cat-card';
+
+        const head = document.createElement('div');
+        head.className = 'msp-cat-head';
+        head.innerHTML = '<span class="tg-arrow">▾</span>' + cat.name;
+        head.addEventListener('click', (e) => {
+            e.stopPropagation();
+            card.classList.toggle('collapsed');
+        });
+        card.appendChild(head);
+
+        const body = document.createElement('div');
+        body.className = 'msp-cat-body';
+
+        for (const def of getModulesByCategory(cat.id)) {
+            const row = document.createElement('div');
+            row.className = 'msp-row';
+            // 名称（左）
+            let labelHtml = '<span>' + renderIconHtml(def.iconTextureKey, def.icon) + ' ' + def.name + '</span>';
+            // 行尾（右）：建造=加成+价格 / 设施=价格或免费
+            if (opts.showBonuses) {
+                labelHtml += '<span class="msp-bonus">'
+                    + t('build.bonusShort', { mass: def.massBonus.toFixed(1), moi: def.momentOfInertiaBonus.toFixed(0) })
+                    + (def.price ? t('build.modulePriceSuffix', { price: def.price }) : '')
+                    + '</span>';
+            } else {
+                labelHtml += '<span class="msp-price">' + (def.price > 0 ? def.price + t('economy.kitsUnit') : t('common.free')) + '</span>';
+            }
+            row.innerHTML = labelHtml;
+
+            // 悬停详情提示（飞船建造用）
+            let tooltip = null;
+            if (opts.showTooltip) {
+                row.addEventListener('mouseenter', () => {
+                    tooltip = document.createElement('div');
+                    tooltip.className = 'msp-tooltip';
+                    tooltip.innerHTML = '<div class="msp-tooltip-title">' + def.name + '</div>'
+                        + '<div class="msp-tooltip-desc">' + def.description + '</div>'
+                        + '<div class="msp-tooltip-stats">' + t('build.massBonus', { v: def.massBonus.toFixed(1) }) + ' · ' + t('build.moiBonus', { v: def.momentOfInertiaBonus.toFixed(0) }) + '</div>';
+                    document.body.appendChild(tooltip);
+                    const rowRect = row.getBoundingClientRect();
+                    tooltip.style.left = (rowRect.right + 8) + 'px';
+                    tooltip.style.top = rowRect.top + 'px';
+                });
+                row.addEventListener('mouseleave', () => {
+                    if (tooltip) { tooltip.remove(); tooltip = null; }
+                });
+            }
+
+            // 点击安装/替换
+            row.addEventListener('click', (e) => {
+                e.stopPropagation();
+                popup.remove();
+                if (tooltip) tooltip.remove();
+                opts.onSelect(def);
+            });
+
+            body.appendChild(row);
+        }
+        card.appendChild(body);
+        popup.appendChild(card);
+    }
+
+    // 卸载危险行（仅已安装模块时显示）
+    if (opts.onUninstall && installedDef) {
+        const uninstallRow = document.createElement('div');
+        uninstallRow.className = 'msp-uninstall';
+        uninstallRow.textContent = t('build.uninstall');
+        uninstallRow.addEventListener('click', (e) => {
+            e.stopPropagation();
+            popup.remove();
+            opts.onUninstall();
+        });
+        popup.appendChild(uninstallRow);
+    }
+
+    document.body.appendChild(popup);
+    setTimeout(() => {
+        document.addEventListener('click', closeHandler);
+        document.addEventListener('keydown', escHandler);
+    }, 0);
 }

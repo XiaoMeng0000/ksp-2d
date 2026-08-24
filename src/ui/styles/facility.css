@@ -10,7 +10,7 @@
     top: 50%;
     transform: translateY(-50%);
     background: var(--theme-bg);
-    border: 1px solid var(--theme-border);
+    border: 1px solid var(--theme-menu-border);
     border-radius: 5px;
     padding: 14px;
     width: 650px;
@@ -83,7 +83,7 @@
 #facilityDeployPanel .deploy-detail {
     width: 65%;
     background: var(--theme-panel);
-    border: 1px solid var(--theme-border-row);
+    border: none;
     border-radius: 5px;
     padding: 12px;
     color: var(--text-mid);
@@ -91,7 +91,7 @@
 }
 
 .deploy-cat-box {
-    border: 1px solid var(--theme-border-row);
+    border: none;
     border-radius: 5px;
     overflow: hidden;
     margin-bottom: 6px;

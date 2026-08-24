@@ -760,7 +760,7 @@
     top: 50%;
     transform: translateY(-50%);
     background: var(--theme-bg);
-    border: 1px solid var(--theme-border);
+    border: 1px solid var(--theme-menu-border);
     border-radius: 5px;
     padding: 14px;
     width: 550px;
@@ -825,7 +825,7 @@
 /* ---- 大卡片（IdentityCard 式：左图右文） ---- */
 #toolbarPanel .tkp-card {
     background: var(--theme-panel-deep);
-    border: 1px solid var(--theme-border-row);
+    border: none;
     border-radius: 5px;
     padding: 14px;
 }
@@ -833,9 +833,218 @@
 /* 次级卡片（分区内的第二级背景，如资源行列表）— 与 .tkp-card 同底，内边距收紧 */
 #toolbarPanel .tkp-card-sm {
     background: var(--theme-panel-deep);
-    border: 1px solid var(--theme-border-row);
+    border: none;
     border-radius: 5px;
     padding: 10px 12px;
+}
+
+/* ---- 两列网格（信息卡/槽位/飞船卡） ---- */
+#toolbarPanel .tkp-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+/* ---- 槽位/飞船卡（视觉统一，布局由使用处内联） ---- */
+#toolbarPanel .tkp-slot {
+    background: var(--theme-panel-deep);
+    border: none;
+    border-radius: 5px;
+    padding: 8px 10px;
+    min-width: 0;
+}
+
+/* 空槽位（虚线框安装按钮） */
+#toolbarPanel .tkp-slot-empty {
+    background: var(--theme-panel);
+    border: none;
+    border-radius: 5px;
+    padding: 8px 10px;
+    cursor: pointer;
+    color: var(--text-mid);
+    font-size: 11px;
+    font-family: var(--font-mono);
+    text-align: left;
+}
+
+#toolbarPanel .tkp-slot-empty:hover {
+    background: var(--accent-bg);
+    color: var(--accent);
+}
+
+/* ---- 信息小卡（label + value） ---- */
+#toolbarPanel .tkp-info {
+    background: var(--theme-panel-deep);
+    border: none;
+    border-radius: 5px;
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+#toolbarPanel .tkp-info-label {
+    color: var(--text-dim);
+    font-size: 10px;
+}
+
+#toolbarPanel .tkp-info-value {
+    color: var(--text-mid);
+    font-size: 13px;
+    font-weight: bold;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ---- 模块安装选择弹窗（0.2.7 当前风格：紫描边外框 + 分组卡，定位仍 JS 内联） ---- */
+.module-selector-popup {
+    background: var(--theme-bg);
+    border: 1px solid var(--theme-menu-border);
+    border-radius: 5px;
+    padding: 6px;
+    min-width: 220px;
+    max-height: 340px;
+    overflow-y: auto;
+    z-index: 10001;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-main);
+}
+
+/* 分类卡（与资源分组卡同款：紫头顶条 + 卡体，可折叠） */
+.module-selector-popup .msp-cat-card {
+    background: var(--theme-panel-deep);
+    border-radius: 5px;
+    margin-bottom: 6px;
+    overflow: hidden;
+}
+
+.module-selector-popup .msp-cat-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: var(--theme-btn-selected);
+    color: var(--text-bright);
+    font-size: 11px;
+    font-family: var(--font-mono-bold);
+    font-weight: normal;
+    letter-spacing: 1px;
+    cursor: pointer;
+}
+
+.module-selector-popup .msp-cat-head:hover {
+    filter: brightness(1.1);
+}
+
+.module-selector-popup .msp-cat-head .tg-arrow {
+    font-size: 10px;
+    transition: transform 0.15s ease;
+}
+
+.module-selector-popup .msp-cat-card.collapsed .msp-cat-head .tg-arrow {
+    transform: rotate(-90deg);
+}
+
+.module-selector-popup .msp-cat-card.collapsed .msp-cat-body {
+    display: none;
+}
+
+.module-selector-popup .msp-cat-body {
+    padding: 4px 6px;
+    display: flex;
+    flex-direction: column;
+}
+
+.module-selector-popup .msp-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 5px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+    color: var(--text-main);
+}
+
+.module-selector-popup .msp-row:hover {
+    background: var(--accent-bg);
+    color: var(--accent);
+}
+
+.module-selector-popup .msp-price {
+    color: var(--ut-gold);
+    font-size: 10px;
+    flex-shrink: 0;
+}
+
+/* 已安装提示行（飞船建造：当前槽位已有模块） */
+.module-selector-popup .msp-installed {
+    background: var(--theme-panel-deep);
+    border-radius: 3px;
+    padding: 4px 8px;
+    margin-bottom: 6px;
+    color: var(--text-dim);
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+}
+
+/* 行尾加成文本（飞船建造：+质量 +惯量 · 价格） */
+.module-selector-popup .msp-bonus {
+    color: var(--text-dim);
+    font-size: 10px;
+    flex-shrink: 0;
+}
+
+/* 卸载危险行（仅已安装模块时显示） */
+.module-selector-popup .msp-uninstall {
+    color: var(--danger);
+    cursor: pointer;
+    padding: 5px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    margin-top: 2px;
+}
+
+.module-selector-popup .msp-uninstall:hover {
+    background: var(--danger-bg);
+}
+
+/* 模块详情悬停提示（飞船建造用，多行富文本）— 背景与分类卡同款深灰 */
+.msp-tooltip {
+    position: fixed;
+    z-index: 10002;
+    background: var(--theme-panel-deep);
+    border: 1px solid var(--theme-menu-border);
+    border-radius: 5px;
+    padding: 8px 10px;
+    min-width: 160px;
+    max-width: 260px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-main);
+    pointer-events: none;
+}
+
+.msp-tooltip-title {
+    color: var(--accent);
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+
+.msp-tooltip-desc {
+    color: var(--text-mid);
+    margin-bottom: 4px;
+    line-height: 1.5;
+}
+
+.msp-tooltip-stats {
+    color: var(--text-dim);
 }
 
 #toolbarPanel .tkp-card-main {
@@ -918,7 +1127,6 @@
 
 #toolbarPanel .tkp-btn,
 #toolbarPanel .tkp-btn-primary {
-    flex: 1;
     height: 28px;
     padding: 0 12px;
     box-sizing: border-box;
@@ -926,6 +1134,12 @@
     font-family: var(--font-mono);
     font-size: 12px;
     cursor: pointer;
+}
+
+/* 操作区内的按钮等分；行内小按钮不受影响（不写 flex，布局由使用处控制） */
+#toolbarPanel .tkp-actions .tkp-btn,
+#toolbarPanel .tkp-actions .tkp-btn-primary {
+    flex: 1;
 }
 
 #toolbarPanel .tkp-btn {
@@ -991,4 +1205,103 @@
     background: var(--progress-green);
     border-radius: 4px;
     transition: width 0.3s ease;
+}
+
+/* ---- 资源分组卡（0.2.7 v2：一个分类一张卡）
+   卡头 = 紫色顶条（折叠后仅剩此条）；卡体 = 资源条行列表（名字/数量在条外） ---- */
+#toolbarPanel .tkp-res-group-card {
+    background: var(--theme-bg);
+    border: none;
+    border-radius: 5px;
+    padding: 0;
+    margin-bottom: 8px;
+    overflow: hidden;
+}
+
+#toolbarPanel .tkp-res-group-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    background: var(--theme-btn-selected);
+    color: var(--text-bright);
+    font-size: 12px;
+    font-family: var(--font-mono-bold);
+    font-weight: normal;
+    cursor: pointer;
+    letter-spacing: 1px;
+}
+
+#toolbarPanel .tkp-res-group-head:hover {
+    filter: brightness(1.1);
+}
+
+#toolbarPanel .tkp-res-group-head .tg-arrow {
+    font-size: 10px;
+    transition: transform 0.15s ease;
+}
+
+/* 折叠：仅剩紫色顶头（参考图截图） */
+#toolbarPanel .tkp-res-group-card.collapsed .tkp-res-group-head .tg-arrow {
+    transform: rotate(-90deg);
+}
+
+#toolbarPanel .tkp-res-group-card.collapsed .tkp-res-group-body {
+    display: none;
+}
+
+#toolbarPanel .tkp-res-group-body {
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ---- 资源条行（名字/数量在条外，条内无文字；空槽常显 0 量） ---- */
+#toolbarPanel .tkp-res-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 0;
+}
+
+#toolbarPanel .tkp-res-name {
+    width: 88px;
+    flex-shrink: 0;
+    color: var(--text-bright);
+    font-size: 11px;
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#toolbarPanel .tkp-res-track {
+    flex: 1;
+    height: 10px;
+    background: var(--theme-panel);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+#toolbarPanel .tkp-res-fill {
+    display: block;
+    height: 100%;
+    border-radius: 3px;
+}
+
+#toolbarPanel .tkp-res-amount {
+    width: 88px;
+    flex-shrink: 0;
+    color: var(--text-mid);
+    font-size: 10px;
+    text-align: right;
+    white-space: nowrap;
+}
+
+/* 分组卡体内的行按钮（调拨/装卸） */
+#toolbarPanel .tkp-res-group-body .tkp-btn {
+    flex: none;
+    height: 20px;
+    padding: 0 8px;
+    font-size: 10px;
 }

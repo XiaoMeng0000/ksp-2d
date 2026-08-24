@@ -189,6 +189,9 @@ const STRINGS = {
     'facility.typeName': '设施',
     'facility.bridgeResearch': '蓝图研究功能开发中...',
     'facility.unknownCompartment': '未知舱室',
+    'facility.infoSection': '设施信息',
+    'facility.storageSection': '存储',
+    'facility.controlSection': '当前控制',
     'facility.nameLabel': '设施名称',
     'facility.typeLabel': '设施类型',
     'facility.dockLabel': '对接口',
@@ -219,12 +222,10 @@ const STRINGS = {
     'dock.docksFull': (p) => `⚠ 对接口已满（0/${p.max}）`,
     'dock.approachHint': '控制飞船靠近后可对接',
     'dock.noDockedShips': '暂无停靠飞船',
-    'dock.dockedShips': (p) => `停靠飞船（${p.n} 艘）`,
     'dock.modulesCount': (p) => `模块: ${p.n} 个`,
     'dock.switchControl': '切换控制',
     'dock.takeoff': '起飞',
     'dock.noDockedShipsRefuel': '暂无停靠飞船可补给',
-    'dock.refuelableShips': (p) => `可补给飞船（${p.n} 艘）`,
     'dock.refuel': '补给燃料',
     'dock.refuelCost': '消耗设施存储的氢/氧燃料',
     'dock.refuelDone': '燃料补给完成',
@@ -429,9 +430,12 @@ const STRINGS = {
     'tracking.noResources': '未探测到可开采资源',
     'tracking.scanStatus': (p) => `扫描等级: tier ${p.tier}（需扫描仪探测更多资源）`,
 
-    // ---------- 货运 / 存储（0.2.0 阶段5） ----------
+    // ---------- 货运 / 存储（0.2.0 阶段5；0.2.7 分区布局） ----------
     'cargo.title': '货仓',
     'cargo.capacity': '货仓容量（共享池）',
+    'cargo.sectionCapacity': '货仓容量',
+    'cargo.sectionCargo': '货物清单',
+    'cargo.transferSection': '传输资源',
     'cargo.capacityShort': '容量:',
     'cargo.empty': '货仓为空',
     'cargo.fuelNote': '※ 飞船自带燃料（燃料罐）不计入货仓',
@@ -440,6 +444,12 @@ const STRINGS = {
     'cargo.transferred': (p) => `已转移 ${p.n}`,
     'cargo.transferFailed': '转移失败（容量不足或数量无效）',
     'cargo.facToShip': (p) => `${p.fac} → 船 ${p.ship}`,
+
+    // ---------- 资源分类名（0.2.7 存储/货仓分组标题） ----------
+    'cat.propellant': '推进剂',
+    'cat.raw': '星球原料',
+    'cat.construction': '建造材料',
+    'cat.research': '科研',
 
     'facility.storage': '货物储备',
     'facility.storageHint': '设施存储的全部资源（含行内调拨到其他设施）',
@@ -451,6 +461,12 @@ const STRINGS = {
 
     'dock.moduleManage': '模块管理',
     'dock.moduleManageHint': '改装停靠飞船的模块（消耗/返还设施存储的材料套装）',
+    'dock.dockActionSection': '对接操作',
+    'dock.dockedSection': '停靠飞船',
+    'dock.shipSection': '飞船信息',
+    'dock.slotsSection': '模块槽位',
+    'dock.slotsCount': (p) => `槽位 ${p.n}`,
+    'dock.refuelSection': '可补给飞船',
     'dock.installModule': '安装',
     'dock.moduleInstalled': (p) => `已安装 ${p.name}`,
     'dock.moduleRemoved': '模块已卸载（材料已返还设施）',
