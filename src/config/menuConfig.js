@@ -4,7 +4,8 @@
 const MAIN_MENU = [
     // 0.2.5：开始游戏不再进入子菜单，直接打开左侧"开始游戏"综合面板
     { id: 'startGame',    label: '开始游戏',  action: 'callback:openStartGamePanel' },
-    { id: 'encyclopedia', label: '百科',  action: 'scene:encyclopedia' },
+    // 0.2.7：百科由 scene 改为覆盖式面板（不切场景/不中断 BGM），入口协议与设置一致
+    { id: 'encyclopedia', label: '百科',  action: 'callback:openEncyclopedia' },
     { id: 'extra',        label: '额外内容',  action: 'submenu:extra' },
     { id: 'settings',     label: '设置',      action: 'callback:openSettings' },
 ];

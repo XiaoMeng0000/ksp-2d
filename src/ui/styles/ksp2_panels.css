@@ -167,6 +167,99 @@
     gap: 4px;
 }
 
+/* 音量滑条 — KSP2 正式样式（参考总监提供样式图 + 四条修正注解）
+   数字百分比框 + 轨道（描边、深黑底、居中虚线）+ 滑块（竖条完全在轨道内，上下各留 1px） */
+#settingsContent .settings-slider-value {
+    min-width: 72px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    background: var(--theme-btn-bg); /* 通用色 = KSP1/KSP2 按键背景色（总监要求，与滑槽统一） */
+    border: 1px solid var(--border);
+    color: var(--text-bright);
+    font-family: var(--font-mono);
+    font-size: 13px;
+}
+
+#settingsContent .settings-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    flex: 1;
+    height: 24px;
+    background: transparent;
+    cursor: pointer;
+    margin: 0;
+}
+
+/* 轨道：高 = 百分比框(30px)的 4/5 = 24px + 亮描边 + 居中细虚线（约轨道高 5%，段/间隙 4+4）
+   无选中态（参考图音量滑条统一样式）；底色 = KSP1/KSP2 按键背景色通用色 */
+#settingsContent .settings-slider::-webkit-slider-runnable-track {
+    height: 24px;
+    border-radius: 5px;
+    background-color: var(--theme-btn-bg);
+    border: 1px solid #39424f;
+    background-image:
+        linear-gradient(
+            180deg,
+            var(--theme-btn-bg) 0,
+            var(--theme-btn-bg) calc(50% - 0.5px),
+            transparent calc(50% - 0.5px),
+            transparent calc(50% + 0.5px),
+            var(--theme-btn-bg) calc(50% + 0.5px),
+            var(--theme-btn-bg) 100%
+        ),
+        repeating-linear-gradient(
+            90deg,
+            #56647c 0, #56647c 4px,
+            transparent 4px, transparent 8px
+        );
+}
+
+/* 滑块：竖向细条，完全在轨道内（高 22px = 轨道 24px − 两侧各 1px 空隙） */
+#settingsContent .settings-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 6px;
+    height: 22px;
+    margin-top: 1px;
+    border-radius: 3px;
+    background: #c8cdd4;
+    border: none;
+}
+
+/* Firefox 轨道与滑块（thumb 自动垂直居中）；高 = 百分比框(30px)的 4/5 = 24px */
+#settingsContent .settings-slider::-moz-range-track {
+    height: 24px;
+    border-radius: 5px;
+    background-color: var(--theme-btn-bg);
+    border: 1px solid #39424f;
+    background-image:
+        linear-gradient(
+            180deg,
+            var(--theme-btn-bg) 0,
+            var(--theme-btn-bg) calc(50% - 0.5px),
+            transparent calc(50% - 0.5px),
+            transparent calc(50% + 0.5px),
+            var(--theme-btn-bg) calc(50% + 0.5px),
+            var(--theme-btn-bg) 100%
+        ),
+        repeating-linear-gradient(
+            90deg,
+            #56647c 0, #56647c 4px,
+            transparent 4px, transparent 8px
+        );
+}
+
+#settingsContent .settings-slider::-moz-range-thumb {
+    width: 6px;
+    height: 22px;
+    border-radius: 3px;
+    background: #c8cdd4;
+    border: none;
+}
+
 .settings-btn {
     font-family: var(--font-mono);
     height: 26px;
@@ -1304,4 +1397,196 @@
     height: 20px;
     padding: 0 8px;
     font-size: 10px;
+}
+
+/* ============================================================
+   第六部分：游戏百科覆盖面板（encyclopediaUI.js）
+   0.2.7 由 scene 面板化迁入（原 scenes.css 百科段）
+   打开不切场景 → 菜单 BGM 连续；自动获得 UI_PANEL 音效
+   ============================================================ */
+
+#encyclopediaPanel {
+    align-items: center;
+    justify-content: center;
+}
+
+/* 居中大窗口：蓝灰壳 + 紫描边（与三大面板同语言） */
+#encyclopediaPanel .enc-window {
+    width: min(1100px, 92vw);
+    height: min(760px, 88vh);
+    background: var(--theme-bg);
+    border: 1px solid var(--theme-menu-border);
+    border-radius: 5px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* 顶栏：标题 + 关闭 */
+#encyclopediaPanel .enc-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 10px 10px 0 10px;
+    padding: 10px 14px;
+    background: var(--theme-panel);
+    border-radius: 5px;
+}
+
+#encyclopediaPanel .enc-title {
+    color: var(--text-bright);
+    font-family: var(--font-mono-bold);
+    font-weight: normal;
+    font-size: 15px;
+}
+
+#encyclopediaPanel .enc-close {
+    height: 26px;
+    padding: 0 12px;
+    box-sizing: border-box;
+    background: var(--theme-btn-bg);
+    color: var(--text-bright);
+    border: 1px solid var(--border-light);
+    border-radius: 5px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+#encyclopediaPanel .enc-close:hover {
+    border-color: var(--theme-border-hover);
+}
+
+/* 主体：左导航 + 右内容 */
+#encyclopediaPanel .enc-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    gap: 14px;
+    padding: 14px;
+    box-sizing: border-box;
+}
+
+#encyclopediaNav {
+    width: 220px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px;
+    box-sizing: border-box;
+    background: var(--theme-panel);
+    border-radius: 5px;
+    overflow-y: auto;
+}
+
+#encyclopediaNav .enc-nav-item {
+    padding: 8px 12px;
+    border-radius: 4px;
+    background: var(--theme-panel-deep);
+    color: var(--text-main);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+#encyclopediaNav .enc-nav-item:hover {
+    background: var(--theme-hover);
+}
+
+#encyclopediaNav .enc-nav-item.active {
+    background: var(--theme-active-bg);
+    color: var(--text-bright);
+}
+
+#encyclopediaContent {
+    flex: 1;
+    min-width: 0;
+    overflow-y: auto;
+    padding: 14px 16px;
+    box-sizing: border-box;
+    background: var(--theme-panel);
+    border-radius: 5px;
+}
+
+/* 当前分类标题条（// 前缀） */
+#encyclopediaContent .enc-content-title {
+    color: var(--accent);
+    font-size: 13px;
+    letter-spacing: 1px;
+    margin: 0 0 12px 0;
+    padding: 6px 12px;
+    background: var(--theme-panel-deep);
+    border-radius: 4px;
+}
+
+#encyclopediaContent .enc-content-title::before {
+    content: '// ';
+    opacity: 0.7;
+}
+
+/* 条目卡：紫头 + 深色卡体（无边框，与统一卡片语言一致） */
+#encyclopediaContent .enc-card {
+    background: var(--theme-panel-deep);
+    border-radius: 4px;
+    margin-bottom: 14px;
+    overflow: hidden;
+}
+
+#encyclopediaContent .enc-card-title {
+    padding: 8px 14px;
+    background: var(--theme-btn-selected);
+    color: var(--text-bright);
+    font-family: var(--font-mono-bold);
+    font-weight: normal;
+    font-size: 14px;
+    letter-spacing: 1px;
+}
+
+#encyclopediaContent .enc-card-body {
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#encyclopediaContent .enc-card-body p {
+    color: var(--text-main);
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.9;
+    margin: 0;
+}
+
+/* ============================================================
+   滚动条排除：设置页（#settingsContainer）
+   0.2.7 全局滚动条统一为 KSP2 样式后，设置页显式还原浏览器默认外观
+   ============================================================ */
+#settingsContainer {
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+}
+
+#settingsContainer ::-webkit-scrollbar {
+    width: 14px;
+    height: 14px;
+}
+
+#settingsContainer ::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+#settingsContainer ::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 0;
+}
+
+#settingsContainer ::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+#settingsContainer ::-webkit-scrollbar-corner {
+    background: #f1f1f1;
 }

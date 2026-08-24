@@ -35,7 +35,7 @@ export const ESC_ACTIONS = [
     },
     {
         id: 'encyclopedia', section: 'facilities', labelKey: 'esc.encyclopedia',
-        icon: '📖', iconKey: 'icon_wiki', tone: 'facility', action: 'esc-encyclopedia', disabled: true
+        icon: '📖', iconKey: 'icon_wiki', tone: 'facility', action: 'esc-encyclopedia'
     },
     {
         id: 'missions', section: 'facilities', labelKey: 'esc.missions',

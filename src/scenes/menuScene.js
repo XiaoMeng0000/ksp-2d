@@ -242,7 +242,9 @@ function registerMenuScene(options) {
         // 0.2.5：开始游戏/读档/存档管理整合为左侧"开始游戏"综合面板
         openStartGamePanel: options.openStartGamePanel,
         openSettings: options.openSettings,
-        openFeedback: options.openFeedback
+        openFeedback: options.openFeedback,
+        // 0.2.7：百科面板化（scene → uiManager 面板，入口协议同设置）
+        openEncyclopedia: options.openEncyclopedia
     };
 
     sceneManager.registerScene('menu', {

@@ -320,7 +320,7 @@ const STRINGS = {
     'settings.tabControl': '控制',
     'settings.tabGame': '游戏',
     'settings.descDisplay': '选择菜单背景显示模式。星空模式会透出游戏星空背景，图片模式会加载自定义背景图。',
-    'settings.descAudio': '选择菜单背景音乐。KSP1 / KSP2 对应两首不同的菜单音乐。',
+    'settings.descAudio': '调节总音量、音乐、UI 音效与通讯音，并选择菜单背景音乐。KSP1 / KSP2 对应两首不同的菜单音乐。',
     'settings.descControl': '配置键盘映射、鼠标灵敏度等控制选项。（即将推出）',
     'settings.descGame': '调整游戏难度、时间加速倍率等玩法参数。（即将推出）',
     'settings.groupMenu': '菜单',
@@ -329,6 +329,11 @@ const STRINGS = {
     'settings.bgImage': '图片',
     'settings.groupMusic': '音乐',
     'settings.menuMusic': '菜单音乐',
+    'settings.groupVolume': '音量',
+    'settings.volMaster': '总音量',
+    'settings.volMusic': '音乐',
+    'settings.volUi': 'UI 音效',
+    'settings.volComms': '通讯音',
     'settings.comingSoon': '即将推出',
 
     // ---------- 公测公告 ----------
@@ -374,6 +379,9 @@ const STRINGS = {
     // ---------- 游戏百科(0.2.7 KSP2 重构) ----------
     'encyclopedia.title': '游戏百科',
     'encyclopedia.close': '关闭',
+
+    // ---------- 制作人员(0.2.7 v2 参考图样式) ----------
+    'credits.pageTitle': '制作人员',
 
     // ---------- 追踪站场景 ----------
     'tracking.stationName': '追踪站',

@@ -253,8 +253,9 @@ function handleAction(action) {
         case 'esc-tracking': openTrackingStation(); break;
         case 'esc-back-to-flight': backToFlight(); break;
         case 'esc-settings': window.openSettings(); break;
+        case 'esc-encyclopedia': window.openEncyclopedia(); break;
         case 'esc-quit': quitToMenu(); break;
-        // 未知 action（含未来取消 disabled 的 encyclopedia/missions 占位）：提示而非静默
+        // 未知 action（含未来取消 disabled 的 missions 占位）：提示而非静默
         default:
             window.showNotification(t('esc.notReady'), 'info');
     }

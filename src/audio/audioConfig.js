@@ -3,6 +3,10 @@
 // 音频资源配置模块 — 数据驱动，所有音频内容在此声明
 // 目录约定：音乐放 assets/audio/bgm/，音效放 assets/audio/sfx/
 
+// 背景音乐总线增益（0~1）：总监定稿全曲目音量 = 默认的 3/4
+// 注意：必须定义在 VOLUME_DEFAULTS 之前（其引用此常量）；设置面板音量调节复用 setMusicVolume 等接口
+export const MUSIC_VOLUME = 0.75;
+
 // 音乐映射表：场景音乐标识 → { loop, variants | byBodyType }
 // variants 为同一场景可选配的音乐变体（如菜单可切换 KSP1 / KSP2 两首）
 // byBodyType 为按宿主天体音乐分类选曲（飞行场景使用，key 与 CelestialBody.musicType 对应）
@@ -149,12 +153,56 @@ export const warpSfxConfig = {
     resume: { volume: 0.75 }    // 取消暂停（恢复）专属音音量（覆盖恢复档位激活音）
 };
 
+// === 音效通道映射（音量设置分类） ===
+// sfx key → 音量通道：'ui'（UI 音效）/ 'comms'（坎巴拉人通讯音）
+// 未来新分类（环境音/语音等）在此登记新通道，并在 audioCore 建对应总线
+export const sfxChannelMap = {
+    // UI 音效（点击/悬停/面板开关/时间加速档位）
+    ui_panel_open: 'ui', ui_panel_close: 'ui', ui_esc_open: 'ui',
+    ui_click: 'ui', ui_hover: 'ui',
+    warp: 'ui', warp_hover: 'ui', warp_pause: 'ui', warp_resume: 'ui',
+    // 坎巴拉人通讯音（SOI 切换提示等，后续事件通报/轨道警报均归此类）
+    soi_change: 'comms'
+};
+
+// 返回音效所属通道（未登记默认 'ui'）
+export function getSfxChannel(key) {
+    return sfxChannelMap[key] || 'ui';
+}
+
+// === 音量通道默认值与存储键（audioCore 启动应用 / 设置面板读写共用） ===
+// 默认值：总 100% / 音乐 75%（既有 MUSIC_VOLUME）/ UI 100% / 通讯 100%（总监确认）
+export const VOLUME_DEFAULTS = {
+    master: 1,
+    music: MUSIC_VOLUME,
+    ui: 1,
+    comms: 1
+};
+
+export const VOLUME_STORAGE_KEYS = {
+    master: 'ksp2d.volume.master',
+    music: 'ksp2d.volume.music',
+    ui: 'ksp2d.volume.ui',
+    comms: 'ksp2d.volume.comms'
+};
+
+// 读取指定通道的存储音量（0~1）；无存档/非法值回退默认值
+export function getStoredVolume(channel) {
+    const storageKey = VOLUME_STORAGE_KEYS[channel];
+    const def = VOLUME_DEFAULTS[channel];
+    if (typeof localStorage === 'undefined' || !storageKey) {
+        return def;
+    }
+    const raw = localStorage.getItem(storageKey);
+    if (raw === null) {
+        return def;
+    }
+    const v = parseFloat(raw);
+    return isNaN(v) ? def : Math.max(0, Math.min(1, v));
+}
+
 // 菜单音乐选择的 localStorage 存储键（设置界面写入）
 export const MENU_MUSIC_STORAGE_KEY = 'ksp2d.menuMusic';
-
-// 背景音乐总线增益（0~1）：总监定稿全曲目音量 = 默认的 3/4
-// 音效总线暂不调（UI 音效已有自身音量参数），后续设置面板音量调节直接复用 setMusicVolume 等接口
-export const MUSIC_VOLUME = 0.75;
 
 // 读取当前菜单音乐变体（默认 ksp2，与 menu2.ogg 对应）
 export function getMenuMusicVariant() {

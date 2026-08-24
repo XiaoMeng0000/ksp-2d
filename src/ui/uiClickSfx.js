@@ -23,7 +23,8 @@ const HIT_SELECTOR = [
     '.tracking-node',         // 追踪站天体树节点行（可展开/收起）
     '.tracking-group-header', // 追踪站分组头
     '.sgp-world-row',         // 开始游戏世界行
-    '.sgp-cp-row'             // 开始游戏存档行
+    '.sgp-cp-row',            // 开始游戏存档行
+    '.enc-nav-item'           // 游戏百科分类导航项
 ].join(',');
 
 // 选中态选择器：命中这些标记的点击播放"已选中再点"变体（闷一点、小声一点）
@@ -33,7 +34,8 @@ const SELECTED_SELECTOR = [
     '.tracking-tab-active',   // 追踪站当前导航 Tab
     '.settings-cat.active',   // 设置当前分类
     '.sgp-selected',          // 开始游戏已选中世界/存档行
-    '.tracking-node-selected' // 追踪站已选中的天体节点/卡片
+    '.tracking-node-selected',// 追踪站已选中的天体节点/卡片
+    '.enc-nav-item.active'    // 游戏百科当前分类导航项
 ].join(',');
 
 // 排除选择器：这些元素的点击不广播（时间加速档位格属另一套音效，不在此采集）

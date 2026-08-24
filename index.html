@@ -19,127 +19,171 @@
         html, body { width: 100%; height: 100%; overflow: hidden; }
         canvas { display: block; background: black; width: 100%; height: 100%; }
 
-        /* 启动加载画面 */
+        /* ============================================================
+           启动加载画面（0.2.7 KSP2 视觉：蓝灰面板壳 + 黑底卡片 + 提示分区）
+           引用 root.css / theme.css 变量；main.js 仅依赖各 id 不变
+           ============================================================ */
         #loadingScreen {
             position: fixed;
             inset: 0;
             z-index: 99999;
-            background: #000;
+            background: rgba(0, 0, 0, 0.92);
             display: none;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
-        }
-        #loadingTitle {
-            color: #fff;
+            /* 回退字体：字体加载完成后不引起界面尺寸变化 */
             font-family: monospace;
-            font-size: 28px;
-            margin-bottom: 40px;
+        }
+
+        /* 面板壳：蓝灰底 + 紫描边（与三大面板统一） */
+        #loadingScreen .loading-panel {
+            width: 560px;
+            background: var(--theme-bg);
+            border: 1px solid var(--theme-menu-border);
+            border-radius: 5px;
+            padding: 0;
+            overflow: hidden;
+            box-sizing: border-box;
+        }
+
+        /* 面板头：紫头条（与分组卡头一致） */
+        #loadingScreen .loading-card-head {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            background: var(--theme-btn-selected);
+            color: var(--text-bright);
+            font-size: 14px;
+            font-family: monospace;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        /* 提示分区：耐心等待提示（深底圆角块） */
+        #loadingScreen .loading-hint {
+            margin: 14px 14px 0 14px;
+            padding: 10px 14px;
+            background: var(--theme-panel-deep);
+            border-radius: 4px;
+            color: var(--text-main);
+            font-size: 13px;
+            line-height: 1.7;
             text-align: center;
         }
+
+        /* 卡片：与提示栏同色（深底圆角） */
+        #loadingScreen .loading-card {
+            margin: 14px;
+            background: var(--theme-panel-deep);
+            border-radius: 4px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        /* 日志区：黑底卡内更深底 */
         #loadingLogBox {
-            width: 500px;
-            height: 280px;
-            background: rgba(0,0,0,0.85);
-            border: 1px solid #333;
-            border-radius: 3px;
+            height: 200px;
+            background: var(--theme-panel-deep);
+            border-radius: 4px;
             overflow-y: auto;
-            padding: 12px;
-            margin-bottom: 20px;
-            font-family: monospace;
-            font-size: 13px;
-            line-height: 1.6;
+            padding: 10px 12px;
+            font-size: 12px;
+            line-height: 1.7;
+            box-sizing: border-box;
         }
         .loading-log-ok {
-            color: #88ccff;
+            color: var(--accent);
         }
         .loading-log-fail {
-            color: #ff6666;
+            color: var(--danger);
         }
-        #loadingProgressBarOuter {
-            width: 500px;
+
+        /* 进度组：标签 + 条 + 数字 */
+        #loadingScreen .loading-progress-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        #loadingScreen .loading-progress-label {
+            color: var(--text-dim);
+            font-size: 10px;
+            letter-spacing: 1px;
+        }
+        #loadingScreen .loading-progress-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        #loadingScreen .loading-progress-track {
+            flex: 1;
             height: 8px;
-            background: #222;
+            background: var(--theme-panel-deep);
             border-radius: 4px;
             overflow: hidden;
-            margin-bottom: 8px;
         }
-        #loadingProgressBarInner {
+        #loadingScreen .loading-progress-track > div {
             height: 100%;
             width: 0%;
-            background: #88ccff;
             transition: width 0.15s ease;
         }
-        #loadingProgressText {
-            color: #fff;
-            font-family: monospace;
-            font-size: 14px;
-        }
-        /* 音频加载进度条 */
-        #loadingAudioProgressBarOuter {
-            width: 500px;
-            height: 8px;
-            background: #222;
-            border-radius: 4px;
-            overflow: hidden;
-            margin-top: 12px;
-            margin-bottom: 8px;
-        }
-        #loadingAudioProgressBarInner {
-            height: 100%;
-            width: 0%;
-            background: #66ff88;
-            transition: width 0.15s ease;
-        }
-        #loadingAudioProgressText {
-            color: #fff;
-            font-family: monospace;
-            font-size: 14px;
-        }
-        /* 字体加载进度条 */
-        #loadingFontProgressBarOuter {
-            width: 500px;
-            height: 8px;
-            background: #222;
-            border-radius: 4px;
-            overflow: hidden;
-            margin-top: 12px;
-            margin-bottom: 8px;
-        }
-        #loadingFontProgressBarInner {
-            height: 100%;
-            width: 0%;
-            background: #ffcc66;
-            transition: width 0.15s ease;
-        }
-        #loadingFontProgressText {
-            color: #fff;
-            font-family: monospace;
-            font-size: 14px;
+        /* 三条进度条：资源蓝 / 音频绿 / 字体金 */
+        #loadingProgressBarInner { background: var(--accent); }
+        #loadingAudioProgressBarInner { background: var(--progress-green); }
+        #loadingFontProgressBarInner { background: var(--ut-gold); }
+        #loadingScreen .loading-progress-text {
+            width: 90px;
+            flex-shrink: 0;
+            color: var(--text-mid);
+            font-size: 11px;
+            text-align: right;
+            white-space: nowrap;
         }
     </style>
 </head>
 <body>
     <canvas id="canvas"></canvas>
 
-    <!-- 启动加载画面 -->
+    <!-- 启动加载画面（面板壳 + 提示分区 + 黑底卡片；id 供 main.js 更新，勿改） -->
     <div id="loadingScreen">
-        <div id="loadingTitle">首次启动 游戏正在加载图片、音频与字体 请耐心等待</div>
-        <div id="loadingLogBox">
-            <div id="loadingLogContent"></div>
+        <div class="loading-panel">
+            <div class="loading-card-head">// 启动加载</div>
+            <div class="loading-hint">首次启动 游戏正在加载图片、音频与字体 请耐心等待</div>
+            <div class="loading-card">
+                <div id="loadingLogBox">
+                    <div id="loadingLogContent"></div>
+                </div>
+                <div class="loading-progress-group">
+                    <div class="loading-progress-label">资源加载</div>
+                    <div class="loading-progress-row">
+                        <div class="loading-progress-track">
+                            <div id="loadingProgressBarInner"></div>
+                        </div>
+                        <div id="loadingProgressText" class="loading-progress-text">0/0 (0%)</div>
+                    </div>
+                </div>
+                <div class="loading-progress-group">
+                    <div class="loading-progress-label">音频加载</div>
+                    <div class="loading-progress-row">
+                        <div class="loading-progress-track">
+                            <div id="loadingAudioProgressBarInner"></div>
+                        </div>
+                        <div id="loadingAudioProgressText" class="loading-progress-text">0/0 (0%)</div>
+                    </div>
+                </div>
+                <div class="loading-progress-group">
+                    <div class="loading-progress-label">字体加载</div>
+                    <div class="loading-progress-row">
+                        <div class="loading-progress-track">
+                            <div id="loadingFontProgressBarInner"></div>
+                        </div>
+                        <div id="loadingFontProgressText" class="loading-progress-text">0/0 (0%)</div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div id="loadingProgressBarOuter">
-            <div id="loadingProgressBarInner"></div>
-        </div>
-        <div id="loadingProgressText">0/0 (0%)</div>
-        <div id="loadingAudioProgressBarOuter">
-            <div id="loadingAudioProgressBarInner"></div>
-        </div>
-        <div id="loadingAudioProgressText">0/0 (0%)</div>
-        <div id="loadingFontProgressBarOuter">
-            <div id="loadingFontProgressBarInner"></div>
-        </div>
-        <div id="loadingFontProgressText">0/0 (0%)</div>
     </div>
 
     <script type="module" src="main.js"></script>

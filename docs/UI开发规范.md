@@ -131,6 +131,7 @@ src/
 | `window.showNotification(msg, type, duration)` | 全局通知(跨逻辑模块 79+ 处) |
 | `window.__createDialog / __createInputDialog / __createConfirmDialog` | 对话框桥(main.js / shipBuilderUI 等) |
 | `window.openSettings / startNewGame / continueGame / openLoadMenu / openArchiveManager / openFeedback` | main.js 入口 |
+| `window.openEncyclopedia` | 百科面板入口(0.2.7 由 scene 面板化,encyclopediaUI.js 注册为 uiManager 面板) |
 | `window.openShipBuilder / openFacilityDeployPanel` | 面板入口(flightUI 调用) |
 | `window.renderToolbarIcons / showDockPrompt / hideDockPrompt` | flightScene ↔ flightUI |
 | `window.__visibilityState / __toggleVisibility` | flightScene ↔ sasUI |

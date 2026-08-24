@@ -28,6 +28,15 @@ const contentEl = container.querySelector('#settingsContent');
 
 let _currentCategory = 'display';
 
+// 音量滑条组 → audioCore 总线应用器（数据驱动：settingsConfig 行 group 在此登记）
+// 'input' 事件即调用，拖动实时生效
+const VOLUME_APPLIERS = {
+    volMaster: (v) => audioCore.setMasterVolume(v),
+    volMusic: (v) => audioCore.setMusicVolume(v),
+    volUi: (v) => audioCore.setUiSfxVolume(v),
+    volComms: (v) => audioCore.setCommsVolume(v)
+};
+
 // 按 group 查找设置行配置（事件分发用）
 function findRow(group) {
     for (const rows of Object.values(SETTINGS_ROWS)) {
@@ -60,6 +69,17 @@ function _renderSettingRow(label, controlHtml) {
     return `<div class="settings-row">
         <div class="settings-row-label">${label}</div>
         <div class="settings-row-control">${controlHtml}</div>
+    </div>`;
+}
+
+// 音量滑条控件 — 数字百分比框（左）+ 滑槽（右），存储值折算为 0~1
+// 样式见 ksp2_panels.css（.settings-slider / .settings-slider-value，KSP2 正式样式）
+function _renderSliderRow(row, storedValue) {
+    const pct = Math.round(parseFloat(storedValue) * 100);
+    return `<div style="display:flex;align-items:center;gap:10px;">
+        <span class="settings-slider-value" data-value-for="${row.group}">${pct}%</span>
+        <input type="range" class="settings-slider" data-group="${row.group}"
+            min="0" max="100" step="5" value="${pct}">
     </div>`;
 }
 
@@ -119,13 +139,22 @@ function _renderContent() {
 
     const rows = SETTINGS_ROWS[cat.id] || [];
     if (cat.enabled && rows.length > 0) {
-        // 数据驱动渲染：分组标题 + 各设置行
+        // 数据驱动渲染：分类组标题（第一组）+ 行级分组标题（后续分组）+ 各设置行
         const groupLabelKey = SETTINGS_GROUP_LABELS[cat.id];
         if (groupLabelKey) {
             html += _renderGroupHeader(t(groupLabelKey));
         }
+        let lastSection = groupLabelKey || null;
         for (const row of rows) {
-            html += _renderSettingRow(t(row.labelKey), _renderButtonGroup(row, getRowValue(row)));
+            // 行级分组标题：同分类内多分组（如"音乐"之后的"音量"）
+            if (row.sectionLabelKey && row.sectionLabelKey !== lastSection) {
+                html += _renderGroupHeader(t(row.sectionLabelKey));
+                lastSection = row.sectionLabelKey;
+            }
+            const controlHtml = row.control === 'slider'
+                ? _renderSliderRow(row, getRowValue(row))
+                : _renderButtonGroup(row, getRowValue(row));
+            html += _renderSettingRow(t(row.labelKey), controlHtml);
         }
     } else if (!cat.enabled) {
         // 未启用的分类 — 灰色占位
@@ -148,6 +177,26 @@ function _renderContent() {
             // 菜单音乐切换：仅当处于主菜单时立即试听（面板化后场景不再切换）
             if (group === 'menuMusic' && sceneManager.getCurrentScene() === 'menu') {
                 audioCore.playMusic('menu', value);
+            }
+        });
+    });
+
+    // 绑定音量滑条事件（拖拽即生效：写存储 + 应用总线增益 + 更新百分比标签）
+    contentEl.querySelectorAll('input[type="range"][data-group]').forEach((slider) => {
+        slider.addEventListener('input', () => {
+            const group = slider.getAttribute('data-group');
+            const row = findRow(group);
+            if (!row) return;
+            const pct = parseFloat(slider.value);
+            const value = pct / 100;
+            localStorage.setItem(row.storageKey, String(value));
+            const applier = VOLUME_APPLIERS[group];
+            if (applier) {
+                applier(value);
+            }
+            const label = contentEl.querySelector('[data-value-for="' + group + '"]');
+            if (label) {
+                label.textContent = Math.round(pct) + '%';
             }
         });
     });

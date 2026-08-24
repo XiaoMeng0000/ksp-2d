@@ -26,6 +26,8 @@ import { openStartGamePanel } from './src/ui/startGamePanel.js';
 import './src/ui/newCampaignDialog.js';
 // 0.2.5 设置面板 — 从 scene 抽离为覆盖式 UI 面板
 import { openSettings as openSettingsUI } from './src/ui/settingsUI.js';
+// 0.2.7 游戏百科 — 同样从 scene 抽离为覆盖式 UI 面板（import 即完成 uiManager 注册）
+import { openEncyclopedia as openEncyclopediaUI } from './src/ui/encyclopediaUI.js';
 import './src/ui/facilityDeployUI.js';
 // UI 点击音效采集（document 捕获阶段委托，import 即生效）
 import './src/ui/uiClickSfx.js';
@@ -48,7 +50,6 @@ import { registerTrackingScene, buildTrackingTree, renderTrackingNav, trackingCo
 import { registerSplashScene } from './src/scenes/splashScene.js';
 import { registerInfoScene } from './src/scenes/infoScene.js';
 import { registerMenuScene } from './src/scenes/menuScene.js';
-import { registerEncyclopediaScene } from './src/scenes/encyclopediaScene.js';
 import { registerCreditsScene } from './src/scenes/creditsScene.js';
 import { registerLicenseScene } from './src/scenes/licenseScene.js';
 import { registerGalaxiesScene } from './src/scenes/galaxiesScene.js';
@@ -119,8 +120,8 @@ registerMenuScene({
     // 0.2.5：开始游戏/读档/存档管理整合为左侧"开始游戏"综合面板
     openStartGamePanel: () => openStartGamePanel(),
     openSettings: () => window.openSettings(),
+    openEncyclopedia: () => window.openEncyclopedia(),
 });
-registerEncyclopediaScene();
 registerCreditsScene();
 registerLicenseScene();
 registerGalaxiesScene();
@@ -289,6 +290,11 @@ eventBus.on(Events.SCENE_READY, () => { lastTime = 0; });
 // 0.2.5 设置面板入口（从 scene 抽离为覆盖式 UI 面板，不切换场景/不中断音乐）
 window.openSettings = function() {
     openSettingsUI();
+};
+
+// 0.2.7 游戏百科入口（场景 → 覆盖式面板，同设置面板模式）
+window.openEncyclopedia = function() {
+    openEncyclopediaUI();
 };
 
 // 层级存档 - 当前世界 ID

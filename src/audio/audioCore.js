@@ -1,7 +1,7 @@
 'use strict';
 
 import { eventBus, Events } from '../eventBus.js';
-import { buildAudioManifest, MUSIC_VOLUME } from './audioConfig.js';
+import { buildAudioManifest, MUSIC_VOLUME, getSfxChannel, getStoredVolume } from './audioConfig.js';
 
 // 音乐淡入/淡出时长（秒）
 const FADE_DURATION = 0.4;
@@ -21,10 +21,13 @@ class AudioCore {
         this._completed = 0;
         this._ready = false;
 
-        // 音量总线：master → music / sfx（sfx 预留，供后续音效任务使用）
+        // 音量总线：master → { music, sfx → { ui, comms } }
+        // 分类音量（设置面板可调）：总 / 音乐 / UI 音效 / 坎巴拉人通讯音
         this._masterGain = null;
         this._musicGain = null;
         this._sfxGain = null;
+        this._uiSfxGain = null;
+        this._commsGain = null;
 
         // 当前音乐播放状态
         this._currentMusicKey = null;
@@ -32,6 +35,7 @@ class AudioCore {
         this._musicGainNode = null;
 
         this._initContext();
+        this._applyStoredVolumes();
         this._initUnlock();
     }
 
@@ -58,6 +62,24 @@ class AudioCore {
         this._sfxGain = this._ctx.createGain();
         this._sfxGain.gain.value = 1.0;
         this._sfxGain.connect(this._masterGain);
+
+        // UI 音效总线（点击/悬停/面板/档位等）
+        this._uiSfxGain = this._ctx.createGain();
+        this._uiSfxGain.gain.value = 1.0;
+        this._uiSfxGain.connect(this._sfxGain);
+
+        // 坎巴拉人通讯音总线（SOI 切换等；未来事件通报/轨道警报走此通道）
+        this._commsGain = this._ctx.createGain();
+        this._commsGain.gain.value = 1.0;
+        this._commsGain.connect(this._sfxGain);
+    }
+
+    // 启动时应用存储的音量设置（无存档回退默认值，如音乐 0.75）
+    _applyStoredVolumes() {
+        this.setMasterVolume(getStoredVolume('master'));
+        this.setMusicVolume(getStoredVolume('music'));
+        this.setUiSfxVolume(getStoredVolume('ui'));
+        this.setCommsVolume(getStoredVolume('comms'));
     }
 
     // 浏览器自动播放策略：首次用户交互（点击/按键）时恢复 AudioContext
@@ -248,7 +270,12 @@ class AudioCore {
 
         const gainNode = this._ctx.createGain();
         gainNode.gain.value = Math.max(0, Math.min(1, volume));
-        gainNode.connect(this._sfxGain);
+
+        // 按音效通道路由到对应总线（comms 通讯音 / 其余 UI 音效）
+        const key = id.indexOf('sfx:') === 0 ? id.slice(4) : id;
+        const channel = getSfxChannel(key);
+        const bus = channel === 'comms' ? this._commsGain : this._uiSfxGain;
+        gainNode.connect(bus);
 
         source.connect(gainNode);
         source.start();
@@ -281,6 +308,18 @@ class AudioCore {
     setSfxVolume(v) {
         if (this._sfxGain) {
             this._sfxGain.gain.value = Math.max(0, Math.min(1, v));
+        }
+    }
+
+    setUiSfxVolume(v) {
+        if (this._uiSfxGain) {
+            this._uiSfxGain.gain.value = Math.max(0, Math.min(1, v));
+        }
+    }
+
+    setCommsVolume(v) {
+        if (this._commsGain) {
+            this._commsGain.gain.value = Math.max(0, Math.min(1, v));
         }
     }
 
