@@ -106,8 +106,8 @@ overlay.addEventListener('click', (e) => {
     }
 });
 
-// 打开对话框（默认选中自由模式）
-function openNewCampaignDialog() {
+// 打开对话框的内部实现（默认选中自由模式；仅由 uiManager 的 show 回调调用）
+function _showNewCampaignDialog() {
     selectMode('sandbox');
     overlay.style.display = 'flex';
     const nameInput = document.getElementById('ncNameInput');
@@ -118,16 +118,26 @@ function openNewCampaignDialog() {
     }
 }
 
-// 关闭对话框（左侧开始游戏面板保持原状）
-function closeNewCampaignDialog() {
+// 关闭对话框的内部实现（左侧开始游戏面板保持原状；仅由 uiManager 的 hide 回调调用）
+function _hideNewCampaignDialog() {
     overlay.style.display = 'none';
+}
+
+// 打开对话框（对外入口：统一转发 uiManager，保证 UI_PANEL_OPENED 广播）
+function openNewCampaignDialog() {
+    uiManager.showPanel('newCampaignDialog');
+}
+
+// 关闭对话框（对外入口：统一转发 uiManager，保证 UI_PANEL_CLOSED 广播）
+function closeNewCampaignDialog() {
+    uiManager.hidePanel('newCampaignDialog');
 }
 
 // 注册到 uiManager，统一显隐管理
 uiManager.registerPanel('newCampaignDialog', {
     element: overlay,
-    show: openNewCampaignDialog,
-    hide: closeNewCampaignDialog,
+    show: _showNewCampaignDialog,
+    hide: _hideNewCampaignDialog,
     render: () => {}
 });
 

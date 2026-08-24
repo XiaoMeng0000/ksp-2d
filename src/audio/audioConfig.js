@@ -44,11 +44,117 @@ export const sfxMap = {
             a: { path: 'assets/audio/sfx/soi_change_1.ogg' },
             b: { path: 'assets/audio/sfx/soi_change_2.ogg' }
         }
+    },
+    // UI 面板打开音效（除专属映射面板外统一使用）
+    ui_panel_open: { path: 'assets/audio/sfx/ui_panel_open.ogg' },
+    // UI 面板关闭音效（全部关闭路径统一使用）
+    ui_panel_close: { path: 'assets/audio/sfx/ui_panel_close.ogg' },
+    // ESC 菜单专属打开音效（panelOpenSfxMap 映射到 esc 面板）
+    ui_esc_open: { path: 'assets/audio/sfx/ui_esc_open.ogg' },
+    // UI 点击音效(普通/选中态变体通过 uiClickVariantConfig 变调变音量)
+    ui_click: { path: 'assets/audio/sfx/ui_click.ogg' },
+    // UI 悬停音效(音调走屏幕位置变调机制,见 getScreenPositionRate)
+    ui_hover: { path: 'assets/audio/sfx/ui_hover.ogg' },
+    // 时间加速档位激活音(点击/键盘切档;音调按档位映射见 getWarpSfxRate,1x=原调)
+    warp: { path: 'assets/audio/sfx/warp.ogg' },
+    // 时间加速档位悬停音(与激活音为独立文件;音调同样按档位映射)
+    warp_hover: { path: 'assets/audio/sfx/warp_hover.ogg' },
+    // 0x 暂停专属音效:进入暂停(激活)与取消暂停(恢复)各一,原调不变调
+    warp_pause: { path: 'assets/audio/sfx/warp_pause.ogg' },
+    warp_resume: { path: 'assets/audio/sfx/warp_resume.ogg' }
+};
+
+// 面板打开音效专属映射：面板 id → 音效 key
+// 未映射的面板统一走 ui_panel_open；新增专属音效时在此加行
+export const panelOpenSfxMap = {
+    esc: 'ui_esc_open'
+};
+
+// 面板关闭音效静默映射：面板 id → true 表示该面板关闭不播放关闭音
+// 总监要求：ESC 菜单关闭一律无声（手动关闭 / 伴随场景切换 / 互斥切换均静默）
+export const panelCloseMuteMap = {
+    esc: true
+};
+
+// 返回指定面板的打开音效完整资源标识（如 'sfx:ui_esc_open'）
+// 未命中映射返回统一打开音效 'sfx:ui_panel_open'；供 audioDirector 查表播放
+// 注意：与 getRandomSfxId 一致，返回值含 'sfx:' 前缀（manifest 键格式）
+export function getPanelOpenSfxId(panelId) {
+    return 'sfx:' + (panelOpenSfxMap[panelId] || 'ui_panel_open');
+}
+
+// 指定面板的关闭音效是否静默（true = 不播放关闭音）；供 audioDirector 查表
+export function isPanelCloseMuted(panelId) {
+    return !!panelCloseMuteMap[panelId];
+}
+
+// UI 点击音效变体配置：variant → { volume, rate }
+// normal = 普通点击（原调全音量）；selected = 已被选中的选项再次点击（闷一点、小声一点）
+// rate < 1 降调变闷（并同时变速，短音效无感知）
+// 总监定稿：点击音效整体音量 = 默认的 3/4（normal 1.0→0.75，selected 0.6→0.45）
+export const uiClickVariantConfig = {
+    normal: { volume: 0.75, rate: 1 },
+    selected: { volume: 0.45, rate: 0.85 }
+};
+
+// 返回点击音效变体播放参数（未知变体兜底 normal）
+export function getUiClickPlayConfig(variant) {
+    return uiClickVariantConfig[variant] || uiClickVariantConfig.normal;
+}
+
+// UI 悬停音效播放参数：悬停属背景性轻反馈；音调由位置变调机制决定
+// 总监定稿：悬停音音量 = 初版(0.5)的 0.7 倍 → 0.35
+export const uiHoverConfig = {
+    volume: 0.35
+};
+
+// === 屏幕位置变调机制（正式引入：按钮从下到上的位置关系 → 音调高低） ===
+// 供点击音效使用，后续按钮悬停音直接复用
+// 规则：yRatio = 按钮中心 y / 视口高度（0=顶部，1=底部）
+//       屏幕中间(0.5) = 1.0 原调，越往上越高、越往下越低（线性）
+// 幅度约束：相对原调变化不超过 ±25% → rate ∈ [0.75, 1.25]
+export const SCREEN_POSITION_RATE_MIN = 0.75;
+export const SCREEN_POSITION_RATE_MAX = 1.25;
+
+// 计算屏幕位置变调 rate（yRatio 越接近 0 越高、越接近 1 越低，中心恰为 1.0）
+export function getScreenPositionRate(yRatio) {
+    const r = Math.max(0, Math.min(1, yRatio));
+    return SCREEN_POSITION_RATE_MAX - (SCREEN_POSITION_RATE_MAX - SCREEN_POSITION_RATE_MIN) * r;
+}
+
+// === 时间加速档位音效（激活 + 悬停共用映射，音调按档位倍率） ===
+// 总监约定：1x（最左格）= 文件原调（rate 1.0）；向右（高倍率档）每格线性升高；
+// 最右格（10,000,000x）= +50%（1.5）。总监定稿：初始 ±25% 区分度不足，改为 +50%
+export const WARP_RATE_MAX = 1.5; // 最高档音调（相对原调 +50%）
+
+// 档位序列（与 timeWarp.PANEL_RATES 一致）：1x 在最左，最高档在最右（第三格 = 4x）
+export const WARP_RATE_VALUES = [1, 2, 4, 10, 50, 100, 1000, 10000, 100000, 1000000, 10000000];
+
+// 档位变调映射：rateValue（档位倍率）→ 播放速率（按格序线性，1x=1.0 原调）
+// 不在档位序列中的值（如 0x 暂停档）兜底原调
+export function getWarpSfxRate(rateValue) {
+    const idx = WARP_RATE_VALUES.indexOf(rateValue);
+    if (idx < 0 || WARP_RATE_VALUES.length <= 1) {
+        return 1;
     }
+    return 1 + (idx / (WARP_RATE_VALUES.length - 1)) * (WARP_RATE_MAX - 1);
+}
+
+// 档位音效音量：激活（点击/键盘切换档位，含暂停/恢复）与悬停分开配置
+// 0x 暂停/恢复使用专属音效（warp_pause / warp_resume，原调不变调）
+export const warpSfxConfig = {
+    activate: { volume: 0.75 }, // 激活反馈音量（与 UI 点击 normal 一致）
+    hover: { volume: 0.35 },    // 悬停音量（与 UI 悬停音一致）
+    pause: { volume: 0.75 },    // 进入暂停（0x 激活）专属音音量
+    resume: { volume: 0.75 }    // 取消暂停（恢复）专属音音量（覆盖恢复档位激活音）
 };
 
 // 菜单音乐选择的 localStorage 存储键（设置界面写入）
 export const MENU_MUSIC_STORAGE_KEY = 'ksp2d.menuMusic';
+
+// 背景音乐总线增益（0~1）：总监定稿全曲目音量 = 默认的 3/4
+// 音效总线暂不调（UI 音效已有自身音量参数），后续设置面板音量调节直接复用 setMusicVolume 等接口
+export const MUSIC_VOLUME = 0.75;
 
 // 读取当前菜单音乐变体（默认 ksp2，与 menu2.ogg 对应）
 export function getMenuMusicVariant() {

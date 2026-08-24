@@ -26,9 +26,9 @@ eventBus.on(Events.SCENE_CHANGED, (data) => {
 
 // ========== 布局常量（1920x1080 基准） ==========
 
-// ---- 通用配色（统一为游戏面板风格：半透明黑底 + #555 边框） ----
-const PANEL_BG = 'rgba(0, 0, 0, 0.85)';    // 与左侧工具栏/浮层面板底色一致
-const PANEL_BORDER_COLOR = '#555';         // 与左侧工具栏/浮层面板边框一致
+// ---- 通用配色（0.2.7 统一为左侧工具栏风格：纯黑底 + 紫色边框） ----
+const PANEL_BG = '#000';                    // 与左侧工具栏底色一致（纯黑）
+const PANEL_BORDER_COLOR = '#6C5CE7';       // 与左侧工具栏外框同款紫（--toolbar-border 实色）
 const MARKER_COLOR = '#ffffff';            // 姿态指示（白色三角 / 圆盘中心白圆）
 const DIR_PROGRADE_COLOR = '#88ccff';      // 顺向/逆向 主蓝
 const DIR_RADIAL_COLOR = '#4fc3f7';        // 径向内/外 青色
@@ -60,7 +60,9 @@ const BOTTOM_MAIN_SIZE = 44;             // 主开关（SAS）按钮边长（基
 const BOTTOM_SUB_SIZE = 44;              // 副钮（节点/目标）边长（基准）
 const BOTTOM_BTN_GAP = 10;               // 同组按钮间距（基准）
 const BOTTOM_FRAME_PAD = 8;              // 方形框内边距（基准）
-const BOTTOM_BTN_GAP_BELOW = 16;         // 圆盘底部到按钮框顶部间距（基准）
+// 圆盘底部到按钮框顶部间距（基准）— 0.2.7 调整为按钮框底与节流阀弧底对齐：
+// 框底 = 圆心 y + 88 + GAP_BELOW + 44 + 8×2 = 圆心 y + 210(节流阀外缘半径)，与该弧底端同水平
+const BOTTOM_BTN_GAP_BELOW = 62;
 
 // ========== 导航球四方向定义（注册表，为机动节点预留扩展位） ==========
 // key 与 RENDER_DATA.directions 字段名对应
@@ -780,20 +782,32 @@ class SASUI {
     /**
      * 创建或显示右下角可见性筛选面板
      */
-    showVisibilityPanel() {
+    showVisibilityPanel(opts = {}) {
         if (!this._visibilityPanel) {
             this._createVisibilityPanel();
         }
-        this._visibilityPanel.style.display = 'block';
+        // 仅"从非显示→显示"广播打开事件：重复调用不重复发声
+        // opts.silent = true 用于场景 enter 自动打开（不产生打开音效）
+        if (this._visibilityPanel.style.display !== 'block') {
+            this._visibilityPanel.style.display = 'block';
+            if (!opts.silent) {
+                eventBus.emit(Events.UI_PANEL_OPENED, { panelId: 'visibility' });
+            }
+        }
         this._updateVisibilityCheckboxes();
     }
 
     /**
      * 隐藏可见性筛选面板
      */
-    hideVisibilityPanel() {
-        if (this._visibilityPanel) {
+    hideVisibilityPanel(opts = {}) {
+        // 仅"从显示→非显示"广播关闭事件：已隐藏时静默
+        // opts.silent = true 用于场景 exit 自动关闭（不产生关闭音效）
+        if (this._visibilityPanel && this._visibilityPanel.style.display === 'block') {
             this._visibilityPanel.style.display = 'none';
+            if (!opts.silent) {
+                eventBus.emit(Events.UI_PANEL_CLOSED, { panelId: 'visibility' });
+            }
         }
     }
 

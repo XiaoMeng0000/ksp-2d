@@ -1,7 +1,7 @@
 'use strict';
 
 import { eventBus, Events } from '../eventBus.js';
-import { buildAudioManifest } from './audioConfig.js';
+import { buildAudioManifest, MUSIC_VOLUME } from './audioConfig.js';
 
 // 音乐淡入/淡出时长（秒）
 const FADE_DURATION = 0.4;
@@ -52,7 +52,7 @@ class AudioCore {
         this._masterGain.connect(this._ctx.destination);
 
         this._musicGain = this._ctx.createGain();
-        this._musicGain.gain.value = 1.0;
+        this._musicGain.gain.value = MUSIC_VOLUME;
         this._musicGain.connect(this._masterGain);
 
         this._sfxGain = this._ctx.createGain();
@@ -231,7 +231,8 @@ class AudioCore {
 
     // 播放一次性音效：从已解码缓冲取音频，走 _sfxGain 总线，播完自动清理节点
     // 未就绪或资源缺失时静默跳过，绝不阻塞游戏流程
-    playSfx(id, volume = 1) {
+    // rate 为播放速率(变调)：>1 升高变快、<1 降低变慢(如选中态再点击的"闷"变体)
+    playSfx(id, volume = 1, rate = 1) {
         if (!this._ctx || !this._ready) {
             return;
         }
@@ -243,6 +244,7 @@ class AudioCore {
 
         const source = this._ctx.createBufferSource();
         source.buffer = buffer;
+        source.playbackRate.value = Math.max(0.25, Math.min(4, rate));
 
         const gainNode = this._ctx.createGain();
         gainNode.gain.value = Math.max(0, Math.min(1, volume));

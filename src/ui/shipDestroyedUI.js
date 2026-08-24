@@ -36,6 +36,8 @@ function formatDist(value) {
 function closePanel() {
     if (_overlay && _overlay.parentNode) {
         _overlay.parentNode.removeChild(_overlay);
+        // 仅真正关闭时广播（重复销毁清理旧面板时旧面板确实被关闭，同样发声）
+        eventBus.emit(Events.UI_PANEL_CLOSED, { panelId: 'shipDestroyed' });
     }
     _overlay = null;
     document.removeEventListener('keydown', escHandler);
@@ -155,6 +157,7 @@ function showDestroyedPanel(data) {
 
     overlay.appendChild(panel);
     document.body.appendChild(overlay);
+    eventBus.emit(Events.UI_PANEL_OPENED, { panelId: 'shipDestroyed' });
     _overlay = overlay;
 
     // ESC / 点击遮罩关闭（兜底防卡死）

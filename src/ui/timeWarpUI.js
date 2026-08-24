@@ -137,6 +137,8 @@ class TimeWarpUI {
             cell.className = 'timewarp-cell';
             cell.style.width = CELL_SIZE + 'px';
             cell.style.height = CELL_SIZE + 'px';
+            // 档位值暴露给采集层（uiClickSfx 档位悬停音定位用）
+            cell.dataset.rate = String(rate);
             bindTooltip(cell, rate + 'x');
             const img = document.createElement('img');
             img.className = 'timewarp-cell-img';
@@ -263,7 +265,7 @@ class TimeWarpUI {
 
         // 档位格：
         // - 运行态：累积高亮（rate ≤ 当前倍率 且 ≤ 上限）为绿，其余灰
-        // - 暂停态：仅 savedRate 对应单格亮（savedRate=4x 物理档时降级为 ≤4 最大格=3）
+        // - 暂停态：仅 savedRate 对应单格亮（savedRate 均在面板档位表内，直接对应单格；_computeTargetRate 仅兜底）
         const targetRate = paused ? this._computeTargetRate(savedRate) : null;
         for (let i = 0; i < this._cells.length; i++) {
             const cell = this._cells[i];
@@ -295,7 +297,7 @@ class TimeWarpUI {
         }
     }
 
-    // 暂停态高亮目标：PANEL_RATES 中 ≤ savedRate 的最大档位（4x 物理档降级到 3 格）
+    // 暂停态高亮目标：PANEL_RATES 中 ≤ savedRate 的最大档位（savedRate 在面板内时为自身，兜底处理异常值）
     _computeTargetRate(savedRate) {
         let target = null;
         for (const r of PANEL_RATES) {

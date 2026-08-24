@@ -358,7 +358,7 @@ export function registerTrackingScene({ getTime, setTime, canvas }) {
                     soi: activeShip.currentSOI,
                     // 追踪站摧毁 — 统一 delete 接口
                     delete: () => shipSystem.deleteShip(activeShip.id)
-                });
+                }, { silent: true });
             }
         },
         exit: () => {
@@ -367,8 +367,8 @@ export function registerTrackingScene({ getTime, setTime, canvas }) {
             if (activeShip) {
                 activeShip.controlsLocked = false;
             }
-            // 隐藏信息窗口
-            window.hideTrackingInfo && window.hideTrackingInfo();
+            // 隐藏信息窗口（场景退出自动关闭，不产生关闭音效）
+            window.hideTrackingInfo && window.hideTrackingInfo({ silent: true });
         },
         update: (dt) => {
             const activeShip = shipSystem.getActiveShip();

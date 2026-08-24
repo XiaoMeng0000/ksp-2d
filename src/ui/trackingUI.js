@@ -396,15 +396,27 @@ trackingInfo.addEventListener('click', (e) => {
     }
 });
 
-window.updateTrackingInfo = function(node) {
+window.updateTrackingInfo = function(node, opts = {}) {
+    // 仅"从无到有"广播打开事件：切换查看天体（有→有）不重复发声
+    // opts.silent = true 用于场景 enter 自动打开（不产生打开音效）
+    const wasHidden = !_currentNode;
     _currentNode = node;
     trackingInfo.style.display = 'block';
+    if (wasHidden && !opts.silent) {
+        eventBus.emit(Events.UI_PANEL_OPENED, { panelId: 'trackingInfo' });
+    }
     renderInfo(node);
 };
 
-window.hideTrackingInfo = function() {
+window.hideTrackingInfo = function(opts = {}) {
+    // 仅"从有到无"广播关闭事件：重复调用静默
+    // opts.silent = true 用于场景 exit 自动关闭（不产生关闭音效）
+    const wasVisible = !!_currentNode;
     _currentNode = null;
     trackingInfo.style.display = 'none';
+    if (wasVisible && !opts.silent) {
+        eventBus.emit(Events.UI_PANEL_CLOSED, { panelId: 'trackingInfo' });
+    }
 };
 
 // 追踪站 - 导航栏（标题 + 顶部横向分类 Tab + 树容器）

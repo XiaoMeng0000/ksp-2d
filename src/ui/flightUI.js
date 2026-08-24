@@ -37,14 +37,35 @@ leftToolbar.id = 'leftToolbar';
 leftToolbar.innerHTML = '';
 document.body.appendChild(leftToolbar);
 
-// 统一工具栏 — 动态图标渲染
+// 统一工具栏 — 动态图标渲染（0.2.7 KSP2 重构：竖排标题 + 裸图标行 + 状态竖条选中态）
 // mode: 'ship' | 'facility' | 'off'
 // data: { modules, shipId } 或 { facilityId } 或 null
+let _activeToolbarId = null;   // 当前已打开入口的图标 id（选中态 = 右侧亮绿条）
+
+function setActiveToolbar(id) {
+    _activeToolbarId = id;
+    leftToolbar.querySelectorAll('.toolbar-item').forEach((el) => {
+        el.classList.toggle('active', el.dataset.toolbarId === id);
+    });
+}
+
+function clearActiveToolbar() {
+    _activeToolbarId = null;
+    leftToolbar.querySelectorAll('.toolbar-item.active').forEach((el) => {
+        el.classList.remove('active');
+    });
+}
+
 function renderToolbarIcons(mode, data) {
     leftToolbar.innerHTML = '';
     if (mode === 'off' || !data) return;
 
-    const createIcon = (icon, title, onClick, textureKey) => {
+    // 图标行：裸图标 + 右侧状态竖条（无方框底，参考图样式）
+    const createIcon = (icon, title, onClick, textureKey, iconId) => {
+        const item = document.createElement('div');
+        item.className = 'toolbar-item';
+        item.dataset.toolbarId = iconId || '';
+
         const btn = document.createElement('button');
         btn.className = 'toolbar-icon-btn';
 
@@ -71,8 +92,18 @@ function renderToolbarIcons(mode, data) {
             btn.innerHTML = icon;
         }
 
-        btn.addEventListener('click', onClick);
-        leftToolbar.appendChild(btn);
+        btn.addEventListener('click', () => {
+            // 先执行业务（可能隐藏其他面板 → 触发 UI_PANEL_CLOSED 清除旧选中），再设置新选中
+            onClick();
+            setActiveToolbar(iconId);
+        });
+
+        const bar = document.createElement('span');
+        bar.className = 'toolbar-item-bar';
+
+        item.appendChild(btn);
+        item.appendChild(bar);
+        leftToolbar.appendChild(item);
     };
 
     if (mode === 'ship') {
@@ -97,7 +128,7 @@ function renderToolbarIcons(mode, data) {
                     if (ship) openUtilityPanel(t('scan.menuTitle'), buildScanContent(ship));
                 }
             };
-            createIcon(tb.icon, t(tb.labelKey), onClick, tb.iconId);
+            createIcon(tb.icon, t(tb.labelKey), onClick, tb.iconId, tb.iconId);
         }
     } else if (mode === 'facility') {
         const facility = facilitySystem.getFacility(data.facilityId);
@@ -113,12 +144,12 @@ function renderToolbarIcons(mode, data) {
             if (comp.id === 'assembly_shop') {
                 createIcon(compIcon, compName, () => {
                     window.openShipBuilder();
-                }, 'comp_' + comp.id);
+                }, 'comp_' + comp.id, comp.id);
             } else {
                 createIcon(compIcon, compName, () => {
                     uiManager.hidePanel('shipBuilder');
                     openCompartmentPanel(facility, comp.id);
-                }, 'comp_' + comp.id);
+                }, 'comp_' + comp.id, comp.id);
             }
         }
     }
@@ -134,7 +165,7 @@ function openUtilityPanel(title, html) {
     if (!panel || !content) return;
     if (titleEl) titleEl.textContent = title;
     content.innerHTML = html;
-    panel.style.display = 'block';
+    _setToolbarPanelVisible(true);
 }
 
 // 资源条行（货仓/存储共用）— 0.2.7 v2：名字/数量在条外（条内无文字），空槽常显
@@ -550,7 +581,7 @@ function openCompartmentPanel(facility, compartmentId) {
     }
 
     content.innerHTML = html;
-    panel.style.display = 'block';
+    _setToolbarPanelVisible(true);
 
     // 舱室初始化钩子（绑定事件）
     if (compartmentId === 'dock_hub') bindDockHubEvents(facility);
@@ -881,8 +912,31 @@ if (toolbarPanelContentEl) {
     });
 }
 
+// 工具栏弹出面板显隐辅助：统一控制 display 并广播 UI_PANEL_OPENED/CLOSED
+// 幂等判断避免重复调用重复发声；程序自动隐藏（互斥/场景切换）走静默直接改 display
+function _setToolbarPanelVisible(visible) {
+    const isBlock = toolbarPanel.style.display === 'block';
+    if (visible) {
+        if (!isBlock) {
+            toolbarPanel.style.display = 'block';
+            eventBus.emit(Events.UI_PANEL_OPENED, { panelId: 'toolbarPanel' });
+        }
+    } else if (isBlock) {
+        toolbarPanel.style.display = 'none';
+        eventBus.emit(Events.UI_PANEL_CLOSED, { panelId: 'toolbarPanel' });
+    }
+}
+
 document.getElementById('toolbarPanelCloseBtn').addEventListener('click', () => {
-    toolbarPanel.style.display = 'none';
+    _setToolbarPanelVisible(false);
+});
+
+// 0.2.7：任何可能经工具栏图标打开的面板关闭时，清除图标选中态（绿条）
+// 覆盖：✕ 关工具栏面板 / 建造面板 / 设施部署面板（uiManager 面板的关闭路径）
+eventBus.on(Events.UI_PANEL_CLOSED, (data) => {
+    if (data && data.panelId && ['toolbarPanel', 'shipBuilder', 'facilityDeploy'].includes(data.panelId)) {
+        clearActiveToolbar();
+    }
 });
 
 // 飞船建造UI - 场景切换时显示/隐藏工具栏
@@ -897,6 +951,7 @@ eventBus.on(Events.SCENE_CHANGED, (data) => {
         uiManager.hidePanel('shipBuilder');
         uiManager.hidePanel('facilityDeploy');
         toolbarPanel.style.display = 'none';
+        clearActiveToolbar();
         // 兜底隐藏对接提示框，防止场景切换时遗留
         window.hideDockPrompt?.();
     }

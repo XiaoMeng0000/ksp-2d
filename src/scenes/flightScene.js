@@ -319,8 +319,8 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 delete window.__pendingFacilityId;
             }
 
-            // 显示可见性筛选面板
-            sasUI.showVisibilityPanel();
+            // 显示可见性筛选面板（场景进入自动打开，不产生打开音效）
+            sasUI.showVisibilityPanel({ silent: true });
 
             // SAS 集成 — 为所有现有飞船初始化 SAS 控制器（新建 / 读档后都需要）
             for (const ship of shipSystem.getAllShips()) {
@@ -462,8 +462,8 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
 
             inputManager.disable();
 
-            // 隐藏可见性筛选面板
-            sasUI.hideVisibilityPanel();
+            // 隐藏可见性筛选面板（场景退出自动关闭，不产生关闭音效）
+            sasUI.hideVisibilityPanel({ silent: true });
 
             // 隐藏悬停提示（防切场景后 tooltip 残留）
             hideTooltip();

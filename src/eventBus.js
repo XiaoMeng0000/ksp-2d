@@ -22,6 +22,12 @@ export const Events = {
     AUDIO_READY: 'audio:ready',               // 所有音频资源加载完成
     AUDIO_PROGRESS: 'audio:progress',         // 单个音频资源加载完成或失败时广播
     AUDIO_LOAD_ERROR: 'audio:loadError',      // 单个音频资源加载失败
+    // UI 面板事件（面板打开/关闭 → audioDirector 播放 UI 音效）
+    UI_PANEL_OPENED: 'ui:panelOpened',       // 面板打开，payload: { panelId }
+    UI_PANEL_CLOSED: 'ui:panelClosed',       // 面板关闭，payload: { panelId }
+    UI_CLICKED: 'ui:clicked',                // UI 元素点击，payload: { variant: 'normal' | 'selected' }
+    UI_HOVERED: 'ui:hovered',                // UI 元素悬停进入，payload: { yRatio }
+    UI_WARP_HOVERED: 'ui:warpHovered',       // 时间加速档位格悬停，payload: { rate }（档位倍率）
     // 字体系统事件
     FONTS_READY: 'fonts:ready',               // 所有字体加载完成
     FONT_PROGRESS: 'font:progress',           // 单个字体加载完成或失败时广播

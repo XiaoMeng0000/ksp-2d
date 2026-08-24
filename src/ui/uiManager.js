@@ -1,5 +1,7 @@
 // UI 管理器模块
 
+import { eventBus, Events } from '../eventBus.js';
+
 // UIManager 单例类
 class UIManager {
     constructor() {
@@ -55,8 +57,13 @@ class UIManager {
             console.warn(`[UIManager] 面板 ${id} 未注册`);
             return this;
         }
+        // 仅 false→true 跳变时发出打开事件，防止重复/showPanel 时重复发声
+        const wasVisible = panel.isVisible;
         panel.show();
         panel.isVisible = true;
+        if (!wasVisible) {
+            eventBus.emit(Events.UI_PANEL_OPENED, { panelId: id });
+        }
         const data = this._data[id];
         if (data) {
             panel.render(data);
@@ -71,8 +78,13 @@ class UIManager {
             console.warn(`[UIManager] 面板 ${id} 未注册`);
             return this;
         }
+        // 仅 true→false 跳变时发出关闭事件；已隐藏时 hidePanel 静默
+        const wasVisible = panel.isVisible;
         panel.hide();
         panel.isVisible = false;
+        if (wasVisible) {
+            eventBus.emit(Events.UI_PANEL_CLOSED, { panelId: id });
+        }
         return this;
     }
 

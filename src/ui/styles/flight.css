@@ -3,46 +3,69 @@
    时间加速面板 / SAS 底部按钮区 / 可见性筛选)
    ============================================================ */
 
-/* ---- 左侧工具栏(设施模式图标列) ---- */
+/* ---- 左侧工具栏(飞船/设施操作图标列,KSP2 风格:紫色外框 + 纯黑底 + 状态条) ---- */
 #leftToolbar {
     position: fixed;
-    left: 15px;
-    top: 50%;
-    transform: translateY(-50%);
-    background: var(--panel-bg);
-    border: 1px solid var(--border);
+    left: 3px;
+    top: 25%;
+    background: #000;
+    border: 1px solid var(--toolbar-border);
     border-radius: 5px;
-    padding: 8px;
+    padding: 7px 6px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
     max-height: 75vh;
     overflow-y: auto;
     z-index: 900;
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.3s ease;
     font-family: var(--font-mono);
 }
 
-#leftToolbar .toolbar-icon-btn {
+/* 图标行:裸图标 + 右侧状态竖条(无方框底,参考图样式) */
+#leftToolbar .toolbar-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 0;
+}
+
+#leftToolbar .toolbar-item .toolbar-icon-btn {
     width: 40px;
     height: 40px;
     padding: 0;
-    background: var(--panel-bg);
-    color: var(--accent);
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    cursor: pointer;
+    background: transparent;
+    border: none;
+    color: var(--text-main);
     font-family: var(--font-mono);
-    font-size: 16px;
+    font-size: 18px;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    cursor: pointer;
 }
-#leftToolbar .toolbar-icon-btn:hover {
-    background: var(--accent-bg);
+
+#leftToolbar .toolbar-item:hover .toolbar-icon-btn {
+    color: var(--accent);
+}
+
+/* 状态竖条:未选中暗条 / 选中(已打开入口)亮绿条 */
+#leftToolbar .toolbar-item-bar {
+    width: 4px;
+    height: 24px;
+    border-radius: 2px;
+    background: var(--border-dark);
+    transition: background 0.15s ease;
+}
+
+#leftToolbar .toolbar-item.active .toolbar-item-bar {
+    background: var(--progress-green);
+}
+
+#leftToolbar .toolbar-item.active .toolbar-icon-btn {
+    color: var(--accent);
 }
 
 /* ---- 对接提示弹窗 ---- */
@@ -179,15 +202,15 @@
     padding: 1px 0 3px 0;
 }
 
-/* ---- SAS 底部按钮区 ---- */
+/* ---- SAS 底部按钮区（0.2.7 统一为工具栏风格：黑底 + 紫框） ---- */
 #sasBottomButtons {
     position: fixed;
     z-index: 900;
     display: none;
     align-items: center;
     justify-content: center;
-    background: var(--panel-bg);
-    border: 1px solid var(--border);
+    background: #000;
+    border: 1px solid var(--toolbar-border);
     border-radius: 5px;
     padding: 8px;
     user-select: none;
@@ -195,8 +218,8 @@
 
 #sasBottomButtons button {
     padding: 0;
-    background: var(--panel-bg);
-    border: 1px solid var(--border);
+    background: #000;
+    border: 1px solid var(--toolbar-border);
     border-radius: 4px;
     cursor: pointer;
     display: flex;

@@ -27,6 +27,8 @@ import './src/ui/newCampaignDialog.js';
 // 0.2.5 设置面板 — 从 scene 抽离为覆盖式 UI 面板
 import { openSettings as openSettingsUI } from './src/ui/settingsUI.js';
 import './src/ui/facilityDeployUI.js';
+// UI 点击音效采集（document 捕获阶段委托，import 即生效）
+import './src/ui/uiClickSfx.js';
 import './src/ui/flightUI.js';
 import './src/ui/shipDestroyedUI.js';
 // 玩家资源 HUD（0.2.0 阶段4）— 右上角常驻模式 + 材料套装/科技点显示

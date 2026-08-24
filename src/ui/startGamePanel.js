@@ -306,8 +306,9 @@ panel.addEventListener('click', (e) => {
     }
 });
 
-// 打开面板（展示 + 全量刷新；默认选中左侧第一个战役的右侧第一个存档）
-function openStartGamePanel() {
+// 打开面板的内部实现（展示 + 全量刷新；默认选中左侧第一个战役的右侧第一个存档）
+// 仅由 uiManager 的 show 回调调用，保证 UI_PANEL_OPENED 广播
+function _showStartGamePanel() {
     panel.style.display = 'flex';
     const worlds = saveManager.getWorldList();
     _selectedWorldId = worlds.length > 0 ? worlds[0].id : null;
@@ -316,16 +317,26 @@ function openStartGamePanel() {
     renderAll();
 }
 
-// 关闭面板
-function closeStartGamePanel() {
+// 关闭面板的内部实现（仅由 uiManager 的 hide 回调调用，保证 UI_PANEL_CLOSED 广播）
+function _hideStartGamePanel() {
     panel.style.display = 'none';
+}
+
+// 打开面板（对外入口：统一转发 uiManager，保证 UI_PANEL_OPENED 广播）
+function openStartGamePanel() {
+    uiManager.showPanel('startGamePanel');
+}
+
+// 关闭面板（对外入口：统一转发 uiManager，保证 UI_PANEL_CLOSED 广播）
+function closeStartGamePanel() {
+    uiManager.hidePanel('startGamePanel');
 }
 
 // 注册到 uiManager，与其他面板统一显隐管理
 uiManager.registerPanel('startGamePanel', {
     element: panel,
-    show: openStartGamePanel,
-    hide: closeStartGamePanel,
+    show: _showStartGamePanel,
+    hide: _hideStartGamePanel,
     render: renderAll
 });
 

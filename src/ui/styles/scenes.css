@@ -8,7 +8,7 @@
     position: fixed;
     inset: 0;
     z-index: 2000;
-    background: rgba(0, 0, 0, 0.92);
+    background: var(--panel-bg-deep);
     backdrop-filter: blur(12px);
     display: flex;
     flex-direction: column;
@@ -59,35 +59,40 @@
     border-color: #c05050;
 }
 
-/* ---- 星系图鉴(galaxiesScene.js) ---- */
+/* ---- 星系图鉴(galaxiesScene.js) — 0.2.7 重构为 KSP2 设计语言 ---- */
+
+/* 顶栏：面板头风格（--theme-bg 底 + 行分隔） */
 .galaxies-topbar {
     display: flex;
     align-items: center;
     gap: 16px;
     padding: 14px 40px;
-    border-bottom: 1px solid #3a3a3a;
+    background: var(--theme-bg);
+    border-bottom: 1px solid var(--theme-border-row);
     flex-shrink: 0;
 }
 
 .galaxies-back-btn {
-    padding: 8px 28px;
-    background: rgba(30, 30, 30, 0.8);
-    color: white;
-    border: 1px solid #A04040;
-    border-radius: 4px;
+    height: 26px;
+    padding: 0 20px;
+    box-sizing: border-box;
+    background: var(--theme-btn-bg);
+    color: var(--text-bright);
+    border: 1px solid var(--border-light);
+    border-radius: 5px;
     font-family: var(--font-mono);
-    font-size: 14px;
+    font-size: 12px;
     cursor: pointer;
-    transition: all 0.2s ease;
 }
 .galaxies-back-btn:hover {
-    background: #2a2a2a;
-    border-color: #c05050;
+    border-color: var(--theme-border-hover);
 }
 
 .galaxies-title {
-    color: rgba(255, 255, 255, 0.92);
-    font-size: 18px;
+    color: var(--text-bright);
+    font-family: var(--font-mono-bold);
+    font-weight: normal;
+    font-size: 15px;
     letter-spacing: 2px;
 }
 
@@ -104,85 +109,106 @@
     padding: 40px 0;
 }
 
+/* 星系卡：蓝灰卡壳（框住内容）+ 紫头条 + 深色二级背景卡体（与设施分组卡同构） */
 .galaxies-card {
-    background: #1e1e24;
-    border: 1px solid #3a3a3a;
-    border-radius: 8px;
+    background: var(--theme-bg);
+    border-radius: 5px;
     margin-bottom: 30px;
-    padding: 20px 20px 0 20px;
+    padding: 10px;
+    overflow: hidden;
 }
 
+/* 卡标题 = 紫头顶条（与资源分组卡头一致） */
 .galaxies-card-title {
-    color: #A04040;
-    font-family: var(--font-mono);
-    font-size: 22px;
-    margin: 0 0 16px 0;
+    margin: 0 0 10px 0;
+    padding: 10px 20px;
+    background: var(--theme-btn-selected);
+    color: var(--text-bright);
+    font-family: var(--font-mono-bold);
+    font-weight: normal;
+    font-size: 16px;
+    letter-spacing: 1px;
+    border-radius: 4px;
+}
+
+/* 二级背景卡体（被卡壳"框住"的深色内容区） */
+.galaxies-card-body {
+    background: var(--theme-panel-deep);
+    border-radius: 4px;
+    padding: 18px 20px 16px 20px;
 }
 
 .galaxies-chart {
     width: 100%;
     display: block;
-    margin-bottom: 20px;
 }
 
 .galaxies-desc {
-    color: #999;
+    color: var(--text-main);
     font-family: var(--font-mono);
     font-size: 13px;
     line-height: 1.8;
-    margin: 0 0 12px 0;
+    margin: 16px 0 0 0;
 }
 
+/* 折叠头：次级深底条（展开显示天体行） */
 .galaxies-collapse-header {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 14px 0;
+    padding: 10px 12px;
+    margin-top: 16px;
     cursor: pointer;
     user-select: none;
     font-family: var(--font-mono);
-    color: #A04040;
-    font-size: 14px;
-    border-top: 1px solid #3a3a3a;
+    color: var(--accent);
+    font-size: 12px;
+    letter-spacing: 1px;
+    background: var(--theme-panel);
+    border-radius: 4px;
     transition: background 0.15s ease;
 }
 .galaxies-collapse-header:hover {
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--theme-active-bg);
 }
 
 .galaxies-collapse-content {
     display: none;
-    padding: 4px 0 16px 0;
+    padding: 8px 0 0 0;
 }
 
 .galaxies-empty {
-    color: #666;
+    color: var(--text-dim);
     font-family: var(--font-mono);
     font-size: 12px;
     padding: 6px 0;
 }
 
+/* 天体数据行：深底圆角无边框 */
 .galaxies-row {
-    margin-bottom: 12px;
+    background: var(--theme-panel-deep);
+    border-radius: 4px;
+    padding: 8px 12px;
+    margin-bottom: 8px;
 }
 
 .galaxies-row-title {
-    color: #A04040;
+    color: var(--text-bright);
     font-family: var(--font-mono);
-    font-size: 16px;
+    font-size: 13px;
     margin: 0 0 4px 0;
 }
 
 .galaxies-row-data {
-    color: #666;
+    color: var(--text-dim);
     font-family: var(--font-mono);
-    font-size: 12px;
+    font-size: 11px;
 }
 
 .galaxies-stat {
-    color: #666;
+    color: var(--text-dim);
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: 12px;
     text-align: center;
     padding: 10px 0 20px 0;
 }

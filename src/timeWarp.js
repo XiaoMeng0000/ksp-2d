@@ -6,12 +6,12 @@ import { t } from './config/strings.js';
 
 // 时间加速档位表（索引 0 = 暂停 / 0x）
 // KSP2 原版档位 + 0x 暂停档：. 升档 / , 降档，0x 即暂停
-// 其中 4x 为物理加速档（点火时最高允许档位）
-const WARP_RATES = [0, 1, 2, 3, 4, 10, 50, 100, 1000, 10000, 100000, 1000000, 10000000];
+// 其中 4x 为物理加速档（点火时最高允许档位，同时占面板第 3 格）
+const WARP_RATES = [0, 1, 2, 4, 10, 50, 100, 1000, 10000, 100000, 1000000, 10000000];
 
 // 面板档位表（时间加速 UI 的 11 格）— 从完整档位表派生，禁止手写第二份常量
-// 过滤掉 0x 暂停档与 4x 物理档（4x 仅 Alt+ 微调可达，不占面板格）
-export const PANEL_RATES = WARP_RATES.filter((r) => r !== 0 && r !== 4);
+// 仅过滤 0x 暂停档：4x 物理档与其余档位均占面板格（第三格 = 4x）
+export const PANEL_RATES = WARP_RATES.filter((r) => r !== 0);
 
 // 物理加速上限（thrust 模式允许的最大倍率）
 const PHYSICS_WARP_MAX = 4;
@@ -55,7 +55,7 @@ class TimeWarp {
     }
 
     // 暂停前保存的档位倍率值（大圆按钮恢复目标；UI 暂停态高亮显示用）
-    // savedIndex 可能指向 4x 物理档（PANEL_RATES 不含该值），UI 需自行降级处理
+    // savedIndex 恒为面板档位（PANEL_RATES 含全部非 0 档），UI 可直接对应到单格
     getSavedRate() {
         return WARP_RATES[this._savedIndex];
     }
@@ -186,7 +186,9 @@ class TimeWarp {
         eventBus.emit(Events.TIME_WARP_CHANGED, {
             rate: WARP_RATES[this._index],
             index: this._index,
-            paused
+            paused,
+            // 切换前是否处于暂停：供 audioDirector 区分"取消暂停(恢复)"与普通切档
+            wasPaused
         });
     }
 

@@ -1,6 +1,7 @@
 // UI组件 - 通知和对话框组件
 
 import { textureManager } from '../graphics/textureManager.js';
+import { eventBus, Events } from '../eventBus.js';
 import { t } from '../config/strings.js';
 import { getResourceType } from '../resources/resourceTypes.js';
 import { getModuleDef, getModuleCategories, getModulesByCategory } from '../ship/moduleTypes.js';
@@ -78,24 +79,33 @@ export function createDialog(title, items, onSelect, onCancel) {
     panel.innerHTML = html;
     overlay.appendChild(panel);
     document.body.appendChild(overlay);
+    eventBus.emit(Events.UI_PANEL_OPENED, { panelId: 'dialog' });
+
+    // 统一关闭辅助：移除 overlay 并广播关闭事件（所有关闭路径共用）
+    const closeDialog = () => {
+        if (overlay.parentNode) {
+            overlay.parentNode.removeChild(overlay);
+        }
+        eventBus.emit(Events.UI_PANEL_CLOSED, { panelId: 'dialog' });
+    };
 
     panel.querySelectorAll('[data-id]').forEach(btn => {
         btn.addEventListener('click', () => {
             const id = btn.dataset.id;
-            if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+            closeDialog();
             onSelect(id);
         });
     });
     const cancelBtn = panel.querySelector('#dialogCancelBtn');
     if (cancelBtn) {
         cancelBtn.addEventListener('click', () => {
-            if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+            closeDialog();
             if (onCancel) onCancel();
         });
     }
     overlay.addEventListener('click', (e) => {
         if (e.target === overlay) {
-            if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+            closeDialog();
             if (onCancel) onCancel();
         }
     });
@@ -119,6 +129,7 @@ export function createInputDialog(title, placeholder, defaultValue, onConfirm, o
     `;
     overlay.appendChild(panel);
     document.body.appendChild(overlay);
+    eventBus.emit(Events.UI_PANEL_OPENED, { panelId: 'dialog' });
 
     const input = panel.querySelector('#dialogInput');
     const confirmBtn = panel.querySelector('#dialogConfirmBtn');
@@ -128,7 +139,10 @@ export function createInputDialog(title, placeholder, defaultValue, onConfirm, o
     input.select();
 
     const close = () => {
-        if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+        if (overlay.parentNode) {
+            overlay.parentNode.removeChild(overlay);
+        }
+        eventBus.emit(Events.UI_PANEL_CLOSED, { panelId: 'dialog' });
     };
 
     const handleConfirm = () => {
@@ -179,12 +193,16 @@ export function createConfirmDialog(title, message, onConfirm, onCancel, confirm
     `;
     overlay.appendChild(panel);
     document.body.appendChild(overlay);
+    eventBus.emit(Events.UI_PANEL_OPENED, { panelId: 'dialog' });
 
     const confirmBtn = panel.querySelector('#dialogConfirmBtn');
     const cancelBtn = panel.querySelector('#dialogCancelBtn');
 
     const close = () => {
-        if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+        if (overlay.parentNode) {
+            overlay.parentNode.removeChild(overlay);
+        }
+        eventBus.emit(Events.UI_PANEL_CLOSED, { panelId: 'dialog' });
     };
 
     confirmBtn.addEventListener('click', () => {
@@ -280,9 +298,34 @@ export function showModuleSelectorPopup(opts) {
         position:fixed;left:${Math.min(rect.right + 8, window.innerWidth - 240)}px;top:${rect.top}px;
     `;
 
-    const closeHandler = () => { popup.remove(); document.removeEventListener('click', closeHandler); };
+    // 悬停详情提示（函数级变量，供统一关闭时清理）
+    let tooltip = null;
+
+    // 统一关闭辅助：移除弹窗 + 广播关闭事件（幂等；行点击/卸载/外部点击/Esc 全部共用）
+    let closed = false;
+    const closePopup = () => {
+        if (closed) {
+            return;
+        }
+        closed = true;
+        if (popup.parentNode) {
+            popup.remove();
+        }
+        if (tooltip) {
+            tooltip.remove();
+            tooltip = null;
+        }
+        document.removeEventListener('click', closeHandler);
+        document.removeEventListener('keydown', escHandler);
+        eventBus.emit(Events.UI_PANEL_CLOSED, { panelId: 'moduleSelector' });
+    };
+    const closeHandler = () => {
+        closePopup();
+    };
     const escHandler = (e) => {
-        if (e.key === 'Escape') { popup.remove(); document.removeEventListener('click', closeHandler); }
+        if (e.key === 'Escape') {
+            closePopup();
+        }
     };
 
     // 已安装提示（飞船建造：当前槽位已有模块）
@@ -329,7 +372,6 @@ export function showModuleSelectorPopup(opts) {
             row.innerHTML = labelHtml;
 
             // 悬停详情提示（飞船建造用）
-            let tooltip = null;
             if (opts.showTooltip) {
                 row.addEventListener('mouseenter', () => {
                     tooltip = document.createElement('div');
@@ -350,8 +392,7 @@ export function showModuleSelectorPopup(opts) {
             // 点击安装/替换
             row.addEventListener('click', (e) => {
                 e.stopPropagation();
-                popup.remove();
-                if (tooltip) tooltip.remove();
+                closePopup();
                 opts.onSelect(def);
             });
 
@@ -368,13 +409,14 @@ export function showModuleSelectorPopup(opts) {
         uninstallRow.textContent = t('build.uninstall');
         uninstallRow.addEventListener('click', (e) => {
             e.stopPropagation();
-            popup.remove();
+            closePopup();
             opts.onUninstall();
         });
         popup.appendChild(uninstallRow);
     }
 
     document.body.appendChild(popup);
+    eventBus.emit(Events.UI_PANEL_OPENED, { panelId: 'moduleSelector' });
     setTimeout(() => {
         document.addEventListener('click', closeHandler);
         document.addEventListener('keydown', escHandler);

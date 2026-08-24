@@ -5,10 +5,12 @@ import { textureManager } from '../graphics/textureManager.js';
 import { solarSystemData, starSystemMeta } from '../config/solarSystem.js';
 import { t } from '../config/strings.js';
 
-// ========== 样式常量（Canvas 绘制用；DOM 样式已迁移至 scenes.css） ==========
+// ========== 样式常量（Canvas 绘制用；色值与 CSS 变量保持一致）
+// 注意：Canvas 无法读取 CSS 变量，此处实色为 --theme-bg / --ut-gold / --text-* 的对应值 ==========
 const TEXT_MAIN = 'rgba(255, 255, 255, 0.92)';
-const TEXT_DIM = '#666';        // 数据小字
-const CARD_BG = '#1e1e24';      // 卡片实色底（Canvas 渐变/文字用）
+const TEXT_DIM = '#666';        // 数据小字（--text-dim）
+const CARD_BG = '#2e3540';      // 卡片实色底（--theme-bg，恒星渐隐落到卡上）
+const STAR_LABEL = '#d4c86a';   // 恒星名称标注（--ut-gold）
 const FONT_MONO = 'monospace';
 
 // 对比图绘制常量
@@ -87,7 +89,7 @@ function registerGalaxiesScene() {
             ctx.fillRect(exposed, 0, FADE_WIDTH, height);
 
             // 恒星名称标注（露出弧下方）
-            ctx.fillStyle = '#ffcc44';
+            ctx.fillStyle = STAR_LABEL;
             ctx.font = '12px ' + FONT_MONO;
             ctx.textAlign = 'left';
             ctx.textBaseline = 'alphabetic';
@@ -202,16 +204,21 @@ function registerGalaxiesScene() {
         ctx.fillText(t('galaxies.notOpen'), cx, height - 22);
     }
 
-    // 构建星系卡片：实色底，已加载天体放在卡片下侧可展开区域（样式见 scenes.css）
+    // 构建星系卡片：蓝灰卡壳（框住）+ 紫头 + 深色二级背景卡体（与设施分组卡同构）
     function _buildStarSystemCard(meta, chartWidth) {
         const card = document.createElement('div');
         card.className = 'galaxies-card';
 
-        // 星系名标题
+        // 星系名标题（紫头顶条）
         const title = document.createElement('h2');
         title.textContent = meta.name;
         title.className = 'galaxies-card-title';
         card.appendChild(title);
+
+        // 二级背景卡体：chart / 描述 / 已加载天体 全部落于此（被蓝灰卡壳"框住"）
+        const body = document.createElement('div');
+        body.className = 'galaxies-card-body';
+        card.appendChild(body);
 
         // ===== 占位星系：占位恒星图；正常星系：天体大小对比图 =====
         if (meta.placeholder) {
@@ -222,7 +229,7 @@ function registerGalaxiesScene() {
             chart.className = 'galaxies-chart';
             const chartCtx = chart.getContext('2d');
             _drawPlaceholderStar(chartCtx, chart.width, chart.height);
-            card.appendChild(chart);
+            body.appendChild(chart);
         } else {
             // 正常星系：星体大小对比（Canvas 动态绘制，方案A）
             // 高度随最大卫星数增长（行星中轴 + 卫星垂直竖排）
@@ -236,17 +243,17 @@ function registerGalaxiesScene() {
             chart.className = 'galaxies-chart';
             const chartCtx = chart.getContext('2d');
             _drawComparisonChart(chartCtx, chart.width, chart.height, solarSystemData);
-            card.appendChild(chart);
+            body.appendChild(chart);
         }
 
         // 描述（百科天体档案文风）
         const desc = document.createElement('p');
         desc.textContent = meta.description;
         desc.className = 'galaxies-desc';
-        card.appendChild(desc);
+        body.appendChild(desc);
 
         // 已加载天体：可展开区域（展开时流式推挤下方卡片）
-        card.appendChild(_buildCollapsibleBodies(meta));
+        body.appendChild(_buildCollapsibleBodies(meta));
 
         return card;
     }

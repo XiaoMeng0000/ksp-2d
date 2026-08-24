@@ -153,8 +153,8 @@ function _renderContent() {
     });
 }
 
-// 打开设置面板（显示 + 重置分类 + 渲染；若 ESC 菜单打开则先关闭）
-function openSettings() {
+// 设置面板显隐的内部实现（仅由 uiManager 的 show/hide 回调调用）
+function _showSettings() {
     // 与 ESC 菜单互斥：从 ESC 菜单进入时关闭 ESC 菜单
     uiManager.hidePanel('esc');
     _currentCategory = 'display';
@@ -163,9 +163,19 @@ function openSettings() {
     _renderContent();
 }
 
-// 关闭设置面板
-function closeSettings() {
+// 隐藏设置面板的内部实现（仅由 uiManager 的 show/hide 回调调用）
+function _hideSettings() {
     container.style.display = 'none';
+}
+
+// 打开设置面板（对外入口：统一转发 uiManager，保证 UI_PANEL_OPENED 广播）
+function openSettings() {
+    uiManager.showPanel('settings');
+}
+
+// 关闭设置面板（对外入口：统一转发 uiManager，保证 UI_PANEL_CLOSED 广播）
+function closeSettings() {
+    uiManager.hidePanel('settings');
 }
 
 // 全局 ESC：设置面板可见时关闭（不切场景）
@@ -181,8 +191,8 @@ document.addEventListener('keydown', (e) => {
 // 注册到 uiManager，与开始游戏面板等统一显隐管理
 uiManager.registerPanel('settings', {
     element: container,
-    show: openSettings,
-    hide: closeSettings,
+    show: _showSettings,
+    hide: _hideSettings,
     render: () => {}
 });
 

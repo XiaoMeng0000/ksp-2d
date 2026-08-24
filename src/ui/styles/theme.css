@@ -37,4 +37,7 @@
 
     /* 工具菜单外描边（0.2.7 面板外壳 #toolbarPanel / 建造 / 部署面板，亮紫罗兰线） */
     --theme-menu-border: #5A5FCF;
+
+    /* 左侧工具栏外描边（0.2.7 参考图 GAME VIEW 字体紫） */
+    --toolbar-border: #6C5CE7;
 }
