@@ -145,10 +145,14 @@ function patchedRadialLine(relPos, relVel, host, depth, maxSeg, segments, stepSt
     const outward = relPos.x * relVel.x + relPos.y * relVel.y >= 0;
     const sEnd = Math.max(outward ? (rT - r0) : (rT + r0), 1);
     const M = 16;
+    // 径向段总飞行时间（供逐点 t 使用；下方逃逸分支的 switchT 复用本值，避免重复积分）
+    const tTotal = radialLineTime(relPos, ux, uy, sEnd, E, host.gm);
     const pts = [];
     for (let i = 0; i <= M; i++) {
         const s = (i / M) * sEnd;
-        pts.push({ x: relPos.x + ux * s, y: relPos.y + uy * s });
+        // 径向段速度非均匀，逐点 t 用弧长比例近似
+        // TODO: 骨架期近似值，填功能时可按需精化为逐点积分
+        pts.push({ x: relPos.x + ux * s, y: relPos.y + uy * s, t: (i / M) * tTotal });
     }
 
     const pushSeg = () => segments.push({
@@ -161,7 +165,7 @@ function patchedRadialLine(relPos, relVel, host, depth, maxSeg, segments, stepSt
 
     // 逃逸出 SOI（端点在边界）→ 切换递归
     if (host.gm > 0 && rT >= host.soiRadius - 1) {
-        const switchT = stepStartTime + radialLineTime(relPos, ux, uy, sEnd, E, host.gm);
+        const switchT = stepStartTime + tTotal;
         const hostPosEnd = bodyFuturePos(host, switchT);
         const hostVelEnd = bodyFutureVel(host, switchT);
         const rBound = host.soiRadius;
@@ -205,6 +209,9 @@ function radialLineTime(relPos, ux, uy, sEnd, E, gm) {
 }
 
 // 递归内部：分段拼接一步，采样从 theta0 到交点或完整轨道
+// 段点结构（0.3.0 骨架新增 t 字段）：{ x, y, t } — x/y 为相对锚点坐标，
+// t 为自该段起点（anchorTime）起的游戏秒偏移；锚点绝对时刻 = anchorTime + t。
+// 供轨道悬停 Tooltip 的 T+ 显示与右键菜单"时间加速至此"计算（飞行Scene 交互层读取）。
 function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segments) {
     if (depth >= maxSeg) return;
 
@@ -219,7 +226,7 @@ function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segment
         if (!intersection) {
             // 无交点兜底：时间采样推进（解析）直到出 SOI
             // 段点存相对锚点坐标（宿主在 stepStartTime 的位置），消除绝对坐标大数
-            const pts = [{ x: relPos.x, y: relPos.y }];
+            const pts = [{ x: relPos.x, y: relPos.y, t: 0 }];
             const aMag = -kepler.a;
             const v0 = Math.sqrt(velRel.x * velRel.x + velRel.y * velRel.y);
             const r0 = Math.sqrt(relPos.x * relPos.x + relPos.y * relPos.y);
@@ -229,7 +236,7 @@ function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segment
             for (let i = 1; i <= maxSteps; i++) {
                 const t = i * stepT;
                 const rP = keplerPositionAtTime(kepler, host.gm, t, kepler.omega);
-                if (i % 2 === 0) pts.push({ x: rP.x, y: rP.y });
+                if (i % 2 === 0) pts.push({ x: rP.x, y: rP.y, t });
                 if (Math.sqrt(rP.x * rP.x + rP.y * rP.y) > host.soiRadius) break;
             }
             segments.push({
@@ -271,7 +278,7 @@ function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segment
             const frac = i / N;
             const th = dir * (theta0m + frac * deltaTheta);
             const rP = keplerPositionAtTheta({ a: kepler.a, e: kepler.e, omega: kepler.omega }, host.gm, th);
-            points.push({ x: rP.x, y: rP.y });
+            points.push({ x: rP.x, y: rP.y, t: frac * deltaT });
         }
         segments.push({
             relPoints: points,
@@ -329,7 +336,7 @@ function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segment
         const hP0 = bodyFuturePos(host, stepStartTime);
         let relP = { x: posAbs.x - hP0.x, y: posAbs.y - hP0.y };
         let relV = { x: velRel.x, y: velRel.y };
-        const pts = [{ x: relP.x, y: relP.y }];
+        const pts = [{ x: relP.x, y: relP.y, t: 0 }];
         const dt = 0.05;
 
         // RK4 步数动态化：病态逃逸（kepler=null）时到达 SOI 边界的时间可能远大于
@@ -355,7 +362,7 @@ function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segment
             relV = result.vel;
 
             if (i % 2 === 0) {
-                pts.push({ x: relP.x, y: relP.y });
+                pts.push({ x: relP.x, y: relP.y, t });
             }
 
             // 转到绝对坐标（仅用于 SOI 检测）
@@ -417,7 +424,7 @@ function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segment
         for (let i = 0; i <= N; i++) {
             const t = (i / N) * T;
             const rP = keplerPositionAtTime(kepler, host.gm, t, kepler.omega);
-            drawPoints.push({ x: rP.x, y: rP.y });
+            drawPoints.push({ x: rP.x, y: rP.y, t });
         }
 
         // 扫描用点：逐点绝对坐标，用于 getSOIHostAtTime 精确检测
@@ -510,7 +517,9 @@ function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segment
         const M = Math.max(MIN_POINTS, Math.min(200, Math.ceil(tHi / (T / N))));
         const truncatedPoints = [];
         for (let i = 0; i <= M; i++) {
-            truncatedPoints.push(keplerPositionAtTime(kepler, host.gm, (i / M) * tHi, kepler.omega));
+            const t = (i / M) * tHi;
+            const rP = keplerPositionAtTime(kepler, host.gm, t, kepler.omega);
+            truncatedPoints.push({ x: rP.x, y: rP.y, t });
         }
         segments.push({
             relPoints: truncatedPoints,
@@ -549,7 +558,7 @@ function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segment
         const frac = i / N;
         const th = dir * (theta0m + frac * deltaTheta);
         const rP = keplerPositionAtTheta({ a: kepler.a, e: kepler.e, omega: kepler.omega }, host.gm, th);
-        points.push({ x: rP.x, y: rP.y });
+        points.push({ x: rP.x, y: rP.y, t: frac * deltaT });
     }
     segments.push({
         relPoints: points,
@@ -629,6 +638,76 @@ export function timeToNextSOISwitch(ship, host) {
 
     // 2) 无出界：仅椭圆轨道（有周期）才可能进入嵌套 SOI
     if (!(kepler.a > 0)) {
+        return null;
+    }
+    // 2.1) 嵌套扫描前置筛选（性能保护）：稳定轨道每帧整周期扫描 ≈1.4ms/船,
+    // 飞行/追踪场景取全部飞船 → 多船档会挤爆帧预算。几何判定：
+    //   |ship − B| ≥ d_min(宿主,B) − rMax（rMax = a(1+e) 为宿主-相对轨道最大半径），
+    // 若对每个非宿主天体都有 d_min − rMax > B.soiRadius → 该轨道整个周期内
+    // 不可能进入任何嵌套 SOI → 直接返回 null，无需扫描。
+    // d_min 下界（沿父链求公共祖先再按径向区间间隙减缩）：
+    //   ① B 是宿主(孙)后代 → 先取宿主直接子体近点半径，再逐级减去中间体远点半径；
+    //   ② 非同系（绕公共祖先的兄弟/远亲）→ 宿主侧节点与 B 侧节点的径向区间
+    //      [a(1−e), a(1+e)] 的间隙 max(0, bMin−hMax, hMin−bMax)，再逐级减去 B 侧中间体远点半径；
+    //   ③ 链缺失/环 → 0（保守：总是扫描，保证不漏报）。
+    // 注：星级宿主（深空）下行星即"宿主直接子体"，同公式成立（|ship−B| ≥ rB_pe − rMax）。
+    const rMax = kepler.a * (1 + kepler.e);
+    const dMinToHost = (b) => {
+        const parentOf = (body) => body.orbitParent
+            ? (celestialBodies.find(p => p.name === body.orbitParent) || null)
+            : null;
+        // 宿主链（自下而上）
+        const hostChain = [];
+        {
+            let h = host;
+            while (h && !hostChain.includes(h)) { hostChain.push(h); h = parentOf(h); }
+        }
+        // B 链（自下而上）
+        const bChain = [];
+        {
+            let c = b;
+            while (c && !bChain.includes(c)) { bChain.push(c); c = parentOf(c); }
+        }
+        // ① B 是宿主后代：宿主直接子体近点半径起算
+        const hostIdx = bChain.indexOf(host);
+        if (hostIdx >= 0 && hostIdx >= 1) {
+            const child = bChain[hostIdx - 1];
+            let dMin = child.orbitA * (1 - (child.orbitE || 0));
+            for (let i = 0; i < hostIdx - 1; i++) {
+                dMin = Math.max(0, dMin - bChain[i].orbitA * (1 + (bChain[i].orbitE || 0)));
+            }
+            return dMin;
+        }
+        // ② 兄弟/远亲：公共祖先下两侧节点的径向区间间隙
+        const common = bChain.find(n => hostChain.includes(n));
+        if (common) {
+            const hSide = hostChain[hostChain.indexOf(common) - 1];
+            const bSide = bChain[bChain.indexOf(common) - 1];
+            if (hSide && bSide) {
+                const bMin = bSide.orbitA * (1 - (bSide.orbitE || 0));
+                const bMax = bSide.orbitA * (1 + (bSide.orbitE || 0));
+                const hMin = hSide.orbitA * (1 - (hSide.orbitE || 0));
+                const hMax = hSide.orbitA * (1 + (hSide.orbitE || 0));
+                let dMin = Math.max(0, bMin - hMax, hMin - bMax);
+                const bi = bChain.indexOf(common);
+                for (let i = 0; i < bi - 1; i++) {
+                    dMin = Math.max(0, dMin - bChain[i].orbitA * (1 + (bChain[i].orbitE || 0)));
+                }
+                return dMin;
+            }
+        }
+        // ③ 保守兜底
+        return 0;
+    };
+    let canEnterNested = false;
+    for (const b of celestialBodies) {
+        if (b === host || b.type === 'star') continue;
+        if (dMinToHost(b) - rMax <= b.soiRadius) {
+            canEnterNested = true;
+            break;
+        }
+    }
+    if (!canEnterNested) {
         return null;
     }
     const T = 2 * Math.PI * Math.sqrt(kepler.a * kepler.a * kepler.a / gm);
@@ -724,7 +803,7 @@ export function integrateThrustArc(relPos, relVel, gm, host, thrustAccel, burnDu
 
     // 锚点（宿主在 startTime 的位置，固定锚，消除宿主漂移）
     // 段点存相对锚点坐标
-    points.push({ x: rp.x, y: rp.y });
+    points.push({ x: rp.x, y: rp.y, t: 0 });
 
     for (let i = 1; i <= maxSteps; i++) {
         const r = Math.sqrt(rp.x * rp.x + rp.y * rp.y);
@@ -734,7 +813,7 @@ export function integrateThrustArc(relPos, relVel, gm, host, thrustAccel, burnDu
         rp.x += rv.x * dt;
         rp.y += rv.y * dt;
         if (i % 3 === 0) {
-            points.push({ x: rp.x, y: rp.y });
+            points.push({ x: rp.x, y: rp.y, t: i * dt });
         }
         if (r > host.soiRadius * soiRadiusLimit) break;
     }

@@ -18,4 +18,14 @@ function worldToScreen(worldX, worldY, canvas) {
     };
 }
 
-export { camera, initCamera, worldToScreen };
+// worldToScreen 的数学逆变换：屏幕坐标（canvas 物理像素）→ 世界坐标
+// 注意：入参必须是 canvas 坐标空间的像素（cssX × canvas.width/rect.width），
+// 与 flightScene 事件处理中设施命中检测的坐标口径一致
+function screenToWorld(screenX, screenY, canvas) {
+    return {
+        x: (screenX - canvas.width / 2) / camera.zoom + camera.x,
+        y: -(screenY - canvas.height / 2) / camera.zoom + camera.y
+    };
+}
+
+export { camera, initCamera, worldToScreen, screenToWorld };

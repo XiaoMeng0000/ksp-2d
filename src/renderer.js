@@ -13,6 +13,13 @@ import { t } from './config/strings.js';
 let stars = [];
 const BODY_MIN_SCREEN_RADIUS = 3;  // 天体最低屏幕半径，防止远距离缩成一个像素以下
 
+// ===== 轨道交互骨架（0.3.0）：渲染层持有"本帧已绘制的轨道几何"，供交互层读取 =====
+// 交互层（flightScene）通过访问器读取，不与预测引擎直接耦合；
+// hover 状态由交互层写入，渲染层在绘制标记时消费。功能体待后续提交填充。
+let _lastOrbitSegments = null;   // 本帧活动飞船轨道预测 segments（renderOrbit 写入，null = 无活动飞船）
+let _lastOrbitMarkers = [];      // 本帧 Ap/Pe 标记屏幕位置（renderOrbitMarkers 写入）
+let _orbitHoverState = null;     // 悬停状态（setOrbitHoverState 写入，标记绘制消费）
+
 function hexToRgba(hex, alpha) {
     const r = parseInt(hex.slice(1, 3), 16);
     const g = parseInt(hex.slice(3, 5), 16);
@@ -469,7 +476,19 @@ function renderFacilities(ctx, canvas, facilities, selectedFacilityId, visibilit
     }
 }
 
-export { createStars, render, renderFlightHud };
+export {
+    createStars,
+    render,
+    renderFlightHud,
+    // 轨道交互骨架（0.3.0）：数据访问器 + 悬停状态通道 + 待填功能函数
+    computeApPePositions,
+    renderOrbitMarkers,
+    findNearestOrbitPoint,
+    setOrbitHoverState,
+    getOrbitHoverState,
+    getLastOrbitSegments,
+    getLastOrbitMarkers
+};
 
 // ========== 轨道线渲染系统 ==========
 
@@ -515,7 +534,11 @@ function getSegmentAnchor(seg) {
 // 轨道线渲染主入口
 // 绘制点 = 锚点绝对位置 + 相对坐标（worldToScreen 期望绝对世界坐标）
 function renderOrbit(ship, ctx, canvas, isActive = true) {
-    if (!ship) return;
+    if (!ship) {
+        // 无活动飞船：清空轨道几何缓存，防止交互层读到过期数据
+        _lastOrbitSegments = null;
+        return;
+    }
 
     let segments;
     if (ship.mode === 'on_rails') {
@@ -527,6 +550,8 @@ function renderOrbit(ship, ctx, canvas, isActive = true) {
 
     // 非活动飞船只显示当前 SOI 段（第 0 段），避免跨 SOI 预测复杂性
     if (!segments || !Array.isArray(segments)) return;
+    // 骨架：缓存本帧活动飞船的预测段，供悬停检测 / 右键菜单读取（通道，交互层只读）
+    if (isActive) _lastOrbitSegments = segments;
     const maxSegIdx = isActive ? segments.length - 1 : 0;
 
     for (let si = 0; si <= maxSegIdx; si++) {
@@ -580,6 +605,10 @@ function renderOrbit(ship, ctx, canvas, isActive = true) {
         ctx.setLineDash([]);
     }
 
+    // 骨架：Ap/Pe 标记绘制调用点（renderOrbitMarkers 功能体待填，当前返回 []）
+    // 输出缓存到 _lastOrbitMarkers，供交互层命中检测（此处已过 isActive 提前返回，恒为活动飞船）
+    _lastOrbitMarkers = renderOrbitMarkers(ctx, canvas, ship, _orbitHoverState) || [];
+
     renderManeuverOrbits(ship, ctx, canvas);
 }
 
@@ -595,6 +624,74 @@ function renderManeuverOrbits(ship, ctx, canvas) {
     if (pendingNodes.length === 0) return;
 
     // TODO: 调用 predictManeuverTrajectories，对每个节点的结果段用红色虚线绘制
+}
+
+// ========== 轨道交互骨架（0.3.0，功能体待填） ==========
+// 目标：活动飞船轨道线的 Ap/Pe 标记显示、轨道线悬停检测、右键菜单数据通道。
+// 接口与数据通道已就位（上方 renderOrbit / 本区函数 / 访问器）；
+// 绘制、检测与菜单功能体由后续提交填充，交互层通过访问器只读本帧已绘制几何。
+
+/**
+ * 计算 Ap/Pe 的世界坐标（相对宿主中心的轨道坐标系）
+ * 数学方案：焦点极坐标 r = a(1-e²)/(1+e·cosθ)，θ=0 为 Pe、θ=π 为 Ap，
+ * 局部坐标 (a(1∓e), 0) 按 omega 旋回世界系（与 keplerPositionAtTheta 同构）。
+ * 注意：kepler 必须用实时重算的 liveKepler（stateToKepler(ship.pos, ship.vel, ship.currentGM)），
+ * 不要用 ship.kepler —— 推力模式下会过期，标记将与绘制线脱节。
+ * @param {Object} kepler - stateToKepler 输出（含 a/e/omega）
+ * @returns {Object|null} { ap:{x,y}, pe:{x,y}, apAlt, peAlt }；逃逸/双曲线（a<=0）返回 null
+ */
+function computeApPePositions(kepler) {
+    // TODO: 骨架期占位，功能体待填（数学方案见上）
+    return null;
+}
+
+/**
+ * 绘制轨道标记（Ap/Pe 点 + 悬停高亮），并返回标记屏幕位置列表
+ * 绘制方案：KSP 风格空心菱形（橙 Ap / 绿 Pe）+ 右侧标签文字（黑描边），
+ * 悬停时放大 + 半透明填充；锚点与轨道线同口径（getSegmentAnchor(segments[0])）。
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {HTMLCanvasElement} canvas
+ * @param {Object} ship - 活动飞船
+ * @param {Object|null} hoveredMarker - 悬停状态 { type: 'ap'|'pe'|'orbitPoint', ... }
+ * @returns {Array} markers - [{ type, worldX, worldY, screenX, screenY, label, value, tToNext }]
+ */
+function renderOrbitMarkers(ctx, canvas, ship, hoveredMarker) {
+    // TODO: 骨架期占位，功能体待填（绘制方案见上）
+    return [];
+}
+
+/**
+ * 在轨道预测 segments 中找距鼠标最近的轨道点（屏幕空间点-线段距离）
+ * 方案：逐点 worldToScreen 后计算屏幕空间点到线段的距离，阈值 thresholdPx（像素），
+ * 避免"世界距离阈值 / zoom"在极限缩放下失效（zoom→0 时阈值膨胀为天文数字）。
+ * 悬停/右键共用本函数，命中点附带 relPoints[i].t（段内秒偏移，绝对时刻 = anchorTime + t）。
+ * @param {Array} segments - getLastOrbitSegments() 的同一批 segments
+ * @param {Object} mouseWorld - { x, y }（screenToWorld 产出）
+ * @param {number} thresholdPx - 悬停判定阈值（屏幕像素）
+ * @param {HTMLCanvasElement} canvas
+ * @returns {Object|null} { segmentIndex, pointIndex, worldX, worldY, screenX, screenY, distPx, soiName, isCurrentSoi, timeOffset }
+ */
+function findNearestOrbitPoint(segments, mouseWorld, thresholdPx, canvas) {
+    // TODO: 骨架期占位，功能体待填（检测方案见上）
+    return null;
+}
+
+// 悬停状态通道：flightScene 在 mousemove 中写入，renderOrbitMarkers 绘制时消费
+function setOrbitHoverState(state) {
+    _orbitHoverState = state;
+}
+
+function getOrbitHoverState() {
+    return _orbitHoverState;
+}
+
+// 轨道几何数据通道：本帧已绘制内容，交互层只读（悬停检测 / 右键菜单数据源）
+function getLastOrbitSegments() {
+    return _lastOrbitSegments;
+}
+
+function getLastOrbitMarkers() {
+    return _lastOrbitMarkers;
 }
 
 // ========== 飞行 HUD（顶部轨道数据 + 推力箭头） ==========

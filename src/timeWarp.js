@@ -174,6 +174,21 @@ class TimeWarp {
         }
     }
 
+    // === 目标时刻加速（0.3.0 骨架 — 决策 1B：实现于 timeWarp 单例） ===
+
+    /**
+     * 目标时刻加速调度（骨架期仅建立接口，调度逻辑待填）
+     * 设定目标游戏时刻后，由 flightScene.update 每帧驱动：
+     *   1) 每帧按"剩余时间 ≥ 当前倍率×余量"自动降档（不越过场景已算好的档位上限）
+     *   2) 到达目标后 resetTo1x() + 通知
+     * 用途：轨道右键菜单"时间加速至此"（Ap/Pe 标记 / 当前 SOI 轨道点 / 跨 SOI 段点）
+     * @param {number} targetTime - 目标游戏时刻（秒，与 flightScene 的 _getCelestialTime() 同口径）
+     * @param {Function} [onArrive] - 到达回调（可选）
+     */
+    warpToTime(targetTime, onArrive) {
+        // TODO: 骨架期占位，调度逻辑待填（含自动降档、到达停表、通知与回调）
+    }
+
     // === 核心：设置档位索引并联动暂停 / 事件 ===
 
     warpToIndex(index) {
