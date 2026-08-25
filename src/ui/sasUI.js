@@ -28,8 +28,22 @@ eventBus.on(Events.SCENE_CHANGED, (data) => {
 
 // ---- 通用配色（0.2.7 统一为左侧工具栏风格：纯黑底 + 紫色边框） ----
 const PANEL_BG = '#000';                    // 与左侧工具栏底色一致（纯黑）
-const PANEL_BORDER_COLOR = '#6C5CE7';       // 与左侧工具栏外框同款紫（--toolbar-border 实色）
+const PANEL_BORDER_COLOR = '#6153D0';       // 与左侧工具栏外框同款紫（--toolbar-border 实色，明度-10%）
 const MARKER_COLOR = '#ffffff';             // 姿态指示（白色三角 / 圆盘中心白圆）
+
+// 导航球板块（0.2.7 重构）：
+//  一级背景 = 原尺寸圆盘（深蓝黑实色 + 紫描边，保留原有圆框造型）
+//  二级背景 = 原球内容整体缩小到中央（黑色球面不变，内容样式不变）；外围空出部分即一级背景
+// 交互不变（导航球纯显示不响应点击，命中检测仅覆盖 SAS 圆盘）
+const NAVBALL_PLATE_BG = '#0d1015';
+// 节流阀 激活色（0.2.7：项目绿 --progress-green 实色）
+const THROTTLE_FILL_COLOR = '#3dff3d';
+// 节流阀 未填充色（参考图紫 #5A5FCF 暗化 75% 后再暗化 75%）→ rgb(23,24,52)×0.25 ≈ #06060d
+const THROTTLE_EMPTY_COLOR = '#06060d';
+// 节流阀 二级背景（环带底）黑色
+const THROTTLE_TRACK_COLOR = '#000';
+// 节流阀 内容弧（未填充紫/填充绿）距边框距离（基准 px，两侧各缩进，露出黑色二级背景）
+const THROTTLE_FILL_GAP = 5;
 
 // ---- 图标状态色（0.3.0 图标替换规范：SVG 白色模板 + 运行时染色，色值与 root.css 变量对应） ----
 // 按钮配色方案 v2（参考 KSP2 圆盘按钮像素参考图）：正逆=绿 / 径向=青
@@ -48,6 +62,10 @@ const SAS_INACTIVE_COLOR = '#555';          // SAS 主开关 未激活深灰（-
 
 // ---- 导航球（左下角，纯显示） ----
 const NAVBALL_RADIUS = 175;                // 大导航球半径
+// 内部装饰绿（0.3.0 由蓝改绿：--progress-green #3dff3d 暗 25% = RGB×0.75 → rgb(46,191,46)）
+const NAVBALL_DECOR_RGB = '46,191,46';
+// 二级背景（缩小的球）边界距外框 15px（基准）→ 内容缩放系数
+const NAVBALL_CONTENT_SCALE = (NAVBALL_RADIUS - 15) / NAVBALL_RADIUS;
 const NAVBALL_MARKER_SIZE = 26;            // 中心白色三角外接圆半径
 const NAVBALL_DIR_R = 140;                 // 圆上方向标记的半径位置（内缩避让描边）
 const MARKER_RADIUS = 18;                  // 圆上方向小圆半径（0.3.0 由 12 调大 1.5 倍：SVG 图标内部细节 24px 下不可辨）
@@ -286,19 +304,42 @@ class SASUI {
 
     /**
      * 绘制导航球（左下角，纯显示）
-     * - 圆框：深色半透明底 + 蓝色描边，固定
-     * - 中心：姿态三角形，顶点指向 heading
-     * - 圆上：四方向小圆标记，位置随实时角度（SAS 开启时淡入）
+     * 0.2.7 分层：
+     *  - 一级背景：原尺寸圆盘（深蓝黑实色 + 紫描边，保留原有圆框造型）
+     *  - 二级背景：原球内容整体缩小到中央（黑色球面 / 刻线 / 标记 / 姿态，样式不变）
+     * 外围空出的环形区域 = 一级背景色
      */
     _drawNavball(ctx, cx, cy, s, appearance, heading, directions) {
-        // ---- 圆框（统一游戏面板风格：半透明黑底 + #555 细描边） ----
+        // ---- 一级背景：原尺寸圆盘（深蓝黑实色） + 双层描边（黑外衬 2px + 紫内描边，原有造型保留） ----
+        ctx.beginPath();
+        ctx.arc(cx, cy, NAVBALL_RADIUS * s, 0, Math.PI * 2);
+        ctx.fillStyle = NAVBALL_PLATE_BG;
+        ctx.fill();
+        // 黑色外衬(紫外侧 2px,无缝衔接)
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2 * s;
+        ctx.beginPath();
+        ctx.arc(cx, cy, NAVBALL_RADIUS * s + 1.75 * s, 0, Math.PI * 2);
+        ctx.stroke();
+        // 紫色内描边(原样式)
+        ctx.strokeStyle = PANEL_BORDER_COLOR;
+        ctx.lineWidth = 1.5 * s;
+        ctx.beginPath();
+        ctx.arc(cx, cy, NAVBALL_RADIUS * s, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // ---- 二级背景：原球内容整体缩放（以圆心为基准），内容样式/颜色全部不变 ----
+        const k = NAVBALL_CONTENT_SCALE;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.scale(k, k);
+        ctx.translate(-cx, -cy);
+
+        // 球面（黑色二级背景底）
         ctx.beginPath();
         ctx.arc(cx, cy, NAVBALL_RADIUS * s, 0, Math.PI * 2);
         ctx.fillStyle = PANEL_BG;
         ctx.fill();
-        ctx.strokeStyle = PANEL_BORDER_COLOR;
-        ctx.lineWidth = 1.5 * s;
-        ctx.stroke();
 
         // ========== 科技感装饰层（罗盘刻线 / 十字参考 / 光环） ==========
         const R = NAVBALL_RADIUS * s;
@@ -316,14 +357,14 @@ class SASUI {
             ctx.beginPath();
             ctx.moveTo(cx + cosA * outerR, cy + sinA * outerR);
             ctx.lineTo(cx + cosA * innerR, cy + sinA * innerR);
-            ctx.strokeStyle = isMajor ? 'rgba(136,204,255,0.85)'
-                : (isMedium ? 'rgba(136,204,255,0.45)' : 'rgba(136,204,255,0.22)');
+            ctx.strokeStyle = isMajor ? `rgba(${NAVBALL_DECOR_RGB},0.85)`
+                : (isMedium ? `rgba(${NAVBALL_DECOR_RGB},0.45)` : `rgba(${NAVBALL_DECOR_RGB},0.22)`);
             ctx.lineWidth = (isMajor ? 2 : 1) * s;
             ctx.stroke();
         }
         // ---- 主方向读数（0/90/180/270，位于刻度内侧） ----
         ctx.font = `${11 * s}px monospace`;
-        ctx.fillStyle = 'rgba(136,204,255,0.75)';
+        ctx.fillStyle = `rgba(${NAVBALL_DECOR_RGB},0.75)`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         const numR = R - 25;
@@ -343,13 +384,13 @@ class SASUI {
         // ---- 科技光环：内侧固定细环 + 旋转虚线环（缓慢扫掠，动态科技感） ----
         ctx.beginPath();
         ctx.arc(cx, cy, R - 21, 0, Math.PI * 2);
-        ctx.strokeStyle = 'rgba(136,204,255,0.15)';
+        ctx.strokeStyle = `rgba(${NAVBALL_DECOR_RGB},0.15)`;
         ctx.lineWidth = 1 * s;
         ctx.stroke();
         ctx.beginPath();
         ctx.arc(cx, cy, R - 23, this._pulsePhase, this._pulsePhase + Math.PI * 1.2);
         ctx.setLineDash([4 * s, 9 * s]);
-        ctx.strokeStyle = 'rgba(136,204,255,0.40)';
+        ctx.strokeStyle = `rgba(${NAVBALL_DECOR_RGB},0.40)`;
         ctx.lineWidth = 1.5 * s;
         ctx.stroke();
         ctx.setLineDash([]);
@@ -396,6 +437,9 @@ class SASUI {
                 }
             }
         }
+
+        // 关闭二级背景缩放层
+        ctx.restore();
     }
 
     /**
@@ -404,13 +448,22 @@ class SASUI {
      * - 四方向按钮（X 斜角布局），当前 SAS 模式对应按钮高亮
      */
     _drawSasPanel(ctx, cx, cy, s, sasMode, heading) {
-        // ---- 圆框（统一游戏面板风格：半透明黑底 + #555 细描边） ----
+        // ---- 圆框（双层描边：黑外衬 2px + 紫内描边，原有造型保留） ----
         ctx.beginPath();
         ctx.arc(cx, cy, SAS_PANEL_RADIUS * s, 0, Math.PI * 2);
         ctx.fillStyle = PANEL_BG;
         ctx.fill();
+        // 黑色外衬(紫外侧 2px,无缝衔接)
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2 * s;
+        ctx.beginPath();
+        ctx.arc(cx, cy, SAS_PANEL_RADIUS * s + 1.75 * s, 0, Math.PI * 2);
+        ctx.stroke();
+        // 紫色内描边(原样式)
         ctx.strokeStyle = PANEL_BORDER_COLOR;
         ctx.lineWidth = 1.5 * s;
+        ctx.beginPath();
+        ctx.arc(cx, cy, SAS_PANEL_RADIUS * s, 0, Math.PI * 2);
         ctx.stroke();
 
         // ---- 中心白色圆 ----
@@ -661,28 +714,63 @@ class SASUI {
         const totalRad = (THROTTLE_ARC_END - THROTTLE_ARC_START) * Math.PI / 180;
         const fillRad = startRad + totalRad * (throttle || 0);        // 当前油门对应角度
 
-        // 未填充部分（半透明黑，保留凹槽视觉）
+        // ========== 0.2.7 层级 ==========
+        //  底(二级背景)：黑色铺满整条弧带
+        //  未填充弧(紫色 #5A5FCF)：距边框 5px
+        //  激活填充弧(项目绿)：距边框 5px（油门到达部分）
+        const fillOuter = outerR - THROTTLE_FILL_GAP * s;
+        const fillInner = innerR + THROTTLE_FILL_GAP * s;
+
+        // 二级背景（黑色，整条弧带）
         ctx.beginPath();
-        ctx.arc(cx, cy, outerR, fillRad, endRad);
-        ctx.arc(cx, cy, innerR, endRad, fillRad, true);
+        ctx.arc(cx, cy, outerR, startRad, endRad);
+        ctx.arc(cx, cy, innerR, endRad, startRad, true);
         ctx.closePath();
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+        ctx.fillStyle = THROTTLE_TRACK_COLOR;
         ctx.fill();
 
-        // 填充部分（绿色渐变，从底部到当前油门角）
+        // 未填充弧（紫色，从当前油门角到结束角）
+        ctx.beginPath();
+        ctx.arc(cx, cy, fillOuter, fillRad, endRad);
+        ctx.arc(cx, cy, fillInner, endRad, fillRad, true);
+        ctx.closePath();
+        ctx.fillStyle = THROTTLE_EMPTY_COLOR;
+        ctx.fill();
+
+        // 激活填充弧（项目绿，从起始角到当前油门角）
         if (throttle > 0.01) {
             ctx.beginPath();
-            ctx.arc(cx, cy, outerR, startRad, fillRad);
-            ctx.arc(cx, cy, innerR, fillRad, startRad, true);
+            ctx.arc(cx, cy, fillOuter, startRad, fillRad);
+            ctx.arc(cx, cy, fillInner, fillRad, startRad, true);
             ctx.closePath();
-            const grad = ctx.createLinearGradient(cx, cy + outerR, cx, cy - outerR);
-            grad.addColorStop(0, '#2e7d32');
-            grad.addColorStop(1, '#66bb6a');
-            ctx.fillStyle = grad;
+            ctx.fillStyle = THROTTLE_FILL_COLOR;
             ctx.fill();
         }
 
-        // ---- 弧形外缘/内缘描边（游戏面板风格 #555，避免与导航球黑底融为一体） ----
+        // ========== 0.2.7 双层描边：紫色内描边 + 黑色外衬(2px,基准) ==========
+        const sC = Math.cos(startRad), sS = Math.sin(startRad);
+        const eC = Math.cos(endRad), eS = Math.sin(endRad);
+        // 黑色外衬(先画,外缘在外侧 2px;内缘在内侧 2px;端帽两侧各 1px)
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2 * s;
+        // 外缘黑衬
+        ctx.beginPath();
+        ctx.arc(cx, cy, outerR + 1.5 * s, startRad, endRad);
+        ctx.stroke();
+        // 内缘黑衬
+        ctx.beginPath();
+        ctx.arc(cx, cy, innerR - 1.5 * s, startRad, endRad);
+        ctx.stroke();
+        // 端帽黑衬(径向短线,线宽加倍包边)
+        ctx.lineWidth = 3 * s;
+        ctx.beginPath();
+        ctx.moveTo(cx + sC * innerR, cy + sS * innerR);
+        ctx.lineTo(cx + sC * outerR, cy + sS * outerR);
+        ctx.moveTo(cx + eC * innerR, cy + eS * innerR);
+        ctx.lineTo(cx + eC * outerR, cy + eS * outerR);
+        ctx.stroke();
+
+        // 紫色内描边(原样式)
         ctx.strokeStyle = PANEL_BORDER_COLOR;
         ctx.lineWidth = 1 * s;
         // 外缘
@@ -694,8 +782,6 @@ class SASUI {
         ctx.arc(cx, cy, innerR, startRad, endRad);
         ctx.stroke();
         // 两端封口（底部/顶部径向短线）
-        const sC = Math.cos(startRad), sS = Math.sin(startRad);
-        const eC = Math.cos(endRad), eS = Math.sin(endRad);
         ctx.beginPath();
         ctx.moveTo(cx + sC * innerR, cy + sS * innerR);
         ctx.lineTo(cx + sC * outerR, cy + sS * outerR);

@@ -5,10 +5,12 @@ import { getFacilityType } from '../facility/facilityTypes.js';
 import { camera } from '../camera.js';
 import { updateShipPhysics } from '../physics/physicsUpdate.js';
 import { updateCelestialBodies, getAbsolutePosition, celestialBodies } from '../physics/physics.js';
+import { timeToNextSOISwitch } from '../physics/orbitalPrediction.js';
 import { render } from '../renderer.js';
 import { eventBus, Events } from '../eventBus.js';
 import { gameState } from '../gameState.js';
 import { timeWarp } from '../timeWarp.js';
+import { getSOIWarpProtectEnabled } from '../config/settingsConfig.js';
 import { t } from '../config/strings.js';
 import { renderIconHtml } from '../ui/uiComponents.js';
 
@@ -375,17 +377,23 @@ export function registerTrackingScene({ getTime, setTime, canvas }) {
             const activeId = activeShip ? activeShip.id : null;
             const allShips = shipSystem.getAllShips();
 
-            // 时间加速 — 追踪站无推力放开全部档位；任一飞船接近宿主 SOI 边界(≥99%半径)时限制到逃逸安全档
+            // 时间加速 — 追踪站无推力放开全部档位；SOI 切换时间保护：任一飞船按
+            // "到下一次切换剩余时间 T"限档（保护最高档 = ≤T 的最大档位），取最早切换者（最严）。
+            // 可在设置 → 游戏 中关闭（关闭后放开全部档位，RK4 兜底限档不受影响）
             let warpMaxIndex = timeWarp.getMaxIndex();
-            for (const s of allShips) {
-                if (s.currentSOI) {
-                    const warpHost = celestialBodies.find(b => b.name === s.currentSOI);
-                    if (warpHost) {
-                        const distToHost = Math.sqrt(s.pos.x * s.pos.x + s.pos.y * s.pos.y);
-                        if (distToHost > warpHost.soiRadius * 0.99) {
-                            warpMaxIndex = Math.min(warpMaxIndex, timeWarp.getEscapeMaxIndex());
-                        }
+            let tSwitchMin = Infinity;
+            if (getSOIWarpProtectEnabled()) {
+                for (const s of allShips) {
+                    const warpHost = s.currentSOI
+                        ? celestialBodies.find(b => b.name === s.currentSOI)
+                        : null;
+                    const tSwitch = timeToNextSOISwitch(s, warpHost);
+                    if (tSwitch !== null && tSwitch < tSwitchMin) {
+                        tSwitchMin = tSwitch;
                     }
+                }
+                if (isFinite(tSwitchMin)) {
+                    warpMaxIndex = Math.min(warpMaxIndex, timeWarp.getSOIProtectMaxIndex(tSwitchMin));
                 }
             }
             // 病态区间限档：任一飞船/设施处于"无解析轨道且受引力"（RK4 兜底积分）时限档 ≤50x。

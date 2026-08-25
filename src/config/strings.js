@@ -322,7 +322,7 @@ const STRINGS = {
     'settings.descDisplay': '选择菜单背景显示模式。星空模式会透出游戏星空背景，图片模式会加载自定义背景图。',
     'settings.descAudio': '调节总音量、音乐、UI 音效与通讯音，并选择菜单背景音乐。KSP1 / KSP2 对应两首不同的菜单音乐。',
     'settings.descControl': '配置键盘映射、鼠标灵敏度等控制选项。（即将推出）',
-    'settings.descGame': '调整游戏难度、时间加速倍率等玩法参数。（即将推出）',
+    'settings.descGame': '调整时间加速保护等玩法参数。',
     'settings.groupMenu': '菜单',
     'settings.menuBg': '菜单背景',
     'settings.bgStars': '星空',
@@ -335,6 +335,10 @@ const STRINGS = {
     'settings.volUi': 'UI 音效',
     'settings.volComms': '通讯音',
     'settings.comingSoon': '即将推出',
+    'settings.groupWarp': '时间加速',
+    'settings.soiWarpProtect': 'SOI 切换时间保护',
+    'settings.on': '开',
+    'settings.off': '关',
 
     // ---------- 公测公告 ----------
     // 公告内容已清空（v0.2.4 稳定后填写新公告）

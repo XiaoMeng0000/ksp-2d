@@ -6,12 +6,21 @@
 
 import { VOLUME_STORAGE_KEYS, VOLUME_DEFAULTS } from '../audio/audioConfig.js';
 
+// ==== SOI 切换时间保护开关（设置面板行 + 飞行/追踪场景读取共用同一存储键，默认启用） ====
+export const SOI_PROTECT_STORAGE_KEY = 'ksp2d.soiWarpProtect';
+const SOI_PROTECT_DEFAULT = 'on';
+
+// 读取当前开关状态（true=启用保护；默认启用；仅显式 'off' 视为关闭，异常值兜底启用）
+export function getSOIWarpProtectEnabled() {
+    return (localStorage.getItem(SOI_PROTECT_STORAGE_KEY) || SOI_PROTECT_DEFAULT) !== 'off';
+}
+
 // 分类定义（enabled=false 时 UI 显示为灰色占位）
 export const SETTINGS_CATEGORIES = [
     { id: 'display', labelKey: 'settings.tabDisplay', descKey: 'settings.descDisplay', enabled: true },
     { id: 'audio',   labelKey: 'settings.tabAudio',   descKey: 'settings.descAudio',   enabled: true },
     { id: 'control', labelKey: 'settings.tabControl', descKey: 'settings.descControl', enabled: false },
-    { id: 'game',    labelKey: 'settings.tabGame',    descKey: 'settings.descGame',    enabled: false },
+    { id: 'game',    labelKey: 'settings.tabGame',    descKey: 'settings.descGame',    enabled: true },
 ];
 
 // 每个分类下的设置行列表
@@ -79,11 +88,26 @@ export const SETTINGS_ROWS = {
             defaultValue: String(VOLUME_DEFAULTS.comms),
             control: 'slider'
         }
+    ],
+    game: [
+        // SOI 切换时间保护开关：靠近 SOI 切换时按"到切换剩余时间"自动限制时间加速档位
+        // （保护最高档 = ≤剩余时间 的最大档位；关闭后放开全部档位，物理加速/RK4 兜底限档不受影响）
+        {
+            group: 'soiWarpProtect',
+            labelKey: 'settings.soiWarpProtect',
+            storageKey: SOI_PROTECT_STORAGE_KEY,
+            defaultValue: SOI_PROTECT_DEFAULT,
+            options: [
+                { value: 'on', labelKey: 'settings.on' },
+                { value: 'off', labelKey: 'settings.off' },
+            ]
+        }
     ]
 };
 
 // 分类 → 分组标题文案 key（未启用分类无分组，跳过）
 export const SETTINGS_GROUP_LABELS = {
     display: 'settings.groupMenu',
-    audio: 'settings.groupMusic'
+    audio: 'settings.groupMusic',
+    game: 'settings.groupWarp'
 };

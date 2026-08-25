@@ -10,6 +10,8 @@
     top: 25%;
     background: #000;
     border: 1px solid var(--toolbar-border);
+    /* 紫框外再加 2px 黑色外框 */
+    box-shadow: 0 0 0 2px #000;
     border-radius: 5px;
     padding: 7px 6px;
     display: flex;
@@ -202,7 +204,7 @@
     padding: 1px 0 3px 0;
 }
 
-/* ---- SAS 底部按钮区（0.2.7 统一为工具栏风格：黑底 + 紫框） ---- */
+/* ---- SAS 底部按钮区（0.2.7 统一为工具栏风格：黑底 + 紫框 + 2px 黑外框） ---- */
 #sasBottomButtons {
     position: fixed;
     z-index: 900;
@@ -211,6 +213,8 @@
     justify-content: center;
     background: #000;
     border: 1px solid var(--toolbar-border);
+    /* 紫框外再加 2px 黑色外框 */
+    box-shadow: 0 0 0 2px #000;
     border-radius: 5px;
     padding: 8px;
     user-select: none;

@@ -91,14 +91,29 @@ function keplerPositionAtTime(kepler, gm, t, omega) {
 
         // 求解 M = e·sinhF − F 的逆：asinh 解析近似作初值，牛顿迭代精化
         //（对任意大小的 M 统一处理；不再区分 |M|>20 直接返回近似值）
-        let F = Math.sign(M) * Math.asinh(Math.abs(M) / e);
+        // 小 |M| 时 sinhF−F≈F³/6 → F≈(6M)^(1/3)，asinh 初值（≈M/e）会严重低估
+        //（如 M=1e-10 时真解 F≈8.4e-4,初值仅 ~1e-10）；旧版残差绝对容差 1e-9 下
+        // 该残差 |M|/e < 1e-9 即"零迭代退出"，t≈0 首帧位置误差米级、速度完全
+        // 失真（实测 59%）。故 |M|<0.05 时改用立方根初值（与真解同阶）。
+        const magM = Math.abs(M);
+        let F;
+        if (magM < 0.05) {
+            F = Math.cbrt(6 * magM);
+            if (M < 0) F = -F;
+        } else {
+            F = Math.sign(M) * Math.asinh(magM / e);
+        }
         for (let i = 0; i < 40; i++) {
             const coshF = Math.cosh(F);
             const denom = e * coshF - 1;
             if (!isFinite(denom)) break; // 溢出防护：退化为 asinh 初值
             const delta = e * Math.sinh(F) - F - M;
-            if (Math.abs(delta) < 1e-9) break;
-            F -= delta / denom;
+            // 收敛判据：以"本轮 F 修正量"为准（与椭圆分支同口径）。
+            // 旧版残差绝对容差在 |M| 极大时过松、|M| 极小时假收敛，
+            // 均导致解精度不足；相对容差 1e-12·max(1,|F|) + 绝对地板兼顾两端。
+            const step = delta / denom;
+            if (Math.abs(step) < 1e-12 * Math.max(1, Math.abs(F))) break;
+            F -= step;
         }
 
         // 极坐标形式（与椭圆分支同构）：运动坐标 θm 由 F 计算，真实 θ = dir·θm
@@ -126,15 +141,24 @@ function keplerPositionAtTime(kepler, gm, t, omega) {
 
     let E = M;
     let converged = false;
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 40; i++) {
         const delta = E - e * Math.sin(E) - M;
-        if (Math.abs(delta) < 1e-8) { converged = true; break; }
-        E = E - delta / (1 - e * Math.cos(E));
+        const denom = 1 - e * Math.cos(E);
+        // 收敛判据：以"本轮 E 修正量"为准。旧版残差绝对容差 1e-8 有两个缺陷：
+        // 1) |M| 极小（t≈0）时残差 ≈ −e·M < 1e-8 即被误判收敛，E 停在初值 M 而真解
+        //    ≈ M/(1−e)，近地点附近位置误差可达米级（数值微分速度随之被污染）；
+        // 2) 高离心率轨道中段（e>0.95）牛顿迭代可能跳变到错误分支，"假收敛"
+        //    并不等于收敛 → 位置噪声 0.3~6 Mm，是 keplerToState 速度爆炸源头。
+        // 修正量判据同时约束：E 大时按 1e-12·|E| 相对精度,小 E 时按 1e-12 绝对地板。
+        const step = delta / denom;
+        if (Math.abs(step) < 1e-12 * Math.max(1, Math.abs(E))) { converged = true; break; }
+        E = E - step;
     }
     if (!converged) {
-        // 牛顿法未收敛：降级为二分法（高离心率轨道 e>0.95 时可能出现）
+        // 牛顿法未收敛：降级为二分法（高离心率轨道 e>0.95 时可能出现）。
+        // 40 次二分 → 区间宽度 2π/2^40 ≈ 5.7e-12 rad，位置误差亚毫米级
         let lo = M - Math.PI, hi = M + Math.PI;
-        for (let i = 0; i < 20; i++) {
+        for (let i = 0; i < 40; i++) {
             const mid = (lo + hi) / 2;
             if (mid - e * Math.sin(mid) < M) lo = mid; else hi = mid;
         }
@@ -156,12 +180,36 @@ function keplerPositionAtTime(kepler, gm, t, omega) {
 
 function keplerToState(kepler, gm, t) {
     const pos = keplerPositionAtTime(kepler, gm, t, kepler.omega);
-    const dt = 0.0001;
-    const pos2 = keplerPositionAtTime(kepler, gm, t + dt, kepler.omega);
 
+    // 解析速度（弃用数值微分）：由真近点角 θ 反推径向/切向分量，
+    // 与 findSOIIntersection 的速度公式同口径，椭圆(a>0)/双曲线(a<0)同构：
+    //   p = a·(1−e²)  （双曲线 a<0 时自动为正）
+    //   vr = dir·√(gm/p)·e·sinθ    vθ = dir·√(gm/p)·(1+e·cosθ)
+    // 旧版对 keplerPositionAtTime 做 dt=0.0001 前向差分：高离心率轨道中段
+    // （开普勒方程牛顿假收敛/二分兜底,位置噪声数百米~数 Mm）会把噪声放大到
+    // 百万 m/s 级,导致 HUD 重拟合与预测线逐帧乱跳（"鬼畜"）。
+    // 解析公式零差分、零迭代依赖,双曲线 t≈0 死区一并根治。
+    const { a, e } = kepler;
+    const dir = kepler.dir === undefined ? 1 : kepler.dir;
+    const cosOmega = Math.cos(kepler.omega);
+    const sinOmega = Math.sin(kepler.omega);
+
+    // 从世界坐标逆旋回轨道局部系,取真实真近点角（与位置严格一致）
+    const ox = pos.x * cosOmega + pos.y * sinOmega;
+    const oy = -pos.x * sinOmega + pos.y * cosOmega;
+    const theta = Math.atan2(oy, ox);
+
+    const p = a * (1 - e * e);
+    const sqrtGMp = Math.sqrt(gm / p);
+    const vr = dir * sqrtGMp * e * Math.sin(theta);
+    const vtheta = dir * sqrtGMp * (1 + e * Math.cos(theta));
+
+    // 局部系径向/切向 → 直角坐标 → 旋转回世界系
+    const vlx = vr * Math.cos(theta) - vtheta * Math.sin(theta);
+    const vly = vr * Math.sin(theta) + vtheta * Math.cos(theta);
     const vel = {
-        x: (pos2.x - pos.x) / dt,
-        y: (pos2.y - pos.y) / dt
+        x: vlx * cosOmega - vly * sinOmega,
+        y: vlx * sinOmega + vly * cosOmega
     };
 
     return { pos, vel };
@@ -287,6 +335,50 @@ function findSOIIntersection(kepler, gm, soiRadius) {
     return { theta: thetaIntersect, pos, vel };
 }
 
+// 计算轨道到达宿主 SOI 边界的飞行时间（游戏秒），口径与 orbitalPrediction.patchedStep
+// 完全一致（运动坐标 ΔM/n）：有出界交点返回时间，无交点返回 null（调用方按"无切换"处理）。
+// 供 SOI 切换时间保护与预测线共用同一数学，保证"预测线画到切换点、保护必同步生效"。
+// 找到交点后仍需判断 theta0→交点沿运动方向是否前进由 findSOIIntersection 负责（已保证）。
+function findSOIExitTime(kepler, gm, soiRadius) {
+    if (!kepler || !isFinite(kepler.a) || !(gm > 0) || !isFinite(gm) || !(soiRadius > 0)) {
+        return null;
+    }
+    const intersection = findSOIIntersection(kepler, gm, soiRadius);
+    if (!intersection) {
+        return null;
+    }
+
+    const dir = kepler.dir === undefined ? 1 : kepler.dir;
+    const theta0m = dir * kepler.theta;
+    const thetaEndm = dir * intersection.theta;
+
+    // 双曲线轨道（a<0）：F 由 tanh(F/2)=√((e−1)/(e+1))·tan(θ/2) 反推；
+    // 运动坐标 θm 单调增 → 双曲平近点角 M 单调增，无需 mod 2π
+    if (kepler.a < 0) {
+        const aMag = -kepler.a;
+        const n = Math.sqrt(gm / (aMag * aMag * aMag));
+        const clampTanh = (v) => Math.max(-(1 - 1e-12), Math.min(1 - 1e-12, v));
+        const F0 = 2 * Math.atanh(clampTanh(
+            Math.sqrt((kepler.e - 1) / (kepler.e + 1)) * Math.tan(theta0m / 2)
+        ));
+        const Fend = 2 * Math.atanh(clampTanh(
+            Math.sqrt((kepler.e - 1) / (kepler.e + 1)) * Math.tan(thetaEndm / 2)
+        ));
+        const deltaM = (kepler.e * Math.sinh(Fend) - Fend) - (kepler.e * Math.sinh(F0) - F0);
+        return Math.max(deltaM / n, 0.01);
+    }
+
+    // 椭圆轨道（a>0）：真近点角 → 偏近点角 → 平近点角差（正向单圈取模）
+    const n = Math.sqrt(gm / (kepler.a * kepler.a * kepler.a));
+    const E0 = 2 * Math.atan(Math.sqrt((1 - kepler.e) / (1 + kepler.e)) * Math.tan(theta0m / 2));
+    const M0 = E0 - kepler.e * Math.sin(E0);
+    const Eend = 2 * Math.atan(Math.sqrt((1 - kepler.e) / (1 + kepler.e)) * Math.tan(thetaEndm / 2));
+    const Mend = Eend - kepler.e * Math.sin(Eend);
+    let deltaM = Mend - M0;
+    if (deltaM < 0) deltaM += 2 * Math.PI;
+    return Math.max(deltaM / n, 0.01);
+}
+
 function normalizeAngle(a) {
     return ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
 }
@@ -378,4 +470,4 @@ function getOrbitalInfo(kepler, gm, body, relPos) {
     return { apAlt, peAlt, currentAlt, period, tToAp, tToPe, orbitType };
 }
 
-export { stateToKepler, keplerPositionAtTime, keplerToState, keplerPositionAtTheta, findSOIIntersection, getOrbitalDirectionAngles, getOrbitalInfo };
+export { stateToKepler, keplerPositionAtTime, keplerToState, keplerPositionAtTheta, findSOIIntersection, findSOIExitTime, getOrbitalDirectionAngles, getOrbitalInfo };

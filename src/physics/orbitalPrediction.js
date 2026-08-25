@@ -1,7 +1,7 @@
 import { eventBus, Events } from '../eventBus.js';
 import { celestialBodies, getAbsolutePosition } from './physics.js';
 import { rk4Integrate } from './integrator.js';
-import { stateToKepler, keplerPositionAtTime, keplerPositionAtTheta, findSOIIntersection } from './orbitalMechanics.js';
+import { stateToKepler, keplerPositionAtTime, keplerPositionAtTheta, findSOIIntersection, findSOIExitTime } from './orbitalMechanics.js';
 
 // SOI 边界诊断开关 — 运行时从 window 读取，支持控制台热切换
 function soiDiagEnabled() {
@@ -586,6 +586,109 @@ function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segment
     };
 
     patchedStep(nextAbsPos, nextRelVel, nextHost, intersectionTime, depth + 1, maxSeg, segments);
+}
+
+// ========== SOI 切换时间保护 ==========
+
+/**
+ * 计算"沿当前解析轨道到下一次 SOI 切换"的剩余游戏时间（秒）。
+ * 口径与 patchedStep（预测线）完全一致：
+ *   1) 有出界交点（双曲线/椭圆离开宿主 SOI）→ 解析 ΔM/n；
+ *   2) 无出界交点 → 整周期 200 点扫描嵌套 SOI 进入（如 Kerbin 轨道穿越 Mun SOI）
+ *      + 二分精化 + 1s 探针校验（防假阳性）。
+ * 返回 null 表示：无解析轨道（径向/RK4 病态，由 RK4 50x 限档兜底）、深空无宿主、
+ * 或轨道永不切换（稳定轨道/无嵌套进入）——调用方按"不额外限档"处理。
+ *
+ * 注意：必须从当前状态（ship.pos/ship.vel）重拟合轨道根数——ship.kepler 只在
+ * SOI 切换/机动时刻重拟合，其 theta 是彼时的真近点角，位置由 keplerToState 随
+ * orbitTime 推进；直接用 ship.kepler 会把已飞行时间多算进"剩余切换时间"
+ * （或当旧交点已过时错取下一圈交点），保护档位恒偏松、靠近边界也不会收紧。
+ * 预测线 patchedStep 同口径：均从当前位移/速度重建轨道。
+ * @param {Object} ship - 飞船实例（用 ship.pos/ship.vel，相对当前宿主坐标）
+ * @param {Object|null} host - 当前宿主天体（null = 深空）
+ * @returns {number|null} 剩余游戏秒
+ */
+export function timeToNextSOISwitch(ship, host) {
+    if (!host || !(host.gm > 0) || !ship.pos || !ship.vel) {
+        return null;
+    }
+
+    // 从当前状态重建轨道根数（与预测线同口径；径向/近抛物线病态 → null 走 RK4 兜底）
+    const kepler = stateToKepler(ship.pos, ship.vel, host.gm);
+    if (!kepler || !isFinite(kepler.a)) {
+        return null;
+    }
+
+    const gm = host.gm;
+
+    // 1) 出界交点时间（双曲线/椭圆统一，与预测线同公式）
+    const tExit = findSOIExitTime(kepler, gm, host.soiRadius);
+    if (tExit !== null) {
+        return tExit;
+    }
+
+    // 2) 无出界：仅椭圆轨道（有周期）才可能进入嵌套 SOI
+    if (!(kepler.a > 0)) {
+        return null;
+    }
+    const T = 2 * Math.PI * Math.sqrt(kepler.a * kepler.a * kepler.a / gm);
+    const startTime = _cachedTime;
+    const N = 200;
+
+    // 逐点扫描整个轨道周期（与 patchedStep 无交点分支同口径）
+    let switchIdx = -1;
+    let nextSoiName = null;
+    for (let i = 1; i <= N; i++) {
+        const t = (i / N) * T;
+        const rP = keplerPositionAtTime(kepler, gm, t, kepler.omega);
+        const hp = bodyFuturePos(host, startTime + t);
+        const absP = { x: hp.x + rP.x, y: hp.y + rP.y };
+        const soiAtPt = getSOIHostAtTime(absP, startTime + t);
+        if (soiAtPt && soiAtPt.name !== host.name) {
+            switchIdx = i;
+            nextSoiName = soiAtPt.name;
+            break;
+        }
+    }
+    if (switchIdx === -1) {
+        return null;
+    }
+
+    // 3) 二分精化切换时刻（与 patchedStep 同口径）
+    const tPrev = ((switchIdx - 1) / N) * T;
+    const tCurr = (switchIdx / N) * T;
+    let tLo = tPrev;
+    let tHi = tCurr;
+    for (let iter = 0; iter < 15; iter++) {
+        const tMid = (tLo + tHi) / 2;
+        const rPos = keplerPositionAtTime(kepler, gm, tMid, kepler.omega);
+        const hpMid = bodyFuturePos(host, startTime + tMid);
+        const absPos = { x: hpMid.x + rPos.x, y: hpMid.y + rPos.y };
+        const soiCheck = getSOIHostAtTime(absPos, startTime + tMid);
+        if (soiCheck && soiCheck.name === nextSoiName) {
+            tHi = tMid;
+        } else {
+            tLo = tMid;
+        }
+    }
+    const switchT = tHi;
+
+    // 4) 探针校验（同 patchedStep）：切换点 +1s 后确认确属新宿主（防浮点假阳性）
+    const dt2 = 0.001;
+    const rPos = keplerPositionAtTime(kepler, gm, switchT, kepler.omega);
+    const rPos2 = keplerPositionAtTime(kepler, gm, switchT + dt2, kepler.omega);
+    const hp1 = bodyFuturePos(host, startTime + switchT);
+    const hp2 = bodyFuturePos(host, startTime + switchT + dt2);
+    const absPos = { x: hp1.x + rPos.x, y: hp1.y + rPos.y };
+    const absPos2 = { x: hp2.x + rPos2.x, y: hp2.y + rPos2.y };
+    const absVel = { x: (absPos2.x - absPos.x) / dt2, y: (absPos2.y - absPos.y) / dt2 };
+    const probePos = { x: absPos.x + absVel.x, y: absPos.y + absVel.y };
+    const verifiedHost = getSOIHostAtTime(probePos, startTime + switchT + 1);
+    if (!verifiedHost || verifiedHost.name === host.name) {
+        return null;
+    }
+
+    return switchT;
 }
 
 // 解析解分段预测 — 多段拼接完整轨道（含 SOI 穿越）

@@ -5,6 +5,7 @@ import { eventBus, Events } from '../eventBus.js';
 import { updateShipPhysics } from '../physics/physicsUpdate.js';
 import { updateCelestialBodies, getSOIHost, getAbsolutePosition, getRelativePosition, convertVelocityFrame, celestialBodies } from '../physics/physics.js';
 import { stateToKepler } from '../physics/orbitalMechanics.js';
+import { timeToNextSOISwitch } from '../physics/orbitalPrediction.js';
 import { render, renderFlightHud } from '../renderer.js';
 import { sceneManager } from '../sceneManager.js';
 import { gameState } from '../gameState.js';
@@ -21,6 +22,7 @@ import { getEngineType } from '../resources/engineConfig.js';
 import { consumeCargo, hasCargoHold, getCargoAmount } from '../resources/cargoSystem.js';
 import { isBalanceEnforced } from '../resources/modeRules.js';
 import { timeWarp } from '../timeWarp.js';
+import { getSOIWarpProtectEnabled } from '../config/settingsConfig.js';
 import { t } from '../config/strings.js';
 
 // 由 main.js 在注册时注入的依赖
@@ -495,19 +497,24 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             const allShips = shipSystem.getAllShips();
             const allFacilities = facilitySystem.getAllFacilities();
 
-            // 时间加速 — 档位上限：点火 → 物理加速档(≤4x)；SOI 边界接近(≥99%半径) → 逃逸安全档(≤100x)；否则放开全部档位
+            // 时间加速 — 档位上限：点火 → 物理加速档(≤4x)；SOI 切换时间保护（剩余时间 T →
+            // ≤T 最大档位：切换点至少 1 真实秒帧预算且保护最高档下 10s 内必达）；否则放开全部档位
             // 先设置档位上限再算 simDt：保证降档在本帧物理推进前生效（否则边界穿越帧会按旧高倍率大步长穿越导致位置跳变）
             let warpMaxIndex = timeWarp.getMaxIndex();
             if (activeShip && activeShip.throttle > 0) {
                 warpMaxIndex = timeWarp.getPhysicsMaxIndex();
-            } else if (activeShip && activeShip.currentSOI) {
-                const warpHost = celestialBodies.find(b => b.name === activeShip.currentSOI);
-                if (warpHost) {
-                    const distToHost = Math.sqrt(
-                        activeShip.pos.x * activeShip.pos.x + activeShip.pos.y * activeShip.pos.y
-                    );
-                    if (distToHost > warpHost.soiRadius * 0.99) {
-                        warpMaxIndex = Math.min(warpMaxIndex, timeWarp.getEscapeMaxIndex());
+            } else if (activeShip) {
+                // SOI 切换时间保护（替代旧"≥99% 半径 → 限 100x"距离制）：
+                // 按预测的"到下一次 SOI 切换剩余时间 T"限档——保护最高档 = ≤T 的最大档位。
+                // 与预测线同口径（含嵌套 SOI 进入）；深空/无解析轨道/永不切换返回 null → 不限档。
+                // 可在设置 → 游戏 中关闭（关闭后放开全部档位，物理加速/RK4 兜底限档不受影响）
+                if (getSOIWarpProtectEnabled()) {
+                    const warpHost = activeShip.currentSOI
+                        ? celestialBodies.find(b => b.name === activeShip.currentSOI)
+                        : null;
+                    const tSwitch = timeToNextSOISwitch(activeShip, warpHost);
+                    if (tSwitch !== null) {
+                        warpMaxIndex = Math.min(warpMaxIndex, timeWarp.getSOIProtectMaxIndex(tSwitch));
                     }
                 }
             }

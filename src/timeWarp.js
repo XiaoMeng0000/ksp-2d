@@ -16,10 +16,6 @@ export const PANEL_RATES = WARP_RATES.filter((r) => r !== 0);
 // 物理加速上限（thrust 模式允许的最大倍率）
 const PHYSICS_WARP_MAX = 4;
 
-// SOI 边界接近（≥99% 宿主 SOI 半径）时允许的最大倍率
-// 保证边界穿越帧步长小、位置连续、预测线平滑（KSP1 原版：SOI 边界前自动降档）
-const ESCAPE_WARP_MAX = 100;
-
 // 病态区间（无解析轨道、RK4 兜底积分）时允许的最大倍率
 // stateToKepler 返回 null 且 GM>0 时，物理层走 RK4 子步循环（每帧最多 simDt/0.05 步）。
 // 高倍率下子步数随倍率线性增长（1e6x 一帧约 33 万步 → 明显卡顿），限档 50x 保证流畅。
@@ -81,9 +77,27 @@ class TimeWarp {
         return WARP_RATES.indexOf(PHYSICS_WARP_MAX);
     }
 
-    // SOI 边界接近安全档位上限索引（≥99% 宿主半径时最高允许 100x）
-    getEscapeMaxIndex() {
-        return WARP_RATES.indexOf(ESCAPE_WARP_MAX);
+    /**
+     * SOI 切换时间保护：剩余切换时间（游戏秒）→ 保护最高档位索引。
+     * 规则：保护最高档 = WARP_RATES 中 ≤ secondsToSwitch 的最大档位（下限 1x，上限满档）。
+     * 性质（由档位表结构保证）：
+     *   ① 帧预算：60fps 下切换点至少保留 60·T/rate ≥ 60 帧（1 真实秒）——每帧推进 ≤ T/60 游戏秒；
+     *   ② 档位阶梯相邻比值 ≤10 → 到达时间 T/rate < 10 真实秒，保护最高档下 10s 内必达切换；
+     *   ③ T 巨大时饱和返回满档（远途不限制），T 极小（<2s）时下限 1x（1x 下仍 ≤10s 内到达）。
+     * @param {number} secondsToSwitch - 到下一次 SOI 切换的剩余游戏秒（timeToNextSOISwitch 返回值）
+     * @returns {number} 档位索引
+     */
+    getSOIProtectMaxIndex(secondsToSwitch) {
+        const t = secondsToSwitch;
+        if (!(t > 0) || !isFinite(t)) {
+            return WARP_RATES.length - 1;
+        }
+        for (let i = WARP_RATES.length - 1; i >= 1; i--) {
+            if (WARP_RATES[i] <= t) {
+                return i;
+            }
+        }
+        return 1;
     }
 
     // 病态区间安全档位上限索引（kepler=null 且 GM>0 时最高允许 50x，防 RK4 高倍率卡顿）
