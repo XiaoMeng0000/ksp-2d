@@ -245,6 +245,14 @@ const STRINGS = {
     'orbitPoint.pe': 'Pe',
     'orbitPoint.apFull': '远点',
     'orbitPoint.peFull': '近点',
+    // SOI 穿越标签（0.3.0：段尾=离开 / 段头=进入）
+    'orbitPoint.soiLeave': (p) => `离开 ${p.name}`,
+    'orbitPoint.soiEnter': (p) => `进入 ${p.name}`,
+    // SOI 标签展开面板状态行（替代高度行）
+    'orbitPoint.soiLeaving': (p) => `正在离开 ${p.name}`,
+    'orbitPoint.soiEncounter': (p) => `正在遭遇 ${p.name}`,
+    // 可见性筛选：SOI 切换标签开关
+    'sas.soiLabels': 'SOI 切换标签',
 
     // ---------- 飞船建造 ----------
     'build.title': '飞船建造',

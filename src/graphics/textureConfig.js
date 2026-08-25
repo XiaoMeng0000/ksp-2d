@@ -32,6 +32,10 @@ export const textureConfig = {
     dir_radial_in: 'assets/images/sas/dir_radial_in.svg',
     dir_radial_out: 'assets/images/sas/dir_radial_out.svg',
 
+    // SOI 穿越标签图标（0.3.0，白色单色模板稿 PNG，进入/离开箭头；美术可覆盖同名文件）
+    icon_soi_enter: 'assets/images/ui/icon_soi_enter.png',
+    icon_soi_exit: 'assets/images/ui/icon_soi_exit.png',
+
     // tracking station
     icon_tracking_all: 'assets/images/ui/tracking_station/all.svg',
     icon_tracking_ship: 'assets/images/ui/tracking_station/ship_port.svg',

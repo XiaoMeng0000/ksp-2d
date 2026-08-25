@@ -22,6 +22,7 @@ const BODY_MIN_SCREEN_RADIUS = 3;  // 天体最低屏幕半径，防止远距离
 let _lastOrbitSegments = null;   // 本帧活动飞船轨道预测 segments（renderOrbit 写入，null = 无活动飞船）
 let _lastOrbitMarkers = [];      // 本帧 Ap/Pe 标记屏幕位置（renderOrbitMarkers 写入）
 let _orbitHoverState = null;     // 悬停状态（setOrbitHoverState 写入，标记绘制消费）
+let _lastVisibility = {};        // 本帧可见性选项（render 写入，SOI 标签开关等消费）
 
 function hexToRgba(hex, alpha) {
     const r = parseInt(hex.slice(1, 3), 16);
@@ -234,6 +235,8 @@ function drawBodyOrbits(ctx, canvas) {
 
 function render(ctx, canvas, activeShip, options = {}) {
     const { visibility = { ships: false, facilities: false, bodyOrbits: true }, facilities = [], selectedFacilityId = null } = options;
+    // 供标记层消费本次可见性（SOI 切换标签开关等；模块级状态，与悬停通道同风格）
+    _lastVisibility = visibility;
     ctx.fillStyle = 'black';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -734,6 +737,8 @@ function renderOrbitMarkers(ctx, canvas, ship, hoveredMarker) {
         const wy = d.world.y + anchor.y;
         const s = worldToScreen(wx, wy, canvas);
         markers.push({
+            // 实例唯一 id（DOM 标签元素标识）：Ap/Pe 每类唯一，用类型本身
+            id: d.typeId,
             type: d.typeId,
             worldX: wx, worldY: wy,
             screenX: s.x, screenY: s.y,
@@ -748,9 +753,44 @@ function renderOrbitMarkers(ctx, canvas, ship, hoveredMarker) {
             // 到达时刻的宇宙时间（秒）：供标签展开后显示 UT；无数据时为 null
             arrivalUt: (d.tToNext !== null && d.tToNext !== undefined) ? getCachedTime() + d.tToNext : null,
             contextMenu: def.contextMenu,
-            isHover: !!hoveredMarker && hoveredMarker.type === d.typeId
+            // 悬停按实例 id 匹配优先（SOI 标签同 type 多次出现时只高亮命中的那个），
+            // 无 id 的外部 marker 回退按 type 匹配
+            isHover: !!hoveredMarker && (hoveredMarker.id ? hoveredMarker.id === d.typeId
+                : hoveredMarker.type === d.typeId)
         });
     }
+
+    // ===== SOI 穿越标签（0.3.0）：存在 SOI 穿越时，段尾=离开该段 SOI、段头=进入该段 SOI =====
+    // 可由可见性面板"SOI 切换标签"开关控制（soiLabels === false 时不生成）
+    // 数据源：本帧预测 segments（与轨道线同源）；段点 t = 段起点（anchorTime）起的秒偏移
+    // → 到边界时刻 tToNext = anchorTime + relPt.t − 当前游戏时间；段 0 头（飞船位置）不标"进入"。
+    // 注意：段 i 尾与段 i+1 头是世界同一点，但渲染锚点各自不同（宿主当前时刻位置），
+    // 屏幕位置不同（跨 SOI 衔接线两端），标签天然不重叠。
+    const segments = getLastOrbitSegments();
+    if (segments && segments.length > 1 && _lastVisibility.soiLabels !== false) {
+        const now = getCachedTime();
+        for (let si = 0; si < segments.length; si++) {
+            const seg = segments[si];
+            if (!seg.relPoints || seg.relPoints.length < 2) continue;
+            const segAnchor = getSegmentAnchor(seg);
+            const hostBody = celestialBodies.find(b => b.name === seg.anchorBody);
+
+            // 段尾（有后续段 → 末点即 SOI 边界）：离开 seg.soiName
+            if (si < segments.length - 1) {
+                pushSoiTag(markers, 'soi_exit', si, seg.relPoints[seg.relPoints.length - 1],
+                    seg, segAnchor, hostBody, now, canvas, hoveredMarker);
+            }
+            // 段头（si>0 → 首点即从上级进入的边界点）：进入 seg.soiName
+            if (si > 0) {
+                pushSoiTag(markers, 'soi_entry', si, seg.relPoints[0],
+                    seg, segAnchor, hostBody, now, canvas, hoveredMarker);
+            }
+        }
+    }
+
+    // ===== 标签避让（KSP2 风格，0.3.0）：同一 SOI 边界两端的离开/进入标签若挤在一起，
+    // 则后段"进入"标签沿两标签连线方向推开（leader 线相应延长），迭代收敛 =====
+    applyLabelAvoidance(markers);
 
     // Canvas：折线（锚点 → 本体位置，单段直线）+ 锚点（旋转 45° 正方形 = 菱形）
     // 统一使用飞行界面紫（ORBIT_MARKER_COLOR），类型区分只在 DOM 标签文字颜色
@@ -780,9 +820,95 @@ function renderOrbitMarkers(ctx, canvas, ship, hoveredMarker) {
         ctx.restore();
     }
 
+    // 轨道线任意点悬停高亮（0.3.0 提交4）：hoveredMarker.type === 'orbitPoint' 时
+    // 在最近点画高亮圆点（命中点世界坐标由 findNearestOrbitPoint 提供）
+    if (hoveredMarker && hoveredMarker.type === 'orbitPoint'
+        && isFinite(hoveredMarker.worldX) && isFinite(hoveredMarker.worldY)) {
+        const hp = worldToScreen(hoveredMarker.worldX, hoveredMarker.worldY, canvas);
+        ctx.beginPath();
+        ctx.arc(hp.x, hp.y, 5, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255, 220, 90, 0.9)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    }
+
     // DOM 文字本体同步（与 Canvas 同帧同源）
     syncOrbitLabels(markers, canvas);
     return markers;
+}
+
+// SOI 穿越标签构建（0.3.0）：push 单个边界点标签（段尾=离开 / 段头=进入）
+// relPt 为段内相对锚点坐标；id 用"类型+段索引+头尾"保证实例唯一
+// （同一 type 可出现多次——多次穿越有多个离开/进入标签，DOM 元素必须按 id 区分）；
+// name 防御：soiName 缺失时回退 anchorBody，再回退深空文案（防"离开 undefined"）
+function pushSoiTag(markers, typeId, segIndex, relPt, seg, segAnchor, hostBody, now, canvas, hoveredMarker) {
+    const def = ORBIT_POINT_TYPES[typeId];
+    if (!def) return;
+
+    const name = seg.soiName || seg.anchorBody || t('orbit.type.deepSpace');
+    const isExit = typeId === 'soi_exit';
+    const id = typeId + '_' + segIndex + (isExit ? '_out' : '_in');
+    const wx = relPt.x + segAnchor.x;
+    const wy = relPt.y + segAnchor.y;
+    const s = worldToScreen(wx, wy, canvas);
+    // 边界高度：边界点距段宿主中心距离 − 天体半径（宿主缺失（深空段）时无数据）
+    const dist = Math.hypot(relPt.x, relPt.y);
+    const alt = hostBody ? dist - hostBody.radius : null;
+    // 到边界时刻：段点绝对时刻（anchorTime + t）− 当前游戏时间（防御负值/缺 t 字段）
+    const tToNext = (relPt.t !== undefined) ? Math.max(0, (seg.anchorTime + relPt.t) - now) : null;
+
+    markers.push({
+        id,
+        type: typeId,
+        // 目标天体名（图标化后本体文字只显示名称；展开面板标题/状态行复用）
+        name,
+        worldX: wx, worldY: wy,
+        screenX: s.x, screenY: s.y,
+        bodyX: s.x + ORBIT_LABEL_DX,
+        bodyY: s.y + ORBIT_LABEL_DY,
+        icon: def.icon,
+        label: t(def.labelKey, { name }),
+        value: alt !== null ? formatAltitude(alt) : '--',
+        altM: alt,
+        // 展开面板状态行（替代高度行）：正在离开/正在遭遇
+        statusText: t(isExit ? 'orbitPoint.soiLeaving' : 'orbitPoint.soiEncounter', { name }),
+        tToNext,
+        arrivalUt: tToNext !== null ? now + tToNext : null,
+        contextMenu: def.contextMenu,
+        // 悬停按实例 id 匹配优先（同 type 多实例只高亮命中的那个）
+        isHover: !!hoveredMarker && (hoveredMarker.id ? hoveredMarker.id === id
+            : hoveredMarker.type === typeId)
+    });
+}
+
+// KSP2 风格标签避让（0.3.0 修复4）：所有标签（SOI 穿越 + Ap/Pe）两两 body 挤压时
+// 沿两者连线方向互相推开（各推一半；锚点不动、leader 线相应延长），迭代收敛。
+// 全标不丢弃，只错位——多次穿越时同类型标签同堆（进入×2 等）也必须互相避让。
+const LABEL_MIN_DIST = 70;   // 标签 body 最小间隔（px）
+function applyLabelAvoidance(markers) {
+    for (let iter = 0; iter < 4; iter++) {
+        let adjusted = false;
+        for (let i = 0; i < markers.length; i++) {
+            for (let j = i + 1; j < markers.length; j++) {
+                const a = markers[i];
+                const b = markers[j];
+                let dx = b.bodyX - a.bodyX;
+                let dy = b.bodyY - a.bodyY;
+                let d = Math.hypot(dx, dy);
+                if (d < LABEL_MIN_DIST) {
+                    // 完全重合时给固定方向，避免除零/抖动
+                    if (d < 1) { dx = 1; dy = 0.5; d = Math.hypot(dx, dy); }
+                    const push = (LABEL_MIN_DIST - d) / 2 + 2;   // 各推一半 + 余量
+                    a.bodyX -= dx / d * push;
+                    a.bodyY -= dy / d * push;
+                    b.bodyX += dx / d * push;
+                    b.bodyY += dy / d * push;
+                    adjusted = true;
+                }
+            }
+        }
+        if (!adjusted) break;
+    }
 }
 
 // 屏幕空间点到线段的最短距离（平方）与线段插值参数 t（0~1）

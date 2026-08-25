@@ -1,12 +1,13 @@
 import { shipSystem } from '../ship/shipSystem.js';
-import { camera } from '../camera.js';
+import { camera, screenToWorld } from '../camera.js';
 import { inputManager } from '../input.js';
 import { eventBus, Events } from '../eventBus.js';
 import { updateShipPhysics } from '../physics/physicsUpdate.js';
 import { updateCelestialBodies, getSOIHost, getAbsolutePosition, getRelativePosition, convertVelocityFrame, celestialBodies } from '../physics/physics.js';
 import { stateToKepler } from '../physics/orbitalMechanics.js';
 import { timeToNextSOISwitch } from '../physics/orbitalPrediction.js';
-import { render, renderFlightHud } from '../renderer.js';
+import { render, renderFlightHud, getLastOrbitSegments, getLastOrbitMarkers, setOrbitHoverState, findNearestOrbitPoint } from '../renderer.js';
+import { formatDuration } from '../utils/format.js';
 import { sceneManager } from '../sceneManager.js';
 import { gameState } from '../gameState.js';
 import { SASController } from '../ship/sasController.js';
@@ -37,9 +38,10 @@ let _activeFacilityId = null;  // 当前控制的设施 ID（无活动飞船时�
 let _dockPromptFacId = null;   // 当前显示对接弹窗的设施 ID（防止重复 show）
 let _lastToolbarMode = null;         // 统一工具栏脏检测：上一次的 mode
 let _lastToolbarFingerprint = null; // 统一工具栏脏检测：上一次的数据指纹（含模块列表）
+let _lastOrbitHoverKey = '';   // 轨道悬停 Tooltip 目标指纹（变化才触发，防频繁调用）
 
 // 可见性筛选状态 — 控制飞行场景中非活动飞船/设施的显示
-let _visibilityState = { ships: true, facilities: true, facilityRange: true, bodyOrbits: true };
+let _visibilityState = { ships: true, facilities: true, facilityRange: true, bodyOrbits: true, soiLabels: true };
 
 // 暴露到全局供 sasUI 面板调用
 window.__visibilityState = _visibilityState;
@@ -288,6 +290,85 @@ export function computeNavballDirections(ship, host) {
         radialIn: dirs.radialIn !== null ? { angle: dirs.radialIn } : null,
         radialOut: dirs.radialOut !== null ? { angle: dirs.radialOut } : null
     };
+}
+
+/**
+ * 轨道悬停检测（0.3.0 提交4）：
+ *   标记锚点命中（12px 半径）优先 → 轨道线点-线段命中（8px 阈值）；
+ *   结果写入渲染层悬停通道（setOrbitHoverState，renderOrbitMarkers 消费：
+ *   锚点放大/标签高亮/轨道点圆点）；Tooltip 仅轨道线命中时显示（标记命中由
+ *   DOM 标签展开交互覆盖），且目标指纹变化才触发（showTooltip 延迟+固定位置语义）。
+ * 数据源：渲染层本帧已绘制几何（getLastOrbitSegments/getLastOrbitMarkers），
+ * 不与预测引擎直接耦合；仅在鼠标移动事件时执行（纯数学命中，无预测重算）。
+ * @param {MouseEvent} e - 原始事件（clientX/clientY 供工具提示定位）
+ * @param {number} cssX - 画布 CSS 像素 x
+ * @param {number} cssY - 画布 CSS 像素 y
+ */
+function updateOrbitHover(e, cssX, cssY) {
+    const ship = shipSystem.getActiveShip();
+    if (!ship) {
+        setOrbitHoverState(null);
+        if (_lastOrbitHoverKey !== '') {
+            _lastOrbitHoverKey = '';
+            hideTooltip();
+        }
+        return;
+    }
+
+    const rect = _canvas.getBoundingClientRect();
+    // canvas 坐标空间换算（画布物理像素 = CSS 像素 × canvas.width/rect.width，兼容 DPR/缩放）
+    const canvasX = cssX * (_canvas.width / rect.width);
+    const canvasY = cssY * (_canvas.height / rect.height);
+
+    // 1. 标记锚点命中（菱形锚点）
+    let hoveredMarker = null;
+    const markers = getLastOrbitMarkers() || [];
+    for (const mk of markers) {
+        if (Math.hypot(canvasX - mk.screenX, canvasY - mk.screenY) < 12) {
+            hoveredMarker = mk;
+            break;
+        }
+    }
+
+    // 2. 轨道线命中（屏幕空间点-线段距离；标记优先于轨道线）
+    let nearest = null;
+    if (!hoveredMarker) {
+        const segments = getLastOrbitSegments();
+        if (segments && segments.length > 0) {
+            const mouseWorld = screenToWorld(canvasX, canvasY, _canvas);
+            nearest = findNearestOrbitPoint(segments, mouseWorld, 8, _canvas);
+        }
+    }
+
+    // 3. 写入渲染层悬停通道（下一帧绘制时消费）
+    setOrbitHoverState(hoveredMarker || (nearest
+        ? { type: 'orbitPoint', worldX: nearest.worldX, worldY: nearest.worldY }
+        : null));
+
+    // 4. Tooltip（仅轨道线命中；指纹变化才调用）
+    const key = nearest
+        ? (nearest.segSoiName || '') + '|' + nearest.worldX.toFixed(0) + '|' + nearest.worldY.toFixed(0)
+        : '';
+    if (key) {
+        if (key !== _lastOrbitHoverKey) {
+            const hostBody = celestialBodies.find(b => b.name === nearest.segSoiName);
+            const alt = hostBody
+                ? Math.hypot(nearest.worldX - hostBody.position.x, nearest.worldY - hostBody.position.y) - hostBody.radius
+                : null;
+            const altText = alt !== null
+                ? (Math.abs(alt) >= 1000 ? (alt / 1000).toFixed(1) + ' km' : alt.toFixed(0) + ' m')
+                : '--';
+            const tText = nearest.timeOffset !== null ? formatDuration(nearest.timeOffset) : '--';
+            showTooltip(
+                (nearest.segSoiName || t('orbit.type.deepSpace')) + ' · ALT ' + altText + ' · T+ ' + tText,
+                e.clientX, e.clientY
+            );
+            _lastOrbitHoverKey = key;
+        }
+    } else if (_lastOrbitHoverKey !== '') {
+        _lastOrbitHoverKey = '';
+        hideTooltip();
+    }
 }
 
 /**

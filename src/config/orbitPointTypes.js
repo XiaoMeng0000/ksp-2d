@@ -33,5 +33,24 @@ export const ORBIT_POINT_TYPES = {
         labelFullKey: 'orbitPoint.peFull',
         contextMenu: false,
         labelStyle: { side: 'outside' }
+    },
+    // SOI 穿越标签（0.3.0）：段尾=离开、段头=进入；青蓝系呼应 SOI 边界圆
+    soi_exit: {
+        id: 'soi_exit',
+        icon: null,
+        color: '#7DA6E8',
+        labelKey: 'orbitPoint.soiLeave',
+        labelFullKey: 'orbitPoint.soiLeave',
+        contextMenu: false,
+        labelStyle: { side: 'outside' }
+    },
+    soi_entry: {
+        id: 'soi_entry',
+        icon: null,
+        color: '#7DA6E8',
+        labelKey: 'orbitPoint.soiEnter',
+        labelFullKey: 'orbitPoint.soiEnter',
+        contextMenu: false,
+        labelStyle: { side: 'outside' }
     }
 };

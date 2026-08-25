@@ -1060,6 +1060,10 @@ class SASUI {
         const orbitsLabel = this._makeCheckbox('bodyOrbits', t('sas.bodyOrbits'));
         content.appendChild(orbitsLabel);
 
+        // SOI 切换标签 toggle（0.3.0）
+        const soiLabel = this._makeCheckbox('soiLabels', t('sas.soiLabels'));
+        content.appendChild(soiLabel);
+
         panel.appendChild(content);
         document.body.appendChild(panel);
 
