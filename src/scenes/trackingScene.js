@@ -13,6 +13,7 @@ import { timeWarp } from '../timeWarp.js';
 import { getSOIWarpProtectEnabled } from '../config/settingsConfig.js';
 import { t } from '../config/strings.js';
 import { renderIconHtml } from '../ui/uiComponents.js';
+import { clearOrbitLabels } from '../ui/orbitLabels.js';
 
 // 追踪站内部状态
 let trackingFocusPos = null;
@@ -371,6 +372,8 @@ export function registerTrackingScene({ getTime, setTime, canvas }) {
             }
             // 隐藏信息窗口（场景退出自动关闭，不产生关闭音效）
             window.hideTrackingInfo && window.hideTrackingInfo({ silent: true });
+            // 清空轨道标签（追踪站同样产生 Ap/Pe 标记，退出后必须显式清理，防残留其他场景）
+            clearOrbitLabels();
         },
         update: (dt) => {
             const activeShip = shipSystem.getActiveShip();

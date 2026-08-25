@@ -286,3 +286,66 @@
     user-select: none;
     padding: 2px 0;
 }
+
+/* ---- 轨道标签（0.3.0 提交 2：Canvas 锚点 + DOM 文字本体） ---- */
+/* 容器：fixed 于视口 0,0，不拦截鼠标；每个标签 absolute 0,0 + transform 平移 */
+#orbitLabels {
+    position: fixed;
+    left: 0;
+    top: 0;
+    pointer-events: none;
+    z-index: 500;
+}
+
+.orbit-label {
+    position: absolute;
+    left: 0;
+    top: 0;
+    /* 宽度收缩到内容（max-content）：防止面板在窄容器下被逐字符断行竖排 */
+    width: max-content;
+    pointer-events: none;
+}
+
+/* 文字本体：小面板样式；边框统一飞行界面紫（--toolbar-border，与 Canvas 锚点/折线一致），
+   文字颜色由注册表内联注入（类型区分色，Ap/Pe 各一）；
+   可悬停/右键锁定展开（0.3.0）：宽度同样收缩到内容，保证展开面板各行为完整单行 */
+.orbit-label-body {
+    background: rgba(0, 0, 0, 0.75);
+    border: 1px solid var(--toolbar-border);
+    border-radius: 3px;
+    padding: 1px 6px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.4;
+    width: max-content;
+    pointer-events: auto;
+    cursor: pointer;
+    user-select: none;
+}
+
+/* 展开态：信息面板加大底色衬底 */
+.orbit-label.expanded .orbit-label-body {
+    padding: 3px 7px;
+    font-size: 12px;
+}
+
+/* 展开面板行结构（0.3.0）：标题=类型色（内联注入），T- 行=HUD 绿，高度行=主文本色 */
+.orbit-label-body .olb-title {
+    display: block;
+    color: var(--text-main);
+}
+
+.orbit-label-body .olb-t {
+    display: block;
+    color: rgba(64, 224, 80, 0.9);
+}
+
+.orbit-label-body .olb-alt {
+    display: block;
+    color: var(--text-main);
+}
+
+/* 悬停高亮（由 renderer 的 isHover 驱动，与 Canvas 锚点放大联动） */
+.orbit-label.hovered .orbit-label-body {
+    background: rgba(255, 255, 255, 0.15);
+}

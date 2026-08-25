@@ -379,6 +379,31 @@ function findSOIExitTime(kepler, gm, soiRadius) {
     return Math.max(deltaM / n, 0.01);
 }
 
+// 双曲线轨道到达近拱点（最近接近点，真实角 θ=0 → 运动坐标 θm=0 → F=0 → M=0）的时间
+// 口径与 findSOIExitTime 的双曲线分支一致（M = e·sinhF − F，M 随运动坐标单调增）：
+//   M0 < 0（未过近点）→ 返回正向时间 -M0/n；
+//   M0 >= 0（已过近点）→ 返回 null（最近点已过去，无"下一次"）。
+// 供标记层显示双曲线"入近点 Pe"（KSP 语义；getOrbitalInfo 对 a<=0 维持无数据，HUD 不受影响）
+function timeToHyperPeriapsis(kepler, gm) {
+    if (!kepler || !isFinite(kepler.a) || kepler.a >= 0 || !(gm > 0) || !isFinite(gm)) {
+        return null;
+    }
+    const dir = kepler.dir === undefined ? 1 : kepler.dir;
+    const theta0m = dir * kepler.theta;
+    const aMag = -kepler.a;
+    const n = Math.sqrt(gm / (aMag * aMag * aMag));
+    // tanh 钳制仅防 θ 极端接近渐近线时 atanh(±1)=±∞（与 findSOIExitTime 同口径）
+    const clampTanh = (v) => Math.max(-(1 - 1e-12), Math.min(1 - 1e-12, v));
+    const F0 = 2 * Math.atanh(clampTanh(
+        Math.sqrt((kepler.e - 1) / (kepler.e + 1)) * Math.tan(theta0m / 2)
+    ));
+    const M0 = kepler.e * Math.sinh(F0) - F0;
+    if (M0 < 0) {
+        return -M0 / n;
+    }
+    return null;
+}
+
 function normalizeAngle(a) {
     return ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
 }
@@ -461,6 +486,10 @@ function getOrbitalInfo(kepler, gm, body, relPos) {
     let orbitType;
     if (peAlt < 0) {
         orbitType = 'suborbital';
+    } else if (a * (1 + e) > body.soiRadius) {
+        // 伪椭圆（Ap 超出宿主 SOI）：轨道在到达 Ap 前即切换参考系，语义上按逃逸显示。
+        // 0.3.0 修复：近逃逸 a 巨大/抖动时 HUD 不再误标"椭圆轨"（Ap/Pe 标记层同步隐藏 Ap）
+        orbitType = 'escape';
     } else if (e < 0.01) {
         orbitType = 'circular';
     } else {
@@ -470,4 +499,4 @@ function getOrbitalInfo(kepler, gm, body, relPos) {
     return { apAlt, peAlt, currentAlt, period, tToAp, tToPe, orbitType };
 }
 
-export { stateToKepler, keplerPositionAtTime, keplerToState, keplerPositionAtTheta, findSOIIntersection, findSOIExitTime, getOrbitalDirectionAngles, getOrbitalInfo };
+export { stateToKepler, keplerPositionAtTime, keplerToState, keplerPositionAtTheta, findSOIIntersection, findSOIExitTime, timeToHyperPeriapsis, getOrbitalDirectionAngles, getOrbitalInfo };

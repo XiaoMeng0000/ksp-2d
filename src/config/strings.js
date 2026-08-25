@@ -240,6 +240,12 @@ const STRINGS = {
     'orbit.type.escape': '逃逸',
     'orbit.type.deepSpace': '深空',
 
+    // ---------- 轨道点标签（0.3.0：Ap/Pe 标记） ----------
+    'orbitPoint.ap': 'Ap',
+    'orbitPoint.pe': 'Pe',
+    'orbitPoint.apFull': '远点',
+    'orbitPoint.peFull': '近点',
+
     // ---------- 飞船建造 ----------
     'build.title': '飞船建造',
     'build.selectHint': '选择飞船查看数据',

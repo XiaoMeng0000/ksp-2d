@@ -49,3 +49,37 @@ export function formatUniverseTime(s) {
 export function formatGameDate(ts) {
     return new Date(ts).toLocaleString('zh-CN', { hour12: false });
 }
+
+// 时长格式化：1h 30m 00s / 12m 30s / 45s（0.3.0 从 renderer.js 迁移为共享工具）
+export function formatDuration(sec) {
+    if (sec === null || sec === undefined || !isFinite(sec)) return '--';
+    sec = Math.max(0, Math.round(sec));
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    if (h > 0) return h + 'h ' + String(m).padStart(2, '0') + 'm ' + String(s).padStart(2, '0') + 's';
+    if (m > 0) return m + 'm ' + String(s).padStart(2, '0') + 's';
+    return s + 's';
+}
+
+// 长时长格式化（游戏年/天口径）："0年:0天:01时:16分:20秒"（0.3.0 轨道标签展开面板用）
+// 年 = 426 日 × 6 小时（GAME_YEAR_SECONDS），天 = 6 小时（GAME_DAY_SECONDS）；时/分/秒补零
+export function formatGameDurationLong(sec) {
+    if (sec === null || sec === undefined || !isFinite(sec)) return '--';
+    sec = Math.max(0, Math.floor(sec));
+    const y = Math.floor(sec / GAME_YEAR_SECONDS);
+    sec %= GAME_YEAR_SECONDS;
+    const d = Math.floor(sec / GAME_DAY_SECONDS);
+    sec %= GAME_DAY_SECONDS;
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    return y + '年:' + d + '天:' + String(h).padStart(2, '0') + '时:'
+        + String(m).padStart(2, '0') + '分:' + String(s).padStart(2, '0') + '秒';
+}
+
+// 精确米数格式化（千分位）："499,999 m"（0.3.0 轨道标签展开面板高度行用）
+export function formatMeters(m) {
+    if (m === null || m === undefined || !isFinite(m)) return '--';
+    return Math.round(m).toLocaleString('en-US') + ' m';
+}

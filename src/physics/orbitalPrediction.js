@@ -208,6 +208,58 @@ function radialLineTime(relPos, ux, uy, sEnd, E, gm) {
     return t;
 }
 
+// 椭圆均匀偏近点角 E 采样（0.3.x 高离心率轨道近星折线问题根治）：
+// 返回 count+1 个点，E 从 E0 到 E1 均匀推进；点严格落在解析圆锥曲线上，
+// t =（E − e·sinE − M0)/n 随 E 单调递增（全圈时末点 t = 2π/n = T，语义与旧实现一致）。
+// 数学依据：
+//   ① E 均匀时相邻点空间弦长正比于 v·dt = √(gm/a)·√(1−e²cos²E)·dE/n，
+//      最近/最远弦长比 ≤ 1/√(1−e²)（e=0.943 时仅约 3×），近点/远点（曲率最大处）自动最密；
+//   ② 时间/平近点角均匀采样弦长 ∝ v，近星点速度最大、空间最疏，与曲率分布恰好相反。
+// 近星段矢高（弦-弧偏差）≈ π²a/(2N²)，与离心率无关——N 的选择由调用方按 a 决定。
+function ellipseSampleByE(kepler, E0, E1, count, M0, n) {
+    const { a, e, omega } = kepler;
+    const dir = kepler.dir === undefined ? 1 : kepler.dir;
+    const cosW = Math.cos(omega);
+    const sinW = Math.sin(omega);
+    const sqP = Math.sqrt(1 + e);
+    const sqM = Math.sqrt(1 - e);
+    const points = [];
+    for (let i = 0; i <= count; i++) {
+        const E = E0 + (i / count) * (E1 - E0);
+        // 半角 atan2 形式（与 getOrbitalInfo 同口径）：象限安全，且与 E→θ 变换严格互逆
+        const thetaM = 2 * Math.atan2(sqP * Math.sin(E / 2), sqM * Math.cos(E / 2));
+        const theta = dir * thetaM;
+        const r = a * (1 - e * Math.cos(E));
+        const ox = r * Math.cos(theta);
+        const oy = r * Math.sin(theta);
+        points.push({
+            x: ox * cosW - oy * sinW,
+            y: ox * sinW + oy * cosW,
+            t: (E - e * Math.sin(E) - M0) / n
+        });
+    }
+    return points;
+}
+
+// 求解开普勒方程 M = E − e·sinE（牛顿迭代，收敛判据与 keplerPositionAtTime 同口径；
+// 高离心率牛顿跳变/不收敛时降级二分兜底，与 keplerPositionAtTime 同策略）
+function solveEccentricAnomaly(M, e) {
+    let E = M;
+    for (let i = 0; i < 40; i++) {
+        const denom = 1 - e * Math.cos(E);
+        const step = (E - e * Math.sin(E) - M) / denom;
+        if (Math.abs(step) < 1e-12 * Math.max(1, Math.abs(E))) return E;
+        E -= step;
+    }
+    let lo = M - Math.PI;
+    let hi = M + Math.PI;
+    for (let i = 0; i < 40; i++) {
+        const mid = (lo + hi) / 2;
+        if (mid - e * Math.sin(mid) < M) lo = mid; else hi = mid;
+    }
+    return (lo + hi) / 2;
+}
+
 // 递归内部：分段拼接一步，采样从 theta0 到交点或完整轨道
 // 段点结构（0.3.0 骨架新增 t 字段）：{ x, y, t } — x/y 为相对锚点坐标，
 // t 为自该段起点（anchorTime）起的游戏秒偏移；锚点绝对时刻 = anchorTime + t。
@@ -416,16 +468,33 @@ function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segment
     if (!intersection) {
         // 轨道未离开当前宿主 SOI，但需检测是否进入其他天体嵌套 SOI
         const T = 2 * Math.PI * Math.sqrt(kepler.a * kepler.a * kepler.a / host.gm);
-        const N = 200;
+        const n = 2 * Math.PI / T;
+        const N = 200;      // SOI 扫描分辨率（扫描/二分专用，不参与绘制采样密度）
+
+        // 绘制采样数（均匀偏近点角 E，根治高离心率近星段折线）：
+        // 近星段矢高 S_p = π²a/(2N²)（与离心率无关，推导见 ellipseSampleByE 注释）
+        // → N = ceil(π·√(a/(2·S_TARGET)))；a 越大近星"发夹"越需加密（e≈0.999 的
+        // 大椭圆需近 2000 点）；S_TARGET 以"天体总览视角"（恒星约 1px≈1.8e6m）≈0.25px
+        // 矢高为目标；下限 200 保近圆小轨道平滑，上限防失控。
+        const S_TARGET = 4.6e5; // m
+        const N_DRAW = Math.max(200, Math.min(4096, Math.ceil(Math.PI * Math.sqrt(kepler.a / (2 * S_TARGET)))));
+
+        // 起始偏近点角 E0 与平近点角 M0（运动坐标 θm=dir·θ；atan2 半角形式与 getOrbitalInfo 同口径）
+        const theta0m = (kepler.dir === undefined ? 1 : kepler.dir) * kepler.theta;
+        const E0 = 2 * Math.atan2(
+            Math.sqrt(1 - kepler.e) * Math.sin(theta0m / 2),
+            Math.sqrt(1 + kepler.e) * Math.cos(theta0m / 2)
+        );
+        const M0 = E0 - kepler.e * Math.sin(E0);
 
         // 绘制用点：固定锚点（宿主在 stepStartTime 的位置），
-        // 段点存相对锚点坐标，保证以宿主为中心的视觉椭圆
-        const drawPoints = [];
-        for (let i = 0; i <= N; i++) {
-            const t = (i / N) * T;
-            const rP = keplerPositionAtTime(kepler, host.gm, t, kepler.omega);
-            drawPoints.push({ x: rP.x, y: rP.y, t });
-        }
+        // 段点存相对锚点坐标，保证以宿主为中心的视觉椭圆。
+        // 高离心率轨道（e→1）下"均匀时间/平近点角"采样弦长 ∝ v，近星点速度最大、
+        // 空间最疏，与曲率分布恰好相反（e=0.943 案例近星弦长 ≈1.1e9 m ≈620px，
+        // 即截图折线根因）；改为均匀偏近点角 E 后空间弦长全场平衡
+        // （最近/最远弦长比 ≤ 1/√(1−e²)，e=0.943 时仅约 3×），
+        // 近星/远星点（曲率最大处）自动最密，矢高 <0.5px（视觉平滑）。
+        const drawPoints = ellipseSampleByE(kepler, E0, E0 + 2 * Math.PI, N_DRAW, M0, n);
 
         // 扫描用点：逐点绝对坐标，用于 getSOIHostAtTime 精确检测
         const scanPoints = [];
@@ -512,15 +581,12 @@ function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segment
         nextSoiHost = verifiedHost;
 
         // 截断至切换点：在 [0, tHi] 区间重采样，保证最小点数（避免进入 SOI 前
-        // 的短段在固定 N=200 采样下只剩少数点、画成短直线）
+        // 的短段在固定 N=200 采样下只剩少数点、画成短直线）；
+        // 同样用均匀偏近点角 E 采样（弧段可能跨近星点，时间均匀会暴露同类折线问题）
         const MIN_POINTS = 32;
         const M = Math.max(MIN_POINTS, Math.min(200, Math.ceil(tHi / (T / N))));
-        const truncatedPoints = [];
-        for (let i = 0; i <= M; i++) {
-            const t = (i / M) * tHi;
-            const rP = keplerPositionAtTime(kepler, host.gm, t, kepler.omega);
-            truncatedPoints.push({ x: rP.x, y: rP.y, t });
-        }
+        const E1 = solveEccentricAnomaly(M0 + n * tHi, kepler.e);
+        const truncatedPoints = ellipseSampleByE(kepler, E0, E1, M, M0, n);
         segments.push({
             relPoints: truncatedPoints,
             anchorBody: host.name,

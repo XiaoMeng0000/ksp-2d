@@ -13,6 +13,7 @@ import { SASController } from '../ship/sasController.js';
 import { SAS_CYCLE_ORDER, SAS_DIRECTION_ORDER, computeNavballDirections as computeSasDirections } from '../ship/sasModes.js';
 import { sasUI } from '../ui/sasUI.js';
 import { showTooltip, hideTooltip } from '../ui/uiTooltip.js';
+import { clearOrbitLabels } from '../ui/orbitLabels.js';
 import { facilitySystem } from '../facility/facilitySystem.js';
 import { getModuleDef } from '../ship/moduleTypes.js';
 import { getFacilityType } from '../facility/facilityTypes.js';
@@ -469,6 +470,9 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
 
             // 隐藏悬停提示（防切场景后 tooltip 残留）
             hideTooltip();
+
+            // 清空轨道标签（标签由渲染循环每帧驱动，退出场景后无人同步 → 必须显式清理）
+            clearOrbitLabels();
 
             // SAS 集成 — 清理 Canvas 事件监听
             if (_canvas._sasClickHandler) {
