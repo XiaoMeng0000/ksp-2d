@@ -21,7 +21,11 @@ let _hasSkipped = false;
 function _skipSplash() {
     _hasSkipped = true;
     _cleanup();
-    sceneManager.switchTo('info');
+    // 0.2.8：公告面板化后启动链直达主菜单；仅启动路径自动打开公告面板
+    sceneManager.switchTo('menu');
+    if (typeof window.openAnnouncement === 'function') {
+        window.openAnnouncement();
+    }
 }
 
 function _cleanup() {
@@ -62,7 +66,12 @@ function _advancePhase() {
             _phase = 'fadeIn';
         }
     } else if (_phase === 'blackScreen') {
-        sceneManager.switchTo('info');
+        // 0.2.8：公告面板化后启动链直达主菜单；仅启动路径自动打开公告面板
+        //（其他场景返回主菜单不经此路径 → 不自动打开）
+        sceneManager.switchTo('menu');
+        if (typeof window.openAnnouncement === 'function') {
+            window.openAnnouncement();
+        }
     }
 }
 

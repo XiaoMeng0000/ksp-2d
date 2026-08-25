@@ -244,7 +244,9 @@ function registerMenuScene(options) {
         openSettings: options.openSettings,
         openFeedback: options.openFeedback,
         // 0.2.7：百科面板化（scene → uiManager 面板，入口协议同设置）
-        openEncyclopedia: options.openEncyclopedia
+        openEncyclopedia: options.openEncyclopedia,
+        // 0.2.8：公告面板化（scene → uiManager 面板，入口协议同设置）
+        openAnnouncement: options.openAnnouncement
     };
 
     sceneManager.registerScene('menu', {

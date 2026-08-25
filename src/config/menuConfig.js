@@ -12,6 +12,7 @@ const MAIN_MENU = [
 
 // 二级菜单（额外内容子菜单）
 const EXTRA_MENU = [
+    { id: 'announcement', label: '游戏公告',  action: 'callback:openAnnouncement' },
     { id: 'galaxies', label: '已加载星系',  action: 'scene:galaxies' },
     { id: 'credits',  label: '制作人员',  action: 'scene:credits' },
     { id: 'license',  label: '版权声明',  action: 'scene:license' },

@@ -28,6 +28,8 @@ import './src/ui/newCampaignDialog.js';
 import { openSettings as openSettingsUI } from './src/ui/settingsUI.js';
 // 0.2.7 游戏百科 — 同样从 scene 抽离为覆盖式 UI 面板（import 即完成 uiManager 注册）
 import { openEncyclopedia as openEncyclopediaUI } from './src/ui/encyclopediaUI.js';
+// 0.2.8 游戏公告 — 同模式面板化（启动进主菜单自动打开 / 额外内容入口）
+import { openAnnouncement as openAnnouncementUI } from './src/ui/announcementUI.js';
 import './src/ui/facilityDeployUI.js';
 // UI 点击音效采集（document 捕获阶段委托，import 即生效）
 import './src/ui/uiClickSfx.js';
@@ -48,7 +50,6 @@ import { eventBus, Events } from './src/eventBus.js';
 import { registerFlightScene } from './src/scenes/flightScene.js';
 import { registerTrackingScene, buildTrackingTree, renderTrackingNav, trackingCollapsed } from './src/scenes/trackingScene.js';
 import { registerSplashScene } from './src/scenes/splashScene.js';
-import { registerInfoScene } from './src/scenes/infoScene.js';
 import { registerMenuScene } from './src/scenes/menuScene.js';
 import { registerCreditsScene } from './src/scenes/creditsScene.js';
 import { registerLicenseScene } from './src/scenes/licenseScene.js';
@@ -113,14 +114,15 @@ resize();
 // 天体渲染配置（数据驱动）— 在任何场景渲染前注册到 RenderableManager
 registerBodyRenderables();
 
-// SceneManager - 注册 splash / info / menu / encyclopedia / credits 场景
+// SceneManager - 注册 splash / menu / encyclopedia / credits 场景（公告已面板化）
 registerSplashScene();
-registerInfoScene();
 registerMenuScene({
     // 0.2.5：开始游戏/读档/存档管理整合为左侧"开始游戏"综合面板
     openStartGamePanel: () => openStartGamePanel(),
     openSettings: () => window.openSettings(),
     openEncyclopedia: () => window.openEncyclopedia(),
+    // 0.2.8：公告入口（主菜单额外内容子菜单）
+    openAnnouncement: () => window.openAnnouncement(),
 });
 registerCreditsScene();
 registerLicenseScene();
@@ -295,6 +297,11 @@ window.openSettings = function() {
 // 0.2.7 游戏百科入口（场景 → 覆盖式面板，同设置面板模式）
 window.openEncyclopedia = function() {
     openEncyclopediaUI();
+};
+
+// 0.2.8 游戏公告入口（启动自动打开 / 主菜单额外内容；面板由 announcementUI 注册）
+window.openAnnouncement = function() {
+    openAnnouncementUI();
 };
 
 // 层级存档 - 当前世界 ID

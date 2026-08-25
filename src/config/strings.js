@@ -340,10 +340,9 @@ const STRINGS = {
     'settings.on': '开',
     'settings.off': '关',
 
-    // ---------- 公测公告 ----------
-    // 公告内容已清空（v0.2.4 稳定后填写新公告）
-    'info.title': '',
-    'info.body': '',
+    // ---------- 游戏公告（0.2.8 面板化） ----------
+    // 公告内容数据移至 src/config/announcementConfig.js（多版本公告）
+    'info.title': '游戏公告',
 
     // ---------- 启动画面 ----------
     'splash.text': '本游戏为个人学习项目，不用于商业用途',

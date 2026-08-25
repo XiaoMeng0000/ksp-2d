@@ -1400,18 +1400,22 @@
 }
 
 /* ============================================================
-   第六部分：游戏百科覆盖面板（encyclopediaUI.js）
-   0.2.7 由 scene 面板化迁入（原 scenes.css 百科段）
+   第六部分：游戏百科 + 公告栏覆盖面板
+   0.2.7 百科由 scene 面板化迁入（原 scenes.css 百科段）
+   0.2.8 公告栏（infoScene.js）复用 .enc-* 结构（左侧导航 + 右侧卡片），
+        选择器扩展为 #encyclopediaPanel, #infoScenePanel 共用
    打开不切场景 → 菜单 BGM 连续；自动获得 UI_PANEL 音效
    ============================================================ */
 
-#encyclopediaPanel {
+#encyclopediaPanel,
+#infoScenePanel {
     align-items: center;
     justify-content: center;
 }
 
 /* 居中大窗口：蓝灰壳 + 紫描边（与三大面板同语言） */
-#encyclopediaPanel .enc-window {
+#encyclopediaPanel .enc-window,
+#infoScenePanel .enc-window {
     width: min(1100px, 92vw);
     height: min(760px, 88vh);
     background: var(--theme-bg);
@@ -1424,7 +1428,8 @@
 }
 
 /* 顶栏：标题 + 关闭 */
-#encyclopediaPanel .enc-topbar {
+#encyclopediaPanel .enc-topbar,
+#infoScenePanel .enc-topbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -1434,14 +1439,16 @@
     border-radius: 5px;
 }
 
-#encyclopediaPanel .enc-title {
+#encyclopediaPanel .enc-title,
+#infoScenePanel .enc-title {
     color: var(--text-bright);
     font-family: var(--font-mono-bold);
     font-weight: normal;
     font-size: 15px;
 }
 
-#encyclopediaPanel .enc-close {
+#encyclopediaPanel .enc-close,
+#infoScenePanel .enc-close {
     height: 26px;
     padding: 0 12px;
     box-sizing: border-box;
@@ -1454,12 +1461,14 @@
     cursor: pointer;
 }
 
-#encyclopediaPanel .enc-close:hover {
+#encyclopediaPanel .enc-close:hover,
+#infoScenePanel .enc-close:hover {
     border-color: var(--theme-border-hover);
 }
 
 /* 主体：左导航 + 右内容 */
-#encyclopediaPanel .enc-body {
+#encyclopediaPanel .enc-body,
+#infoScenePanel .enc-body {
     flex: 1;
     min-height: 0;
     display: flex;
@@ -1468,7 +1477,8 @@
     box-sizing: border-box;
 }
 
-#encyclopediaNav {
+#encyclopediaNav,
+#infoSceneNav {
     width: 220px;
     flex-shrink: 0;
     display: flex;
@@ -1481,7 +1491,8 @@
     overflow-y: auto;
 }
 
-#encyclopediaNav .enc-nav-item {
+#encyclopediaNav .enc-nav-item,
+#infoSceneNav .enc-nav-item {
     padding: 8px 12px;
     border-radius: 4px;
     background: var(--theme-panel-deep);
@@ -1492,16 +1503,19 @@
     transition: background 0.15s ease, color 0.15s ease;
 }
 
-#encyclopediaNav .enc-nav-item:hover {
+#encyclopediaNav .enc-nav-item:hover,
+#infoSceneNav .enc-nav-item:hover {
     background: var(--theme-hover);
 }
 
-#encyclopediaNav .enc-nav-item.active {
+#encyclopediaNav .enc-nav-item.active,
+#infoSceneNav .enc-nav-item.active {
     background: var(--theme-active-bg);
     color: var(--text-bright);
 }
 
-#encyclopediaContent {
+#encyclopediaContent,
+#infoSceneContent {
     flex: 1;
     min-width: 0;
     overflow-y: auto;
@@ -1512,7 +1526,8 @@
 }
 
 /* 当前分类标题条（// 前缀） */
-#encyclopediaContent .enc-content-title {
+#encyclopediaContent .enc-content-title,
+#infoSceneContent .enc-content-title {
     color: var(--accent);
     font-size: 13px;
     letter-spacing: 1px;
@@ -1522,20 +1537,23 @@
     border-radius: 4px;
 }
 
-#encyclopediaContent .enc-content-title::before {
+#encyclopediaContent .enc-content-title::before,
+#infoSceneContent .enc-content-title::before {
     content: '// ';
     opacity: 0.7;
 }
 
 /* 条目卡：紫头 + 深色卡体（无边框，与统一卡片语言一致） */
-#encyclopediaContent .enc-card {
+#encyclopediaContent .enc-card,
+#infoSceneContent .enc-card {
     background: var(--theme-panel-deep);
     border-radius: 4px;
     margin-bottom: 14px;
     overflow: hidden;
 }
 
-#encyclopediaContent .enc-card-title {
+#encyclopediaContent .enc-card-title,
+#infoSceneContent .enc-card-title {
     padding: 8px 14px;
     background: var(--theme-btn-selected);
     color: var(--text-bright);
@@ -1545,14 +1563,16 @@
     letter-spacing: 1px;
 }
 
-#encyclopediaContent .enc-card-body {
+#encyclopediaContent .enc-card-body,
+#infoSceneContent .enc-card-body {
     padding: 12px 14px;
     display: flex;
     flex-direction: column;
     gap: 10px;
 }
 
-#encyclopediaContent .enc-card-body p {
+#encyclopediaContent .enc-card-body p,
+#infoSceneContent .enc-card-body p {
     color: var(--text-main);
     font-family: var(--font-mono);
     font-size: 12.5px;
