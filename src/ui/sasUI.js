@@ -29,20 +29,35 @@ eventBus.on(Events.SCENE_CHANGED, (data) => {
 // ---- 通用配色（0.2.7 统一为左侧工具栏风格：纯黑底 + 紫色边框） ----
 const PANEL_BG = '#000';                    // 与左侧工具栏底色一致（纯黑）
 const PANEL_BORDER_COLOR = '#6C5CE7';       // 与左侧工具栏外框同款紫（--toolbar-border 实色）
-const MARKER_COLOR = '#ffffff';            // 姿态指示（白色三角 / 圆盘中心白圆）
-const DIR_PROGRADE_COLOR = '#88ccff';      // 顺向/逆向 主蓝
-const DIR_RADIAL_COLOR = '#4fc3f7';        // 径向内/外 青色
+const MARKER_COLOR = '#ffffff';             // 姿态指示（白色三角 / 圆盘中心白圆）
+
+// ---- 图标状态色（0.3.0 图标替换规范：SVG 白色模板 + 运行时染色，色值与 root.css 变量对应） ----
+// 按钮配色方案 v2（参考 KSP2 圆盘按钮像素参考图）：正逆=绿 / 径向=青
+//   激活（SAS 开 + 选中）  = 语义色图标，黑底
+//   未激活（SAS 开 + 未选中）= 语义色实底圆 + 黑色符号
+//   SAS 关闭                = 全部深灰（已有样式）
+const DIR_PROGRADE_COLOR = '#00d84a';       // 按钮 顺向/逆向 语义绿（参考图一/二 像素绿）
+const DIR_RADIAL_COLOR = '#3fa8a8';         // 按钮 径向内/外 语义青（参考图三/四 teal 青）
+const DIR_SYMBOL_ON_BG = '#000';            // 未激活实底圆上的符号黑（参考图二/四）
+// 导航球标记色（沿用 v1：正逆黄 / 径向青，与按钮语义色分离；如需同步按钮配色请告知）
+const NAV_DIR_PROGRADE_COLOR = '#ffcc33';   // 导航球 顺向/逆向 标记黄
+const NAV_DIR_RADIAL_COLOR = '#4fc3f7';     // 导航球 径向内/外 标记青
+const DIR_INACTIVE_COLOR = '#555';          // 未激活 图标/框 深灰（--border / --text-faint）
+const SAS_ACTIVE_COLOR = '#3dff3d';         // SAS 主开关 激活绿（--progress-green 工具栏激活条）
+const SAS_INACTIVE_COLOR = '#555';          // SAS 主开关 未激活深灰（--border）
 
 // ---- 导航球（左下角，纯显示） ----
 const NAVBALL_RADIUS = 175;                // 大导航球半径
 const NAVBALL_MARKER_SIZE = 26;            // 中心白色三角外接圆半径
 const NAVBALL_DIR_R = 140;                 // 圆上方向标记的半径位置（内缩避让描边）
-const MARKER_RADIUS = 12;                  // 圆上方向小圆半径（Step2 先用小圆，后续换图片驱动器）
+const MARKER_RADIUS = 18;                  // 圆上方向小圆半径（0.3.0 由 12 调大 1.5 倍：SVG 图标内部细节 24px 下不可辨）
+const NAV_MARKER_BG_COLOR = '#0e0e0e';     // 方向标记圆底（非常接近背景黑的深灰：遮蔽罗盘刻度、凸显图标）
 
 // ---- SAS 控制圆盘（导航球右侧，交互，按 KSP2 比例约为导航球 0.5 倍） ----
 const SAS_PANEL_RADIUS = 88;               // 圆盘半径（导航球 0.5 倍）
-const SAS_PANEL_CENTER_RADIUS = 10;        // 圆盘中心白色圆半径
-const DIR_BTN_RADIUS = 16;                 // 方向按钮半径
+const SAS_PANEL_CENTER_RADIUS = 6;         // 圆盘中心白色圆半径（0.3.0 由 10 改小：直径 12，与按钮(40)拉开层次）
+const DIR_BTN_RADIUS = 20;                 // 方向按钮半径（0.3.0 由 16 调大：参考 KSP2 圆盘按钮约占圆盘 20%，
+                                            //  取再大一点 → 直径 40 ≈ 圆盘 22.7%；相邻按钮仍留 ~44px 间隙）
 const DIR_OFFSET = 42;                     // 方向按钮偏移（X 斜角布局 dx/dy）
 const SAS_PANEL_GAP = 46;                  // 导航球与圆盘水平间距
 
@@ -56,30 +71,38 @@ const THROTTLE_ARC_END = 360;            // 结束角（度，顶部）
 const MARGIN = THROTTLE_ARC_OUTER + 16;  // 距左/下边缘（=210+16=226）
 
 // ---- 按钮框（DOM：SAS 圆盘正下方的方形框，主开关 + 副钮组） ----
-const BOTTOM_MAIN_SIZE = 44;             // 主开关（SAS）按钮边长（基准，与副钮统一大小）
-const BOTTOM_SUB_SIZE = 44;              // 副钮（节点/目标）边长（基准）
-const BOTTOM_BTN_GAP = 10;               // 同组按钮间距（基准）
-const BOTTOM_FRAME_PAD = 8;              // 方形框内边距（基准）
-// 圆盘底部到按钮框顶部间距（基准）— 0.2.7 调整为按钮框底与节流阀弧底对齐：
-// 框底 = 圆心 y + 88 + GAP_BELOW + 44 + 8×2 = 圆心 y + 210(节流阀外缘半径)，与该弧底端同水平
-const BOTTOM_BTN_GAP_BELOW = 62;
+// 0.3.0 由 44px 缩至 3/4（33px），间距/内边距同步 ×0.75；框底仍与节流阀弧底对齐
+const BOTTOM_MAIN_SIZE = 33;             // 主开关（SAS）按钮边长（基准，与副钮统一大小）
+const BOTTOM_SUB_SIZE = 33;              // 副钮（节点/目标）边长（基准）
+const BOTTOM_BTN_GAP = 7.5;              // 同组按钮间距（基准）
+const BOTTOM_FRAME_PAD = 6;              // 方形框内边距（基准）
+// 圆盘底部到按钮框顶部间距（基准）— 0.2.7 起框底与节流阀弧底对齐：
+// 框底 = 圆心 y + Δ + 88 + GAP_BELOW + 框高(33+6×2=45) = 圆心 y + 210(节流阀外缘半径)
+// 0.3.0 为贴近工具栏将间距收紧为 11px，圆盘下移量 Δ 由公式自动反解（62→11 后 Δ=66）
+const BOTTOM_BTN_GAP_BELOW = 11;
+// 圆盘下移量（基准）— 由对齐等式反解：Δ = 节流阀外缘(210) - 圆盘半径(88) - 间距(62) - 框高(45)
+const SAS_PANEL_DOWN_SHIFT = THROTTLE_ARC_OUTER - SAS_PANEL_RADIUS - BOTTOM_BTN_GAP_BELOW
+    - (BOTTOM_MAIN_SIZE + BOTTOM_FRAME_PAD * 2);
 
 // ========== 导航球四方向定义（注册表，为机动节点预留扩展位） ==========
-// key 与 RENDER_DATA.directions 字段名对应
+// key 与 RENDER_DATA.directions 字段名对应；tex 为方向图标纹理 key（0.3.0 图标替换）
 const NAV_DIRECTIONS = [
-    { key: 'prograde',   label: t('sas.prograde'),   color: DIR_PROGRADE_COLOR },
-    { key: 'retrograde', label: t('sas.retrograde'), color: DIR_PROGRADE_COLOR },
-    { key: 'radialIn',   label: t('sas.radialIn'),   color: DIR_RADIAL_COLOR },
-    { key: 'radialOut',  label: t('sas.radialOut'),  color: DIR_RADIAL_COLOR }
+    { key: 'prograde',   label: t('sas.prograde'),   color: NAV_DIR_PROGRADE_COLOR, tex: 'dir_prograde' },
+    { key: 'retrograde', label: t('sas.retrograde'), color: NAV_DIR_PROGRADE_COLOR, tex: 'dir_retrograde' },
+    { key: 'radialIn',   label: t('sas.radialIn'),   color: NAV_DIR_RADIAL_COLOR,  tex: 'dir_radial_in' },
+    { key: 'radialOut',  label: t('sas.radialOut'),  color: NAV_DIR_RADIAL_COLOR,  tex: 'dir_radial_out' }
     // 未来：{ key: 'maneuverNode', label: '机动节点', color: '#4FC3F7' }
 ];
 
 // ========== SAS 圆盘方向按钮（X 斜角布局） ==========
+// tex 与 NAV_DIRECTIONS 共用同一套方向图标
+// iconScale：图标占按钮直径比例（默认 0.8）。0.3.0 径向图标内容扩展远小于正逆长十字
+// （正逆内容跨距 92%、径向仅 44%~69% 的 viewBox），同等 0.8 下视觉偏小 → 径向单独放大
 const DIR_CIRCLES = [
-    { mode: 'radial_in',  dx: -DIR_OFFSET, dy: -DIR_OFFSET, color: DIR_RADIAL_COLOR, label: t('sas.radialIn') },
-    { mode: 'prograde',   dx:  DIR_OFFSET, dy: -DIR_OFFSET, color: DIR_PROGRADE_COLOR, label: t('sas.prograde') },
-    { mode: 'retrograde', dx: -DIR_OFFSET, dy:  DIR_OFFSET, color: DIR_PROGRADE_COLOR, label: t('sas.retrograde') },
-    { mode: 'radial_out', dx:  DIR_OFFSET, dy:  DIR_OFFSET, color: DIR_RADIAL_COLOR, label: t('sas.radialOut') }
+    { mode: 'radial_in',  dx: -DIR_OFFSET, dy: -DIR_OFFSET, color: DIR_RADIAL_COLOR, label: t('sas.radialIn'),    tex: 'dir_radial_in',  iconScale: 0.95 },
+    { mode: 'prograde',   dx:  DIR_OFFSET, dy: -DIR_OFFSET, color: DIR_PROGRADE_COLOR, label: t('sas.prograde'), tex: 'dir_prograde' },
+    { mode: 'retrograde', dx: -DIR_OFFSET, dy:  DIR_OFFSET, color: DIR_PROGRADE_COLOR, label: t('sas.retrograde'), tex: 'dir_retrograde' },
+    { mode: 'radial_out', dx:  DIR_OFFSET, dy:  DIR_OFFSET, color: DIR_RADIAL_COLOR, label: t('sas.radialOut'),    tex: 'dir_radial_out', iconScale: 0.95 }
 ];
 
 // ========== 动画时间常量 ==========
@@ -123,10 +146,10 @@ class SASUI {
         const margin = MARGIN * this._scale;
         // 底部预留：取两个约束较大者（均在屏幕外不再画，只影响导航球上移量）
         //  a) 节流阀弧外缘(210)距底 ≥ 16
-        //  b) 按钮框（圆盘下方：圆盘半径 + 间距 + 主钮高 + 框内边距）距底 ≥ 16
+        //  b) 按钮框（圆盘下移 Δ 后：Δ + 圆盘半径 + 间距 + 主钮高 + 框内边距）距底 ≥ 16
         const bottomPad = Math.max(
             THROTTLE_ARC_OUTER + 16 - NAVBALL_RADIUS,
-            SAS_PANEL_RADIUS + BOTTOM_BTN_GAP_BELOW + BOTTOM_MAIN_SIZE + BOTTOM_FRAME_PAD * 2 + 16 - NAVBALL_RADIUS
+            SAS_PANEL_DOWN_SHIFT + SAS_PANEL_RADIUS + BOTTOM_BTN_GAP_BELOW + BOTTOM_MAIN_SIZE + BOTTOM_FRAME_PAD * 2 + 16 - NAVBALL_RADIUS
         ) * this._scale;
         const navY = canvas.height - bottomPad - NAVBALL_RADIUS * this._scale;
         this._navballCenter = {
@@ -135,7 +158,8 @@ class SASUI {
         };
         this._panelCenter = {
             x: margin + (NAVBALL_RADIUS + SAS_PANEL_GAP + SAS_PANEL_RADIUS) * this._scale,
-            y: navY
+            // 0.3.0：圆盘整体下移 Δ，按钮框底（navY+Δ+88+62+45）恒等于节流阀弧底（navY+210）
+            y: navY + SAS_PANEL_DOWN_SHIFT * this._scale
         };
         this._centerPos = this._navballCenter;
 
@@ -235,6 +259,32 @@ class SASUI {
     }
 
     /**
+     * 图标模板染色：将单色 SVG 模板着色为指定纯色（离屏 canvas + source-in）。
+     * 方向图标 SVG 统一为白色底稿，激活/未激活颜色由此函数在运行时决定。
+     * @param {HTMLImageElement} img - 模板图（白色单色描线）
+     * @param {string} color - 目标颜色（如 #d4c86a / #555）
+     * @param {number} w - 输出宽（px）
+     * @param {number} h - 输出高（px）
+     * @returns {HTMLCanvasElement} 染色后的离屏画布（上下同宽高，可 drawImage）
+     */
+    _tintImage(img, color, w, h) {
+        if (!this._tintCanvas) this._tintCanvas = document.createElement('canvas');
+        const off = this._tintCanvas;
+        if (off.width !== w || off.height !== h) {
+            off.width = w;
+            off.height = h;
+        }
+        const octx = off.getContext('2d');
+        octx.clearRect(0, 0, w, h);
+        octx.drawImage(img, 0, 0, w, h);
+        octx.globalCompositeOperation = 'source-in';
+        octx.fillStyle = color;
+        octx.fillRect(0, 0, w, h);
+        octx.globalCompositeOperation = 'source-over';
+        return off;
+    }
+
+    /**
      * 绘制导航球（左下角，纯显示）
      * - 圆框：深色半透明底 + 蓝色描边，固定
      * - 中心：姿态三角形，顶点指向 heading
@@ -309,6 +359,8 @@ class SASUI {
         this._drawTriangle(ctx, cx, cy, s, heading, NAVBALL_MARKER_SIZE, MARKER_COLOR);
 
         // ---- 圆上四方向标记（常驻，角度有效时显示） ----
+        // 0.3.0 图标替换：纹理就绪用方向 SVG 模板染色（固定朝向不随角度旋转，仅沿圆环移动），
+        // 纹理未就绪回退程序化小圆（铁律：永远带 fallback）
         if (appearance > 0.01) {
             const dirR = NAVBALL_DIR_R * s;
             const markerR = MARKER_RADIUS * s * appearance;
@@ -319,12 +371,29 @@ class SASUI {
                 const mx = cx + Math.cos(rad) * dirR;
                 const my = cy + Math.sin(rad) * dirR;
 
-                ctx.beginPath();
-                ctx.arc(mx, my, markerR, 0, Math.PI * 2);
-                ctx.fillStyle = dir.color;
-                ctx.globalAlpha = 0.9 * appearance;
-                ctx.fill();
-                ctx.globalAlpha = 1.0;
+                const img = dir.tex ? textureManager.get(dir.tex) : null;
+                if (img) {
+                    // 方向图标：模板染色为语义色（正逆黄 / 径向青），正方形绘制（直径 = 小圆直径）
+                    const size = Math.max(1, Math.round(markerR * 2));
+                    // 圆底：接近背景黑的深灰，直径 = 图标 + 0.5px 刚好撑满（遮蔽罗盘刻度，图标更清晰）；
+                    // 0.3.0 不透明度 95%（图标保持 0.9）
+                    ctx.globalAlpha = 0.95 * appearance;
+                    ctx.beginPath();
+                    ctx.arc(mx, my, size / 2 + 0.5, 0, Math.PI * 2);
+                    ctx.fillStyle = NAV_MARKER_BG_COLOR;
+                    ctx.fill();
+                    const tinted = this._tintImage(img, dir.color, size, size);
+                    ctx.globalAlpha = 0.9 * appearance;
+                    ctx.drawImage(tinted, mx - size / 2, my - size / 2, size, size);
+                    ctx.globalAlpha = 1.0;
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(mx, my, markerR, 0, Math.PI * 2);
+                    ctx.fillStyle = dir.color;
+                    ctx.globalAlpha = 0.9 * appearance;
+                    ctx.fill();
+                    ctx.globalAlpha = 1.0;
+                }
             }
         }
     }
@@ -351,6 +420,12 @@ class SASUI {
         ctx.fill();
 
         // ---- 四方向按钮 ----
+        // 0.3.0 配色方案 v2（参考 KSP2 圆盘按钮像素图）：
+        //   外框  SAS 开启 = 语义色（与图标一致，含未激活态；正逆绿/径向青）；SAS 关闭 = 深灰，描边 1px
+        //   图标  SAS 开 + 选中   = 语义色实底（填满外框内，无黑隙）+ 黑色符号（醒目高亮）
+        //         SAS 开 + 未选中 = 语义色图标·黑底（低调常显）
+        //         SAS 关          = 全部深灰（已有样式）
+        // 纹理未就绪回退纯描边圆按钮（铁律：永远带 fallback）
         const btnR = DIR_BTN_RADIUS * s;
         for (const dir of DIR_CIRCLES) {
             const bx = cx + dir.dx * s;
@@ -359,11 +434,35 @@ class SASUI {
 
             ctx.beginPath();
             ctx.arc(bx, by, btnR, 0, Math.PI * 2);
-            ctx.strokeStyle = dir.color;
-            ctx.globalAlpha = isSelected ? 1.0 : 0.4;
-            ctx.lineWidth = 2 * s;
+            // 边框色：SAS 开启时 = 语义色（与图标一致，含未激活态）；SAS 关闭 = 深灰
+            ctx.strokeStyle = (sasMode === 'off') ? DIR_INACTIVE_COLOR : dir.color;
+            ctx.lineWidth = 1 * s;
             ctx.stroke();
-            ctx.globalAlpha = 1.0;
+
+            const img = dir.tex ? textureManager.get(dir.tex) : null;
+            if (img) {
+                // 图标内缩 20%（iconScale 可覆盖：径向调大），与外框留出间隙；模板染色随状态切换颜色
+                const iconSize = Math.max(1, Math.round(btnR * 2 * (dir.iconScale || 0.8)));
+                const iconX = bx - iconSize / 2;
+                const iconY = by - iconSize / 2;
+                if (sasMode === 'off') {
+                    // SAS 关闭：全部深灰图标
+                    const tinted = this._tintImage(img, DIR_INACTIVE_COLOR, iconSize, iconSize);
+                    ctx.drawImage(tinted, iconX, iconY, iconSize, iconSize);
+                } else if (isSelected) {
+                    // 激活：语义色实底填满外框内（直径 = 外框直径，无未填充空隙）+ 黑色符号
+                    ctx.beginPath();
+                    ctx.arc(bx, by, btnR, 0, Math.PI * 2);
+                    ctx.fillStyle = dir.color;
+                    ctx.fill();
+                    const tinted = this._tintImage(img, DIR_SYMBOL_ON_BG, iconSize, iconSize);
+                    ctx.drawImage(tinted, iconX, iconY, iconSize, iconSize);
+                } else {
+                    // 未激活：语义色图标（黑底）
+                    const tinted = this._tintImage(img, dir.color, iconSize, iconSize);
+                    ctx.drawImage(tinted, iconX, iconY, iconSize, iconSize);
+                }
+            }
         }
     }
 
@@ -621,11 +720,16 @@ class SASUI {
     // ========== 下方按钮区（DOM：主开关 + 副钮组，方形 1:1） ==========
 
     /**
-     * 按钮定义（tex 为未来导入的 1x1 图片纹理 key，就绪时优先显示图片，否则 emoji 占位）
+     * 按钮定义（tex 为图标纹理 key，就绪时优先显示图片，否则 emoji 占位）
+     * iconScale：mask 图标占按钮边长比例（默认 0.7）。
+     * 0.3.0 视觉对齐：icon_sas 正式素材圆环撑满 viewBox（≈95%），而 node/+/- 占位素材
+     * 内容仅约 75% —— 同为 0.7 时 SAS 显得大。icon_sas 单独缩至 0.55（视觉 ≈ 0.55×95% ≈ 52%，
+     * 与占位图标的 0.7×75% ≈ 52.5% 对齐）；三张占位素材换成正式版（撑满圆环）后,
+     * 建议把 iconScale 统一回 0.7。
      */
     _getBottomBtnDefs() {
         return [
-            { id: 'sas',          label: t('sas.main'),          emoji: '🛰', tex: 'icon_sas',          main: true },
+            { id: 'sas',          label: t('sas.main'),          emoji: '🛰', tex: 'icon_sas',          main: true, iconScale: 0.55 },
             { id: 'node',         label: t('sas.node'),          emoji: '⭐', tex: 'icon_node',         main: false },
             { id: 'target_plus',  label: t('sas.targetPlus'),    emoji: '🎯', tex: 'icon_target_plus',  main: false },
             { id: 'target_minus', label: t('sas.targetMinus'),   emoji: '🎯', tex: 'icon_target_minus', main: false }
@@ -655,13 +759,26 @@ class SASUI {
                 hideTooltip();
             });
 
-            // 内容：纹理就绪用 1:1 图片（预留接口），否则 emoji 占位
+            // 内容：纹理就绪用 SVG mask 图标（background 染色，随按钮状态色切换，与 Canvas 模板染色同思路），
+            // 图标占按钮比例由 def.iconScale 控制（默认 0.7），纹理未就绪回退 emoji 占位
             const tex = def.tex ? textureManager.get(def.tex) : null;
             if (tex) {
-                const img = document.createElement('img');
-                img.src = tex.src;
-                img.style.cssText = 'width:100%;height:100%;object-fit:contain;';
-                btn.appendChild(img);
+                const icon = document.createElement('div');
+                icon.className = 'sas-btn-icon';
+                const iconPct = Math.round((def.iconScale || 0.7) * 100);
+                icon.style.cssText = [
+                    `width:${iconPct}%;height:${iconPct}%;`,
+                    `-webkit-mask-image:url(${tex.src});`,
+                    `mask-image:url(${tex.src});`,
+                    '-webkit-mask-size:contain;',
+                    'mask-size:contain;',
+                    '-webkit-mask-repeat:no-repeat;',
+                    'mask-repeat:no-repeat;',
+                    '-webkit-mask-position:center;',
+                    'mask-position:center;',
+                    'background:#ddd;'   // 初始灰白（--text-main），激活态由 _updateBottomButtonsState 改写
+                ].join('');
+                btn.appendChild(icon);
             } else {
                 const span = document.createElement('span');
                 span.style.cssText = `font-size:20px;line-height:1;`;
@@ -760,6 +877,7 @@ class SASUI {
 
     /**
      * 同步 SAS 按钮激活态（sasMode 变化才写 DOM）
+     * 0.3.0 状态色规范：激活=通用绿(--progress-green) / 未激活=通用深灰(--border)
      * @param {string} sasMode
      */
     _updateBottomButtonsState(sasMode) {
@@ -767,12 +885,13 @@ class SASUI {
         const active = sasMode !== 'off' ? 1 : 0;
         if (active !== this._bottomLastSas) {
             this._bottomLastSas = active;
-            if (active) {
-                this._sasBtnEl.style.borderColor = '#88ccff';
-                this._sasBtnEl.style.color = '#88ccff';
-            } else {
-                this._sasBtnEl.style.borderColor = '#555';
-                this._sasBtnEl.style.color = '#ddd';
+            const stateColor = active ? SAS_ACTIVE_COLOR : SAS_INACTIVE_COLOR;
+            this._sasBtnEl.style.borderColor = stateColor;
+            // color 同步：mask 图标 background 初始为固定色，直接改写；emoji fallback 文字随 color
+            this._sasBtnEl.style.color = stateColor;
+            const iconEl = this._sasBtnEl.querySelector('.sas-btn-icon');
+            if (iconEl) {
+                iconEl.style.background = stateColor;
             }
         }
     }

@@ -20,6 +20,18 @@ export const textureConfig = {
     icon_wiki: 'assets/images/ui/icon_escMenu/icon_wiki.svg',
     icon_missions: 'assets/images/ui/icon_escMenu/icon_missions.svg',
 
+    // SAS 底部按钮图标（SVG，占位版已入位，正式美术出图后覆盖同名文件即可，零代码改动）
+    icon_sas: 'assets/images/sas/icon_sas.svg',
+    icon_node: 'assets/images/sas/icon_node.svg',
+    icon_target_plus: 'assets/images/sas/icon_target_plus.svg',
+    icon_target_minus: 'assets/images/sas/icon_target_minus.svg',
+
+    // 导航球方向图标（SVG；导航球标记与 SAS 圆盘按钮共用）
+    dir_prograde: 'assets/images/sas/dir_prograde.svg',
+    dir_retrograde: 'assets/images/sas/dir_retrograde.svg',
+    dir_radial_in: 'assets/images/sas/dir_radial_in.svg',
+    dir_radial_out: 'assets/images/sas/dir_radial_out.svg',
+
     // tracking station
     icon_tracking_all: 'assets/images/ui/tracking_station/all.svg',
     icon_tracking_ship: 'assets/images/ui/tracking_station/ship_port.svg',
