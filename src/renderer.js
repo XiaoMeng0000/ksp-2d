@@ -793,10 +793,10 @@ function renderOrbitMarkers(ctx, canvas, ship, hoveredMarker) {
     applyLabelAvoidance(markers);
 
     // Canvas：折线（锚点 → 本体位置，单段直线）+ 锚点（旋转 45° 正方形 = 菱形）
-    // 统一使用飞行界面紫（ORBIT_MARKER_COLOR），类型区分只在 DOM 标签文字颜色
+    // 统一使用飞行界面紫（ORBIT_MARKER_COLOR），类型区分只在 DOM 标签文字颜色；
+    // 锚点悬停高亮效果已去除（0.3.0：悬停只作用于 DOM 标签本体），恒普通样式
     for (const m of markers) {
-        // 锚点半边长：普通 3.5 / 悬停 5.5（0.3.0 修正：原 7/11 缩至一半）
-        const r = m.isHover ? 5.5 : 3.5;
+        const r = 3.5;
 
         ctx.beginPath();
         ctx.moveTo(m.screenX, m.screenY);
@@ -812,7 +812,7 @@ function renderOrbitMarkers(ctx, canvas, ship, hoveredMarker) {
         ctx.rotate(Math.PI / 4);
         ctx.strokeStyle = ORBIT_MARKER_COLOR;
         ctx.lineWidth = 2;
-        ctx.fillStyle = m.isHover ? hexToRgba(ORBIT_MARKER_COLOR, 0.3) : 'rgba(0,0,0,0.4)';
+        ctx.fillStyle = 'rgba(0,0,0,0.4)';
         ctx.beginPath();
         ctx.rect(-r, -r, r * 2, r * 2);
         ctx.fill();

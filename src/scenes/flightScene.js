@@ -503,6 +503,9 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                     } else {
                         hideTooltip();
                     }
+
+                    // 0.3.0 提交4：轨道线悬停（标记锚点命中优先 → 轨道线命中 → Tooltip）
+                    updateOrbitHover(e, x, y);
                 }
             };
             const onMouseUp = () => {
@@ -535,6 +538,10 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             const onMouseLeave = () => {
                 sasUI.clearHover();
                 sasUI._isDragging = false;
+                // 0.3.0 提交4：轨道悬停清理（渲染层通道 + tooltip 指纹）
+                setOrbitHoverState(null);
+                _lastOrbitHoverKey = '';
+                hideTooltip();
             };
             _canvas.addEventListener('mouseleave', onMouseLeave);
             _canvas._sasMouseLeaveHandler = onMouseLeave;

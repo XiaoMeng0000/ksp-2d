@@ -345,7 +345,4 @@
     color: var(--text-main);
 }
 
-/* 悬停高亮（由 renderer 的 isHover 驱动，与 Canvas 锚点放大联动） */
-.orbit-label.hovered .orbit-label-body {
-    background: rgba(255, 255, 255, 0.15);
-}
+/* 悬停高亮（0.3.0：已去除——锚点与标签本体均无悬停视觉变化，悬停仅用于数据/交互） */

@@ -198,6 +198,6 @@ export function syncOrbitLabels(markers, canvas) {
 
         // 坐标同步：锚点偏移后的本体位置（fixed 容器 0,0 + transform 平移）
         el.style.transform = 'translate(' + Math.round(m.bodyX) + 'px,' + Math.round(m.bodyY) + 'px)';
-        el.classList.toggle('hovered', !!m.isHover);
+        // 0.3.0：标签本体悬停高亮已去除（isHover 数据流保留，供未来交互使用）
     }
 }
