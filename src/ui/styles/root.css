@@ -11,7 +11,7 @@
     src: url('../../../assets/fonts/JetBrainsMapleMono/JetBrainsMapleMono-Regular.ttf') format('truetype');
     font-display: swap;
 }
-    
+
 @font-face {
     font-family: 'JetBrainsMono-Bold';
     src: url('../../../assets/fonts/JetBrainsMapleMono/JetBrainsMapleMono-Bold.ttf') format('truetype');
@@ -20,7 +20,13 @@
 
 @font-face {
     font-family: 'PixeledFont';
-    src: url('../../../assets/fonts/dosvga.ttf') format('truetype');
+    src: url('../../../assets/fonts/Uranus_Pixel.ttf') format('truetype');
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'doto';
+    src: url('../../../assets/fonts/doto.ttf') format('truetype');
     font-display: swap;
 }
 
@@ -54,6 +60,8 @@
     --accent-bg: rgba(136, 204, 255, 0.15);
     --accent-bg-strong: rgba(136, 204, 255, 0.2);
     --accent-border: rgba(136, 204, 255, 0.3);
+    --doc-divider: #389393;
+    --doc-section-tittle: #0DD9FE;
 
     --danger: #ff6666;
     /* 危险红 */
@@ -99,7 +107,8 @@
     /* ---- 字体变量 ---- */
     --font-mono: 'JetBrainsMono-Regular', monospace;
     --font-mono-bold: 'JetBrainsMono-Bold', monospace;
-    --font-pixel: 'PixeledFont', monospace;
+    --font-pixel: "PixeledFont", monospace;
+    --doto: 'doto', 'JetBrainsMono-Regular', monospace;
 }
 
 /* ============================================================

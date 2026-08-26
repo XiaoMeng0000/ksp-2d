@@ -41,6 +41,7 @@
     font-size: 12px;
     cursor: pointer;
 }
+
 .galaxies-back-btn:hover {
     border-color: var(--theme-border-hover);
 }
@@ -125,6 +126,7 @@
     border-radius: 4px;
     transition: background 0.15s ease;
 }
+
 .galaxies-collapse-header:hover {
     background: var(--theme-active-bg);
 }
@@ -199,20 +201,39 @@
 }
 
 .doc-title {
-    color: var(--accent);
-    font-family: var(--font-mono-bold);
+    color: var(--text-bright);
+    font-family: var(--doto);
     font-weight: normal;
-    font-size: 24px;
+    font-size: 40px;
     letter-spacing: 2px;
     margin: 0;
 }
 
+#creditsPanel {
+    background-color: #273833af;
+    backdrop-filter: none;
+}
+
 /* 标题装饰分隔线（参考图：标题下横向装饰线） */
 .doc-header-line {
-    height: 2px;
-    margin: 14px 60px 0 60px;
-    background: linear-gradient(90deg, var(--accent-border), transparent 72%);
+    position: relative;
+    height: 10px;
+    margin: 0px 0px 0 60px;
     flex-shrink: 0;
+}
+
+.doc-header-line::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(45deg,
+            /* 线条颜色 & 厚度 */
+            var(--doc-divider) 0px, var(--doc-divider) 1px,
+            /* 透明间距 */
+            transparent 1px, transparent 4px);
+    pointer-events: none;
+    /* 不干扰鼠标交互 */
+    z-index: 1;
 }
 
 /* 正文滚动区（左对齐流，不垂直居中） */
@@ -224,8 +245,12 @@
 }
 
 .doc-content {
-    max-width: 900px;
-    margin: 0 auto;
+    height: 100%;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    margin: 0;
 }
 
 /* 制作人员：左右分割区（左 Logo + 短分割线 + 右内容）— 分割线仅限内容区高度，
@@ -234,12 +259,12 @@
     flex: 1;
     min-height: 0;
     display: flex;
-    padding: 18px 60px 76px 60px;
+    padding: 0px 60px 0px 60px;
     align-items: stretch;
 }
 
 #creditsPanel .doc-left {
-    width: 280px;
+    width: 400px;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
@@ -248,8 +273,7 @@
 }
 
 #creditsPanel .doc-left img {
-    max-width: 200px;
-    opacity: 0.85;
+    width: 300px;
     display: block;
 }
 
@@ -264,9 +288,7 @@
 
 /* 短分割线（随内容区高度 stretch，容器上下 padding 控制长度） */
 #creditsPanel .doc-divider {
-    width: 1px;
-    background: var(--theme-border-row);
-    flex-shrink: 0;
+    display: none;
 }
 
 #creditsPanel .doc-right {
@@ -274,10 +296,6 @@
     min-width: 0;
     display: flex;
     overflow-y: auto;
-}
-
-#creditsPanel .doc-content {
-    margin: auto;
 }
 
 #creditsPanel .doc-section-title {
@@ -288,31 +306,22 @@
     text-align: center;
 }
 
-#creditsPanel .doc-credit-row {
-    justify-content: center;
-}
-
 /* 节标题（默认亮白：license 用；.warn 橙色：credits 用） */
 .doc-section-title {
-    color: var(--text-bright);
-    font-family: var(--font-mono-bold);
+    width: 100%;
+    color: var(--doc-section-tittle);
+    font-family: var(--font-pixel);
     font-weight: normal;
-    font-size: 17px;
-    margin: 34px 0 14px 0;
+    font-size: 44px;
+    /* 必须是11的倍数，不然出现边缘模糊 */
     letter-spacing: 1px;
-}
-
-.doc-section-title.warn {
-    color: var(--warn);
-    font-size: 19px;
-    margin: 34px 0 18px 0;
 }
 
 /* 节标题副标（----- 牵头人，白） */
 .doc-section-lead {
-    color: var(--text-bright);
     font-weight: normal;
-    font-size: 14px;
+    font-size: 55px;
+    /* 必须是11的倍数，不然出现边缘模糊 */
     margin-left: 8px;
     letter-spacing: 0;
 }
@@ -328,6 +337,7 @@
 
 /* credits 组名（暗灰小字） */
 .doc-group-name {
+    display: none;
     color: var(--text-dim);
     font-family: var(--font-mono);
     font-size: 12px;
@@ -344,12 +354,11 @@
 }
 
 .doc-credit-role {
-    width: 300px;
-    flex-shrink: 0;
+    flex: 1;
     text-align: right;
     color: var(--text-mid);
     font-family: var(--font-mono);
-    font-size: 12.5px;
+    font-size: 25px;
 }
 
 .doc-credit-names {
@@ -362,7 +371,7 @@
 .doc-credit-name {
     color: var(--text-bright);
     font-family: var(--font-mono);
-    font-size: 12.5px;
+    font-size: 25px;
 }
 
 /* 灵感来源子项（橙色标题级，兼容旧 subItems 数据） */
@@ -381,20 +390,23 @@
 /* 返回按钮（左下角固定，标准面板按钮风格） */
 .doc-back {
     position: absolute;
-    bottom: 40px;
+    bottom: 60px;
     left: 60px;
-    height: 30px;
-    padding: 0 26px;
+    padding: 5px 80px;
     box-sizing: border-box;
-    background: var(--theme-btn-bg);
+    background: #424242;
     color: var(--text-bright);
-    border: 1px solid var(--border-light);
+    border: 1px solid var(--text-bright);
     border-radius: 5px;
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: 25px;
     cursor: pointer;
 }
 
 .doc-back:hover {
-    border-color: var(--theme-border-hover);
+    background: #53829A;
+}
+
+.doc-back:active {
+    background: #0f0;
 }

@@ -398,7 +398,7 @@ const STRINGS = {
     'encyclopedia.close': '关闭',
 
     // ---------- 制作人员(0.2.7 v2 参考图样式) ----------
-    'credits.pageTitle': '制作人员',
+    'credits.pageTitle': '《坎巴拉2D》制作人员',
 
     // ---------- 追踪站场景 ----------
     'tracking.stationName': '追踪站',

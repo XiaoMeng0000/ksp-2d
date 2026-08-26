@@ -34,7 +34,7 @@ function registerCreditsScene() {
                 sectionTitle.appendChild(titleLabel);
 
                 const leadLabel = document.createElement('span');
-                leadLabel.textContent = '----- ' + section.lead;
+                leadLabel.textContent = ' - ' + section.lead;
                 leadLabel.className = 'doc-section-lead';
                 sectionTitle.appendChild(leadLabel);
             } else {
@@ -44,33 +44,39 @@ function registerCreditsScene() {
 
             // 分组
             if (section.groups) {
+                // 在 _renderContent 内，遍历 groups 后
                 for (const group of section.groups) {
-                    const groupName = document.createElement('div');
-                    groupName.textContent = group.name;
-                    groupName.className = 'doc-group-name';
-                    contentEl.appendChild(groupName);
+                    // 如果组名有内容才显示，但这里组名为空，可以忽略
+                    if (group.name) {
+                        const groupName = document.createElement('div');
+                        groupName.textContent = group.name;
+                        groupName.className = 'doc-group-name';
+                        contentEl.appendChild(groupName);
+                    }
 
                     for (const row of group.rows) {
-                        // 双列格网：角色右对齐 | 名字左对齐（参考图排版）
-                        const rowEl = document.createElement('div');
-                        rowEl.className = 'doc-credit-row';
+                        // 将每个成员拆成单独的行
+                        row.members.forEach((member, idx) => {
+                            const rowEl = document.createElement('div');
+                            rowEl.className = 'doc-credit-row';
 
-                        const roleLabel = document.createElement('span');
-                        roleLabel.textContent = row.role;
-                        roleLabel.className = 'doc-credit-role';
-                        rowEl.appendChild(roleLabel);
+                            // 角色列：第一行显示角色名，后续行用 &nbsp;（\u00A0）占位保持对齐
+                            const roleLabel = document.createElement('span');
+                            roleLabel.className = 'doc-credit-role';
+                            roleLabel.textContent = idx === 0 ? row.role : '\u00A0';
+                            rowEl.appendChild(roleLabel);
 
-                        const namesEl = document.createElement('div');
-                        namesEl.className = 'doc-credit-names';
-                        for (const member of row.members) {
+                            // 名字列：每行只放一个成员的名字
+                            const namesEl = document.createElement('div');
+                            namesEl.className = 'doc-credit-names';
                             const nameSpan = document.createElement('span');
                             nameSpan.textContent = member.name;
                             nameSpan.className = 'doc-credit-name';
                             namesEl.appendChild(nameSpan);
-                        }
-                        rowEl.appendChild(namesEl);
+                            rowEl.appendChild(namesEl);
 
-                        contentEl.appendChild(rowEl);
+                            contentEl.appendChild(rowEl);
+                        });
                     }
                 }
             }
@@ -102,7 +108,7 @@ function registerCreditsScene() {
             header.className = 'doc-header';
 
             const title = document.createElement('h1');
-            title.textContent = '// ' + t('credits.pageTitle');
+            title.textContent = '//' + t('credits.pageTitle');
             title.className = 'doc-title';
             header.appendChild(title);
 
@@ -151,6 +157,12 @@ function registerCreditsScene() {
             split.appendChild(rightPanel);
 
             panel.appendChild(split);
+
+            // 结尾装饰分隔线
+            const footerLine = document.createElement('div');
+            footerLine.className = 'doc-header-line';
+            footerLine.style = 'margin-bottom: 180px;'
+            panel.appendChild(footerLine);
 
             // ========== 返回按钮（左下角固定） ==========
             const backBtn = document.createElement('button');

@@ -5,5 +5,6 @@
 export const fontConfig = {
     'JetBrainsMono-Regular': 'assets/fonts/JetBrainsMapleMono/JetBrainsMapleMono-Regular.ttf',
     'JetBrainsMono-Bold': 'assets/fonts/JetBrainsMapleMono/JetBrainsMapleMono-Bold.ttf',
-    'PixeledFont': 'assets/fonts/dosvga.ttf'
+    'PixeledFont' : 'assets/fonts/Uranus_Pixel.ttf',
+    'doto': 'assets/fonts/doto.ttf'
 };
