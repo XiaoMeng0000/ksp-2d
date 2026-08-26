@@ -6,7 +6,7 @@ import { updateShipPhysics } from '../physics/physicsUpdate.js';
 import { updateCelestialBodies, getSOIHost, getAbsolutePosition, getRelativePosition, convertVelocityFrame, celestialBodies } from '../physics/physics.js';
 import { stateToKepler } from '../physics/orbitalMechanics.js';
 import { timeToNextSOISwitch } from '../physics/orbitalPrediction.js';
-import { render, renderFlightHud, getLastOrbitSegments, getLastOrbitMarkers, setOrbitHoverState, findNearestOrbitPoint } from '../renderer.js';
+import { render, renderFlightHud, getLastOrbitSegments, getLastOrbitMarkers, setOrbitHoverState, findNearestOrbitPoint, resolveOrbitHit } from '../renderer.js';
 import { formatDuration } from '../utils/format.js';
 import { sceneManager } from '../sceneManager.js';
 import { gameState } from '../gameState.js';
@@ -38,7 +38,13 @@ let _activeFacilityId = null;  // 当前控制的设施 ID（无活动飞船时�
 let _dockPromptFacId = null;   // 当前显示对接弹窗的设施 ID（防止重复 show）
 let _lastToolbarMode = null;         // 统一工具栏脏检测：上一次的 mode
 let _lastToolbarFingerprint = null; // 统一工具栏脏检测：上一次的数据指纹（含模块列表）
-let _lastOrbitHoverKey = '';   // 轨道悬停 Tooltip 目标指纹（变化才触发，防频繁调用）
+let _lastMouseX = -1;          // 最近鼠标画布 CSS 坐标（-1 = 未知/离开画布）
+let _lastMouseY = -1;
+let _lastClientX = 0;          // 最近鼠标视口坐标（供工具提示定位）
+let _lastClientY = 0;
+let _lastOrbitHit = null;      // 轨道线命中缓存（含世界坐标；悬停滞后/工具提示用）
+let _lastOrbitTipX = -9999;    // 最近一次工具提示触发时鼠标位置（移动防抖）
+let _lastOrbitTipY = -9999;
 
 // 可见性筛选状态 — 控制飞行场景中非活动飞船/设施的显示
 let _visibilityState = { ships: true, facilities: true, facilityRange: true, bodyOrbits: true, soiLabels: true };
@@ -293,25 +299,24 @@ export function computeNavballDirections(ship, host) {
 }
 
 /**
- * 轨道悬停检测（0.3.0 提交4）：
- *   标记锚点命中（12px 半径）优先 → 轨道线点-线段命中（8px 阈值）；
- *   结果写入渲染层悬停通道（setOrbitHoverState，renderOrbitMarkers 消费：
- *   锚点放大/标签高亮/轨道点圆点）；Tooltip 仅轨道线命中时显示（标记命中由
- *   DOM 标签展开交互覆盖），且目标指纹变化才触发（showTooltip 延迟+固定位置语义）。
+ * 轨道悬停检测（0.3.0 提交4，每帧渲染驱动版 + 悬停滞后防鬼畜）：
+ *   标记锚点命中（12px 半径）优先 → 轨道线点-线段命中；
+ *   结果写入渲染层悬停通道（setOrbitHoverState，renderOrbitMarkers 消费：轨道点圆点）。
+ * 时间加速稳定化：
+ *   - 命中滞后（hysteresis）：命中维持阈值 8px、释放阈值 10px —— 轨道/锚点帧间
+ *     移动导致 8px 边缘振荡时不闪烁（warp 鬼畜主因之一）；
+ *   - 命中缓存 _lastOrbitHit：圆点挂在命中点上随轨道平滑滑动，不再逐帧跳变。
+ * Tooltip 不在此处处理（改由 mousemove 事件驱动 updateOrbitTooltip，见下）。
  * 数据源：渲染层本帧已绘制几何（getLastOrbitSegments/getLastOrbitMarkers），
- * 不与预测引擎直接耦合；仅在鼠标移动事件时执行（纯数学命中，无预测重算）。
- * @param {MouseEvent} e - 原始事件（clientX/clientY 供工具提示定位）
+ * 不与预测引擎直接耦合；由渲染循环每帧驱动（用最后鼠标坐标）。
  * @param {number} cssX - 画布 CSS 像素 x
  * @param {number} cssY - 画布 CSS 像素 y
  */
-function updateOrbitHover(e, cssX, cssY) {
+function updateOrbitHover(cssX, cssY) {
     const ship = shipSystem.getActiveShip();
     if (!ship) {
         setOrbitHoverState(null);
-        if (_lastOrbitHoverKey !== '') {
-            _lastOrbitHoverKey = '';
-            hideTooltip();
-        }
+        _lastOrbitHit = null;
         return;
     }
 
@@ -340,33 +345,61 @@ function updateOrbitHover(e, cssX, cssY) {
         }
     }
 
-    // 3. 写入渲染层悬停通道（下一帧绘制时消费）
-    setOrbitHoverState(hoveredMarker || (nearest
-        ? { type: 'orbitPoint', worldX: nearest.worldX, worldY: nearest.worldY }
-        : null));
-
-    // 4. Tooltip（仅轨道线命中；指纹变化才调用）
-    const key = nearest
-        ? (nearest.segSoiName || '') + '|' + nearest.worldX.toFixed(0) + '|' + nearest.worldY.toFixed(0)
-        : '';
-    if (key) {
-        if (key !== _lastOrbitHoverKey) {
-            const hostBody = celestialBodies.find(b => b.name === nearest.segSoiName);
-            const alt = hostBody
-                ? Math.hypot(nearest.worldX - hostBody.position.x, nearest.worldY - hostBody.position.y) - hostBody.radius
-                : null;
-            const altText = alt !== null
-                ? (Math.abs(alt) >= 1000 ? (alt / 1000).toFixed(1) + ' km' : alt.toFixed(0) + ' m')
-                : '--';
-            const tText = nearest.timeOffset !== null ? formatDuration(nearest.timeOffset) : '--';
-            showTooltip(
-                (nearest.segSoiName || t('orbit.type.deepSpace')) + ' · ALT ' + altText + ' · T+ ' + tText,
-                e.clientX, e.clientY
-            );
-            _lastOrbitHoverKey = key;
+    // 3. 悬停滞后：未命中但上次命中点仍在 10px 内（屏幕）→ 保持命中（防 8px 阈值边缘帧间振荡）。
+    //    位置检测用"当前帧重算"（resolveOrbitHit：与轨道线同源，warp 重锚下不漂移）
+    if (!nearest && !hoveredMarker && _lastOrbitHit) {
+        const cur = resolveOrbitHit(_lastOrbitHit, _canvas);
+        if (cur && Math.hypot(cur.screenX - canvasX, cur.screenY - canvasY) < 10) {
+            nearest = _lastOrbitHit;
+        } else {
+            _lastOrbitHit = null;
         }
-    } else if (_lastOrbitHoverKey !== '') {
-        _lastOrbitHoverKey = '';
+    }
+    if (nearest) _lastOrbitHit = nearest;
+    if (!nearest) _lastOrbitHit = null;
+
+    // 4. 写入渲染层悬停通道（命中参数形态：渲染端每帧同源重算，跨帧零错位）
+    setOrbitHoverState(hoveredMarker || (nearest
+        ? {
+              type: 'orbitPoint',
+              segIndex: nearest.segmentIndex,
+              pointIndex: nearest.pointIndex,
+              segT: nearest.segT,
+              soiName: nearest.segSoiName,
+              timeOffset: nearest.timeOffset
+          }
+        : null));
+}
+
+/**
+ * 轨道线 Tooltip（0.3.0 提交4）：仅由 mousemove 事件驱动，且鼠标移动距离防抖
+ * （>20px 才触发，避免 warp 下每帧指纹变化导致 500ms 延迟定时器反复重置、提示不显示/闪烁）。
+ * 内容取每帧更新缓存的 _lastOrbitHit。
+ * @param {MouseEvent} e - 原始事件（clientX/clientY 供定位）
+ */
+function updateOrbitTooltip(e, x, y) {
+    const hit = _lastOrbitHit;
+    const moved = Math.hypot(x - _lastOrbitTipX, y - _lastOrbitTipY) > 20;
+    // 内容用当前帧重算（与轨道线同源）：位置/到达时间随 warp 推进实时准确
+    const cur = hit ? resolveOrbitHit(hit, _canvas) : null;
+    if (cur && moved) {
+        _lastOrbitTipX = x;
+        _lastOrbitTipY = y;
+        const hostBody = celestialBodies.find(b => b.name === hit.soiName);
+        const alt = hostBody
+            ? Math.hypot(cur.worldX - hostBody.position.x, cur.worldY - hostBody.position.y) - hostBody.radius
+            : null;
+        const altText = alt !== null
+            ? (Math.abs(alt) >= 1000 ? (alt / 1000).toFixed(1) + ' km' : alt.toFixed(0) + ' m')
+            : '--';
+        const tText = cur.tToNext !== null ? formatDuration(cur.tToNext) : '--';
+        showTooltip(
+            (hit.soiName || t('orbit.type.deepSpace')) + ' · ALT ' + altText + ' · T+ ' + tText,
+            e.clientX, e.clientY
+        );
+    } else if (!cur) {
+        _lastOrbitTipX = x;
+        _lastOrbitTipY = y;
         hideTooltip();
     }
 }
@@ -478,6 +511,12 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 const x = e.clientX - rect.left;
                 const y = e.clientY - rect.top;
 
+                // 记录最近鼠标位置（渲染循环每帧驱动轨道悬停检测用）
+                _lastMouseX = x;
+                _lastMouseY = y;
+                _lastClientX = e.clientX;
+                _lastClientY = e.clientY;
+
                 // 拖拽更新节流阀
                 if (sasUI._isDragging) {
                     // 兜底：左键实际已松开（如拖出画布后松开导致 mouseup 丢失）→ 立即结束拖拽
@@ -504,8 +543,8 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                         hideTooltip();
                     }
 
-                    // 0.3.0 提交4：轨道线悬停（标记锚点命中优先 → 轨道线命中 → Tooltip）
-                    updateOrbitHover(e, x, y);
+                    // 0.3.0 提交4：轨道线 Tooltip（鼠标事件驱动 + 移动防抖；圆点由渲染循环驱动）
+                    updateOrbitTooltip(e, x, y);
                 }
             };
             const onMouseUp = () => {
@@ -538,9 +577,13 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             const onMouseLeave = () => {
                 sasUI.clearHover();
                 sasUI._isDragging = false;
-                // 0.3.0 提交4：轨道悬停清理（渲染层通道 + tooltip 指纹）
+                // 0.3.0 提交4：清空最近鼠标与轨道悬停（渲染层通道 + 命中缓存 + tooltip）
+                _lastMouseX = -1;
+                _lastMouseY = -1;
+                _lastOrbitHit = null;
+                _lastOrbitTipX = -9999;
+                _lastOrbitTipY = -9999;
                 setOrbitHoverState(null);
-                _lastOrbitHoverKey = '';
                 hideTooltip();
             };
             _canvas.addEventListener('mouseleave', onMouseLeave);
@@ -897,6 +940,12 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 facilities: renderFacilities,
                 selectedFacilityId: _activeFacilityId
             });
+
+            // 0.3.0 提交4：每帧驱动轨道悬停检测（渲染循环兜底：圆点必跟手；
+            // 用最近鼠标位置，节流阀拖拽时跳过）
+            if (activeShip && _lastMouseX >= 0 && !sasUI._isDragging) {
+                updateOrbitHover(_lastMouseX, _lastMouseY);
+            }
 
             // 状态驱动：统一工具栏图标切换
             let nextMode = 'off';

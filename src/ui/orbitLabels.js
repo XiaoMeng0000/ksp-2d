@@ -62,7 +62,8 @@ function isExpanded(key) {
 // 收起态 HTML：SOI 标签 = 纯图标（进入/离开箭头，天体名不再显示）；
 // Ap/Pe 标签 = 纯名称
 function buildCollapsedHTML(m) {
-    const icon = soiIconHtml(m, 24);
+    // 0.3.0：SOI 收起标签图标缩至 21.6px（原 24 的 -10%）；宽度按素材自然比例
+    const icon = soiIconHtml(m, 21.6);
     if (icon) {
         return icon;
     }

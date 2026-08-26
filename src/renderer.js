@@ -490,6 +490,7 @@ export {
     computeApPePositions,
     renderOrbitMarkers,
     findNearestOrbitPoint,
+    resolveOrbitHit,
     setOrbitHoverState,
     getOrbitHoverState,
     getLastOrbitSegments,
@@ -634,12 +635,46 @@ function renderManeuverOrbits(ship, ctx, canvas) {
     // TODO: 调用 predictManeuverTrajectories，对每个节点的结果段用红色虚线绘制
 }
 
-// ========== 轨道交互（0.3.0：骨架 + 提交2 标记 + 提交3 悬停检测计算层） ==========
+// ===== 轨道交互（0.3.0：骨架 + 提交2 标记 + 提交3 悬停检测计算层） =====
 // 目标：活动飞船轨道线的 Ap/Pe 标记显示、轨道线悬停检测、右键菜单数据通道。
 // 已完成：数据通道（缓存/访问器/悬停状态）+ computeApPePositions/renderOrbitMarkers
 //   （提交 2：Canvas 锚点 + DOM 文字本体，类型注册表数据驱动）+ findNearestOrbitPoint
 //   （提交 3：屏幕空间点-线段悬停检测）。
 // 待填：flightScene 交互接入（提交 4）、右键菜单（提交 5）。
+
+/**
+ * 把 orbitPoint 命中参数解析为当前帧的世界/屏幕坐标与到达时间（0.3.0 提交4 修复）：
+ * 轨道线每帧随 cachedTime 重锚（锚点 = 宿主"当前时刻"位置），命中缓存的世界坐标
+ * 跨帧会与重锚后的轨道线错位（warp 下偏移、zoom 越大越明显）。
+ * 本函数与轨道线同帧同源重算：用本帧 segments（_lastOrbitSegments）+ 段锚点，
+ * 保证圆点恒贴在线上。返回 { screenX, screenY, worldX, worldY, tToNext } 或 null。
+ * @param {Object} hit - { segIndex, pointIndex, segT }（findNearestOrbitPoint 产出）
+ * @param {HTMLCanvasElement} canvas
+ */
+function resolveOrbitHit(hit, canvas) {
+    if (!hit || hit.segIndex === undefined || hit.pointIndex === undefined) return null;
+    const segs = _lastOrbitSegments;
+    const seg = segs && segs[hit.segIndex];
+    if (!seg || !seg.relPoints || seg.relPoints.length < 2) return null;
+
+    const pi = Math.max(0, Math.min(hit.pointIndex, seg.relPoints.length - 2));
+    const p0 = seg.relPoints[pi];
+    const p1 = seg.relPoints[pi + 1];
+    const t = (hit.segT !== undefined) ? Math.max(0, Math.min(1, hit.segT)) : 0;
+
+    const anchor = getSegmentAnchor(seg);   // 本帧锚点（与轨道线同源）
+    const wx = (p0.x + (p1.x - p0.x) * t) + anchor.x;
+    const wy = (p0.y + (p1.y - p0.y) * t) + anchor.y;
+    const s = worldToScreen(wx, wy, canvas);
+
+    // 到该点的剩余时间（与渲染帧同一 cachedTime）
+    let tToNext = null;
+    if (p0.t !== undefined && p1.t !== undefined && isFinite(seg.anchorTime)) {
+        tToNext = Math.max(0, (seg.anchorTime + (p0.t + (p1.t - p0.t) * t)) - getCachedTime());
+    }
+
+    return { screenX: s.x, screenY: s.y, worldX: wx, worldY: wy, tToNext };
+}
 
 /**
  * 计算拱点相对于宿主中心的轨道坐标
@@ -820,16 +855,17 @@ function renderOrbitMarkers(ctx, canvas, ship, hoveredMarker) {
         ctx.restore();
     }
 
-    // 轨道线任意点悬停高亮（0.3.0 提交4）：hoveredMarker.type === 'orbitPoint' 时
-    // 在最近点画高亮圆点（命中点世界坐标由 findNearestOrbitPoint 提供）
-    if (hoveredMarker && hoveredMarker.type === 'orbitPoint'
-        && isFinite(hoveredMarker.worldX) && isFinite(hoveredMarker.worldY)) {
-        const hp = worldToScreen(hoveredMarker.worldX, hoveredMarker.worldY, canvas);
-        ctx.beginPath();
-        ctx.arc(hp.x, hp.y, 5, 0, Math.PI * 2);
-        ctx.strokeStyle = 'rgba(255, 220, 90, 0.9)';
-        ctx.lineWidth = 2;
-        ctx.stroke();
+    // 轨道线任意点悬停高亮（0.3.0 提交4）：hoveredMarker 为 orbitPoint 命中参数时，
+    // 用本帧 segments 同帧重算（resolveOrbitHit）—— 与轨道线同源，warp 重锚下零错位
+    if (hoveredMarker && hoveredMarker.type === 'orbitPoint') {
+        const cur = resolveOrbitHit(hoveredMarker, canvas);
+        if (cur) {
+            ctx.beginPath();
+            ctx.arc(cur.screenX, cur.screenY, 5, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(255, 220, 90, 0.9)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
     }
 
     // DOM 文字本体同步（与 Canvas 同帧同源）
