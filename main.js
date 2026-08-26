@@ -44,7 +44,8 @@ import { registerBodyRenderables } from './src/graphics/bodyRenderables.js';
 
 import { initCamera } from './src/camera.js';
 import { createStars } from './src/renderer.js';
-import { updateCelestialBodies, celestialBodies } from './src/physics/physics.js';
+import { updateCelestialBodies, celestialBodies, setActiveSystems } from './src/physics/physics.js';
+import { getDefaultSystemIds, validateSystemSelection } from './src/config/starSystemIndex.js';
 import { stateToKepler } from './src/physics/orbitalMechanics.js';
 import { eventBus, Events } from './src/eventBus.js';
 import { registerFlightScene } from './src/scenes/flightScene.js';
@@ -308,10 +309,26 @@ window.openAnnouncement = function() {
 window.currentWorldId = null;
 
 // 0.2.5 创建新战役核心逻辑（供"创建新战役"对话框调用）
+// name: 战役名称; starSystems: 星系组合 id 数组(创建时绑定,创建后不可更改)
 // 返回创建成功的世界 ID；名称冲突等失败时返回 null 并已回滚
-window.applyNewGameCreation = function(name) {
+window.applyNewGameCreation = function(name, starSystems) {
+    // 星系组合:显式传入优先,否则用默认组合(仅 homeworld 星系)
+    const systemIds = Array.isArray(starSystems) && starSystems.length > 0
+        ? [...starSystems]
+        : getDefaultSystemIds();
+    const validation = validateSystemSelection(systemIds);
+    if (!validation.ok) {
+        window.showNotification(t('newcampaign.systemInvalid'), 'error');
+        console.warn('[applyNewGameCreation] 星系组合校验失败:', validation.reason);
+        return null;
+    }
+
     // Bug修复 — 新游戏前清空旧飞船，防止跨世界飞船泄漏
     gameState.reset();
+
+    // 激活星系组合(重建天体集合),再重置时间更新天体位置
+    setActiveSystems(systemIds);
+    gameState.setState({ starSystems: systemIds });
 
     // 轨道修复 — 在创建飞船前重置时间并更新天体到零点，防止上一局 Kerbin 位置污染初始轨道
     _celestialTime = 0;
@@ -390,7 +407,7 @@ window.applyNewGameCreation = function(name) {
     }
 
     // 先创建世界（含名称冲突检测），成功后再切场景
-    const worldId = window.__saveManager.createWorld(name);
+    const worldId = window.__saveManager.createWorld(name, systemIds);
     if (worldId) {
         window.currentWorldId = worldId;
         sceneManager.switchTo('flight');

@@ -1610,3 +1610,235 @@
 #settingsContainer ::-webkit-scrollbar-corner {
     background: #f1f1f1;
 }
+
+/* ============================================================
+   星系配置入口(创建新战役对话框内)与星系选择面板
+   0.2.5 多星系加载:创建时选择星系组合,创建后不可更改
+   视觉规范:面板壳 --theme-bg + 紫描边;分区头 --theme-btn-selected;
+   内部卡无边框(底色差区分);选中态 --theme-active-bg
+   ============================================================ */
+
+/* 星系配置入口:与 nc-form-input 同型,可点击提示 */
+#newCampaignDialog .nc-system-config {
+    cursor: pointer;
+    user-select: none;
+}
+
+#newCampaignDialog .nc-system-config:hover {
+    border-color: var(--theme-border-hover);
+    background: var(--theme-hover);
+}
+
+/* 星系选择面板覆盖层(压在新战役对话框之上) */
+#systemSelectPanel.ssp-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    align-items: center;
+    justify-content: center;
+    z-index: 10010;
+    font-family: var(--font-mono);
+}
+
+/* 面板壳(规范 3.1):--theme-bg + 1px 紫描边 */
+#systemSelectPanel .ssp-dialog {
+    width: min(680px, 90vw);
+    max-height: 82vh;
+    overflow-y: auto;
+    background: var(--theme-bg);
+    border: 1px solid var(--theme-menu-border);
+    border-radius: 5px;
+    padding: 14px;
+    box-sizing: border-box;
+    color: var(--text-bright);
+}
+
+/* 面板标题:accent + 下边框(与 nc-title 同语言) */
+#systemSelectPanel .ssp-title {
+    color: var(--accent);
+    font-size: 16px;
+    font-family: var(--font-mono-bold);
+    font-weight: normal;
+    padding-bottom: 8px;
+    margin: 0 14px 14px 14px;
+    border-bottom: 1px solid var(--theme-border);
+}
+
+#systemSelectPanel .ssp-body {
+    display: flex;
+    gap: 14px;
+    padding: 0 14px;
+    margin-bottom: 14px;
+    box-sizing: border-box;
+}
+
+/* 左列:星系列表(深色容器,与设施面板 tkp-card-sm 同层;
+   分组卡嵌于其中形成"深容器→浅卡"分级) */
+#systemSelectPanel .ssp-list {
+    flex: 1;
+    min-width: 0;
+    background: var(--theme-panel-deep);
+    border-radius: 5px;
+    padding: 10px;
+    max-height: 46vh;
+    overflow-y: auto;
+    box-sizing: border-box;
+}
+
+/* 分类卡(与设施货物储备分组卡同款:浅卡体 + 紫头条,嵌在深容器内) */
+#systemSelectPanel .ssp-group-card {
+    background: var(--theme-bg);
+    border: none;
+    border-radius: 5px;
+    margin-bottom: 8px;
+    overflow: hidden;
+}
+
+#systemSelectPanel .ssp-group-card:last-child {
+    margin-bottom: 0;
+}
+
+#systemSelectPanel .ssp-group-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    background: var(--theme-btn-selected);
+    color: var(--text-bright);
+    font-size: 12px;
+    font-family: var(--font-mono-bold);
+    font-weight: normal;
+    letter-spacing: 1px;
+}
+
+#systemSelectPanel .ssp-group-body {
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+/* 星系条目:裸行 + 左侧状态竖条(与飞行工具栏 tool-item 同款:无方框底) */
+#systemSelectPanel .ssp-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+#systemSelectPanel .ssp-item:hover {
+    background: var(--theme-hover);
+    color: var(--accent);
+}
+
+/* 状态竖条:未选中暗条 / 选中亮绿条(与 #leftToolbar .toolbar-item-bar 同款) */
+#systemSelectPanel .ssp-bar {
+    width: 4px;
+    height: 24px;
+    flex-shrink: 0;
+    border-radius: 2px;
+    background: var(--border-dark);
+    transition: background 0.15s ease;
+}
+
+#systemSelectPanel .ssp-item.ssp-selected .ssp-bar {
+    background: var(--progress-green);
+}
+
+#systemSelectPanel .ssp-name {
+    color: var(--text-main);
+    font-size: 13px;
+    font-family: var(--font-mono-bold);
+    font-weight: normal;
+}
+
+#systemSelectPanel .ssp-item.ssp-selected .ssp-name {
+    color: var(--text-bright);
+}
+
+#systemSelectPanel .ssp-item:hover .ssp-name {
+    color: var(--accent);
+}
+
+#systemSelectPanel .ssp-sub {
+    color: var(--text-dim);
+    font-size: 11px;
+    margin-left: auto;
+}
+
+/* 占位星系:灰显不可交互(竖条为暗灰,不变绿) */
+#systemSelectPanel .ssp-item.ssp-disabled {
+    cursor: default;
+    opacity: 0.5;
+}
+
+#systemSelectPanel .ssp-item.ssp-disabled:hover {
+    background: transparent;
+    color: inherit;
+}
+
+#systemSelectPanel .ssp-item.ssp-disabled:hover .ssp-name {
+    color: var(--text-main);
+}
+
+/* 右列:分布示意图(内容卡,无边框) */
+#systemSelectPanel .ssp-chart-box {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    background: var(--theme-panel);
+    border-radius: 5px;
+    padding: 12px;
+    box-sizing: border-box;
+}
+
+#systemSelectPanel #sspChart {
+    background: var(--theme-panel-deep);
+    border-radius: 5px;
+    width: 240px;
+    height: 240px;
+}
+
+#systemSelectPanel .ssp-chart-hint {
+    color: var(--text-dim);
+    font-size: 11px;
+    text-align: center;
+}
+
+/* 底部操作区 */
+#systemSelectPanel .ssp-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 0 14px 4px 14px;
+}
+
+#systemSelectPanel .ssp-actions .ui-btn,
+#systemSelectPanel .ssp-actions .ui-btn-primary {
+    height: 26px;
+    padding: 0 12px;
+    box-sizing: border-box;
+    background: var(--theme-btn-bg);
+    border: 1px solid var(--border-light);
+    border-radius: 5px;
+    color: var(--text-bright);
+    font-family: var(--font-mono);
+    font-size: 12px;
+}
+
+/* 弹性布局:小屏下面板允许纵向排列 */
+@media (max-width: 620px) {
+    #systemSelectPanel .ssp-body {
+        flex-direction: column;
+    }
+
+    #systemSelectPanel .ssp-chart-box {
+        width: 100%;
+    }
+}

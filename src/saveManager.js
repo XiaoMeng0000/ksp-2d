@@ -7,9 +7,10 @@ import { sceneManager } from './sceneManager.js';
 import { shipSystem } from './ship/shipSystem.js';
 import { facilitySystem } from './facility/facilitySystem.js';
 import { stateToKepler } from './physics/orbitalMechanics.js';
-import { celestialBodies } from './physics/physics.js';
+import { celestialBodies, setActiveSystems, getActiveSystemIds } from './physics/physics.js';
 import { eventBus, Events } from './eventBus.js';
 import { t } from './config/strings.js';
+import { validateSystemSelection } from './config/starSystemIndex.js';
 import { initFacilityStorage, addStorage } from './resources/cargoSystem.js';
 
 class SaveManager {
@@ -137,11 +138,22 @@ class SaveManager {
     }
 
     // 创建新世界
-    createWorld(name) {
+    // starSystems: 星系组合 id 数组(创建时绑定,不可更改;缺省时按当前激活组合)
+    createWorld(name, starSystems) {
         // 名称冲突检测
         const nameExists = this._worldList.some(id => this._worlds[id].metadata.name === name);
         if (nameExists) {
             console.warn(`[SaveManager] 世界名称 "${name}" 已存在`);
+            return null;
+        }
+
+        // 星系组合:显式传入优先,否则沿用当前激活组合(保证不丢默认 kerbolar)
+        const systemIds = Array.isArray(starSystems) && starSystems.length > 0
+            ? [...starSystems]
+            : getActiveSystemIds();
+        const validation = validateSystemSelection(systemIds);
+        if (!validation.ok) {
+            console.warn(`[SaveManager] 星系组合校验失败,拒绝创建: ${validation.reason}`);
             return null;
         }
 
@@ -179,7 +191,9 @@ class SaveManager {
             metadata: {
                 name: name || '新世界',
                 createdAt: now,
-                configVersion: state.version || '0.1.0'
+                configVersion: state.version || '0.1.0',
+                // 星系组合:创建时绑定,创建后不可更改
+                starSystems: systemIds
             },
             player: this._sanitizePlayerForSave(this._playerProfile),
             checkpoints: [initialCheckpoint],
@@ -295,6 +309,24 @@ class SaveManager {
             return false;
         }
 
+        // 星系组合校验:存档绑定的星系必须全部存在于当前配置,否则拒绝加载
+        // 旧存档无 starSystems 字段 → 默认 ['kerbolar'](创建于单星系时代,直接可读)
+        const savedSystems = world.metadata.starSystems || ['kerbolar'];
+        const validation = validateSystemSelection(savedSystems);
+        if (!validation.ok) {
+            console.warn(`[SaveManager] 拒绝加载:存档星系组合与当前配置不兼容 (${validation.reason})`);
+            if (typeof window.showNotification === 'function') {
+                window.showNotification(t('save.systemIncompatible'), 'error');
+            }
+            return false;
+        }
+
+        // 激活存档绑定的星系组合(重建天体集合,不改变任何物理逻辑)
+        if (!setActiveSystems(savedSystems)) {
+            console.warn('[SaveManager] 拒绝加载:星系组合激活失败');
+            return false;
+        }
+
         gameState.setState({
             ships: checkpoint.ships,
             player: this._sanitizePlayerForSave(world.player),
@@ -303,6 +335,8 @@ class SaveManager {
             gameTime: checkpoint.gameTime,
             activeShipId: checkpoint.activeShipId,
             activeFacilityId: checkpoint.activeFacilityId || null,
+            // 同步存档绑定的星系组合(创建后不可改)
+            starSystems: [...savedSystems],
             // 恢复当前场景
             currentScene: checkpoint.currentScene || 'menu'
         });

@@ -221,7 +221,11 @@ function loadSelectedGame() {
         return;
     }
     window.currentWorldId = _selectedWorldId;
-    saveManager.loadCheckpoint(_selectedWorldId, _selectedCheckpointId);
+    const success = saveManager.loadCheckpoint(_selectedWorldId, _selectedCheckpointId);
+    if (!success) {
+        // 加载失败(含星系组合与当前配置不兼容):保持面板打开,不切场景
+        return;
+    }
     closeStartGamePanel();
     sceneManager.switchTo('flight');
 }

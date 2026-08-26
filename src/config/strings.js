@@ -65,6 +65,24 @@ const STRINGS = {
     'newcampaign.modeNotReady': '生涯模式尚未完成，请先体验自由模式。',
     'newcampaign.cancel': '取消',
     'newcampaign.start': '开始新战役',
+    // 0.2.5 星系配置(创建时选择,创建后不可更改)
+    'newcampaign.systemConfig': '星系配置',
+    'newcampaign.systemConfigHint': '选择本战役加载的星系组合（创建后不可更改）',
+    'newcampaign.systemInvalid': '星系组合无效，无法创建新战役',
+
+    // ---------- 星系选择面板 ----------
+    'systemselect.title': '星系配置',
+    'systemselect.homeworldSection': '家园星系（单选，必选）',
+    'systemselect.optionalSection': '可选星系（复选）',
+    'systemselect.placeholderSection': '未探索星系（不可选择）',
+    'systemselect.homeworldTag': '家园星系',
+    'systemselect.placeholderTag': '未探索',
+    'systemselect.distanceLabel': (p) => `距 homeworld ${p.d} 光年`,
+    'systemselect.chartCenter': 'homeworld',
+    'systemselect.chartHint': '示意图为归一化尺度，非真实光年比例',
+    'systemselect.invalidCombo': '星系组合无效：SOI 重叠或缺少家园星系',
+    'systemselect.cancel': '取消',
+    'systemselect.confirm': '确定',
 
     // ---------- ESC 菜单 ----------
     'esc.menu': '菜单',
@@ -420,6 +438,8 @@ const STRINGS = {
 
     // ---------- 存档 / 时间暂停通知 ----------
     'save.thrustBlocked': '推力模式下无法存档！',
+    // 0.2.5 星系组合兼容性(读档校验)
+    'save.systemIncompatible': '❌ 该存档的星系配置与当前版本不兼容，无法加载',
     'timewarp.pausedNotice': '游戏已暂停',
     'timewarp.resumedNotice': '游戏已恢复',
 

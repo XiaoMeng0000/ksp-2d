@@ -2,7 +2,7 @@
 
 import { sceneManager } from '../sceneManager.js';
 import { textureManager } from '../graphics/textureManager.js';
-import { solarSystemData, starSystemMeta } from '../config/solarSystem.js';
+import { solarSystemData, starSystemMeta } from '../config/starSystemIndex.js';
 import { t } from '../config/strings.js';
 
 // ========== 样式常量（Canvas 绘制用；色值与 CSS 变量保持一致）
