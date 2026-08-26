@@ -1,6 +1,8 @@
 "use strict";
 
 import { meta as kerbolarMeta, bodies as kerbolarBodies } from './systems/kerbolarSystem.js';
+import { meta as testbolarMeta, bodies as testbolarBodies } from './systems/testSystem.js';
+import { meta as debdebTestMeta, bodies as debdebTestBodies } from './systems/debdebTestSystem.js';
 import { meta as debdebMeta, bodies as debdebBodies } from './systems/debdebSystem.js';
 import { meta as tuunMeta, bodies as tuunBodies } from './systems/tuunSystem.js';
 
@@ -20,6 +22,8 @@ export const LIGHT_YEAR_METERS = 9.4607304725808e15;
 // 星系注册表(注册顺序即展示顺序)
 export const starSystemRegistry = [
     { meta: kerbolarMeta, bodies: kerbolarBodies },
+    { meta: testbolarMeta, bodies: testbolarBodies },
+    { meta: debdebTestMeta, bodies: debdebTestBodies },
     { meta: debdebMeta, bodies: debdebBodies },
     { meta: tuunMeta, bodies: tuunBodies }
 ];
@@ -27,6 +31,12 @@ export const starSystemRegistry = [
 // 按 id 查询星系
 export function getSystemById(id) {
     return starSystemRegistry.find(s => s.meta.id === id) || null;
+}
+
+// 按星系 id 查询天体数组(直接引用;占位星系为空数组)
+export function getSystemBodiesById(id) {
+    const system = getSystemById(id);
+    return system ? system.bodies : [];
 }
 
 // 星系是否为 homeworld 星系(其天体列表中存在 isHomeworld 天体)

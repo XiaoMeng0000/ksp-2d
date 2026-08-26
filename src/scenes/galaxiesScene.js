@@ -2,7 +2,7 @@
 
 import { sceneManager } from '../sceneManager.js';
 import { textureManager } from '../graphics/textureManager.js';
-import { solarSystemData, starSystemMeta } from '../config/starSystemIndex.js';
+import { solarSystemData, starSystemMeta, getSystemBodiesById } from '../config/starSystemIndex.js';
 import { t } from '../config/strings.js';
 
 // ========== 样式常量（Canvas 绘制用；色值与 CSS 变量保持一致）
@@ -232,9 +232,11 @@ function registerGalaxiesScene() {
             body.appendChild(chart);
         } else {
             // 正常星系：星体大小对比（Canvas 动态绘制，方案A）
+            // 只绘制本星系天体（多星系支持：按 meta.id 过滤）
+            const systemBodies = getSystemBodiesById(meta.id);
             // 高度随最大卫星数增长（行星中轴 + 卫星垂直竖排）
-            const maxSatCount = solarSystemData.reduce((m, b) => {
-                const n = solarSystemData.filter(x => x.orbitParent === b.name).length;
+            const maxSatCount = systemBodies.reduce((m, b) => {
+                const n = systemBodies.filter(x => x.orbitParent === b.name).length;
                 return Math.max(m, n);
             }, 0);
             const chart = document.createElement('canvas');
@@ -242,7 +244,7 @@ function registerGalaxiesScene() {
             chart.height = CHART_HEIGHT_BASE + maxSatCount * SAT_VSTEP;
             chart.className = 'galaxies-chart';
             const chartCtx = chart.getContext('2d');
-            _drawComparisonChart(chartCtx, chart.width, chart.height, solarSystemData);
+            _drawComparisonChart(chartCtx, chart.width, chart.height, systemBodies);
             body.appendChild(chart);
         }
 
@@ -265,7 +267,7 @@ function registerGalaxiesScene() {
         const header = document.createElement('div');
         header.className = 'galaxies-collapse-header';
 
-        const bodyCount = (meta && meta.placeholder) ? 0 : solarSystemData.length;
+        const bodyCount = (meta && meta.placeholder) ? 0 : getSystemBodiesById(meta.id).length;
         header.textContent = t('galaxies.loadedBodies', { n: bodyCount, arrow: '▸' });
 
         const content = document.createElement('div');
@@ -277,7 +279,7 @@ function registerGalaxiesScene() {
             empty.className = 'galaxies-empty';
             content.appendChild(empty);
         } else {
-            for (const body of solarSystemData) {
+            for (const body of getSystemBodiesById(meta.id)) {
                 content.appendChild(_buildBodyDataRow(body));
             }
         }

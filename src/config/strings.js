@@ -66,12 +66,12 @@ const STRINGS = {
     'newcampaign.cancel': '取消',
     'newcampaign.start': '开始新战役',
     // 0.2.5 星系配置(创建时选择,创建后不可更改)
-    'newcampaign.systemConfig': '星系配置',
+    'newcampaign.systemConfig': '星系配置（测试功能）',
     'newcampaign.systemConfigHint': '选择本战役加载的星系组合（创建后不可更改）',
     'newcampaign.systemInvalid': '星系组合无效，无法创建新战役',
 
     // ---------- 星系选择面板 ----------
-    'systemselect.title': '星系配置',
+    'systemselect.title': '星系配置（测试功能）',
     'systemselect.homeworldSection': '家园星系（单选，必选）',
     'systemselect.optionalSection': '可选星系（复选）',
     'systemselect.placeholderSection': '未探索星系（不可选择）',
