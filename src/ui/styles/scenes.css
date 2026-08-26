@@ -174,8 +174,9 @@
 
 /* ============================================================
    文档场景共用（版权声明 licenseScene / 制作人员 creditsScene）— 0.2.7 v2
-   参考 KSP 原版：顶部 // 标题 + 装饰分隔线 + 半透明背景 + 左对齐正文流 + 底部 BACK
-   无卡片设计；credits 采用角色/名字双列格网（角色右对齐 | 名字左对齐）
+   参考 KSP 原版：顶部 // 标题 + 装饰分隔线 + 半透明背景 + 底部 BACK
+   两页同款左右分割布局（左 Logo 水印 + 右内容区）；
+   credits 采用角色/名字双列格网（角色右对齐 | 名字左对齐）
    ============================================================ */
 
 #licensePanel,
@@ -209,6 +210,7 @@
     margin: 0;
 }
 
+#licensePanel,
 #creditsPanel {
     background-color: #273833af;
     backdrop-filter: none;
@@ -236,14 +238,6 @@
     z-index: 1;
 }
 
-/* 正文滚动区（左对齐流，不垂直居中） */
-.doc-body {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    padding: 26px 60px 90px 60px;
-}
-
 .doc-content {
     height: 100%;
     flex: 1;
@@ -253,8 +247,9 @@
     margin: 0;
 }
 
-/* 制作人员：左右分割区（左 Logo + 短分割线 + 右内容）— 分割线仅限内容区高度，
+/* 制作人员/版权声明：左右分割区（左 Logo + 短分割线 + 右内容）— 分割线仅限内容区高度，
    上下留白避免覆盖顶部装饰线与左下角返回按钮区域 */
+#licensePanel .doc-split,
 #creditsPanel .doc-split {
     flex: 1;
     min-height: 0;
@@ -263,6 +258,7 @@
     align-items: stretch;
 }
 
+#licensePanel .doc-left,
 #creditsPanel .doc-left {
     width: 400px;
     flex-shrink: 0;
@@ -272,11 +268,13 @@
     justify-content: center;
 }
 
+#licensePanel .doc-left img,
 #creditsPanel .doc-left img {
     width: 300px;
     display: block;
 }
 
+#licensePanel .doc-logo-text,
 #creditsPanel .doc-logo-text {
     color: var(--accent);
     font-family: var(--font-mono-bold);
@@ -287,10 +285,12 @@
 }
 
 /* 短分割线（随内容区高度 stretch，容器上下 padding 控制长度） */
+#licensePanel .doc-divider,
 #creditsPanel .doc-divider {
     display: none;
 }
 
+#licensePanel .doc-right,
 #creditsPanel .doc-right {
     flex: 1;
     min-width: 0;
@@ -298,15 +298,18 @@
     overflow-y: auto;
 }
 
+#licensePanel .doc-section-title,
 #creditsPanel .doc-section-title {
     text-align: center;
+    /* 节标题缩小为 3/4(33px = 44px × 0.75),仍为 11 的倍数避免像素字体模糊 */
+    font-size: 33px;
 }
 
 #creditsPanel .doc-group-name {
     text-align: center;
 }
 
-/* 节标题（默认亮白：license 用；.warn 橙色：credits 用） */
+/* 节标题（license / credits 共用，青蓝色 #0DD9FE） */
 .doc-section-title {
     width: 100%;
     color: var(--doc-section-tittle);
@@ -326,13 +329,18 @@
     letter-spacing: 0;
 }
 
-/* license 段落 */
+/* license 段落（字号与 credits 行文字一致：25px）
+   限宽 50% 并居中：避免全宽内容列单行字符过多 */
 .doc-para {
+    max-width: 50%;
+    margin-left: auto;
+    margin-right: auto;
+    text-align: left;
     color: var(--text-main);
     font-family: var(--font-mono);
-    font-size: 13px;
-    line-height: 1.9;
-    margin: 0 0 14px 0;
+    font-size: 25px;
+    line-height: 1.6;
+    margin-bottom: 18px;
 }
 
 /* credits 组名（暗灰小字） */

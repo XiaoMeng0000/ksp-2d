@@ -51,7 +51,7 @@ const CREDITS = {
                 {
                     name: '',
                     rows: [
-                        { role: 'emo', members: [{ name: '' }] },
+                        { role: '图标设计', members: [{ name: 'emo' }] },
                     ]
                 }
             ]

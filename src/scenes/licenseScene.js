@@ -1,11 +1,12 @@
 'use strict';
 
 import { sceneManager } from '../sceneManager.js';
+import { textureManager } from '../graphics/textureManager.js';
 import { LICENSE } from '../config/licenseConfig.js';
 import { t } from '../config/strings.js';
 
-// 版权声明（0.2.7 v2 参考 KSP 原版：顶部 // 标题 + 装饰线 + 半透明背景 + 左对齐正文流 + 底部 BACK）
-// 无卡片设计；视觉走 scenes.css（#licensePanel / .doc-* 共用类）
+// 版权声明（与制作人员同款：顶部 // 标题 + 左右分割式布局；分割线仅限内容区，不覆盖装饰线/返回按钮区域）
+// 视觉走 scenes.css（#licensePanel / .doc-* 共用类）
 function registerLicenseScene() {
     let panel = null;
     let escHandler = null;
@@ -62,17 +63,50 @@ function registerLicenseScene() {
             headerLine.className = 'doc-header-line';
             panel.appendChild(headerLine);
 
-            // ========== 正文滚动区 ==========
-            const body = document.createElement('div');
-            body.className = 'doc-body';
+            // ========== 左右分割区（左侧 Logo + 短分割线 + 右侧内容） ==========
+            const split = document.createElement('div');
+            split.className = 'doc-split';
+
+            // 左侧 Logo 水印
+            const leftPanel = document.createElement('div');
+            leftPanel.className = 'doc-left';
+
+            if (textureManager.isReady() && textureManager.get('title')) {
+                const logoImg = document.createElement('img');
+                logoImg.src = textureManager.get('title').src;
+                leftPanel.appendChild(logoImg);
+            } else {
+                const logoFallback = document.createElement('div');
+                logoFallback.className = 'doc-logo-text';
+                logoFallback.textContent = 'KSP 2D';
+                leftPanel.appendChild(logoFallback);
+            }
+            split.appendChild(leftPanel);
+
+            // 短分割线（仅内容区高度，不覆盖装饰线/返回按钮区域）
+            const divider = document.createElement('div');
+            divider.className = 'doc-divider';
+            split.appendChild(divider);
+
+            // 右侧内容区（内容水平+垂直居中）
+            const rightPanel = document.createElement('div');
+            rightPanel.className = 'doc-right';
 
             const contentWrapper = document.createElement('div');
             contentWrapper.className = 'doc-content';
 
             _renderContent(contentWrapper);
 
-            body.appendChild(contentWrapper);
-            panel.appendChild(body);
+            rightPanel.appendChild(contentWrapper);
+            split.appendChild(rightPanel);
+
+            panel.appendChild(split);
+
+            // 结尾装饰分隔线
+            const footerLine = document.createElement('div');
+            footerLine.className = 'doc-header-line';
+            footerLine.style = 'margin-bottom: 180px;'
+            panel.appendChild(footerLine);
 
             // ========== 返回按钮（左下角固定） ==========
             const backBtn = document.createElement('button');
