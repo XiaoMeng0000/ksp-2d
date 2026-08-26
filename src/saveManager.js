@@ -11,6 +11,7 @@ import { celestialBodies, setActiveSystems, getActiveSystemIds } from './physics
 import { eventBus, Events } from './eventBus.js';
 import { t } from './config/strings.js';
 import { validateSystemSelection } from './config/starSystemIndex.js';
+import { createInfoDialog } from './ui/uiComponents.js';
 import { initFacilityStorage, addStorage } from './resources/cargoSystem.js';
 
 class SaveManager {
@@ -315,9 +316,8 @@ class SaveManager {
         const validation = validateSystemSelection(savedSystems);
         if (!validation.ok) {
             console.warn(`[SaveManager] 拒绝加载:存档星系组合与当前配置不兼容 (${validation.reason})`);
-            if (typeof window.showNotification === 'function') {
-                window.showNotification(t('save.systemIncompatible'), 'error');
-            }
+            // 拒绝加载:弹模态信息框提示(仅"关闭"),玩家关闭后留在原场景
+            createInfoDialog(t('save.systemIncompatibleTitle'), t('save.systemIncompatible'), t('common.close'));
             return false;
         }
 

@@ -23,7 +23,7 @@ export const meta = {
 
 export const bodies = [
     new CelestialBody({
-        name: 'Debbol (test)',
+        name: 'Debdeb (test)',
         type: 'star',
         musicType: 'star',
         gm: 100000,

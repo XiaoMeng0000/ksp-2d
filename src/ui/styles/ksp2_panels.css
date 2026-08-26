@@ -24,7 +24,6 @@
     display: flex;
     font-family: var(--font-mono);
     color: var(--text-bright);
-    backdrop-filter: blur(4px);
 }
 
 /* 左侧导航栏 */
@@ -687,6 +686,9 @@
    0.2.6 从 dialogs.css 迁入，统一为 KSP2 面板风格
    覆盖：选择对话框 / 输入对话框 / 确认对话框
    ============================================================ */
+/* 通用对话框覆盖层 — 全项目最高 z-index 层(10010):
+   任何面板(星系配置 10005 / 新战役 10000 / 通知 10001)弹出的对话框
+   都必须盖过其宿主面板,确保 confirm/info 对话框永远最顶 */
 .ui-dialog-overlay {
     position: fixed;
     inset: 0;
@@ -694,7 +696,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 10000;
+    z-index: 10010;
 }
 
 .ui-dialog {
@@ -1629,7 +1631,9 @@
     background: var(--theme-hover);
 }
 
-/* 星系选择面板覆盖层(压在新战役对话框之上) */
+/* 星系选择面板覆盖层(压在新战役对话框之上,但低于标准对话框/通知:
+   10000 新战役对话框 < 10005 本面板 < 10001+ 对话框/通知)
+   确保星系配置校验失败弹 info 对话框时不被本面板遮挡 */
 #systemSelectPanel.ssp-overlay {
     display: none;
     position: fixed;
@@ -1637,7 +1641,7 @@
     background: rgba(0, 0, 0, 0.85);
     align-items: center;
     justify-content: center;
-    z-index: 10010;
+    z-index: 10005;
     font-family: var(--font-mono);
 }
 

@@ -2,6 +2,7 @@
 
 import { uiManager } from './uiManager.js';
 import { t } from '../config/strings.js';
+import { createInfoDialog } from './uiComponents.js';
 import {
     starSystemRegistry,
     isHomeworldSystem,
@@ -241,7 +242,8 @@ function _confirmSelection() {
     const ids = _currentIds();
     const validation = validateSystemSelection(ids);
     if (!validation.ok) {
-        window.showNotification(t('systemselect.invalidCombo'), 'error');
+        // 校验失败:弹模态信息框(仅"关闭"),玩家关闭后留在面板继续调整选择
+        createInfoDialog(t('systemselect.invalidTitle'), t('systemselect.invalidCombo'), t('common.close'));
         return;
     }
     closeSystemSelectPanel();

@@ -223,6 +223,40 @@ export function createConfirmDialog(title, message, onConfirm, onCancel, confirm
     return overlay;
 }
 
+// 信息对话框组件(单按钮"知道了"— 纯提示,无确认分支,玩家只能关闭)
+// 用于需要用户注意但不提供选择余地的场景(如星系组合校验失败)
+export function createInfoDialog(title, message, okText = t('common.confirmDefault')) {
+    const overlay = document.createElement('div');
+    overlay.className = 'ui-dialog-overlay';
+    const panel = document.createElement('div');
+    panel.className = 'ui-dialog';
+    panel.innerHTML = `
+        <h3 class="ui-dialog-title">${title}</h3>
+        <p class="ui-dialog-body">${message}</p>
+        <div class="ui-dialog-actions">
+            <button id="dialogOkBtn" class="ui-btn">${okText}</button>
+        </div>
+    `;
+    overlay.appendChild(panel);
+    document.body.appendChild(overlay);
+    eventBus.emit(Events.UI_PANEL_OPENED, { panelId: 'dialog' });
+
+    const close = () => {
+        if (overlay.parentNode) {
+            overlay.parentNode.removeChild(overlay);
+        }
+        eventBus.emit(Events.UI_PANEL_CLOSED, { panelId: 'dialog' });
+    };
+
+    const okBtn = panel.querySelector('#dialogOkBtn');
+    okBtn.addEventListener('click', close);
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) close();
+    });
+
+    return overlay;
+}
+
 // 辅助：HTML 转义（用户输入内容拼 innerHTML 前必须转义，防 XSS）
 export function escapeHtml(str) {
     return String(str)

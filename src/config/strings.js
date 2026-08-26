@@ -80,7 +80,8 @@ const STRINGS = {
     'systemselect.distanceLabel': (p) => `距 homeworld ${p.d} 光年`,
     'systemselect.chartCenter': 'homeworld',
     'systemselect.chartHint': '示意图为归一化尺度，非真实光年比例',
-    'systemselect.invalidCombo': '星系组合无效：SOI 重叠或缺少家园星系',
+    'systemselect.invalidTitle': '星系组合无效',
+    'systemselect.invalidCombo': '当前星系组合不合法：缺少家园星系、SOI 重叠或包含不可选择星系。请调整勾选后重试。',
     'systemselect.cancel': '取消',
     'systemselect.confirm': '确定',
 
@@ -439,7 +440,8 @@ const STRINGS = {
     // ---------- 存档 / 时间暂停通知 ----------
     'save.thrustBlocked': '推力模式下无法存档！',
     // 0.2.5 星系组合兼容性(读档校验)
-    'save.systemIncompatible': '❌ 该存档的星系配置与当前版本不兼容，无法加载',
+    'save.systemIncompatibleTitle': '无法加载存档',
+    'save.systemIncompatible': '该存档的星系配置与当前版本不兼容，无法加载。',
     'timewarp.pausedNotice': '游戏已暂停',
     'timewarp.resumedNotice': '游戏已恢复',
 

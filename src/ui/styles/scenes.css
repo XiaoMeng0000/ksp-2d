@@ -10,7 +10,6 @@
     inset: 0;
     z-index: 2000;
     background: var(--panel-bg-deep);
-    backdrop-filter: blur(12px);
     display: flex;
     flex-direction: column;
     font-family: var(--font-mono);
