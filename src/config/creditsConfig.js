@@ -39,6 +39,7 @@ const CREDITS = {
                     rows: [
                         { role: 'Doto Sans', members: [{ name: 'github.com/oliverlalan/Doto' }] },
                         { role: 'Jetbrains Maple Mono', members: [{ name: 'github.com/SpaceTimee/Fusion-JetBrainsMapleMono' }] },
+                        { role: 'Uranus-Pixel', members: [{ name: 'github.com/scott0107000/Uranus-Pixel' }] },
                         { role: 'KDE Breeze Icons', members: [{ name: 'develop.kde.org/frameworks/breeze-icons/' }] },
                     ]
                 }
