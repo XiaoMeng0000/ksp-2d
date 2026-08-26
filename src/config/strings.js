@@ -272,6 +272,14 @@ const STRINGS = {
     'orbitPoint.soiEncounter': (p) => `正在遭遇 ${p.name}`,
     // 可见性筛选：SOI 切换标签开关
     'sas.soiLabels': 'SOI 切换标签',
+    // ---------- 轨道线右键菜单（0.3.0 提交5 占位版） ----------
+    'orbitMenu.createNode': '创建机动计划',
+    'orbitMenu.warpToPoint': '时间加速至目标点',
+    'orbitMenu.toApo': '快进至远点',
+    'orbitMenu.toPe': '快进至近点',
+    'orbitMenu.toSoi': '快进至引力范围变化',
+    'orbitMenu.targetSuffix': '到目标点',
+    'orbitMenu.todo': (p) => `「${p.name}」功能开发中，敬请期待`,
 
     // ---------- 飞船建造 ----------
     'build.title': '飞船建造',

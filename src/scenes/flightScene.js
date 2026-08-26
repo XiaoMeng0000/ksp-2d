@@ -7,6 +7,7 @@ import { updateCelestialBodies, getSOIHost, getAbsolutePosition, getRelativePosi
 import { stateToKepler } from '../physics/orbitalMechanics.js';
 import { timeToNextSOISwitch } from '../physics/orbitalPrediction.js';
 import { render, renderFlightHud, getLastOrbitSegments, getLastOrbitMarkers, setOrbitHoverState, findNearestOrbitPoint, resolveOrbitHit } from '../renderer.js';
+import { showOrbitContextMenu, updateOrbitContextMenu } from '../ui/orbitContextMenu.js';
 import { formatDuration } from '../utils/format.js';
 import { sceneManager } from '../sceneManager.js';
 import { gameState } from '../gameState.js';
@@ -477,7 +478,37 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 if (!ship) return;
 
                 const result = sasUI.handleClick(cssX, cssY, ship.sasMode || 'off');
-                if (!result.hit) return;
+                // 3. 0.3.0 提交5：SAS 未命中 → 左键点击轨道线打开锚定菜单（拦截；未命中则无操作）
+                if (!result.hit) {
+                    const canvasHitX = cssX * (_canvas.width / rect.width);
+                    const canvasHitY = cssY * (_canvas.height / rect.height);
+                    const segments = getLastOrbitSegments();
+                    if (segments && segments.length > 0) {
+                        const mouseWorld = screenToWorld(canvasHitX, canvasHitY, _canvas);
+                        const hit = findNearestOrbitPoint(segments, mouseWorld, 12, _canvas);
+                        if (hit) {
+                            const cur = resolveOrbitHit(hit, _canvas);
+                            const seg = segments[hit.segmentIndex];
+                            const absTime = (hit.timeOffset !== null && isFinite(seg.anchorTime))
+                                ? seg.anchorTime + hit.timeOffset
+                                : null;
+                            showOrbitContextMenu(e.clientX, e.clientY, {
+                                worldX: cur ? cur.worldX : hit.worldX,
+                                worldY: cur ? cur.worldY : hit.worldY,
+                                soiName: hit.segSoiName,
+                                absTime,
+                                tToNext: cur ? cur.tToNext : hit.timeOffset,
+                                // 轨道坐标锚定（点随轨道线/宿主移动，不滑不离线）：
+                                // 世界坐标 = 宿主当前时刻位置 + 冻结的轨道相对坐标
+                                anchorBody: cur ? cur.anchorBody : null,
+                                relX: cur ? cur.relX : null,
+                                relY: cur ? cur.relY : null
+                            }, _canvas);
+                            return;
+                        }
+                    }
+                    return;
+                }
 
                 if (result.action === 'toggle') {
                     ship.sasMode = ship.sasMode === 'off' ? 'stability' : 'off';
@@ -556,7 +587,8 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             window.addEventListener('mouseup', onMouseUp);
             _canvas._sasDragHandlers = { onMouseDown, onMouseMove, onMouseUp };
 
-            // SAS 集成 — Canvas 右键处理（右键中心 → 回到 STABILITY）
+            // SAS 集成 — Canvas 右键处理（右键中心 → 回到 STABILITY；
+            // 0.3.0 提交5：菜单已改为左键打开，右键不再拦截轨道线）
             const onContextMenu = (e) => {
                 e.preventDefault();
                 const rect = _canvas.getBoundingClientRect();
@@ -946,6 +978,9 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             if (activeShip && _lastMouseX >= 0 && !sasUI._isDragging) {
                 updateOrbitHover(_lastMouseX, _lastMouseY);
             }
+
+            // 0.3.0 提交5：右键菜单锚定轨道点（每帧同源重算，菜单跟点走不漂移）
+            updateOrbitContextMenu(_canvas);
 
             // 状态驱动：统一工具栏图标切换
             let nextMode = 'off';

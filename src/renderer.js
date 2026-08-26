@@ -647,14 +647,21 @@ function renderManeuverOrbits(ship, ctx, canvas) {
  * 轨道线每帧随 cachedTime 重锚（锚点 = 宿主"当前时刻"位置），命中缓存的世界坐标
  * 跨帧会与重锚后的轨道线错位（warp 下偏移、zoom 越大越明显）。
  * 本函数与轨道线同帧同源重算：用本帧 segments（_lastOrbitSegments）+ 段锚点，
- * 保证圆点恒贴在线上。返回 { screenX, screenY, worldX, worldY, tToNext } 或 null。
+ * 保证圆点恒贴在线上。返回 { screenX, screenY, worldX, worldY, tToNext,
+ * anchorBody, relX, relY } 或 null——relX/relY 为"相对宿主中心的轨道坐标"（轨道形状
+ * 在宿主参考系固定），冻结后供菜单锚点随宿主/轨道线移动：世界坐标 = 宿主当前时刻
+ * 位置 + 轨道坐标（点始终在轨道线上、不沿轨道滑动）。
  * @param {Object} hit - { segIndex, pointIndex, segT }（findNearestOrbitPoint 产出）
  * @param {HTMLCanvasElement} canvas
  */
 function resolveOrbitHit(hit, canvas) {
-    if (!hit || hit.segIndex === undefined || hit.pointIndex === undefined) return null;
+    if (!hit) return null;
+    // 字段兼容：上游 findNearestOrbitPoint 返回 segmentIndex，悬停通道构造 segIndex；
+    // 统一在此归一（菜单/悬停/未来调用方均不依赖字段名）
+    const segIndex = (hit.segIndex !== undefined) ? hit.segIndex : hit.segmentIndex;
+    if (segIndex === undefined || hit.pointIndex === undefined) return null;
     const segs = _lastOrbitSegments;
-    const seg = segs && segs[hit.segIndex];
+    const seg = segs && segs[segIndex];
     if (!seg || !seg.relPoints || seg.relPoints.length < 2) return null;
 
     const pi = Math.max(0, Math.min(hit.pointIndex, seg.relPoints.length - 2));
@@ -663,8 +670,10 @@ function resolveOrbitHit(hit, canvas) {
     const t = (hit.segT !== undefined) ? Math.max(0, Math.min(1, hit.segT)) : 0;
 
     const anchor = getSegmentAnchor(seg);   // 本帧锚点（与轨道线同源）
-    const wx = (p0.x + (p1.x - p0.x) * t) + anchor.x;
-    const wy = (p0.y + (p1.y - p0.y) * t) + anchor.y;
+    const relX = (p0.x + (p1.x - p0.x) * t);
+    const relY = (p0.y + (p1.y - p0.y) * t);
+    const wx = relX + anchor.x;
+    const wy = relY + anchor.y;
     const s = worldToScreen(wx, wy, canvas);
 
     // 到该点的剩余时间（与渲染帧同一 cachedTime）
@@ -673,7 +682,14 @@ function resolveOrbitHit(hit, canvas) {
         tToNext = Math.max(0, (seg.anchorTime + (p0.t + (p1.t - p0.t) * t)) - getCachedTime());
     }
 
-    return { screenX: s.x, screenY: s.y, worldX: wx, worldY: wy, tToNext };
+    return {
+        screenX: s.x, screenY: s.y,
+        worldX: wx, worldY: wy,
+        tToNext,
+        // 轨道坐标（相对宿主）与宿主名：供锚定菜单点随轨道线移动（冻结后用）
+        anchorBody: seg.anchorBody,
+        relX, relY
+    };
 }
 
 /**

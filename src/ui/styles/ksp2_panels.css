@@ -1846,3 +1846,68 @@
         width: 100%;
     }
 }
+
+/* ---- 轨道线右键菜单（0.3.0 提交5 占位版；参考图式样后续美化） ---- */
+.orbit-context-menu {
+    position: fixed;
+    z-index: 950;
+    background: #10151f;
+    border: 1px solid var(--toolbar-border);
+    box-shadow: 0 0 0 2px #000;
+    border-radius: 4px;
+    padding: 6px;
+    min-width: 180px;
+    font-family: var(--font-mono);
+    user-select: none;
+}
+
+.orbit-context-menu .ocm-title {
+    color: #7DA6E8;
+    font-size: 11px;
+    padding: 2px 6px 6px 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    margin-bottom: 4px;
+}
+
+.orbit-context-menu .ocm-item {
+    padding: 5px 8px;
+    font-size: 12px;
+    color: var(--text-main);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 3px;
+    margin-bottom: 4px;
+    cursor: pointer;
+}
+
+.orbit-context-menu .ocm-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--toolbar-border);
+}
+
+/* ---- 轨道右键菜单锚点层（0.3.0 提交5：菱形选择点 + 竖线连面板，KSP2 式） ---- */
+/* 显示优先级：锚点层 945 > 标签 500 < 面板 950（菜单显示在标签之上） */
+#orbitContextMenuAnchor {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 0;
+    height: 0;
+    z-index: 945;
+    pointer-events: none;
+}
+
+#orbitContextMenuAnchor .ocm-diamond {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    box-sizing: border-box;
+    border: 2px solid var(--toolbar-border);
+    background: rgba(0, 0, 0, 0.4);
+    transform: rotate(45deg);
+}
+
+#orbitContextMenuAnchor .ocm-line {
+    position: absolute;
+    width: 2px;
+    background: var(--toolbar-border);
+}

@@ -1,29 +1,210 @@
 'use strict';
 
-// 轨道右键菜单（0.3.0 骨架 — 功能体待填）
-// 入口：flightScene onContextMenu 在 SAS 右键处理之前，命中轨道线 / Ap/Pe 标记时调用本函数
-// 交互数据来源：renderer.getLastOrbitSegments() / getLastOrbitMarkers()（本帧已绘制的轨道几何，
-// 由 renderer 在 renderOrbit / renderOrbitMarkers 中写入，交互层只读，不与预测引擎直接耦合）
-//
-// 菜单项规划（亡星余孤"不超过 3 选项"原则）：
-//   轨道点右键：
-//     1. 时间加速至此   → timeWarp.warpToTime(当前时刻 + 段内偏移 t)；t 取自命中点 relPoints[i].t
-//                        （t 为自段起点 anchorTime 起的游戏秒偏移，绝对时刻 = anchorTime + t）
-//     2. 创建机动节点   → TODO: 机动节点功能开发中（与 renderManeuverOrbits 的 TODO 同源）
-//     3. 复制轨道坐标   → navigator.clipboard.writeText('{x: 1234.5, y: -678.9}') + 通知反馈
-//   Ap/Pe 标记右键：额外显示"跳转至 Ap/Pe"（= 时间加速到 info.tToAp / info.tToPe）
-//
-// 视觉与关闭模式：固定定位浮动面板，复用 ksp2_panels.css 面板风格，
-// 点击面板外部 / Esc 关闭（参考 uiComponents.js showModuleSelectorPopup 的 closePopup 模式）
+// 轨道线右键菜单（0.3.0 提交5 占位版 + 锚点化）
+// 入口：flightScene 命中轨道线时调用；菜单锚定"点击那一刻的轨道时空点"（KSP2 式）：
+//   - 面板通过"菱形选择点 + 竖线（连面板底边中点）"连接轨道点，与标签的折线（连右上）不同；
+//   - **定点冻结**：锚点 = 点击瞬间解析的世界坐标（不随轨道重锚/宿主移动漂移），
+//     每帧仅做相机变换（worldToScreen）；倒计时归零（到达目标时刻）→ 点与菜单自动消失；
+//   数据为右键点快照（冻结：absTime = anchorTime + 段内偏移，不受时间推进影响）。
+// 本版功能占位：点击项弹"未完成"通知。后续：机动计划 / 时间加速至目标点 / 快进。
+// 显示优先级：#orbitLabels(500) < 锚点层(945) < 面板(950)——菜单显示在标签之上。
+
+import { t } from '../config/strings.js';
+import { eventBus, Events } from '../eventBus.js';
+import { getCachedTime, bodyFuturePos } from '../physics/orbitalPrediction.js';
+import { celestialBodies } from '../physics/physics.js';
+import { formatGameDurationLong } from '../utils/format.js';
+import { worldToScreen } from '../camera.js';
+
+// 菜单项定义（数据驱动：图标字符 + strings key）
+const MENU_ITEMS = [
+    { icon: '+', nameKey: 'orbitMenu.createNode' },
+    { icon: '\u27A4', nameKey: 'orbitMenu.warpToPoint' },   // ➤
+    { icon: '\u27A4', nameKey: 'orbitMenu.toApo' },
+    { icon: '\u27A4', nameKey: 'orbitMenu.toPe' },
+    { icon: '\u27A4', nameKey: 'orbitMenu.toSoi' }
+];
+
+// 面板底边中点与锚点（轨道点）之间的连接间隙：菱形半径(约10) + 竖线段
+const ANCHOR_GAP = 26;
+
+let _menuEl = null;      // 菜单面板
+let _anchorEl = null;    // 锚点层（菱形选择点 + 竖线）
+let _titleEl = null;     // 标题元素（倒计时实时刷新）
+let _menuData = null;    // 右键点快照（冻结）
+
+function closeMenu(silent) {
+    for (const el of [_menuEl, _anchorEl]) {
+        if (el && el.parentNode) {
+            el.remove();
+        }
+    }
+    _menuEl = null;
+    _anchorEl = null;
+    _menuData = null;
+    document.removeEventListener('click', closeOnOutside);
+    document.removeEventListener('keydown', closeOnEsc);
+    // 用户关闭才发关闭事件（音频对称）；幂等清理（打开新菜单前的内部清理）静默
+    if (!silent) {
+        eventBus.emit(Events.UI_PANEL_CLOSED, { panelId: 'orbitContextMenu' });
+    }
+}
+
+function closeOnOutside() {
+    closeMenu(false);
+}
+
+function closeOnEsc(e) {
+    if (e.key === 'Escape') {
+        closeMenu(false);
+    }
+}
 
 /**
- * 显示轨道右键菜单（骨架期仅建立接口，菜单 DOM 与菜单项动作待填）
- * @param {number} clientX - 触发点 clientX（DOM 像素）
- * @param {number} clientY - 触发点 clientY（DOM 像素）
- * @param {Object} data - 命中上下文，两种形态：
- *   轨道点命中：{ worldX, worldY, soiName, isCurrentSoi, timeOffset }
- *   标记命中：  { markerType: 'ap' | 'pe', worldX, worldY, tToNext }
+ * 显示轨道线右键菜单（锚定轨道时空点）
+ * @param {number} clientX - 触发点 clientX（首次定位近似用；之后由 updateOrbitContextMenu 锚定）
+ * @param {number} clientY - 触发点 clientY
+ * @param {Object} data - 点击点快照（冻结）：
+ *   { worldX, worldY, soiName, absTime, tToNext, anchorBody, relX, relY }
+ *   anchorBody + relX/relY = 轨道坐标锚定（点随宿主/轨道线移动，始终在线上）；
+ *   absTime = 目标绝对时刻，倒计时归零时菜单自动消失
+ * @param {HTMLCanvasElement} [canvas] - 画布（相机变换用；flightScene 传入）
  */
-export function showOrbitContextMenu(clientX, clientY, data) {
-    // TODO: 骨架期占位，菜单 DOM 与菜单项动作待填（结构规划见文件头注释）
+export function showOrbitContextMenu(clientX, clientY, data, canvas) {
+    // 幂等：静默清理（菜单未开时不应发关闭事件，防干扰音频时序）
+    closeMenu(true);
+
+    _menuData = data || null;
+
+    const menu = document.createElement('div');
+    menu.className = 'orbit-context-menu';
+
+    // 标题：T-{剩余时间}到目标点（每帧随倒计时刷新；无目标时刻显示 --）
+    const remain = (data && data.absTime !== null && data.absTime !== undefined)
+        ? Math.max(0, data.absTime - getCachedTime())
+        : null;
+    const title = document.createElement('div');
+    title.className = 'ocm-title';
+    title.textContent = 'T-'
+        + (remain !== null ? formatGameDurationLong(remain) : '--')
+        + t('orbitMenu.targetSuffix');
+    menu.appendChild(title);
+    _titleEl = title;
+
+    // 菜单项：占位版——点击弹"未完成"通知并关闭
+    for (const item of MENU_ITEMS) {
+        const row = document.createElement('div');
+        row.className = 'ocm-item';
+        row.textContent = item.icon + ' ' + t(item.nameKey);
+        row.addEventListener('click', (e) => {
+            e.stopPropagation();
+            // TODO: 占位——具体功能（机动计划/时间加速/快进）后续提交实现
+            if (typeof window.showNotification === 'function') {
+                window.showNotification(t('orbitMenu.todo', { name: t(item.nameKey) }), 'info');
+            }
+            closeMenu(false);
+        });
+        menu.appendChild(row);
+    }
+
+    // 首次近似定位（之后由 updateOrbitContextMenu 锚定）
+    menu.style.left = Math.max(4, Math.min(clientX, window.innerWidth - 210)) + 'px';
+    menu.style.top = Math.max(4, Math.min(clientY, window.innerHeight - 250)) + 'px';
+
+    document.body.appendChild(menu);
+    _menuEl = menu;
+
+    // 锚点层（菱形选择点 + 竖线）——始终启用（冻结世界坐标）
+    _anchorEl = document.createElement('div');
+    _anchorEl.id = 'orbitContextMenuAnchor';
+    document.body.appendChild(_anchorEl);
+
+    eventBus.emit(Events.UI_PANEL_OPENED, { panelId: 'orbitContextMenu' });
+    // 延迟绑定：避免打开本菜单的点击事件立即触发关闭
+    setTimeout(() => {
+        document.addEventListener('click', closeOnOutside);
+        document.addEventListener('keydown', closeOnEsc);
+    }, 0);
+
+    // 立即做一次锚定（测量/定位/连线）
+    if (canvas) {
+        updateOrbitContextMenu(canvas);
+    }
+}
+
+/**
+ * 每帧更新锚定位置（flightScene render 循环调用；菜单未开时无操作）：
+ * - **轨道坐标锚定**：世界坐标 = 宿主"当前时刻"位置 + 冻结的轨道相对坐标（relX/relY），
+ *   与轨道线渲染同源——宿主（星球）移动 → 轨道线移动 → 菜单点**跟着轨道线走**，
+ *   始终在线上、不沿轨道滑动；宿主缺失（深空段）时回退冻结世界坐标；
+ * - 倒计时归零：absTime 到达（或已过）→ 点与菜单一起关闭；
+ * - 面板保持"底边中点 经竖线 + 菱形 连到轨道点"，竖直连接（KSP2 式）；防出屏翻转/钳制。
+ * @param {HTMLCanvasElement} canvas
+ */
+export function updateOrbitContextMenu(canvas) {
+    if (!_menuEl || !_menuData || !canvas) return;
+
+    // 倒计时归零 → 菜单与锚点一起消失（目标时空点已到达/走过）
+    if (_menuData.absTime !== null && _menuData.absTime !== undefined
+        && getCachedTime() >= _menuData.absTime) {
+        closeMenu(false);
+        return;
+    }
+
+    // 标题倒计时实时刷新
+    if (_titleEl && _menuData.absTime !== null && _menuData.absTime !== undefined) {
+        const remain = Math.max(0, _menuData.absTime - getCachedTime());
+        _titleEl.textContent = 'T-' + formatGameDurationLong(remain) + t('orbitMenu.targetSuffix');
+    }
+
+    // 轨道坐标锚定：宿主当前时刻位置 + 冻结轨道相对坐标（随轨道线移动）
+    let wx = _menuData.worldX;
+    let wy = _menuData.worldY;
+    if (_menuData.anchorBody && _menuData.relX !== null && _menuData.relX !== undefined
+        && _menuData.relY !== null && _menuData.relY !== undefined) {
+        const hostBody = celestialBodies.find(b => b.name === _menuData.anchorBody);
+        const anchor = hostBody ? bodyFuturePos(hostBody, getCachedTime()) : { x: 0, y: 0 };
+        wx = anchor.x + _menuData.relX;
+        wy = anchor.y + _menuData.relY;
+    }
+    const s = worldToScreen(wx, wy, canvas);
+    const ax = s.x;
+    const ay = s.y;
+    const w = _menuEl.offsetWidth || 200;
+    const h = _menuEl.offsetHeight || 230;
+
+    // 面板：水平居中对齐锚点；默认在锚点上方（底边中点 = 锚点 - ANCHOR_GAP）
+    let left = ax - w / 2;
+    let top = ay - ANCHOR_GAP - h;
+    const flip = top < 4;                 // 上方放不下 → 翻转到锚点下方
+    if (flip) {
+        top = ay + ANCHOR_GAP;
+    }
+    const viewW = (canvas && canvas.width) || window.innerWidth;
+    const viewH = (canvas && canvas.height) || window.innerHeight;
+    left = Math.max(4, Math.min(left, viewW - w - 4));
+    top = Math.max(4, Math.min(top, viewH - h - 4));
+    _menuEl.style.left = left + 'px';
+    _menuEl.style.top = top + 'px';
+
+    // 锚点层：菱形（锚点位置）+ 竖线（锚点 → 面板近边的中点）
+    // 锚点移出屏幕 → 隐藏锚点层（菜单贴边保留；KSP 菜单不跟出屏）
+    const onScreen = ax > 4 && ax < viewW - 4 && ay > 4 && ay < viewH - 4;
+    if (_anchorEl) {
+        _anchorEl.textContent = '';   // 轻量重建（元素极少）
+        if (onScreen) {
+            const diamond = document.createElement('div');
+            diamond.className = 'ocm-diamond';
+            diamond.style.left = (ax - 7) + 'px';
+            diamond.style.top = (ay - 7) + 'px';
+            const panelEdgeY = flip ? top : (top + h);   // 翻转时连面板顶边中点（默认连底边）
+            const line = document.createElement('div');
+            line.className = 'ocm-line';
+            line.style.left = (ax - 1) + 'px';
+            line.style.top = Math.min(ay, panelEdgeY) + 'px';
+            line.style.height = Math.max(1, Math.abs(panelEdgeY - ay)) + 'px';
+            _anchorEl.appendChild(diamond);
+            _anchorEl.appendChild(line);
+        }
+    }
 }
