@@ -4,11 +4,13 @@ import { uiManager } from './uiManager.js';
 import { eventBus, Events } from '../eventBus.js';
 import { SHIP_TEMPLATES } from '../ship/shipTemplates.js';
 import { SHIP_CATEGORIES } from '../ship/shipCategories.js';
-import { getModuleDef, getModuleCategories, getModulesByCategory } from '../ship/moduleTypes.js';
+import { getModuleDef } from '../ship/moduleTypes.js';
 import { stateToKepler } from '../physics/orbitalMechanics.js';
 import { textureManager } from '../graphics/textureManager.js';
-import { renderIconHtml } from './uiComponents.js';
+import { renderIconHtml, showModuleSelectorPopup } from './uiComponents.js';
 import { sceneManager } from '../sceneManager.js';
+import { consumeStorage } from '../resources/cargoSystem.js';
+import { t } from '../config/strings.js';
 
 // EventBus 迁移 — 缓存最近一帧的飞船渲染数据，供 UI 只读函数使用
 let _cachedShipData = null;
@@ -19,47 +21,42 @@ eventBus.on(Events.RENDER_DATA, (data) => {
 // 飞船建造UI - 飞船建造界面弹窗
 const shipBuilderPanel = document.createElement('div');
 shipBuilderPanel.id = 'shipBuilderPanel';
-shipBuilderPanel.style.cssText = `
-    display:none;position:fixed;left:70px;top:50%;transform:translateY(-50%);
-    background:rgba(0,0,0,0.85);border:1px solid #555;border-radius:5px;
-    padding:15px;width:650px;max-height:70vh;overflow:hidden;
-    z-index:999;font-family:monospace;
-`;
 shipBuilderPanel.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;
-        margin-bottom:15px;padding-bottom:8px;border-bottom:1px solid #444;">
-        <h3 style="color:#88ccff;margin:0;font-size:14px;">飞船建造</h3>
-        <button id="shipBuilderCloseBtn" style="padding:4px 10px;background:#333;
-            color:#aaa;border:1px solid #555;border-radius:3px;font-family:monospace;
-            font-size:12px;cursor:pointer;">关闭</button>
+    <div class="ui-panel-header">
+        <h3 class="ui-panel-title">${t('build.title')}</h3>
+        <button id="shipBuilderCloseBtn" class="ui-btn-sm">关闭</button>
     </div>
-    <div style="display:flex;height:calc(100% - 80px);gap:15px;">
-        <div style="width:35%;display:flex;flex-direction:column;gap:10px;">
-            <div style="background:#333;border:1px solid #555;border-radius:3px;
-                padding:10px;height:80px;display:flex;align-items:center;
-                justify-content:center;color:#666;font-size:12px;">NO DATA</div>
-            <div id="shipBuilderCategories" style="flex:1;overflow-y:auto;"></div>
+    <div class="builder-body">
+        <div class="builder-left">
+            <div class="builder-preview">NO DATA</div>
+            <div id="shipBuilderCategories" class="builder-categories"></div>
         </div>
-        <div style="width:65%;display:flex;flex-direction:column;gap:10px;">
-            <div id="shipBuilderStats" style="background:#333;border:1px solid #555;
-                border-radius:3px;padding:10px;color:#666;font-size:12px;">
-                <div>选择飞船查看数据</div>
+        <div class="builder-right">
+            <div id="shipBuilderStats" class="builder-stats">
+                <div>${t('build.selectHint')}</div>
             </div>
-            <div style="flex:1;background:#333;border:1px solid #555;border-radius:3px;
-                padding:8px;overflow:hidden;">
-                <div style="font-size:11px;color:#666;margin-bottom:5px;">模块槽</div>
-                <div id="shipBuilderSlots" style="display:flex;gap:8px;overflow-x:auto;
-                    padding-bottom:5px;"></div>
+            <div class="builder-slots-box">
+                <div class="builder-slots-label">${t('build.moduleSlots')}</div>
+                <div id="shipBuilderSlots" class="builder-slots"></div>
             </div>
         </div>
     </div>
     <div style="position:absolute;bottom:15px;right:15px;">
-        <button id="shipBuilderBuildBtn" style="padding:8px 24px;background:#333;
-            color:#88ccff;border:1px solid #555;border-radius:3px;font-family:monospace;
-            font-size:13px;cursor:pointer;">建造！</button>
+        <button id="shipBuilderBuildBtn" class="ui-btn-primary">${t('build.buildBtn')}</button>
     </div>
 `;
 document.body.appendChild(shipBuilderPanel);
+
+// 飞船建造 - 事件委托（避免字符串 onclick）
+shipBuilderPanel.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    if (btn.dataset.action === 'toggle-category') {
+        toggleShipCategory(btn.dataset.catId);
+    } else if (btn.dataset.action === 'select-ship') {
+        selectShip(btn.dataset.shipId);
+    }
+});
 
 // 飞船系统 - 从配置文件读取飞船数据
 const shipBuilderData = {
@@ -110,21 +107,17 @@ function renderShipBuilderCategories() {
         const ships = shipBuilderData.getShipsByCategory(cat.id);
         const isExpanded = catIndex === 0;
         html += `
-            <div style="border:1px solid #555;border-radius:3px;overflow:hidden;">
-                <div style="padding:8px;background:#333;cursor:pointer;display:flex;
-                    align-items:center;justify-content:space-between;" 
-                    onclick="window.__toggleShipCategory('${cat.id}')">
-                    <span style="color:#88ccff;font-size:12px;">${cat.name}</span>
-                    <span style="color:#666;font-size:10px;">${isExpanded ? '-' : '+'}</span>
+            <div class="builder-cat-box">
+                <div class="builder-cat-header" 
+                    data-action="toggle-category" data-cat-id="${cat.id}">
+                    <span>${cat.name}</span>
+                    <span>${isExpanded ? '-' : '+'}</span>
                 </div>
                 <div id="cat-${cat.id}" style="display:${isExpanded ? 'block' : 'none'};">
-                    ${ships.length === 0 ? '<div style="padding:6px 10px;color:#666;font-size:11px;">暂无飞船</div>' : 
+                    ${ships.length === 0 ? '<div style="padding:6px 10px;color:var(--text-dim);font-size:11px;">' + t('build.noShips') + '</div>' : 
                         ships.map(ship => `
-                            <button onclick="window.__selectShip('${ship.id}')" 
-                                style="width:100%;padding:6px 10px;background:transparent;
-                                border:none;border-bottom:1px solid #444;color:#ddd;
-                                font-family:monospace;font-size:12px;cursor:pointer;
-                                text-align:left;" 
+                            <button data-action="select-ship" 
+                                class="builder-ship-btn" 
                                 data-ship-id="${ship.id}">${ship.name}</button>
                         `).join('')}
                 </div>
@@ -158,6 +151,25 @@ function selectShip(shipId) {
     renderShipBuilderSlots();
 }
 
+// 建造面板 - 计算模板燃料总容量（0.2.0：模板燃料改为 fuelTanks，兼容旧 fuelCapacity）
+function getTemplateFuelTotal(ship) {
+    if (!ship) return 0;
+    if (ship.fuelTanks) {
+        return Object.values(ship.fuelTanks).reduce((sum, cap) => sum + (cap || 0), 0);
+    }
+    return ship.fuelCapacity ?? 0;
+}
+
+// 建造面板 - 满燃料 ΔV（KSP 式火箭方程），含已选模块的干质量加成
+function computeTemplateDeltaV(ship, massBonus) {
+    if (!ship || !ship.isp) return 0;
+    const g0 = 9.81;
+    const dryMass = (ship.dryMass || 0) + (massBonus || 0);
+    const totalMass = dryMass + getTemplateFuelTotal(ship);
+    if (dryMass <= 0 || totalMass <= dryMass) return 0;
+    return ship.isp * g0 * Math.log(totalMass / dryMass);
+}
+
 // 建造面板 - 更新 stats 显示（含简介 + 模块加成括号）
 function updateShipBuilderStats() {
     const ship = selectedShip;
@@ -166,6 +178,7 @@ function updateShipBuilderStats() {
     // 计算模块累计加成
     let totalMassBonus = 0;
     let totalMoiBonus = 0;
+    let totalModuleCost = 0;
     const slots = selectedModules;
     if (slots) {
         slots.forEach(modId => {
@@ -174,6 +187,7 @@ function updateShipBuilderStats() {
                 if (def) {
                     totalMassBonus += def.massBonus;
                     totalMoiBonus += def.momentOfInertiaBonus;
+                    totalModuleCost += (def.price || 0);
                 }
             }
         });
@@ -185,200 +199,57 @@ function updateShipBuilderStats() {
         ? ship.dryMass.toFixed(1) + ' t'
         : '-';
     const bonusMassStr = hasBonus
-        ? ` <span style="color:#666;">(${totalMassBonus > 0 ? '+' : ''}${totalMassBonus.toFixed(1)} t)</span>`
+        ? ` <span style="color:var(--text-dim);">(${totalMassBonus > 0 ? '+' : ''}${totalMassBonus.toFixed(1)} t)</span>`
         : '';
 
     const moiStr = ship.momentOfInertia != null
         ? ship.momentOfInertia.toFixed(0) + ' kg·m²'
         : '-';
     const bonusMoiStr = hasBonus && ship.momentOfInertia != null
-        ? ` <span style="color:#666;">(${totalMoiBonus > 0 ? '+' : ''}${totalMoiBonus.toFixed(0)})</span>`
+        ? ` <span style="color:var(--text-dim);">(${totalMoiBonus > 0 ? '+' : ''}${totalMoiBonus.toFixed(0)})</span>`
         : '';
 
     // 简介行（有 description 时才显示 + 分隔线）
     const descHtml = ship.description
-        ? `<div style="color:#aaa;font-size:11px;margin-bottom:6px;">${ship.description}</div>
-        <hr style="border:none;border-top:1px solid #444;margin:6px 0 8px 0;">`
+        ? `<div style="color:var(--text-mid);font-size:11px;margin-bottom:6px;">${ship.description}</div>
+        <hr style="border:none;border-top:1px solid var(--theme-border-row);margin:6px 0 8px 0;">`
         : '';
 
     const statsEl = document.getElementById('shipBuilderStats');
+    const totalCost = (ship.cost || 0) + totalModuleCost;
     statsEl.innerHTML = `
-        <div style="color:#88ccff;font-weight:bold;margin-bottom:4px;font-size:13px;">${ship.name}</div>
+        <div style="color:var(--accent);font-weight:bold;margin-bottom:4px;font-size:13px;">${ship.name}</div>
         ${descHtml}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-            <div><span style="color:#666;">干质量:</span> <span style="color:#fff;">${massStr}${bonusMassStr}</span></div>
-            <div><span style="color:#666;">推力:</span> <span style="color:#fff;">${ship.maxThrust != null ? ship.maxThrust.toFixed(0) : '-'} N</span></div>
-            <div><span style="color:#666;">ΔV:</span> <span style="color:#fff;">${ship.initialDeltaV != null ? ship.initialDeltaV.toFixed(0) : '-'} m/s</span></div>
-            <div><span style="color:#666;">燃料:</span> <span style="color:#fff;">${ship.fuelCapacity != null ? ship.fuelCapacity.toFixed(0) : '-'}</span></div>
-            <div><span style="color:#666;">转动惯量:</span> <span style="color:#fff;">${moiStr}${bonusMoiStr}</span></div>
-            <div><span style="color:#666;">槽位:</span> <span style="color:#fff;">${ship.moduleSlots != null ? ship.moduleSlots : '-'}</span></div>
+            <div><span style="color:var(--text-dim);">${t('build.dryMass')}</span> <span style="color:var(--text-bright);">${massStr}${bonusMassStr}</span></div>
+            <div><span style="color:var(--text-dim);">${t('build.thrust')}</span> <span style="color:var(--text-bright);">${ship.maxThrust != null ? ship.maxThrust.toFixed(0) : '-'} N</span></div>
+            <div><span style="color:var(--text-dim);">${t('build.dv')}</span> <span style="color:var(--text-bright);">${computeTemplateDeltaV(ship, totalMassBonus).toFixed(0)} m/s</span></div>
+            <div><span style="color:var(--text-dim);">${t('build.fuel')}</span> <span style="color:var(--text-bright);">${getTemplateFuelTotal(ship).toFixed(0)}</span></div>
+            <div><span style="color:var(--text-dim);">${t('build.moi')}</span> <span style="color:var(--text-bright);">${moiStr}${bonusMoiStr}</span></div>
+            <div><span style="color:var(--text-dim);">${t('build.slots')}</span> <span style="color:var(--text-bright);">${ship.moduleSlots != null ? ship.moduleSlots : '-'}</span></div>
         </div>
+        <div style="margin-top:8px;font-size:11px;color:#cc8;">${t('economy.buildCost', { cost: totalCost })}${totalModuleCost > 0 ? t('build.costIncludesModules', { cost: totalModuleCost }) : ''}</div>
     `;
 }
 
-// 模块系统 - 模块选择弹窗
+// 模块系统 - 模块选择弹窗（0.2.7 统一走共享组件 showModuleSelectorPopup）
 function showModuleSelector(slotIndex, slotElement) {
-    // 移除已有弹窗
-    const existing = document.querySelector('.module-selector-popup');
-    if (existing) existing.remove();
-
-    const rect = slotElement.getBoundingClientRect();
-
-    const popup = document.createElement('div');
-    popup.className = 'module-selector-popup';
-    popup.style.cssText = `
-        position:fixed;left:${rect.right + 8}px;top:${rect.top}px;
-        background:rgba(0,0,0,0.92);border:1px solid #555;border-radius:4px;
-        padding:6px 0;min-width:180px;max-height:300px;overflow-y:auto;
-        z-index:10001;font-family:monospace;font-size:12px;color:#ddd;
-    `;
-
-    const currentModuleId = selectedModules[slotIndex];
-
-    // 已安装提示
-    if (currentModuleId) {
-        const def = getModuleDef(currentModuleId);
-        if (def) {
-            const installedRow = document.createElement('div');
-            installedRow.style.cssText = 'padding:4px 10px;color:#666;border-bottom:1px solid #444;margin-bottom:4px;';
-            installedRow.innerHTML = `已安装: <span style="color:#88ccff;">${renderIconHtml(def.iconTextureKey, def.icon)} ${def.name}</span>`;
-            popup.appendChild(installedRow);
-        }
-    }
-
-    // 分类分组
-    const categories = getModuleCategories();
-    const allExpanded = {};
-
-    categories.forEach((cat, catIdx) => {
-        allExpanded[cat.id] = true;
-
-        // 分类标题行
-        const header = document.createElement('div');
-        header.style.cssText = `
-            padding:4px 10px;cursor:pointer;display:flex;
-            align-items:center;justify-content:space-between;
-            color:#88ccff;font-size:11px;user-select:none;
-        `;
-        header.innerHTML = `<span>${cat.name}</span><span style="color:#666;font-size:10px;">-</span>`;
-        popup.appendChild(header);
-
-        // 模块列表容器
-        const listContainer = document.createElement('div');
-        listContainer.style.display = 'block';
-        popup.appendChild(listContainer);
-
-        const modules = getModulesByCategory(cat.id);
-        const toggleSpan = header.querySelector('span:last-child');
-
-        header.addEventListener('click', () => {
-            allExpanded[cat.id] = !allExpanded[cat.id];
-            listContainer.style.display = allExpanded[cat.id] ? 'block' : 'none';
-            toggleSpan.textContent = allExpanded[cat.id] ? '-' : '+';
-        });
-
-        modules.forEach(modDef => {
-            const row = document.createElement('div');
-            row.style.cssText = `
-                padding:4px 10px;cursor:pointer;display:flex;
-                align-items:center;gap:4px;font-size:11px;
-            `;
-            row.innerHTML = `${renderIconHtml(modDef.iconTextureKey, modDef.icon)} ${modDef.name} <span style="color:#666;font-size:10px;">(+${modDef.massBonus.toFixed(1)}t +${modDef.momentOfInertiaBonus.toFixed(0)}惯)</span>`;
-
-            // Tooltip
-            let tooltip = null;
-            row.addEventListener('mouseenter', () => {
-                tooltip = document.createElement('div');
-                tooltip.className = 'module-tooltip';
-                tooltip.style.cssText = `
-                    position:fixed;z-index:10002;
-                    background:rgba(0,0,0,0.92);border:1px solid #555;
-                    border-radius:4px;padding:8px 10px;min-width:160px;
-                    font-family:monospace;font-size:11px;color:#ddd;
-                    pointer-events:none;
-                `;
-                tooltip.innerHTML = `
-                    <div style="color:#88ccff;font-weight:bold;margin-bottom:4px;">${modDef.name}</div>
-                    <div style="color:#aaa;margin-bottom:4px;">${modDef.description}</div>
-                    <div style="color:#666;">干质量加成: +${modDef.massBonus.toFixed(1)} t</div>
-                    <div style="color:#666;">转动惯量加成: +${modDef.momentOfInertiaBonus.toFixed(0)} kg·m²</div>
-                `;
-                document.body.appendChild(tooltip);
-                const rowRect = row.getBoundingClientRect();
-                tooltip.style.left = (rowRect.right + 8) + 'px';
-                tooltip.style.top = rowRect.top + 'px';
-            });
-            row.addEventListener('mouseleave', () => {
-                if (tooltip) { tooltip.remove(); tooltip = null; }
-            });
-
-            // 点击安装/替换
-            row.addEventListener('click', (e) => {
-                e.stopPropagation();
-                selectedModules[slotIndex] = modDef.id;
-                popup.remove();
-                if (tooltip) tooltip.remove();
-                renderShipBuilderSlots();
-                updateShipBuilderStats();
-            });
-
-            // hover 样式
-            row.addEventListener('mouseenter', () => {
-                row.style.background = 'rgba(136,204,255,0.1)';
-            });
-            row.addEventListener('mouseleave', () => {
-                row.style.background = 'transparent';
-            });
-
-            listContainer.appendChild(row);
-        });
-    });
-
-    // 卸载选项（仅已安装时）
-    if (currentModuleId) {
-        const uninstallRow = document.createElement('div');
-        uninstallRow.style.cssText = `
-            padding:4px 10px;color:#c44;cursor:pointer;border-top:1px solid #444;
-            margin-top:4px;font-size:11px;
-        `;
-        uninstallRow.textContent = '卸载';
-        uninstallRow.addEventListener('mouseenter', () => {
-            uninstallRow.style.background = 'rgba(170,68,68,0.15)';
-        });
-        uninstallRow.addEventListener('mouseleave', () => {
-            uninstallRow.style.background = 'transparent';
-        });
-        uninstallRow.addEventListener('click', (e) => {
-            e.stopPropagation();
-            selectedModules[slotIndex] = null;
-            popup.remove();
+    showModuleSelectorPopup({
+        anchorEl: slotElement,
+        onSelect: (modDef) => {
+            selectedModules[slotIndex] = modDef.id;
             renderShipBuilderSlots();
             updateShipBuilderStats();
-        });
-        popup.appendChild(uninstallRow);
-    }
-
-    document.body.appendChild(popup);
-
-    // 关闭逻辑
-    const closeHandler = (e) => {
-        if (!popup.contains(e.target) && e.target !== slotElement) {
-            popup.remove();
-            document.removeEventListener('click', closeHandler);
-            document.removeEventListener('keydown', escHandler);
-        }
-    };
-    const escHandler = (e) => {
-        if (e.key === 'Escape') {
-            popup.remove();
-            document.removeEventListener('click', closeHandler);
-            document.removeEventListener('keydown', escHandler);
-        }
-    };
-    setTimeout(() => {
-        document.addEventListener('click', closeHandler);
-        document.addEventListener('keydown', escHandler);
-    }, 0);
+        },
+        onUninstall: () => {
+            selectedModules[slotIndex] = null;
+            renderShipBuilderSlots();
+            updateShipBuilderStats();
+        },
+        installedModuleId: selectedModules[slotIndex],
+        showBonuses: true,
+        showTooltip: true
+    });
 }
 
 // 模块系统 - 渲染模块槽（读取 selectedModules）
@@ -389,41 +260,27 @@ function renderShipBuilderSlots() {
     const slots = selectedModules;
     
     if (!slots || slots.length === 0) {
-        slotsEl.innerHTML = '<div style="color:#666;font-size:11px;">暂无模块槽</div>';
+        slotsEl.innerHTML = '<div style="color:var(--text-dim);font-size:11px;">' + t('build.noSlots') + '</div>';
         return;
     }
     
     slots.forEach((moduleTypeId, index) => {
         const slotDiv = document.createElement('div');
-        slotDiv.style.cssText = `
-            min-width:80px;padding:8px;background:#222;border:1px solid #555;
-            border-radius:3px;text-align:center;color:#ddd;font-size:11px;
-            flex-shrink:0;cursor:pointer;transition:all 0.2s ease;
-        `;
+        slotDiv.className = 'builder-slot';
 
         const def = moduleTypeId ? getModuleDef(moduleTypeId) : null;
 
         if (def) {
             slotDiv.innerHTML = `
-                <div style="color:#88ccff;font-size:10px;margin-bottom:4px;">槽${index + 1}</div>
+                <div class="builder-slot-label">${t('build.slotIndex', { i: index + 1 })}</div>
                 <div style="font-size:11px;">${renderIconHtml(def.iconTextureKey, def.icon)} ${def.name}</div>
             `;
         } else {
             slotDiv.innerHTML = `
-                <div style="color:#88ccff;font-size:10px;margin-bottom:4px;">槽${index + 1}</div>
-                空
+                <div class="builder-slot-label">${t('build.slotIndex', { i: index + 1 })}</div>
+                ${t('build.slotEmpty')}
             `;
         }
-        
-        // TEMP: 飞船建造UI-占位 - 鼠标悬停样式
-        slotDiv.addEventListener('mouseenter', () => {
-            slotDiv.style.borderColor = '#88ccff';
-            slotDiv.style.background = '#2a2a3a';
-        });
-        slotDiv.addEventListener('mouseleave', () => {
-            slotDiv.style.borderColor = '#555';
-            slotDiv.style.background = '#222';
-        });
         
         // 模块系统 - 点击打开模块选择弹窗
         slotDiv.addEventListener('click', (e) => {
@@ -438,7 +295,7 @@ function renderShipBuilderSlots() {
 // 飞船建造UI - 建造按钮（完整闭环）
 function buildShip() {
     if (!selectedShip) {
-        window.showNotification('请先选择一艘飞船', 'warning');
+        window.showNotification(t('build.selectShipFirst'), 'warning');
         return;
     }
 
@@ -446,7 +303,7 @@ function buildShip() {
     const bodies = window.__celestialBodies || [];
     const homeworld = bodies.find(b => b.isHomeworld);
     if (!homeworld) {
-        window.showNotification('找不到起始天体数据', 'error');
+        window.showNotification(t('build.noHomeBody'), 'error');
         return;
     }
 
@@ -454,13 +311,13 @@ function buildShip() {
 
     // 弹出轨道高度输入框
     window.__createInputDialog(
-        '选择轨道高度',
-        '请输入绕 ' + homeworld.name + ' 的轨道半径（米）',
+        t('build.chooseAltitude'),
+        t('build.altitudePrompt', { name: homeworld.name }),
         String(defaultOrbitR),
         (radiusStr) => {
             const radius = parseFloat(radiusStr);
             if (isNaN(radius) || radius <= 0) {
-                window.showNotification('请输入有效数字', 'error');
+                window.showNotification(t('build.invalidNumber'), 'error');
                 return;
             }
 
@@ -470,11 +327,27 @@ function buildShip() {
             const vel = { x: 0, y: orbitalSpeed };
 
             // 创建飞船实例
-            const shipName = selectedShip.name + '号';
+            const shipName = t('build.shipNameSuffix', { name: selectedShip.name });
             const installedModules = selectedModules.filter(m => m !== null);
+            // 0.2.0 阶段5：建造扣费从当前设施存储扣（全局资源已退场，只留科技点）
+            const moduleCost = installedModules.reduce((sum, id) => {
+                const def = getModuleDef(id);
+                return sum + ((def && def.price) || 0);
+            }, 0);
+            const totalCost = (selectedShip.cost || 0) + moduleCost;
+            const facility = window.__getControlledFacility ? window.__getControlledFacility() : null;
+            if (!facility) {
+                window.showNotification(t('build.noFacility'), 'error');
+                return;
+            }
+            if (!consumeStorage(facility, 'materialKits', totalCost)) {
+                window.showNotification(t('economy.insufficientKits'), 'error');
+                return;
+            }
+
             const newShip = window.__shipSystem.createShip(selectedShip.id, shipName, installedModules);
             if (!newShip) {
-                window.showNotification('飞船创建失败', 'error');
+                window.showNotification(t('build.createFailed'), 'error');
                 return;
             }
 
@@ -496,25 +369,21 @@ function buildShip() {
 
             // 关闭建造面板，切换到飞行场景
             uiManager.hidePanel('shipBuilder');
-            window.showNotification('飞船建造完成，已发射！', 'success');
+            window.showNotification(t('build.launched'), 'success');
             sceneManager.switchTo('flight');
         },
         () => {
-            window.showNotification('建造已取消', 'info');
+            window.showNotification(t('build.cancelled'), 'info');
         }
     );
 }
-
-// 飞船建造UI - 暴露函数到全局
-window.__toggleShipCategory = toggleShipCategory;
-window.__selectShip = selectShip;
 
 // 飞船建造UI - 打开建造界面
 window.openShipBuilder = function() {
     renderShipBuilderCategories();
     selectedShip = null;
     document.getElementById('shipBuilderStats').innerHTML = 
-        '<div>选择飞船查看数据</div>';
+        '<div>' + t('build.selectHint') + '</div>';
     document.getElementById('shipBuilderSlots').innerHTML = '';
     // 关闭 toolbarPanel（与 shipBuilderPanel 互斥）
     const tp = document.getElementById('toolbarPanel');

@@ -1,0 +1,20 @@
+{
+  "totalRuns": 1,
+  "totalRawTokens": 11152,
+  "totalCompressedTokens": 366,
+  "totalSavedTokens": 10786,
+  "averageSavingsPercent": 97,
+  "firstRunAt": "2026-08-26T17:44:39.191Z",
+  "lastRunAt": "2026-08-26T17:44:39.191Z",
+  "recentRecords": [
+    {
+      "timestamp": "2026-08-26T17:44:39.191Z",
+      "query": "公告 星系图 百科 UI 面板 性能 卡顿",
+      "rawTokens": 11152,
+      "compressedTokens": 366,
+      "savingsPercent": 97,
+      "source": "preview_context",
+      "kind": "tokens-not-fidelity"
+    }
+  ]
+}

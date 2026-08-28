@@ -1,20 +1,32 @@
 import { shipSystem } from '../ship/shipSystem.js';
-import { camera } from '../camera.js';
+import { camera, screenToWorld } from '../camera.js';
 import { inputManager } from '../input.js';
 import { eventBus, Events } from '../eventBus.js';
 import { updateShipPhysics } from '../physics/physicsUpdate.js';
 import { updateCelestialBodies, getSOIHost, getAbsolutePosition, getRelativePosition, convertVelocityFrame, celestialBodies } from '../physics/physics.js';
 import { stateToKepler } from '../physics/orbitalMechanics.js';
-import { render, renderFlightHud } from '../renderer.js';
+import { timeToNextSOISwitch } from '../physics/orbitalPrediction.js';
+import { render, renderFlightHud, getLastOrbitSegments, getLastOrbitMarkers, setOrbitHoverState, findNearestOrbitPoint, resolveOrbitHit } from '../renderer.js';
+import { showOrbitContextMenu, updateOrbitContextMenu } from '../ui/orbitContextMenu.js';
+import { formatDuration } from '../utils/format.js';
 import { sceneManager } from '../sceneManager.js';
 import { gameState } from '../gameState.js';
 import { SASController } from '../ship/sasController.js';
 import { SAS_CYCLE_ORDER, SAS_DIRECTION_ORDER, computeNavballDirections as computeSasDirections } from '../ship/sasModes.js';
 import { sasUI } from '../ui/sasUI.js';
+import { showTooltip, hideTooltip } from '../ui/uiTooltip.js';
+import { clearOrbitLabels } from '../ui/orbitLabels.js';
 import { facilitySystem } from '../facility/facilitySystem.js';
 import { getModuleDef } from '../ship/moduleTypes.js';
 import { getFacilityType } from '../facility/facilityTypes.js';
+import { getTotalMass, getResource, getFuelAmount, getFuelCapacity } from '../resources/resourceSystem.js';
+import { updateScanProgress } from '../resources/scanSystem.js';
+import { getEngineType } from '../resources/engineConfig.js';
+import { consumeCargo, hasCargoHold, getCargoAmount } from '../resources/cargoSystem.js';
+import { isBalanceEnforced } from '../resources/modeRules.js';
 import { timeWarp } from '../timeWarp.js';
+import { getSOIWarpProtectEnabled } from '../config/settingsConfig.js';
+import { t } from '../config/strings.js';
 
 // 由 main.js 在注册时注入的依赖
 let _throttleRate = 1.0;
@@ -27,9 +39,16 @@ let _activeFacilityId = null;  // 当前控制的设施 ID（无活动飞船时�
 let _dockPromptFacId = null;   // 当前显示对接弹窗的设施 ID（防止重复 show）
 let _lastToolbarMode = null;         // 统一工具栏脏检测：上一次的 mode
 let _lastToolbarFingerprint = null; // 统一工具栏脏检测：上一次的数据指纹（含模块列表）
+let _lastMouseX = -1;          // 最近鼠标画布 CSS 坐标（-1 = 未知/离开画布）
+let _lastMouseY = -1;
+let _lastClientX = 0;          // 最近鼠标视口坐标（供工具提示定位）
+let _lastClientY = 0;
+let _lastOrbitHit = null;      // 轨道线命中缓存（含世界坐标；悬停滞后/工具提示用）
+let _lastOrbitTipX = -9999;    // 最近一次工具提示触发时鼠标位置（移动防抖）
+let _lastOrbitTipY = -9999;
 
 // 可见性筛选状态 — 控制飞行场景中非活动飞船/设施的显示
-let _visibilityState = { ships: true, facilities: true, facilityRange: true, bodyOrbits: true };
+let _visibilityState = { ships: true, facilities: true, facilityRange: true, bodyOrbits: true, soiLabels: true };
 
 // 暴露到全局供 sasUI 面板调用
 window.__visibilityState = _visibilityState;
@@ -148,20 +167,31 @@ eventBus.on(Events.SHIP_COMMAND, ({ action, params }) => {
                 return def?.capability === 'deploy_facility';
             });
             if (!hasModule) {
-                window.showNotification('未挂载建设集成模块', 'warning');
+                window.showNotification(t('deploy.noModule'), 'warning');
+                break;
+            }
+
+            // 0.2.0 阶段5：部署设施消耗材料套装（从部署飞船货仓扣除）
+            // 修复：扣费校验前置但实际扣除后移 —— 原实现在所有轨道校验之前扣费，
+            // 校验失败（逃逸轨道/危险区）时材料套装已被扣但设施未部署（资源丢失）
+            // 0.2.0 阶段7：自由模式跳过余额检查（不足不拦截），货仓存在性检查保留
+            const deployTypeCfg = getFacilityType(typeId);
+            const deployCost = (deployTypeCfg && deployTypeCfg.cost) || 0;
+            if (deployCost > 0 && (!hasCargoHold(ship) || (isBalanceEnforced() && getCargoAmount(ship, 'materialKits') < deployCost))) {
+                window.showNotification(t('deploy.noKits'), 'warning');
                 break;
             }
 
             // 检查在宿主 SOI 内且在轨
             if (!ship.currentSOI || ship.mode !== 'on_rails') {
-                window.showNotification('必须在稳定轨道上才能部署设施', 'warning');
+                window.showNotification(t('deploy.needStableOrbit'), 'warning');
                 break;
             }
 
             // 检查是否为稳定轨道（禁止逃逸轨道上部署，防止设施 SOI 切换 Bug）
             // 双曲线轨道 kepler.a < 0（e>=1 无椭圆解），椭圆/圆轨道 a > 0
             if (!ship.kepler || ship.kepler.a < 0) {
-                window.showNotification('逃逸轨道上无法部署设施，需在椭圆/圆轨道上进行', 'warning');
+                window.showNotification(t('deploy.noEscapeTrajectory'), 'warning');
                 break;
             }
 
@@ -176,10 +206,29 @@ eventBus.on(Events.SHIP_COMMAND, ({ action, params }) => {
                     ? hostBody.radius + hostBody.atmosphereHeight
                     : hostBody.radius;
                 if (shipDist < hazardBoundary) {
-                    window.showNotification('无法在危险区域内部署设施（大气层/表面范围内）', 'warning');
+                    window.showNotification(t('deploy.dangerZone'), 'warning');
                     break;
                 }
             }
+
+            // 创建设施（createFacility 期望绝对世界坐标，需从相对坐标转换）
+            const absPos = getAbsolutePosition(ship);
+            const typeCfg = getFacilityType(typeId);
+            const facilityName = params?.facilityName || (typeCfg ? t('deploy.newName', { name: typeCfg.name }) : t('deploy.newFacility'));
+            const facility = facilitySystem.createFacility(
+                typeId,
+                facilityName,
+                { x: absPos.x, y: absPos.y },
+                { x: ship.vel.x, y: ship.vel.y },
+                ship.currentSOI
+            );
+
+            // 设施创建成功后才真正扣费 + 消耗建设模块（避免失败时资源/模块丢失）
+            if (!facility) {
+                window.showNotification(t('deploy.failed'), 'error');
+                break;
+            }
+            if (deployCost > 0) consumeCargo(ship, 'materialKits', deployCost);
 
             // 消耗建设模块（移除第一个匹配的）
             const modIndex = ship.modules.findIndex(m => {
@@ -194,46 +243,31 @@ eventBus.on(Events.SHIP_COMMAND, ({ action, params }) => {
             }
             shipSystem.persistShip(ship);
 
-            // 创建设施（createFacility 期望绝对世界坐标，需从相对坐标转换）
-            const absPos = getAbsolutePosition(ship);
-            const typeCfg = getFacilityType(typeId);
-            const facilityName = params?.facilityName || (typeCfg ? '新建' + typeCfg.name : '新建设施');
-            const facility = facilitySystem.createFacility(
-                typeId,
-                facilityName,
-                { x: absPos.x, y: absPos.y },
-                { x: ship.vel.x, y: ship.vel.y },
-                ship.currentSOI
-            );
-
-            if (facility) {
-                window.showNotification(`${facilityName} 部署成功`, 'success');
-            } else {
-                window.showNotification('设施部署失败', 'error');
-            }
+            window.showNotification(t('deploy.success', { name: facilityName }), 'success');
             break;
         }
         case 'deployToBody': {
             const targetBody = celestialBodies.find(b => b.name === params.targetBody);
             if (!targetBody) {
-                window.showNotification('目标天体不存在', 'error');
+                window.showNotification(t('deploy.noTargetBody'), 'error');
                 break;
             }
             const orbitR = targetBody.radius + params.altitude;
             if (orbitR >= targetBody.soiRadius) {
-                window.showNotification('轨道高度超出天体引力范围', 'error');
+                window.showNotification(t('deploy.altitudeOutOfRange'), 'error');
                 break;
             }
             ship.pos = { x: orbitR, y: 0 };
             const v = Math.sqrt(targetBody.gm / orbitR);
-            ship.vel = { x: 0, y: -v };
+            // 顺行（逆时针，与天体公转同向）：pos 在 +x 时速度沿 +y
+            ship.vel = { x: 0, y: v };
             ship.currentSOI = targetBody.name;
             ship.currentGM = targetBody.gm;
             ship.kepler = stateToKepler(ship.pos, ship.vel, targetBody.gm);
             ship.orbitTime = 0;
             ship.mode = 'on_rails';
             ship.thrust = { ax: 0, ay: 0 };
-            window.showNotification(`已部署到 ${targetBody.name} 轨道，高度 ${params.altitude}`, 'success');
+            window.showNotification(t('deploy.deployedAt', { name: targetBody.name, altitude: params.altitude }), 'success');
             break;
         }
     }
@@ -263,6 +297,112 @@ export function computeNavballDirections(ship, host) {
         radialIn: dirs.radialIn !== null ? { angle: dirs.radialIn } : null,
         radialOut: dirs.radialOut !== null ? { angle: dirs.radialOut } : null
     };
+}
+
+/**
+ * 轨道悬停检测（0.3.0 提交4，每帧渲染驱动版 + 悬停滞后防鬼畜）：
+ *   标记锚点命中（12px 半径）优先 → 轨道线点-线段命中；
+ *   结果写入渲染层悬停通道（setOrbitHoverState，renderOrbitMarkers 消费：轨道点圆点）。
+ * 时间加速稳定化：
+ *   - 命中滞后（hysteresis）：命中维持阈值 8px、释放阈值 10px —— 轨道/锚点帧间
+ *     移动导致 8px 边缘振荡时不闪烁（warp 鬼畜主因之一）；
+ *   - 命中缓存 _lastOrbitHit：圆点挂在命中点上随轨道平滑滑动，不再逐帧跳变。
+ * Tooltip 不在此处处理（改由 mousemove 事件驱动 updateOrbitTooltip，见下）。
+ * 数据源：渲染层本帧已绘制几何（getLastOrbitSegments/getLastOrbitMarkers），
+ * 不与预测引擎直接耦合；由渲染循环每帧驱动（用最后鼠标坐标）。
+ * @param {number} cssX - 画布 CSS 像素 x
+ * @param {number} cssY - 画布 CSS 像素 y
+ */
+function updateOrbitHover(cssX, cssY) {
+    const ship = shipSystem.getActiveShip();
+    if (!ship) {
+        setOrbitHoverState(null);
+        _lastOrbitHit = null;
+        return;
+    }
+
+    const rect = _canvas.getBoundingClientRect();
+    // canvas 坐标空间换算（画布物理像素 = CSS 像素 × canvas.width/rect.width，兼容 DPR/缩放）
+    const canvasX = cssX * (_canvas.width / rect.width);
+    const canvasY = cssY * (_canvas.height / rect.height);
+
+    // 1. 标记锚点命中（菱形锚点）
+    let hoveredMarker = null;
+    const markers = getLastOrbitMarkers() || [];
+    for (const mk of markers) {
+        if (Math.hypot(canvasX - mk.screenX, canvasY - mk.screenY) < 12) {
+            hoveredMarker = mk;
+            break;
+        }
+    }
+
+    // 2. 轨道线命中（屏幕空间点-线段距离；标记优先于轨道线）
+    let nearest = null;
+    if (!hoveredMarker) {
+        const segments = getLastOrbitSegments();
+        if (segments && segments.length > 0) {
+            const mouseWorld = screenToWorld(canvasX, canvasY, _canvas);
+            nearest = findNearestOrbitPoint(segments, mouseWorld, 8, _canvas);
+        }
+    }
+
+    // 3. 悬停滞后：未命中但上次命中点仍在 10px 内（屏幕）→ 保持命中（防 8px 阈值边缘帧间振荡）。
+    //    位置检测用"当前帧重算"（resolveOrbitHit：与轨道线同源，warp 重锚下不漂移）
+    if (!nearest && !hoveredMarker && _lastOrbitHit) {
+        const cur = resolveOrbitHit(_lastOrbitHit, _canvas);
+        if (cur && Math.hypot(cur.screenX - canvasX, cur.screenY - canvasY) < 10) {
+            nearest = _lastOrbitHit;
+        } else {
+            _lastOrbitHit = null;
+        }
+    }
+    if (nearest) _lastOrbitHit = nearest;
+    if (!nearest) _lastOrbitHit = null;
+
+    // 4. 写入渲染层悬停通道（命中参数形态：渲染端每帧同源重算，跨帧零错位）
+    setOrbitHoverState(hoveredMarker || (nearest
+        ? {
+              type: 'orbitPoint',
+              segIndex: nearest.segmentIndex,
+              pointIndex: nearest.pointIndex,
+              segT: nearest.segT,
+              soiName: nearest.segSoiName,
+              timeOffset: nearest.timeOffset
+          }
+        : null));
+}
+
+/**
+ * 轨道线 Tooltip（0.3.0 提交4）：仅由 mousemove 事件驱动，且鼠标移动距离防抖
+ * （>20px 才触发，避免 warp 下每帧指纹变化导致 500ms 延迟定时器反复重置、提示不显示/闪烁）。
+ * 内容取每帧更新缓存的 _lastOrbitHit。
+ * @param {MouseEvent} e - 原始事件（clientX/clientY 供定位）
+ */
+function updateOrbitTooltip(e, x, y) {
+    const hit = _lastOrbitHit;
+    const moved = Math.hypot(x - _lastOrbitTipX, y - _lastOrbitTipY) > 20;
+    // 内容用当前帧重算（与轨道线同源）：位置/到达时间随 warp 推进实时准确
+    const cur = hit ? resolveOrbitHit(hit, _canvas) : null;
+    if (cur && moved) {
+        _lastOrbitTipX = x;
+        _lastOrbitTipY = y;
+        const hostBody = celestialBodies.find(b => b.name === hit.soiName);
+        const alt = hostBody
+            ? Math.hypot(cur.worldX - hostBody.position.x, cur.worldY - hostBody.position.y) - hostBody.radius
+            : null;
+        const altText = alt !== null
+            ? (Math.abs(alt) >= 1000 ? (alt / 1000).toFixed(1) + ' km' : alt.toFixed(0) + ' m')
+            : '--';
+        const tText = cur.tToNext !== null ? formatDuration(cur.tToNext) : '--';
+        showTooltip(
+            (hit.soiName || t('orbit.type.deepSpace')) + ' · ALT ' + altText + ' · T+ ' + tText,
+            e.clientX, e.clientY
+        );
+    } else if (!cur) {
+        _lastOrbitTipX = x;
+        _lastOrbitTipY = y;
+        hideTooltip();
+    }
 }
 
 /**
@@ -297,8 +437,8 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 delete window.__pendingFacilityId;
             }
 
-            // 显示可见性筛选面板
-            sasUI.showVisibilityPanel();
+            // 显示可见性筛选面板（场景进入自动打开，不产生打开音效）
+            sasUI.showVisibilityPanel({ silent: true });
 
             // SAS 集成 — 为所有现有飞船初始化 SAS 控制器（新建 / 读档后都需要）
             for (const ship of shipSystem.getAllShips()) {
@@ -338,7 +478,37 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 if (!ship) return;
 
                 const result = sasUI.handleClick(cssX, cssY, ship.sasMode || 'off');
-                if (!result.hit) return;
+                // 3. 0.3.0 提交5：SAS 未命中 → 左键点击轨道线打开锚定菜单（拦截；未命中则无操作）
+                if (!result.hit) {
+                    const canvasHitX = cssX * (_canvas.width / rect.width);
+                    const canvasHitY = cssY * (_canvas.height / rect.height);
+                    const segments = getLastOrbitSegments();
+                    if (segments && segments.length > 0) {
+                        const mouseWorld = screenToWorld(canvasHitX, canvasHitY, _canvas);
+                        const hit = findNearestOrbitPoint(segments, mouseWorld, 12, _canvas);
+                        if (hit) {
+                            const cur = resolveOrbitHit(hit, _canvas);
+                            const seg = segments[hit.segmentIndex];
+                            const absTime = (hit.timeOffset !== null && isFinite(seg.anchorTime))
+                                ? seg.anchorTime + hit.timeOffset
+                                : null;
+                            showOrbitContextMenu(e.clientX, e.clientY, {
+                                worldX: cur ? cur.worldX : hit.worldX,
+                                worldY: cur ? cur.worldY : hit.worldY,
+                                soiName: hit.segSoiName,
+                                absTime,
+                                tToNext: cur ? cur.tToNext : hit.timeOffset,
+                                // 轨道坐标锚定（点随轨道线/宿主移动，不滑不离线）：
+                                // 世界坐标 = 宿主当前时刻位置 + 冻结的轨道相对坐标
+                                anchorBody: cur ? cur.anchorBody : null,
+                                relX: cur ? cur.relX : null,
+                                relY: cur ? cur.relY : null
+                            }, _canvas);
+                            return;
+                        }
+                    }
+                    return;
+                }
 
                 if (result.action === 'toggle') {
                     ship.sasMode = ship.sasMode === 'off' ? 'stability' : 'off';
@@ -372,6 +542,12 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 const x = e.clientX - rect.left;
                 const y = e.clientY - rect.top;
 
+                // 记录最近鼠标位置（渲染循环每帧驱动轨道悬停检测用）
+                _lastMouseX = x;
+                _lastMouseY = y;
+                _lastClientX = e.clientX;
+                _lastClientY = e.clientY;
+
                 // 拖拽更新节流阀
                 if (sasUI._isDragging) {
                     // 兜底：左键实际已松开（如拖出画布后松开导致 mouseup 丢失）→ 立即结束拖拽
@@ -385,11 +561,21 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                         if (ship) ship.throttle = result.throttle;
                     }
                 } else {
-                    // 非拖拽时检测悬停目标
+                    // 非拖拽时检测悬停目标；仅在悬停目标变化时触发全局 tooltip（延迟显示、位置固定）
                     const ship = shipSystem.getActiveShip();
                     if (ship) {
-                        sasUI.handleHover(x, y, ship.sasMode || 'off');
+                        const res = sasUI.handleHover(x, y, ship.sasMode || 'off');
+                        if (res.label && res.changed) {
+                            showTooltip(res.label, e.clientX, e.clientY);
+                        } else if (!res.label) {
+                            hideTooltip();
+                        }
+                    } else {
+                        hideTooltip();
                     }
+
+                    // 0.3.0 提交4：轨道线 Tooltip（鼠标事件驱动 + 移动防抖；圆点由渲染循环驱动）
+                    updateOrbitTooltip(e, x, y);
                 }
             };
             const onMouseUp = () => {
@@ -401,7 +587,8 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             window.addEventListener('mouseup', onMouseUp);
             _canvas._sasDragHandlers = { onMouseDown, onMouseMove, onMouseUp };
 
-            // SAS 集成 — Canvas 右键处理（右键中心 → 回到 STABILITY）
+            // SAS 集成 — Canvas 右键处理（右键中心 → 回到 STABILITY；
+            // 0.3.0 提交5：菜单已改为左键打开，右键不再拦截轨道线）
             const onContextMenu = (e) => {
                 e.preventDefault();
                 const rect = _canvas.getBoundingClientRect();
@@ -422,6 +609,14 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             const onMouseLeave = () => {
                 sasUI.clearHover();
                 sasUI._isDragging = false;
+                // 0.3.0 提交4：清空最近鼠标与轨道悬停（渲染层通道 + 命中缓存 + tooltip）
+                _lastMouseX = -1;
+                _lastMouseY = -1;
+                _lastOrbitHit = null;
+                _lastOrbitTipX = -9999;
+                _lastOrbitTipY = -9999;
+                setOrbitHoverState(null);
+                hideTooltip();
             };
             _canvas.addEventListener('mouseleave', onMouseLeave);
             _canvas._sasMouseLeaveHandler = onMouseLeave;
@@ -433,8 +628,14 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
 
             inputManager.disable();
 
-            // 隐藏可见性筛选面板
-            sasUI.hideVisibilityPanel();
+            // 隐藏可见性筛选面板（场景退出自动关闭，不产生关闭音效）
+            sasUI.hideVisibilityPanel({ silent: true });
+
+            // 隐藏悬停提示（防切场景后 tooltip 残留）
+            hideTooltip();
+
+            // 清空轨道标签（标签由渲染循环每帧驱动，退出场景后无人同步 → 必须显式清理）
+            clearOrbitLabels();
 
             // SAS 集成 — 清理 Canvas 事件监听
             if (_canvas._sasClickHandler) {
@@ -463,20 +664,30 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             const allShips = shipSystem.getAllShips();
             const allFacilities = facilitySystem.getAllFacilities();
 
-            // 时间加速 — 档位上限：点火 → 物理加速档(≤4x)；SOI 边界接近(≥99%半径) → 逃逸安全档(≤100x)；否则放开全部档位
+            // 时间加速 — 档位上限：点火 → 物理加速档(≤4x)；SOI 切换时间保护（剩余时间 T →
+            // ≤T 最大档位：切换点至少 1 真实秒帧预算且保护最高档下 10s 内必达）；否则放开全部档位
             // 先设置档位上限再算 simDt：保证降档在本帧物理推进前生效（否则边界穿越帧会按旧高倍率大步长穿越导致位置跳变）
             let warpMaxIndex = timeWarp.getMaxIndex();
             if (activeShip && activeShip.throttle > 0) {
                 warpMaxIndex = timeWarp.getPhysicsMaxIndex();
-            } else if (activeShip && activeShip.currentSOI) {
-                const warpHost = celestialBodies.find(b => b.name === activeShip.currentSOI);
-                if (warpHost) {
-                    const distToHost = Math.sqrt(
-                        activeShip.pos.x * activeShip.pos.x + activeShip.pos.y * activeShip.pos.y
-                    );
-                    if (distToHost > warpHost.soiRadius * 0.99) {
-                        warpMaxIndex = Math.min(warpMaxIndex, timeWarp.getEscapeMaxIndex());
+            } else if (getSOIWarpProtectEnabled()) {
+                // SOI 切换时间保护（替代旧"≥99% 半径 → 限 100x"距离制）：
+                // 与追踪站同口径——全部飞船按"到下一次 SOI 切换剩余时间 T"限档，
+                // 取最早切换者（最严）；保护最高档 = ≤T 的最大档位。
+                // 深空/无解析轨道/永不切换返回 null → 不限档；设置 → 游戏 可关闭
+                //（关闭后放开全部档位，物理加速/RK4 兜底限档不受影响）
+                let tSwitchMin = Infinity;
+                for (const s of allShips) {
+                    const warpHost = s.currentSOI
+                        ? celestialBodies.find(b => b.name === s.currentSOI)
+                        : null;
+                    const tSwitch = timeToNextSOISwitch(s, warpHost);
+                    if (tSwitch !== null && tSwitch < tSwitchMin) {
+                        tSwitchMin = tSwitch;
                     }
+                }
+                if (isFinite(tSwitchMin)) {
+                    warpMaxIndex = Math.min(warpMaxIndex, timeWarp.getSOIProtectMaxIndex(tSwitchMin));
                 }
             }
             // 病态区间限档：任一飞船/设施处于"无解析轨道且受引力"（RK4 兜底积分）时，
@@ -506,6 +717,32 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 }
             }
             timeWarp.setMaxIndex(warpMaxIndex);
+
+            // 0.3.0 定点时间加速：以当前可用最大档位推进，到达直接切 1x + 通知。
+            // SOI 切换保护/点火物理档/病态限档已在上方 warpMaxIndex 计算中生效，
+            // 此处只在该上限内拉满；剩余时间帧预算（倍率 ≤ 剩余/最大帧长）防一帧越过目标点。
+            const warpTargetNow = timeWarp.getWarpTarget();
+            if (warpTargetNow) {
+                const nowT = _getCelestialTime();
+                const remaining = warpTargetNow.time - nowT;
+                if (remaining <= 0) {
+                    timeWarp.completeWarpToTime();   // 清目标 → 直接 1x → onArrive
+                    if (typeof window.showNotification === 'function') {
+                        window.showNotification(t('orbitMenu.arrived'), 'success');
+                    }
+                } else {
+                    // 帧预算档：复用 SOI 保护的"档位 ≤ 秒数"查询（表内最大 ≤ x，下限 1x），
+                    // x = 剩余时间 / 最大真实帧长(0.05s，保守)
+                    const arriveIdx = timeWarp.getSOIProtectMaxIndex(remaining / 0.05);
+                    // 升档目标 = 当前生效上限（含 SOI 保护/点火/病态限档）与帧预算档的较小者；
+                    // 每帧无条件对齐（warpToIndex 对同值早退、内部钳制到上限）：
+                    //   - 升：保护解除/切换完成后自动恢复最大可用档；
+                    //   - 降：接近目标时按帧预算自动降档，杜绝一帧越过目标点。
+                    const wantIdx = Math.min(timeWarp.getCurrentMaxIndex(), arriveIdx);
+                    timeWarp.warpToIndex(wantIdx);
+                }
+            }
+
             const warpRate = timeWarp.getRate();
             const simDt = dt * warpRate;
 
@@ -513,6 +750,9 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             _setCelestialTime(_getCelestialTime() + simDt);
             updateCelestialBodies(_getCelestialTime());
             eventBus.emit(Events.CELESTIAL_TIME_UPDATED, { time: _getCelestialTime(), dt: simDt });
+
+            // 0.2.0 阶段6：扫描任务推进（随 simDt，时间加速下同步加速）
+            updateScanProgress(simDt);
 
             // 物理推进
             for (const s of allShips) {
@@ -546,9 +786,9 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             if (inputManager.justPressed('KeyB') && _nearFacility && activeShip) {
                 const result = facilitySystem.dockShip(_nearFacility.id, activeShip.id);
                 if (result) {
-                    window.showNotification('对接成功', 'success');
+                    window.showNotification(t('dock.success'), 'success');
                 } else {
-                    window.showNotification('对接失败（对接口已满或其他原因）', 'warning');
+                    window.showNotification(t('dock.failFull'), 'warning');
                 }
             }
 
@@ -564,7 +804,7 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 facilitySystem.lastDockedFacilityId = null;
             }
 
-            // 5d. 对接弹窗状态驱动（委托 ui.js 管理 HTML DOM，渲染函数不碰 UI）
+            // 5d. 对接弹窗状态驱动（委托 UI 模块管理 HTML DOM，渲染函数不碰 UI）
             if (_nearFacility && activeShip) {
                 if (_dockPromptFacId !== _nearFacility.id) {
                     if (_dockPromptFacId) window.hideDockPrompt();
@@ -574,9 +814,9 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                         if (ship && _nearFacility) {
                             const result = facilitySystem.dockShip(facId, ship.id);
                             if (result) {
-                                window.showNotification('对接成功', 'success');
+                                window.showNotification(t('dock.success'), 'success');
                             } else {
-                                window.showNotification('对接失败（对接口已满或其他原因）', 'warning');
+                                window.showNotification(t('dock.failFull'), 'warning');
                             }
                         }
                     });
@@ -655,6 +895,10 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 if (inputManager.isDown('KeyZ')) activeShip.throttle = 1;
                 if (inputManager.isDown('KeyX')) activeShip.throttle = 0;
                 activeShip.throttle = Math.max(0, Math.min(1, activeShip.throttle));
+                // 0.2.0 阶段2：引擎停机（燃料耗尽）时禁止点火，油门强制归零
+                if (activeShip.engineOut) {
+                    activeShip.throttle = 0;
+                }
             }
 
             // 推力模式自动切换（油门驱动）
@@ -677,8 +921,9 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             }
 
             // 推力向量计算 + 燃料消耗（活动飞船，每帧）
-            if (activeShip && activeShip.throttle > 0) {
-                const totalMass = activeShip.dryMass + activeShip.fuel;
+            if (activeShip && activeShip.throttle > 0 && !activeShip.engineOut) {
+                // 0.2.0：总质量 = 干质量 + 全部推进剂存量（资源模型）
+                const totalMass = getTotalMass(activeShip);
                 const thrustAccel = activeShip.throttle * activeShip.maxThrust / totalMass;
                 activeShip.thrust = {
                     ax: Math.sin(activeShip.heading) * thrustAccel,
@@ -686,14 +931,37 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 };
 
                 // 燃料消耗（火箭方程：质量流量 = 推力 / (比冲 × g0)）
+                // 0.2.0 阶段2：按引擎配方向各推进剂槽独立分配消耗（chemical: 氢:氧 = 1:8）
                 const massFlow = activeShip.throttle * activeShip.maxThrust / (activeShip.isp * 9.81);
-                activeShip.fuel -= massFlow * simDt;
-                if (activeShip.fuel <= 0) {
-                    activeShip.fuel = 0;
-                    activeShip.throttle = 0;
-                    activeShip.mode = 'on_rails';
-                    activeShip.maxThrust = 0;
-                    activeShip.thrust = { ax: 0, ay: 0 };
+                const engineDef = getEngineType(activeShip.engineType) || getEngineType('chemical');
+                if (engineDef && engineDef.props.length > 0) {
+                    const totalRatio = engineDef.props.reduce((sum, p) => sum + p.ratio, 0);
+                    for (const prop of engineDef.props) {
+                        const slot = getResource(activeShip, prop.id);
+                        if (slot) {
+                            slot.amount = Math.max(0, slot.amount - massFlow * prop.ratio / totalRatio * simDt);
+                        }
+                    }
+                    // 任一配方燃料耗尽 → 引擎停机（不修改 maxThrust，修复 B1）
+                    const anyEmpty = engineDef.props.some(prop => {
+                        const slot = getResource(activeShip, prop.id);
+                        return !slot || slot.amount <= 0;
+                    });
+                    if (anyEmpty) {
+                        activeShip.engineOut = true;
+                        activeShip.throttle = 0;
+                        activeShip.mode = 'on_rails';
+                        activeShip.thrust = { ax: 0, ay: 0 };
+                        // 停机时从当前 pos/vel 重算 kepler（与手动熄火一致，避免旧轨道跳变）
+                        const host = getSOIHost(getAbsolutePosition(activeShip));
+                        if (host) {
+                            activeShip.kepler = stateToKepler(activeShip.pos, activeShip.vel, host.gm) || null;
+                            activeShip.orbitTime = 0;
+                        } else {
+                            activeShip.kepler = null;
+                        }
+                        eventBus.emit(Events.SHIP_THRUST_ENDED, { shipId: activeShip.id, reason: 'out_of_fuel' });
+                    }
                 }
             } else if (activeShip && activeShip.throttle === 0) {
                 activeShip.thrust = { ax: 0, ay: 0 };
@@ -730,6 +998,15 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 facilities: renderFacilities,
                 selectedFacilityId: _activeFacilityId
             });
+
+            // 0.3.0 提交4：每帧驱动轨道悬停检测（渲染循环兜底：圆点必跟手；
+            // 用最近鼠标位置，节流阀拖拽时跳过）
+            if (activeShip && _lastMouseX >= 0 && !sasUI._isDragging) {
+                updateOrbitHover(_lastMouseX, _lastMouseY);
+            }
+
+            // 0.3.0 提交5：右键菜单锚定轨道点（每帧同源重算，菜单跟点走不漂移）
+            updateOrbitContextMenu(_canvas);
 
             // 状态驱动：统一工具栏图标切换
             let nextMode = 'off';
@@ -783,11 +1060,17 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 kepler: activeShip?.kepler ?? null,
                 vel: activeShip?.vel ?? { x: 0, y: 0 },
                 pos: activeShip?.pos ?? { x: 0, y: 0 },
-                fuel: activeShip?.fuel ?? 0,
+                fuel: getFuelAmount(activeShip),
+                // 0.2.0：修复 B2 — 广播推进剂总容量与资源槽，供 UI 正确显示
+                fuelCapacity: getFuelCapacity(activeShip),
+                resources: activeShip?.resources ?? null,
+                isp: activeShip?.isp ?? 0,
                 dryMass: activeShip?.dryMass ?? 0,
                 maxThrust: activeShip?.maxThrust ?? 0,
                 heading: activeShip?.heading ?? 0,
                 throttle: activeShip?.throttle ?? 0,
+                // 0.2.0 阶段2：引擎停机状态（燃料耗尽），供 UI 显示
+                engineOut: activeShip?.engineOut ?? false,
                 controlsLocked: activeShip?.controlsLocked ?? false,
                 displayName: activeShip?.displayName ?? '',
                 nearFacilityId: _nearFacility?.id ?? null,

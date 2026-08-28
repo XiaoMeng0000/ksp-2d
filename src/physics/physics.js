@@ -1,8 +1,61 @@
 // 天体驱动器 6.5步
-import { solarSystemData } from '../config/solarSystem.js';
+import {
+    getSystemById,
+    getHomeworldSystemId,
+    computeSystemPosition,
+    getDefaultSystemIds,
+    validateSystemSelection
+} from '../config/starSystemIndex.js';
 import { keplerPositionAtTime } from './orbitalMechanics.js';
 
-export const celestialBodies = structuredClone(solarSystemData);
+// 天体集合:数组引用全生命周期不变,内容随激活集原地重建(所有引用方自动生效)
+export const celestialBodies = [];
+
+// 当前激活的星系组合(默认:第一个 homeworld 星系,与历史行为等价)
+let _activeSystemIds = [];
+
+// 按星系组合重建天体集合(原地替换,保持 celestialBodies 引用不变)
+// 只负责"星系加载":克隆配置数据 + 注入恒星固定位置,不触碰任何物理逻辑
+function _applyActiveSystems(ids) {
+    const validation = validateSystemSelection(ids);
+    if (!validation.ok) {
+        console.warn(`[Physics] 星系组合校验失败: ${validation.reason}`, validation.id || '');
+        return false;
+    }
+
+    const homeworldId = getHomeworldSystemId(ids);
+    const next = [];
+    for (const id of ids) {
+        const system = getSystemById(id);
+        const cloned = structuredClone(system.bodies);
+        // 恒星(无 orbitParent 的天体)位置固定:homeworld 星系在原点,其余按距离+方位角摆放
+        const starPos = computeSystemPosition(system.meta, homeworldId);
+        for (const body of cloned) {
+            if (!body.orbitParent) {
+                body.position = { x: starPos.x, y: starPos.y };
+            }
+        }
+        next.push(...cloned);
+    }
+
+    celestialBodies.length = 0;
+    celestialBodies.push(...next);
+    _activeSystemIds = [...ids];
+    return true;
+}
+
+// 切换激活星系组合(创建世界/读档时调用;失败返回 false 且天体集合不变)
+export function setActiveSystems(ids) {
+    return _applyActiveSystems(ids);
+}
+
+// 读取当前激活星系组合(副本)
+export function getActiveSystemIds() {
+    return [..._activeSystemIds];
+}
+
+// 模块加载时按默认组合初始化(与旧行为等价:全部 Kerbolar 天体)
+_applyActiveSystems(getDefaultSystemIds());
 
 // 获取飞船相对于宿主天体的位置（世界坐标 → 宿主参考系）
 export function getRelativePosition(pos, host) {

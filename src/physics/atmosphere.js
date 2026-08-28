@@ -14,6 +14,7 @@
 import { eventBus, Events } from '../eventBus.js';
 import { getAbsolutePosition, celestialBodies } from './physics.js';
 import { shipSystem } from '../ship/shipSystem.js';
+import { t } from '../config/strings.js';
 
 // 大气进入倒计时（秒）
 const ATMO_WARNING_TIME = 10;
@@ -51,7 +52,7 @@ export function checkAtmosphereDanger(ship, dt) {
                         boundaryType: 'atmosphere'
                     };
                     if (window.showNotification) {
-                        window.showNotification(`⚠ 警告：正在进入 ${body.name} 大气层！`, 'warning');
+                        window.showNotification(t('atmo.entering', { name: body.name }), 'warning');
                     }
                 } else {
                     // 持续在大气内：倒计时递减
@@ -103,8 +104,8 @@ function _destroyShip(ship, reason) {
     });
     if (window.showNotification) {
         const msg = reason === 'atmosphere'
-            ? `💥 ${displayName} 在大气层中坠毁`
-            : `💥 ${displayName} 撞击天体表面`;
+            ? t('atmo.destroyedAtmosphere', { name: displayName })
+            : t('atmo.destroyedSurface', { name: displayName });
         window.showNotification(msg, 'error');
     }
     console.log(`[Atmosphere] 飞船 ${displayName} 已销毁，原因: ${reason}`);

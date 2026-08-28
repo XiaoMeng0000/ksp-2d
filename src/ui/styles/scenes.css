@@ -1,0 +1,419 @@
+/* ============================================================
+   scenes.css — 菜单类文档场景(信息页 / 星系图鉴 / 版权声明 / 制作人员)
+   覆盖 infoScene.js / galaxiesScene.js / licenseScene.js / creditsScene.js
+   （游戏百科于 0.2.7 面板化，样式已迁入 ksp2_panels.css）
+   ============================================================ */
+
+/* ---- 全屏遮罩面板(info / galaxies 共用) ---- */
+.scene-fullscreen {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    background: var(--panel-bg-deep);
+    display: flex;
+    flex-direction: column;
+    font-family: var(--font-mono);
+}
+
+/* ---- 星系图鉴(galaxiesScene.js) — 0.2.7 重构为 KSP2 设计语言 ---- */
+
+/* 顶栏：面板头风格（--theme-bg 底 + 行分隔） */
+.galaxies-topbar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 40px;
+    background: var(--theme-bg);
+    border-bottom: 1px solid var(--theme-border-row);
+    flex-shrink: 0;
+}
+
+.galaxies-back-btn {
+    height: 26px;
+    padding: 0 20px;
+    box-sizing: border-box;
+    background: var(--theme-btn-bg);
+    color: var(--text-bright);
+    border: 1px solid var(--border-light);
+    border-radius: 5px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.galaxies-back-btn:hover {
+    border-color: var(--theme-border-hover);
+}
+
+.galaxies-title {
+    color: var(--text-bright);
+    font-family: var(--font-mono-bold);
+    font-weight: normal;
+    font-size: 15px;
+    letter-spacing: 2px;
+}
+
+.galaxies-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 40px;
+}
+
+.galaxies-content {
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 40px 0;
+}
+
+/* 星系卡：蓝灰卡壳（框住内容）+ 紫头条 + 深色二级背景卡体（与设施分组卡同构） */
+.galaxies-card {
+    background: var(--theme-bg);
+    border-radius: 5px;
+    margin-bottom: 30px;
+    padding: 10px;
+    overflow: hidden;
+}
+
+/* 卡标题 = 紫头顶条（与资源分组卡头一致） */
+.galaxies-card-title {
+    margin: 0 0 10px 0;
+    padding: 10px 20px;
+    background: var(--theme-btn-selected);
+    color: var(--text-bright);
+    font-family: var(--font-mono-bold);
+    font-weight: normal;
+    font-size: 16px;
+    letter-spacing: 1px;
+    border-radius: 4px;
+}
+
+/* 二级背景卡体（被卡壳"框住"的深色内容区） */
+.galaxies-card-body {
+    background: var(--theme-panel-deep);
+    border-radius: 4px;
+    padding: 18px 20px 16px 20px;
+}
+
+.galaxies-chart {
+    width: 100%;
+    display: block;
+}
+
+.galaxies-desc {
+    color: var(--text-main);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.8;
+    margin: 16px 0 0 0;
+}
+
+/* 折叠头：次级深底条（展开显示天体行） */
+.galaxies-collapse-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    margin-top: 16px;
+    cursor: pointer;
+    user-select: none;
+    font-family: var(--font-mono);
+    color: var(--accent);
+    font-size: 12px;
+    letter-spacing: 1px;
+    background: var(--theme-panel);
+    border-radius: 4px;
+    transition: background 0.15s ease;
+}
+
+.galaxies-collapse-header:hover {
+    background: var(--theme-active-bg);
+}
+
+.galaxies-collapse-content {
+    display: none;
+    padding: 8px 0 0 0;
+}
+
+.galaxies-empty {
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 6px 0;
+}
+
+/* 天体数据行：深底圆角无边框 */
+.galaxies-row {
+    background: var(--theme-panel-deep);
+    border-radius: 4px;
+    padding: 8px 12px;
+    margin-bottom: 8px;
+}
+
+.galaxies-row-title {
+    color: var(--text-bright);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    margin: 0 0 4px 0;
+}
+
+.galaxies-row-data {
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    font-size: 11px;
+}
+
+.galaxies-stat {
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    text-align: center;
+    padding: 10px 0 20px 0;
+}
+
+/* ============================================================
+   文档场景共用（版权声明 licenseScene / 制作人员 creditsScene）— 0.2.7 v2
+   参考 KSP 原版：顶部 // 标题 + 装饰分隔线 + 半透明背景 + 底部 BACK
+   两页同款左右分割布局（左 Logo 水印 + 右内容区）；
+   credits 采用角色/名字双列格网（角色右对齐 | 名字左对齐）
+   ============================================================ */
+
+#licensePanel,
+#creditsPanel {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(10px);
+    display: flex;
+    flex-direction: column;
+    font-family: var(--font-mono);
+    color: var(--text-main);
+}
+
+/* 顶部标题区（// 标题，accent 蓝） */
+.doc-header {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    padding: 34px 60px 0 60px;
+    flex-shrink: 0;
+}
+
+.doc-title {
+    color: var(--text-bright);
+    font-family: var(--doto);
+    font-weight: normal;
+    font-size: 40px;
+    letter-spacing: 2px;
+    margin: 0;
+}
+
+#licensePanel,
+#creditsPanel {
+    background-color: #273833af;
+    backdrop-filter: none;
+}
+
+/* 标题装饰分隔线（参考图：标题下横向装饰线） */
+.doc-header-line {
+    position: relative;
+    height: 10px;
+    margin: 0px 0px 0 60px;
+    flex-shrink: 0;
+}
+
+.doc-header-line::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(45deg,
+            /* 线条颜色 & 厚度 */
+            var(--doc-divider) 0px, var(--doc-divider) 1px,
+            /* 透明间距 */
+            transparent 1px, transparent 4px);
+    pointer-events: none;
+    /* 不干扰鼠标交互 */
+    z-index: 1;
+}
+
+.doc-content {
+    height: 100%;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    margin: 0;
+}
+
+/* 制作人员/版权声明：左右分割区（左 Logo + 短分割线 + 右内容）— 分割线仅限内容区高度，
+   上下留白避免覆盖顶部装饰线与左下角返回按钮区域 */
+#licensePanel .doc-split,
+#creditsPanel .doc-split {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    padding: 0px 60px 0px 60px;
+    align-items: stretch;
+}
+
+#licensePanel .doc-left,
+#creditsPanel .doc-left {
+    width: 400px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+#licensePanel .doc-left img,
+#creditsPanel .doc-left img {
+    width: 300px;
+    display: block;
+}
+
+#licensePanel .doc-logo-text,
+#creditsPanel .doc-logo-text {
+    color: var(--accent);
+    font-family: var(--font-mono-bold);
+    font-weight: normal;
+    font-size: 22px;
+    letter-spacing: 3px;
+    opacity: 0.85;
+}
+
+/* 短分割线（随内容区高度 stretch，容器上下 padding 控制长度） */
+#licensePanel .doc-divider,
+#creditsPanel .doc-divider {
+    display: none;
+}
+
+#licensePanel .doc-right,
+#creditsPanel .doc-right {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    overflow-y: auto;
+}
+
+#licensePanel .doc-section-title,
+#creditsPanel .doc-section-title {
+    text-align: center;
+    /* 节标题缩小为 3/4(33px = 44px × 0.75),仍为 11 的倍数避免像素字体模糊 */
+    font-size: 33px;
+}
+
+#creditsPanel .doc-group-name {
+    text-align: center;
+}
+
+/* 节标题（license / credits 共用，青蓝色 #0DD9FE） */
+.doc-section-title {
+    width: 100%;
+    color: var(--doc-section-tittle);
+    font-family: var(--font-pixel);
+    font-weight: normal;
+    font-size: 44px;
+    /* 必须是11的倍数，不然出现边缘模糊 */
+    letter-spacing: 1px;
+}
+
+/* 节标题副标（----- 牵头人，白） */
+.doc-section-lead {
+    font-weight: normal;
+    font-size: 55px;
+    /* 必须是11的倍数，不然出现边缘模糊 */
+    margin-left: 8px;
+    letter-spacing: 0;
+}
+
+/* license 段落（字号与 credits 行文字一致：25px）
+   限宽 50% 并居中：避免全宽内容列单行字符过多 */
+.doc-para {
+    max-width: 50%;
+    margin-left: auto;
+    margin-right: auto;
+    text-align: left;
+    color: var(--text-main);
+    font-family: var(--font-mono);
+    font-size: 25px;
+    line-height: 1.6;
+    margin-bottom: 18px;
+}
+
+/* credits 组名（暗灰小字） */
+.doc-group-name {
+    display: none;
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 1px;
+    margin: 0 0 14px 0;
+}
+
+/* credits 双列行：角色右对齐 | 名字左对齐 */
+.doc-credit-row {
+    display: flex;
+    align-items: baseline;
+    gap: 22px;
+    padding: 3px 0;
+}
+
+.doc-credit-role {
+    flex: 1;
+    text-align: right;
+    color: var(--text-mid);
+    font-family: var(--font-mono);
+    font-size: 25px;
+}
+
+.doc-credit-names {
+    flex: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 18px;
+}
+
+.doc-credit-name {
+    color: var(--text-bright);
+    font-family: var(--font-mono);
+    font-size: 25px;
+}
+
+/* 灵感来源子项（橙色标题级，兼容旧 subItems 数据） */
+.doc-subitem {
+    color: var(--warn);
+    font-family: var(--font-mono-bold);
+    font-weight: normal;
+    font-size: 19px;
+    margin: 30px 0 8px 0;
+}
+
+.doc-spacer {
+    height: 30px;
+}
+
+/* 返回按钮（左下角固定，标准面板按钮风格） */
+.doc-back {
+    position: absolute;
+    bottom: 60px;
+    left: 60px;
+    padding: 5px 80px;
+    box-sizing: border-box;
+    background: #424242;
+    color: var(--text-bright);
+    border: 1px solid var(--text-bright);
+    border-radius: 5px;
+    font-family: var(--font-mono);
+    font-size: 25px;
+    cursor: pointer;
+}
+
+.doc-back:hover {
+    background: #53829A;
+}
+
+.doc-back:active {
+    background: #0f0;
+}

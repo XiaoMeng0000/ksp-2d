@@ -1,0 +1,393 @@
+/* ============================================================
+   root.css — 全局主题基石
+   所有 UI 样式从此处引用 CSS 变量,禁止在各 JS 文件中硬编码色值/字体
+   ============================================================ */
+
+/* 字体引用
+   font-display: swap — 字体加载期间先用回退字体显示文本（FOIT 修复：
+   加载页使用本字体族且字体本身是加载资源之一，未加 swap 会整段文本不可见） */
+@font-face {
+    font-family: 'JetBrainsMono-Regular';
+    src: url('../../../assets/fonts/JetBrainsMapleMono/JetBrainsMapleMono-Regular.ttf') format('truetype');
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'JetBrainsMono-Bold';
+    src: url('../../../assets/fonts/JetBrainsMapleMono/JetBrainsMapleMono-Bold.ttf') format('truetype');
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'PixeledFont';
+    src: url('../../../assets/fonts/Uranus_Pixel.ttf') format('truetype');
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'doto';
+    src: url('../../../assets/fonts/doto.ttf') format('truetype');
+    font-display: swap;
+}
+
+:root {
+    /* ---- 配色 ---- */
+    --panel-bg-dark: #0C0E16;
+    --panel-bg: rgba(0, 0, 0, 0.85);
+    /* 面板半透明黑底 */
+    --panel-bg-deep: rgba(0, 0, 0, 0.92);
+    /* 更深底色(弹层/提示) */
+    --panel-bg-soft: rgba(0, 0, 0, 0.55);
+    /* 浅黑底(凹槽/占位) */
+    --card-bg: #333;
+    /* 卡片/行实色底 */
+    --card-bg-dark: #222;
+    /* 更深卡片底(槽位) */
+    --card-bg-light: #2a2a3a;
+
+    --card-bg-pri: #2A303A;
+    /* 悬停高亮底 */
+
+    --border: #555;
+    /* 面板/按钮边框 */
+    --border-dark: #444;
+    /* 分隔线/标题下划线 */
+    --border-light: #666;
+    --header-bg: #232A48;
+
+    --accent: #88ccff;
+    /* HUD 主蓝 */
+    --accent-bg: rgba(136, 204, 255, 0.15);
+    --accent-bg-strong: rgba(136, 204, 255, 0.2);
+    --accent-border: rgba(136, 204, 255, 0.3);
+    --doc-divider: #389393;
+    --doc-section-tittle: #0DD9FE;
+
+    --danger: #ff6666;
+    /* 危险红 */
+    --danger-bg: rgba(255, 80, 80, 0.1);
+    --danger-border: rgba(255, 80, 80, 0.3);
+    --danger-solid: #c44;
+    --danger-solid-bg: rgba(170, 68, 68, 0.15);
+    --danger-solid-border: #644;
+
+    --warn: #ffaa44;
+    /* 警告橙 */
+
+    --success: #6775FB;
+    /* 成功绿 */
+    --success-bg: transparent;
+    --success-border: #6775FB;
+
+    --refuel: #cc4;
+    /* 补给黄 */
+    --refuel-border: #554;
+
+    --text-bright: #fff;
+    --text-main: #ddd;
+    --text-mid: #aaa;
+    --text-dim: #666;
+    --text-faint: #555;
+    --text-danger: #ff5566;
+    --text-heighlighted: #a1894d;
+
+    --theme-color: #6775FB;
+    --theme-color-pri: #2F3663;
+
+    --ut-gold: #d4c86a;
+    /* 时间标签金 */
+    --ut-gold-border: #a8984a;
+
+    --progress-green: #3dff3d;
+    /* 进度条绿（参考 KSP 资源条，扫描进度条等） */
+
+    --hud-bg: #0d0d0d;
+    /* 玩家 HUD 背景（参考图深黑实色） */
+
+    /* ---- 字体变量 ---- */
+    --font-mono: 'JetBrainsMono-Regular', monospace;
+    --font-mono-bold: 'JetBrainsMono-Bold', monospace;
+    --font-pixel: "PixeledFont", monospace;
+    --doto: 'doto', 'JetBrainsMono-Regular', monospace;
+}
+
+/* ============================================================
+   全局文本选择策略
+   游戏 UI 为界面化操作，禁止鼠标拖拽选中文本；
+   输入框 / 文本域 / 可编辑区保留选中与编辑能力（名称输入等）。
+   JS 复制（如 QQ 群号按钮的 clipboard API）不受 user-select 影响。
+   ============================================================ */
+* {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    user-select: none;
+}
+
+input,
+textarea,
+[contenteditable] {
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    user-select: text;
+}
+
+/* ============================================================
+   全局滚动条统一（0.2.7 KSP2 视觉：透明轨道 + 深灰圆角滑块，悬停变蓝）
+   竖向/横向同时生效（WebKit 宽/高一致；Firefox 双属性）
+   注：设置页（#settingsContainer）排除，另行还原浏览器默认外观
+   ============================================================ */
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-dark);
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--theme-border-hover);
+}
+
+::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-dark) transparent;
+}
+
+/* ============================================================
+   全局悬停提示 .game-tooltip（uiTooltip.js 统一管理定位与显隐）
+   视觉样式在此收敛：黑底、#555 边框、圆角、等宽小字、不拦截鼠标
+   ============================================================ */
+.game-tooltip {
+    position: fixed;
+    z-index: 10002;
+    background: var(--panel-bg-deep);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 5px 9px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-main);
+    white-space: nowrap;
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* ============================================================
+   通用组件 class
+   布局定位(display/position/left/top)由 JS 内联控制,
+   视觉样式(底色/边框/圆角/字体/字号)统一走 class
+   ============================================================ */
+
+/* 面板(半透明黑底 + 细边框) */
+.ui-panel {
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    font-family: var(--font-mono);
+}
+
+/* 面板头部标题行(标题 + 关闭按钮) */
+.ui-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border-dark);
+}
+
+/* 面板标题文字 */
+.ui-panel-title {
+    color: var(--accent);
+    margin: 0;
+    font-size: 14px;
+}
+
+/* 通用按钮 */
+.ui-btn {
+    padding: 6px 12px;
+    background: #333;
+    color: var(--text-bright);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.ui-btn:hover {
+    background: var(--accent-bg);
+    color: var(--accent);
+}
+
+/* 小按钮(标题栏关闭/删除等) */
+.ui-btn-sm {
+    padding: 3px 8px;
+    background: var(--card-bg);
+    color: var(--text-mid);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.ui-btn-sm:hover {
+    background: var(--accent-bg);
+    color: var(--accent);
+}
+
+/* 危险按钮(删除/摧毁) */
+.ui-btn-danger {
+    padding: 3px 8px;
+    background: var(--danger-bg);
+    border: 1px solid var(--danger-border);
+    border-radius: 3px;
+    color: var(--danger);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.ui-btn-danger:hover {
+    background: var(--danger-bg);
+}
+
+/* 主操作按钮(确认/建造/部署) */
+.ui-btn-primary {
+    padding: 8px 24px;
+    background: var(--card-bg);
+    color: var(--accent);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.ui-btn-primary:hover {
+    background: var(--accent-bg);
+}
+
+/* 通用卡片/数据行 */
+.ui-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+}
+
+/* 空状态/占位提示文字 */
+.ui-hint {
+    color: var(--text-faint);
+    font-size: 11px;
+    text-align: center;
+    padding: 20px;
+}
+
+/* 分隔线 */
+.ui-divider {
+    border: none;
+    border-top: 1px solid var(--border-dark);
+}
+
+/* 标签小字(数据行的 label) */
+.ui-label {
+    color: var(--text-dim);
+    font-size: 11px;
+    margin-bottom: 4px;
+}
+
+/* 数据值(白色加粗) */
+.ui-value {
+    color: var(--text-bright);
+    font-size: 13px;
+    font-weight: bold;
+}
+
+/* ============================================================
+   玩家资源 HUD（0.2.0 阶段4；0.2.7 移至左上角，显示模式 + 当前载具名）— 常驻
+   ============================================================ */
+#playerResourceHud {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 900;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 6px 12px;
+    background: var(--hud-bg);
+    border: none;
+    border-radius: 0;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-mid);
+    pointer-events: none;
+    user-select: none;
+}
+
+#playerResourceHud .prh-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+#playerResourceHud .prh-value {
+    font-family: var(--font-mono-bold);
+    font-weight: normal;
+    color: var(--text-bright);
+}
+
+/* 当前载具名（0.2.7 替代科技点显示） */
+#playerResourceHud .prh-ship-name {
+    font-family: var(--font-mono-bold);
+    font-weight: normal;
+    color: var(--text-bright);
+    white-space: nowrap;
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#playerResourceHud .prh-mode {
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    white-space: nowrap;
+    /* 0.2.7：模式框改为按钮（点击打开 ESC 菜单）；HUD 本身 pointer-events:none 因此单独放开 */
+    pointer-events: auto;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+#playerResourceHud .prh-mode:hover {
+    background: var(--accent-bg);
+    border-color: var(--accent);
+}
+
+#playerResourceHud .prh-mode-sandbox {
+    color: var(--success);
+    background: var(--success-bg);
+    border: 1px solid var(--success-border);
+}
+
+#playerResourceHud .prh-mode-career {
+    color: var(--warn);
+    background: rgba(255, 170, 68, 0.12);
+    border: 1px solid rgba(255, 170, 68, 0.35);
+}

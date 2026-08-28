@@ -3,7 +3,10 @@
 import { sceneManager } from '../sceneManager.js';
 import { textureManager } from '../graphics/textureManager.js';
 import { LICENSE } from '../config/licenseConfig.js';
+import { t } from '../config/strings.js';
 
+// 版权声明（与制作人员同款：顶部 // 标题 + 左右分割式布局；分割线仅限内容区，不覆盖装饰线/返回按钮区域）
+// 视觉走 scenes.css（#licensePanel / .doc-* 共用类）
 function registerLicenseScene() {
     let panel = null;
     let escHandler = null;
@@ -15,17 +18,11 @@ function registerLicenseScene() {
     function _renderContent(contentEl) {
         contentEl.innerHTML = '';
 
-        // 页面标题
-        const pageTitle = document.createElement('h1');
-        pageTitle.textContent = '// ' + LICENSE.title;
-        pageTitle.style.cssText = 'color:#A04040;font-family:monospace;font-size:26px;margin:0 0 30px 0;';
-        contentEl.appendChild(pageTitle);
-
         for (const section of LICENSE.sections) {
             // 节标题
             const sectionTitle = document.createElement('h2');
-            sectionTitle.textContent = '// ' + section.title;
-            sectionTitle.style.cssText = 'color:#A04040;font-family:monospace;font-size:18px;margin:0 0 16px 0;';
+            sectionTitle.textContent = section.title;
+            sectionTitle.className = 'doc-section-title';
             contentEl.appendChild(sectionTitle);
 
             // 段落
@@ -33,14 +30,14 @@ function registerLicenseScene() {
                 for (const paragraph of section.paragraphs) {
                     const pEl = document.createElement('p');
                     pEl.textContent = paragraph;
-                    pEl.style.cssText = 'color:#ccc;font-family:monospace;font-size:14px;line-height:1.9;margin:0 0 12px 0;padding-left:20px;';
+                    pEl.className = 'doc-para';
                     contentEl.appendChild(pEl);
                 }
             }
 
             // 节间距
             const spacer = document.createElement('div');
-            spacer.style.cssText = 'height:30px;';
+            spacer.className = 'doc-spacer';
             contentEl.appendChild(spacer);
         }
     }
@@ -49,82 +46,77 @@ function registerLicenseScene() {
         enter() {
             panel = document.createElement('div');
             panel.id = 'licensePanel';
-            panel.style.cssText = ''
-                + 'position:fixed;inset:0;z-index:2000;'
-                + 'background:rgba(0,0,0,0.92);backdrop-filter:blur(12px);'
-                + 'display:flex;font-family:monospace;';
 
-            // ========== 分割线 ==========
-            const divider = document.createElement('div');
-            divider.style.cssText = ''
-                + 'width:1px;background:#333;'
-                + 'align-self:stretch;flex-shrink:0;';
+            // ========== 顶部标题区 ==========
+            const header = document.createElement('div');
+            header.className = 'doc-header';
 
-            // ========== 左侧 Logo 区 ==========
+            const title = document.createElement('h1');
+            title.textContent = '// ' + LICENSE.title;
+            title.className = 'doc-title';
+            header.appendChild(title);
+
+            panel.appendChild(header);
+
+            // 标题装饰分隔线
+            const headerLine = document.createElement('div');
+            headerLine.className = 'doc-header-line';
+            panel.appendChild(headerLine);
+
+            // ========== 左右分割区（左侧 Logo + 短分割线 + 右侧内容） ==========
+            const split = document.createElement('div');
+            split.className = 'doc-split';
+
+            // 左侧 Logo 水印
             const leftPanel = document.createElement('div');
-            leftPanel.style.cssText = ''
-                + 'width:280px;padding:0 40px;'
-                + 'display:flex;flex-direction:column;align-items:center;justify-content:center;'
-                + 'flex-shrink:0;';
+            leftPanel.className = 'doc-left';
 
-            const logoContent = document.createElement('div');
-            logoContent.style.cssText = 'text-align:center;';
-
-            // 游戏标题
             if (textureManager.isReady() && textureManager.get('title')) {
-                const titleImg = document.createElement('img');
-                titleImg.src = textureManager.get('title').src;
-                titleImg.style.cssText = 'max-width:220px;';
-                logoContent.appendChild(titleImg);
+                const logoImg = document.createElement('img');
+                logoImg.src = textureManager.get('title').src;
+                leftPanel.appendChild(logoImg);
             } else {
-                const titleFallback = document.createElement('div');
-                titleFallback.textContent = 'KSP 2D';
-                titleFallback.style.cssText = 'color:#A04040;font-family:monospace;font-size:36px;';
-                logoContent.appendChild(titleFallback);
+                const logoFallback = document.createElement('div');
+                logoFallback.className = 'doc-logo-text';
+                logoFallback.textContent = 'KSP 2D';
+                leftPanel.appendChild(logoFallback);
             }
+            split.appendChild(leftPanel);
 
-            leftPanel.appendChild(logoContent);
+            // 短分割线（仅内容区高度，不覆盖装饰线/返回按钮区域）
+            const divider = document.createElement('div');
+            divider.className = 'doc-divider';
+            split.appendChild(divider);
 
-            // 返回按钮 — 左下角固定
+            // 右侧内容区（内容水平+垂直居中）
+            const rightPanel = document.createElement('div');
+            rightPanel.className = 'doc-right';
+
+            const contentWrapper = document.createElement('div');
+            contentWrapper.className = 'doc-content';
+
+            _renderContent(contentWrapper);
+
+            rightPanel.appendChild(contentWrapper);
+            split.appendChild(rightPanel);
+
+            panel.appendChild(split);
+
+            // 结尾装饰分隔线
+            const footerLine = document.createElement('div');
+            footerLine.className = 'doc-header-line';
+            footerLine.style = 'margin-bottom: 180px;'
+            panel.appendChild(footerLine);
+
+            // ========== 返回按钮（左下角固定） ==========
             const backBtn = document.createElement('button');
-            backBtn.textContent = '返回';
-            backBtn.style.cssText = ''
-                + 'position:absolute;bottom:40px;left:40px;'
-                + 'padding:10px 36px;'
-                + 'background:rgba(30,30,30,0.8);color:white;'
-                + 'border:1px solid #A04040;border-radius:4px;'
-                + 'font-family:monospace;font-size:14px;'
-                + 'cursor:pointer;transition:all 0.2s ease;';
-            backBtn.addEventListener('mouseenter', () => {
-                backBtn.style.background = '#2a2a2a';
-                backBtn.style.borderColor = '#c05050';
-            });
-            backBtn.addEventListener('mouseleave', () => {
-                backBtn.style.background = 'rgba(30,30,30,0.8)';
-                backBtn.style.borderColor = '#A04040';
-            });
+            backBtn.textContent = t('common.back');
+            backBtn.className = 'doc-back';
             backBtn.addEventListener('click', () => {
                 _close();
             });
             panel.appendChild(backBtn);
 
-            // ========== 右侧内容区 ==========
-            const rightPanel = document.createElement('div');
-            rightPanel.style.cssText = ''
-                + 'flex:1;padding:0 60px 0 40px;'
-                + 'display:flex;align-items:center;'
-                + 'overflow-y:auto;';
-
-            const contentWrapper = document.createElement('div');
-            contentWrapper.style.cssText = 'width:100%;padding:60px 0;';
-
-            _renderContent(contentWrapper);
-
-            rightPanel.appendChild(contentWrapper);
-
-            panel.appendChild(leftPanel);
-            panel.appendChild(divider);
-            panel.appendChild(rightPanel);
             document.body.appendChild(panel);
 
             escHandler = (event) => {

@@ -1,0 +1,101 @@
+/* ============================================================
+   main_menu.css — 主菜单（阶段 3：Canvas→DOM）
+   覆盖 menuScene.js 动态创建的 DOM 结构
+   布局值对应原 canvas 坐标：logo(30,50) 宽≤340 / 按钮 x=60 间距48 高36 字号20
+   ============================================================ */
+
+#mainMenuContainer {
+    position: fixed;
+    inset: 0;
+    z-index: 800;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    padding: 50px 0 0 30px;      /* 对应原 canvas logo 位置 (30, 50) */
+    font-family: var(--font-mono-blod);
+    user-select: none;
+    pointer-events: none;        /* 空区域不拦截点击，背景仍走 canvas */
+}
+
+/* ---- Logo（图片优先，未就绪时文字 fallback） ---- */
+.mm-logo {
+    max-width: 340px;
+    margin-bottom: 40px;         /* 对应原 logo 与按钮间距 +40 */
+}
+.mm-logo img {
+    display: none;
+    max-width: 340px;
+    height: auto;
+}
+.mm-logo-text {
+    display: none;
+    color: #A04040;
+    font-size: 48px;
+    line-height: 1.1;
+}
+
+/* ---- 导航按钮列 ---- */
+.mm-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;                   /* 原 buttonSpacing 48 - buttonHeight 36 */
+    margin-left: 20px;           /* 对应原 buttonX=60（相对容器左 30） */
+    pointer-events: auto;
+}
+
+.mm-btn {
+    min-width: 270px;
+    padding: 0 12px;
+    background: none;
+    border: none;
+    color: #fff;
+    font-family: var(--font-mono);
+    font-size: 20px;
+    text-align: left;
+    cursor: pointer;
+}
+.mm-btn:hover {
+    background: #3B3F8D;
+}
+
+/* ---- 版本号（右下角） ---- */
+.mm-version {
+    position: absolute;
+    right: 20px;
+    bottom: 20px;
+    color: rgba(255, 255, 255, 0.3);
+    font-size: 11px;
+}
+
+/* ---- 固定链接栏（0.2.6 从 settings.css 移入：主菜单归属） ---- */
+.mm-links {
+    pointer-events: auto;
+    position: absolute;
+    bottom: 80px;
+    left: 50px;
+    display: flex;
+    gap: 20px;
+    z-index: 10;
+}
+
+.mm-link-btn {
+    background: transparent;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s ease;
+}
+
+.mm-link-icon {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+    filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.5));
+}

@@ -7,8 +7,12 @@ import { sceneManager } from './sceneManager.js';
 import { shipSystem } from './ship/shipSystem.js';
 import { facilitySystem } from './facility/facilitySystem.js';
 import { stateToKepler } from './physics/orbitalMechanics.js';
-import { celestialBodies } from './physics/physics.js';
+import { celestialBodies, setActiveSystems, getActiveSystemIds } from './physics/physics.js';
 import { eventBus, Events } from './eventBus.js';
+import { t } from './config/strings.js';
+import { validateSystemSelection } from './config/starSystemIndex.js';
+import { createInfoDialog } from './ui/uiComponents.js';
+import { initFacilityStorage, addStorage } from './resources/cargoSystem.js';
 
 class SaveManager {
     constructor() {
@@ -49,8 +53,14 @@ class SaveManager {
             console.error('[SaveManager] 加载玩家档案失败:', e);
         }
         return {
-            points: 0,
+            // 0.2.0：points 废弃，迁移到 resources
+            gameMode: 'sandbox',            // 游戏模式：'sandbox' 自由 | 'career' 生涯
             unlockedBlueprints: [],
+            scannedBodies: {},              // 天体扫描进度：{ bodyId: { tiersScanned: n } }
+            visitedBodies: {},              // 天体访问记录（已废弃：首访奖励已移除，字段保留兼容存档）
+            resources: {
+                science: { amount: 50 }         // 科技点（唯一全局资源）
+            },
             totalPlayTime: 0,
             stats: { orbits: 0, soiChanges: 0 }
         };
@@ -99,6 +109,23 @@ class SaveManager {
         }
     }
 
+    // 玩家状态进存档/跨世界前清洗：剥离"进行中"的扫描任务（scanning → false, progress → 0）。
+    // 扫描是实时进行的行为，不随存档持久化；否则 scanning 状态会经 _playerProfile / world.player
+    // 跨世界泄漏，卡死全局"扫描单通道"（startScan 遇任何 scanning=true 即返回 busy）
+    _sanitizePlayerForSave(player) {
+        if (!player) return { scannedBodies: {}, visitedBodies: {}, resources: {} };
+        const clean = JSON.parse(JSON.stringify(player));
+        if (clean.scannedBodies) {
+            for (const [bodyId, entry] of Object.entries(clean.scannedBodies)) {
+                if (entry && entry.scanning) {
+                    entry.scanning = false;
+                    entry.progress = 0;
+                }
+            }
+        }
+        return clean;
+    }
+
     // 序列化前清洗飞船对象：剔除下划线开头的运行时对象引用（如 _sasController，
     // 其内部持有 ship 回引形成循环引用，直接 JSON.stringify 会抛错），
     // 其余数据字段全部保留；控制器读档后由飞行场景自动懒重建
@@ -112,11 +139,22 @@ class SaveManager {
     }
 
     // 创建新世界
-    createWorld(name) {
+    // starSystems: 星系组合 id 数组(创建时绑定,不可更改;缺省时按当前激活组合)
+    createWorld(name, starSystems) {
         // 名称冲突检测
         const nameExists = this._worldList.some(id => this._worlds[id].metadata.name === name);
         if (nameExists) {
             console.warn(`[SaveManager] 世界名称 "${name}" 已存在`);
+            return null;
+        }
+
+        // 星系组合:显式传入优先,否则沿用当前激活组合(保证不丢默认 kerbolar)
+        const systemIds = Array.isArray(starSystems) && starSystems.length > 0
+            ? [...starSystems]
+            : getActiveSystemIds();
+        const validation = validateSystemSelection(systemIds);
+        if (!validation.ok) {
+            console.warn(`[SaveManager] 星系组合校验失败,拒绝创建: ${validation.reason}`);
             return null;
         }
 
@@ -154,9 +192,11 @@ class SaveManager {
             metadata: {
                 name: name || '新世界',
                 createdAt: now,
-                configVersion: state.version || '0.1.0'
+                configVersion: state.version || '0.1.0',
+                // 星系组合:创建时绑定,创建后不可更改
+                starSystems: systemIds
             },
-            player: { ...this._playerProfile },
+            player: this._sanitizePlayerForSave(this._playerProfile),
             checkpoints: [initialCheckpoint],
             activeCheckpointId: initialCheckpoint.id
         };
@@ -188,7 +228,7 @@ class SaveManager {
         if (ship && ship.mode === 'thrust') {
             console.warn('[SaveManager] 推力模式下禁止存档');
             if (typeof window.showNotification === 'function') {
-                window.showNotification('推力模式下无法存档！', 'warning');
+                window.showNotification(t('save.thrustBlocked'), 'warning');
             }
             return null;
         }
@@ -246,6 +286,10 @@ class SaveManager {
 
         world.checkpoints.unshift(checkpoint);
         world.activeCheckpointId = checkpointId;
+        // 0.2.0 阶段4：同步玩家状态到世界档案与本地档案（读档按 world.player 恢复，不同步会回滚到初始 500 套）
+        world.player = gameState.getState().player;
+        this._playerProfile = world.player;
+        this._savePlayerProfile();
         this._saveToStorage();
 
         console.log(`[SaveManager] 检查点创建成功: ${checkpointId}`);
@@ -266,14 +310,33 @@ class SaveManager {
             return false;
         }
 
+        // 星系组合校验:存档绑定的星系必须全部存在于当前配置,否则拒绝加载
+        // 旧存档无 starSystems 字段 → 默认 ['kerbolar'](创建于单星系时代,直接可读)
+        const savedSystems = world.metadata.starSystems || ['kerbolar'];
+        const validation = validateSystemSelection(savedSystems);
+        if (!validation.ok) {
+            console.warn(`[SaveManager] 拒绝加载:存档星系组合与当前配置不兼容 (${validation.reason})`);
+            // 拒绝加载:弹模态信息框提示(仅"关闭"),玩家关闭后留在原场景
+            createInfoDialog(t('save.systemIncompatibleTitle'), t('save.systemIncompatible'), t('common.close'));
+            return false;
+        }
+
+        // 激活存档绑定的星系组合(重建天体集合,不改变任何物理逻辑)
+        if (!setActiveSystems(savedSystems)) {
+            console.warn('[SaveManager] 拒绝加载:星系组合激活失败');
+            return false;
+        }
+
         gameState.setState({
             ships: checkpoint.ships,
-            player: world.player,
+            player: this._sanitizePlayerForSave(world.player),
             missions: checkpoint.missions,
             facilities: checkpoint.facilities,
             gameTime: checkpoint.gameTime,
             activeShipId: checkpoint.activeShipId,
             activeFacilityId: checkpoint.activeFacilityId || null,
+            // 同步存档绑定的星系组合(创建后不可改)
+            starSystems: [...savedSystems],
             // 恢复当前场景
             currentScene: checkpoint.currentScene || 'menu'
         });
@@ -283,7 +346,59 @@ class SaveManager {
         for (const s of allShips) {
             if (s.maneuverNodes === undefined) s.maneuverNodes = [];
             if (s.burnDuration === undefined) s.burnDuration = 120;
+            // 0.2.0 阶段5：货仓默认值（无货运模块时为空池）
+            if (s.cargo === undefined) s.cargo = {};
+            // 0.2.0 迁移：旧 fuel/fuelCapacity（单一标量）→ resources（液氢/液氧，按 1:8 质量拆桶）
+            if (!s.resources) {
+                const oldFuel = typeof s.fuel === 'number' ? s.fuel : 0;
+                const oldCap = typeof s.fuelCapacity === 'number' ? s.fuelCapacity : oldFuel;
+                s.resources = {
+                    hydrogen: { amount: oldFuel / 9, capacity: oldCap / 9 },
+                    oxygen: { amount: oldFuel * 8 / 9, capacity: oldCap * 8 / 9 }
+                };
+                delete s.fuel;
+                delete s.fuelCapacity;
+            }
+            // 0.2.0 阶段2：engineOut 默认值（旧存档无此字段视为正常状态）
+            if (s.engineOut === undefined) s.engineOut = false;
         }
+
+        // 0.2.0 阶段5：旧设施补存储槽（按类型 storageProfile 初始化空仓）
+        for (const f of gameState.getAllFacilitiesRef()) {
+            if (!f.storage) initFacilityStorage(f);
+        }
+
+        // 0.2.0 迁移：玩家字段（gameMode/scannedBodies/resources）
+        const playerState = gameState.getState().player;
+        if (!playerState.gameMode) playerState.gameMode = 'sandbox';
+        if (!playerState.scannedBodies) playerState.scannedBodies = {};
+        if (!playerState.visitedBodies) playerState.visitedBodies = {};
+        if (!playerState.resources) {
+            playerState.resources = {
+                science: { amount: 50 }
+            };
+        }
+        // 0.2.0 迁移：火箭零件 rocketParts → 材料套装 materialKits
+        if (playerState.resources.rocketParts) {
+            if (!playerState.resources.materialKits) {
+                playerState.resources.materialKits = playerState.resources.rocketParts;
+            }
+            delete playerState.resources.rocketParts;
+        }
+        // 0.2.0 阶段5 迁移：全局实体资源（materialKits）退场 → 转入第一个设施的存储
+        const legacyKits = playerState.resources.materialKits
+            ? playerState.resources.materialKits.amount || 0
+            : 0;
+        delete playerState.resources.materialKits;
+        if (legacyKits > 0) {
+            const firstFacility = gameState.getAllFacilitiesRef()[0] || null;
+            if (firstFacility) {
+                addStorage(firstFacility, 'materialKits', legacyKits);
+                console.log(`[SaveManager] 迁移：全局材料套装 ${legacyKits} 套转入设施 ${firstFacility.name} 存储`);
+            }
+        }
+        if ('points' in playerState) delete playerState.points;
+        gameState.setState({ player: playerState });
 
         // 切换到存档时的场景
         if (checkpoint.currentScene) {

@@ -1,7 +1,7 @@
 import { eventBus, Events } from '../eventBus.js';
 import { celestialBodies, getAbsolutePosition } from './physics.js';
 import { rk4Integrate } from './integrator.js';
-import { stateToKepler, keplerPositionAtTime, keplerPositionAtTheta, findSOIIntersection } from './orbitalMechanics.js';
+import { stateToKepler, keplerPositionAtTime, keplerPositionAtTheta, findSOIIntersection, findSOIExitTime } from './orbitalMechanics.js';
 
 // SOI 边界诊断开关 — 运行时从 window 读取，支持控制台热切换
 function soiDiagEnabled() {
@@ -145,10 +145,14 @@ function patchedRadialLine(relPos, relVel, host, depth, maxSeg, segments, stepSt
     const outward = relPos.x * relVel.x + relPos.y * relVel.y >= 0;
     const sEnd = Math.max(outward ? (rT - r0) : (rT + r0), 1);
     const M = 16;
+    // 径向段总飞行时间（供逐点 t 使用；下方逃逸分支的 switchT 复用本值，避免重复积分）
+    const tTotal = radialLineTime(relPos, ux, uy, sEnd, E, host.gm);
     const pts = [];
     for (let i = 0; i <= M; i++) {
         const s = (i / M) * sEnd;
-        pts.push({ x: relPos.x + ux * s, y: relPos.y + uy * s });
+        // 径向段速度非均匀，逐点 t 用弧长比例近似
+        // TODO: 骨架期近似值，填功能时可按需精化为逐点积分
+        pts.push({ x: relPos.x + ux * s, y: relPos.y + uy * s, t: (i / M) * tTotal });
     }
 
     const pushSeg = () => segments.push({
@@ -161,7 +165,7 @@ function patchedRadialLine(relPos, relVel, host, depth, maxSeg, segments, stepSt
 
     // 逃逸出 SOI（端点在边界）→ 切换递归
     if (host.gm > 0 && rT >= host.soiRadius - 1) {
-        const switchT = stepStartTime + radialLineTime(relPos, ux, uy, sEnd, E, host.gm);
+        const switchT = stepStartTime + tTotal;
         const hostPosEnd = bodyFuturePos(host, switchT);
         const hostVelEnd = bodyFutureVel(host, switchT);
         const rBound = host.soiRadius;
@@ -204,7 +208,62 @@ function radialLineTime(relPos, ux, uy, sEnd, E, gm) {
     return t;
 }
 
+// 椭圆均匀偏近点角 E 采样（0.3.x 高离心率轨道近星折线问题根治）：
+// 返回 count+1 个点，E 从 E0 到 E1 均匀推进；点严格落在解析圆锥曲线上，
+// t =（E − e·sinE − M0)/n 随 E 单调递增（全圈时末点 t = 2π/n = T，语义与旧实现一致）。
+// 数学依据：
+//   ① E 均匀时相邻点空间弦长正比于 v·dt = √(gm/a)·√(1−e²cos²E)·dE/n，
+//      最近/最远弦长比 ≤ 1/√(1−e²)（e=0.943 时仅约 3×），近点/远点（曲率最大处）自动最密；
+//   ② 时间/平近点角均匀采样弦长 ∝ v，近星点速度最大、空间最疏，与曲率分布恰好相反。
+// 近星段矢高（弦-弧偏差）≈ π²a/(2N²)，与离心率无关——N 的选择由调用方按 a 决定。
+function ellipseSampleByE(kepler, E0, E1, count, M0, n) {
+    const { a, e, omega } = kepler;
+    const dir = kepler.dir === undefined ? 1 : kepler.dir;
+    const cosW = Math.cos(omega);
+    const sinW = Math.sin(omega);
+    const sqP = Math.sqrt(1 + e);
+    const sqM = Math.sqrt(1 - e);
+    const points = [];
+    for (let i = 0; i <= count; i++) {
+        const E = E0 + (i / count) * (E1 - E0);
+        // 半角 atan2 形式（与 getOrbitalInfo 同口径）：象限安全，且与 E→θ 变换严格互逆
+        const thetaM = 2 * Math.atan2(sqP * Math.sin(E / 2), sqM * Math.cos(E / 2));
+        const theta = dir * thetaM;
+        const r = a * (1 - e * Math.cos(E));
+        const ox = r * Math.cos(theta);
+        const oy = r * Math.sin(theta);
+        points.push({
+            x: ox * cosW - oy * sinW,
+            y: ox * sinW + oy * cosW,
+            t: (E - e * Math.sin(E) - M0) / n
+        });
+    }
+    return points;
+}
+
+// 求解开普勒方程 M = E − e·sinE（牛顿迭代，收敛判据与 keplerPositionAtTime 同口径；
+// 高离心率牛顿跳变/不收敛时降级二分兜底，与 keplerPositionAtTime 同策略）
+function solveEccentricAnomaly(M, e) {
+    let E = M;
+    for (let i = 0; i < 40; i++) {
+        const denom = 1 - e * Math.cos(E);
+        const step = (E - e * Math.sin(E) - M) / denom;
+        if (Math.abs(step) < 1e-12 * Math.max(1, Math.abs(E))) return E;
+        E -= step;
+    }
+    let lo = M - Math.PI;
+    let hi = M + Math.PI;
+    for (let i = 0; i < 40; i++) {
+        const mid = (lo + hi) / 2;
+        if (mid - e * Math.sin(mid) < M) lo = mid; else hi = mid;
+    }
+    return (lo + hi) / 2;
+}
+
 // 递归内部：分段拼接一步，采样从 theta0 到交点或完整轨道
+// 段点结构（0.3.0 骨架新增 t 字段）：{ x, y, t } — x/y 为相对锚点坐标，
+// t 为自该段起点（anchorTime）起的游戏秒偏移；锚点绝对时刻 = anchorTime + t。
+// 供轨道悬停 Tooltip 的 T+ 显示与右键菜单"时间加速至此"计算（飞行Scene 交互层读取）。
 function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segments) {
     if (depth >= maxSeg) return;
 
@@ -219,7 +278,7 @@ function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segment
         if (!intersection) {
             // 无交点兜底：时间采样推进（解析）直到出 SOI
             // 段点存相对锚点坐标（宿主在 stepStartTime 的位置），消除绝对坐标大数
-            const pts = [{ x: relPos.x, y: relPos.y }];
+            const pts = [{ x: relPos.x, y: relPos.y, t: 0 }];
             const aMag = -kepler.a;
             const v0 = Math.sqrt(velRel.x * velRel.x + velRel.y * velRel.y);
             const r0 = Math.sqrt(relPos.x * relPos.x + relPos.y * relPos.y);
@@ -229,7 +288,7 @@ function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segment
             for (let i = 1; i <= maxSteps; i++) {
                 const t = i * stepT;
                 const rP = keplerPositionAtTime(kepler, host.gm, t, kepler.omega);
-                if (i % 2 === 0) pts.push({ x: rP.x, y: rP.y });
+                if (i % 2 === 0) pts.push({ x: rP.x, y: rP.y, t });
                 if (Math.sqrt(rP.x * rP.x + rP.y * rP.y) > host.soiRadius) break;
             }
             segments.push({
@@ -271,7 +330,7 @@ function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segment
             const frac = i / N;
             const th = dir * (theta0m + frac * deltaTheta);
             const rP = keplerPositionAtTheta({ a: kepler.a, e: kepler.e, omega: kepler.omega }, host.gm, th);
-            points.push({ x: rP.x, y: rP.y });
+            points.push({ x: rP.x, y: rP.y, t: frac * deltaT });
         }
         segments.push({
             relPoints: points,
@@ -329,7 +388,7 @@ function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segment
         const hP0 = bodyFuturePos(host, stepStartTime);
         let relP = { x: posAbs.x - hP0.x, y: posAbs.y - hP0.y };
         let relV = { x: velRel.x, y: velRel.y };
-        const pts = [{ x: relP.x, y: relP.y }];
+        const pts = [{ x: relP.x, y: relP.y, t: 0 }];
         const dt = 0.05;
 
         // RK4 步数动态化：病态逃逸（kepler=null）时到达 SOI 边界的时间可能远大于
@@ -355,7 +414,7 @@ function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segment
             relV = result.vel;
 
             if (i % 2 === 0) {
-                pts.push({ x: relP.x, y: relP.y });
+                pts.push({ x: relP.x, y: relP.y, t });
             }
 
             // 转到绝对坐标（仅用于 SOI 检测）
@@ -409,16 +468,33 @@ function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segment
     if (!intersection) {
         // 轨道未离开当前宿主 SOI，但需检测是否进入其他天体嵌套 SOI
         const T = 2 * Math.PI * Math.sqrt(kepler.a * kepler.a * kepler.a / host.gm);
-        const N = 200;
+        const n = 2 * Math.PI / T;
+        const N = 200;      // SOI 扫描分辨率（扫描/二分专用，不参与绘制采样密度）
+
+        // 绘制采样数（均匀偏近点角 E，根治高离心率近星段折线）：
+        // 近星段矢高 S_p = π²a/(2N²)（与离心率无关，推导见 ellipseSampleByE 注释）
+        // → N = ceil(π·√(a/(2·S_TARGET)))；a 越大近星"发夹"越需加密（e≈0.999 的
+        // 大椭圆需近 2000 点）；S_TARGET 以"天体总览视角"（恒星约 1px≈1.8e6m）≈0.25px
+        // 矢高为目标；下限 200 保近圆小轨道平滑，上限防失控。
+        const S_TARGET = 4.6e5; // m
+        const N_DRAW = Math.max(200, Math.min(4096, Math.ceil(Math.PI * Math.sqrt(kepler.a / (2 * S_TARGET)))));
+
+        // 起始偏近点角 E0 与平近点角 M0（运动坐标 θm=dir·θ；atan2 半角形式与 getOrbitalInfo 同口径）
+        const theta0m = (kepler.dir === undefined ? 1 : kepler.dir) * kepler.theta;
+        const E0 = 2 * Math.atan2(
+            Math.sqrt(1 - kepler.e) * Math.sin(theta0m / 2),
+            Math.sqrt(1 + kepler.e) * Math.cos(theta0m / 2)
+        );
+        const M0 = E0 - kepler.e * Math.sin(E0);
 
         // 绘制用点：固定锚点（宿主在 stepStartTime 的位置），
-        // 段点存相对锚点坐标，保证以宿主为中心的视觉椭圆
-        const drawPoints = [];
-        for (let i = 0; i <= N; i++) {
-            const t = (i / N) * T;
-            const rP = keplerPositionAtTime(kepler, host.gm, t, kepler.omega);
-            drawPoints.push({ x: rP.x, y: rP.y });
-        }
+        // 段点存相对锚点坐标，保证以宿主为中心的视觉椭圆。
+        // 高离心率轨道（e→1）下"均匀时间/平近点角"采样弦长 ∝ v，近星点速度最大、
+        // 空间最疏，与曲率分布恰好相反（e=0.943 案例近星弦长 ≈1.1e9 m ≈620px，
+        // 即截图折线根因）；改为均匀偏近点角 E 后空间弦长全场平衡
+        // （最近/最远弦长比 ≤ 1/√(1−e²)，e=0.943 时仅约 3×），
+        // 近星/远星点（曲率最大处）自动最密，矢高 <0.5px（视觉平滑）。
+        const drawPoints = ellipseSampleByE(kepler, E0, E0 + 2 * Math.PI, N_DRAW, M0, n);
 
         // 扫描用点：逐点绝对坐标，用于 getSOIHostAtTime 精确检测
         const scanPoints = [];
@@ -505,13 +581,12 @@ function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segment
         nextSoiHost = verifiedHost;
 
         // 截断至切换点：在 [0, tHi] 区间重采样，保证最小点数（避免进入 SOI 前
-        // 的短段在固定 N=200 采样下只剩少数点、画成短直线）
+        // 的短段在固定 N=200 采样下只剩少数点、画成短直线）；
+        // 同样用均匀偏近点角 E 采样（弧段可能跨近星点，时间均匀会暴露同类折线问题）
         const MIN_POINTS = 32;
         const M = Math.max(MIN_POINTS, Math.min(200, Math.ceil(tHi / (T / N))));
-        const truncatedPoints = [];
-        for (let i = 0; i <= M; i++) {
-            truncatedPoints.push(keplerPositionAtTime(kepler, host.gm, (i / M) * tHi, kepler.omega));
-        }
+        const E1 = solveEccentricAnomaly(M0 + n * tHi, kepler.e);
+        const truncatedPoints = ellipseSampleByE(kepler, E0, E1, M, M0, n);
         segments.push({
             relPoints: truncatedPoints,
             anchorBody: host.name,
@@ -549,7 +624,7 @@ function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segment
         const frac = i / N;
         const th = dir * (theta0m + frac * deltaTheta);
         const rP = keplerPositionAtTheta({ a: kepler.a, e: kepler.e, omega: kepler.omega }, host.gm, th);
-        points.push({ x: rP.x, y: rP.y });
+        points.push({ x: rP.x, y: rP.y, t: frac * deltaT });
     }
     segments.push({
         relPoints: points,
@@ -588,6 +663,179 @@ function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segment
     patchedStep(nextAbsPos, nextRelVel, nextHost, intersectionTime, depth + 1, maxSeg, segments);
 }
 
+// ========== SOI 切换时间保护 ==========
+
+/**
+ * 计算"沿当前解析轨道到下一次 SOI 切换"的剩余游戏时间（秒）。
+ * 口径与 patchedStep（预测线）完全一致：
+ *   1) 有出界交点（双曲线/椭圆离开宿主 SOI）→ 解析 ΔM/n；
+ *   2) 无出界交点 → 整周期 200 点扫描嵌套 SOI 进入（如 Kerbin 轨道穿越 Mun SOI）
+ *      + 二分精化 + 1s 探针校验（防假阳性）。
+ * 返回 null 表示：无解析轨道（径向/RK4 病态，由 RK4 50x 限档兜底）、深空无宿主、
+ * 或轨道永不切换（稳定轨道/无嵌套进入）——调用方按"不额外限档"处理。
+ *
+ * 注意：必须从当前状态（ship.pos/ship.vel）重拟合轨道根数——ship.kepler 只在
+ * SOI 切换/机动时刻重拟合，其 theta 是彼时的真近点角，位置由 keplerToState 随
+ * orbitTime 推进；直接用 ship.kepler 会把已飞行时间多算进"剩余切换时间"
+ * （或当旧交点已过时错取下一圈交点），保护档位恒偏松、靠近边界也不会收紧。
+ * 预测线 patchedStep 同口径：均从当前位移/速度重建轨道。
+ * @param {Object} ship - 飞船实例（用 ship.pos/ship.vel，相对当前宿主坐标）
+ * @param {Object|null} host - 当前宿主天体（null = 深空）
+ * @returns {number|null} 剩余游戏秒
+ */
+export function timeToNextSOISwitch(ship, host) {
+    if (!host || !(host.gm > 0) || !ship.pos || !ship.vel) {
+        return null;
+    }
+
+    // 从当前状态重建轨道根数（与预测线同口径；径向/近抛物线病态 → null 走 RK4 兜底）
+    const kepler = stateToKepler(ship.pos, ship.vel, host.gm);
+    if (!kepler || !isFinite(kepler.a)) {
+        return null;
+    }
+
+    const gm = host.gm;
+
+    // 1) 出界交点时间（双曲线/椭圆统一，与预测线同公式）
+    const tExit = findSOIExitTime(kepler, gm, host.soiRadius);
+    if (tExit !== null) {
+        return tExit;
+    }
+
+    // 2) 无出界：仅椭圆轨道（有周期）才可能进入嵌套 SOI
+    if (!(kepler.a > 0)) {
+        return null;
+    }
+    // 2.1) 嵌套扫描前置筛选（性能保护）：稳定轨道每帧整周期扫描 ≈1.4ms/船,
+    // 飞行/追踪场景取全部飞船 → 多船档会挤爆帧预算。几何判定：
+    //   |ship − B| ≥ d_min(宿主,B) − rMax（rMax = a(1+e) 为宿主-相对轨道最大半径），
+    // 若对每个非宿主天体都有 d_min − rMax > B.soiRadius → 该轨道整个周期内
+    // 不可能进入任何嵌套 SOI → 直接返回 null，无需扫描。
+    // d_min 下界（沿父链求公共祖先再按径向区间间隙减缩）：
+    //   ① B 是宿主(孙)后代 → 先取宿主直接子体近点半径，再逐级减去中间体远点半径；
+    //   ② 非同系（绕公共祖先的兄弟/远亲）→ 宿主侧节点与 B 侧节点的径向区间
+    //      [a(1−e), a(1+e)] 的间隙 max(0, bMin−hMax, hMin−bMax)，再逐级减去 B 侧中间体远点半径；
+    //   ③ 链缺失/环 → 0（保守：总是扫描，保证不漏报）。
+    // 注：星级宿主（深空）下行星即"宿主直接子体"，同公式成立（|ship−B| ≥ rB_pe − rMax）。
+    const rMax = kepler.a * (1 + kepler.e);
+    const dMinToHost = (b) => {
+        const parentOf = (body) => body.orbitParent
+            ? (celestialBodies.find(p => p.name === body.orbitParent) || null)
+            : null;
+        // 宿主链（自下而上）
+        const hostChain = [];
+        {
+            let h = host;
+            while (h && !hostChain.includes(h)) { hostChain.push(h); h = parentOf(h); }
+        }
+        // B 链（自下而上）
+        const bChain = [];
+        {
+            let c = b;
+            while (c && !bChain.includes(c)) { bChain.push(c); c = parentOf(c); }
+        }
+        // ① B 是宿主后代：宿主直接子体近点半径起算
+        const hostIdx = bChain.indexOf(host);
+        if (hostIdx >= 0 && hostIdx >= 1) {
+            const child = bChain[hostIdx - 1];
+            let dMin = child.orbitA * (1 - (child.orbitE || 0));
+            for (let i = 0; i < hostIdx - 1; i++) {
+                dMin = Math.max(0, dMin - bChain[i].orbitA * (1 + (bChain[i].orbitE || 0)));
+            }
+            return dMin;
+        }
+        // ② 兄弟/远亲：公共祖先下两侧节点的径向区间间隙
+        const common = bChain.find(n => hostChain.includes(n));
+        if (common) {
+            const hSide = hostChain[hostChain.indexOf(common) - 1];
+            const bSide = bChain[bChain.indexOf(common) - 1];
+            if (hSide && bSide) {
+                const bMin = bSide.orbitA * (1 - (bSide.orbitE || 0));
+                const bMax = bSide.orbitA * (1 + (bSide.orbitE || 0));
+                const hMin = hSide.orbitA * (1 - (hSide.orbitE || 0));
+                const hMax = hSide.orbitA * (1 + (hSide.orbitE || 0));
+                let dMin = Math.max(0, bMin - hMax, hMin - bMax);
+                const bi = bChain.indexOf(common);
+                for (let i = 0; i < bi - 1; i++) {
+                    dMin = Math.max(0, dMin - bChain[i].orbitA * (1 + (bChain[i].orbitE || 0)));
+                }
+                return dMin;
+            }
+        }
+        // ③ 保守兜底
+        return 0;
+    };
+    let canEnterNested = false;
+    for (const b of celestialBodies) {
+        if (b === host || b.type === 'star') continue;
+        if (dMinToHost(b) - rMax <= b.soiRadius) {
+            canEnterNested = true;
+            break;
+        }
+    }
+    if (!canEnterNested) {
+        return null;
+    }
+    const T = 2 * Math.PI * Math.sqrt(kepler.a * kepler.a * kepler.a / gm);
+    const startTime = _cachedTime;
+    const N = 200;
+
+    // 逐点扫描整个轨道周期（与 patchedStep 无交点分支同口径）
+    let switchIdx = -1;
+    let nextSoiName = null;
+    for (let i = 1; i <= N; i++) {
+        const t = (i / N) * T;
+        const rP = keplerPositionAtTime(kepler, gm, t, kepler.omega);
+        const hp = bodyFuturePos(host, startTime + t);
+        const absP = { x: hp.x + rP.x, y: hp.y + rP.y };
+        const soiAtPt = getSOIHostAtTime(absP, startTime + t);
+        if (soiAtPt && soiAtPt.name !== host.name) {
+            switchIdx = i;
+            nextSoiName = soiAtPt.name;
+            break;
+        }
+    }
+    if (switchIdx === -1) {
+        return null;
+    }
+
+    // 3) 二分精化切换时刻（与 patchedStep 同口径）
+    const tPrev = ((switchIdx - 1) / N) * T;
+    const tCurr = (switchIdx / N) * T;
+    let tLo = tPrev;
+    let tHi = tCurr;
+    for (let iter = 0; iter < 15; iter++) {
+        const tMid = (tLo + tHi) / 2;
+        const rPos = keplerPositionAtTime(kepler, gm, tMid, kepler.omega);
+        const hpMid = bodyFuturePos(host, startTime + tMid);
+        const absPos = { x: hpMid.x + rPos.x, y: hpMid.y + rPos.y };
+        const soiCheck = getSOIHostAtTime(absPos, startTime + tMid);
+        if (soiCheck && soiCheck.name === nextSoiName) {
+            tHi = tMid;
+        } else {
+            tLo = tMid;
+        }
+    }
+    const switchT = tHi;
+
+    // 4) 探针校验（同 patchedStep）：切换点 +1s 后确认确属新宿主（防浮点假阳性）
+    const dt2 = 0.001;
+    const rPos = keplerPositionAtTime(kepler, gm, switchT, kepler.omega);
+    const rPos2 = keplerPositionAtTime(kepler, gm, switchT + dt2, kepler.omega);
+    const hp1 = bodyFuturePos(host, startTime + switchT);
+    const hp2 = bodyFuturePos(host, startTime + switchT + dt2);
+    const absPos = { x: hp1.x + rPos.x, y: hp1.y + rPos.y };
+    const absPos2 = { x: hp2.x + rPos2.x, y: hp2.y + rPos2.y };
+    const absVel = { x: (absPos2.x - absPos.x) / dt2, y: (absPos2.y - absPos.y) / dt2 };
+    const probePos = { x: absPos.x + absVel.x, y: absPos.y + absVel.y };
+    const verifiedHost = getSOIHostAtTime(probePos, startTime + switchT + 1);
+    if (!verifiedHost || verifiedHost.name === host.name) {
+        return null;
+    }
+
+    return switchT;
+}
+
 // 解析解分段预测 — 多段拼接完整轨道（含 SOI 穿越）
 export function predictTrajectoryPatched(ship, maxSegments = 5) {
     const segments = [];
@@ -621,7 +869,7 @@ export function integrateThrustArc(relPos, relVel, gm, host, thrustAccel, burnDu
 
     // 锚点（宿主在 startTime 的位置，固定锚，消除宿主漂移）
     // 段点存相对锚点坐标
-    points.push({ x: rp.x, y: rp.y });
+    points.push({ x: rp.x, y: rp.y, t: 0 });
 
     for (let i = 1; i <= maxSteps; i++) {
         const r = Math.sqrt(rp.x * rp.x + rp.y * rp.y);
@@ -631,7 +879,7 @@ export function integrateThrustArc(relPos, relVel, gm, host, thrustAccel, burnDu
         rp.x += rv.x * dt;
         rp.y += rv.y * dt;
         if (i % 3 === 0) {
-            points.push({ x: rp.x, y: rp.y });
+            points.push({ x: rp.x, y: rp.y, t: i * dt });
         }
         if (r > host.soiRadius * soiRadiusLimit) break;
     }

@@ -3,10 +3,11 @@
 import { sceneManager } from '../sceneManager.js';
 import { eventBus, Events } from '../eventBus.js';
 import { textureManager } from '../graphics/textureManager.js';
+import { t } from '../config/strings.js';
 
 const LOGO_SEQUENCE = [
     { type: 'image', textureKey: 'project_logo', maxWidthRatio: 0.45, fadeIn: 0.8, hold: 1.5, fadeOut: 0.8 },
-    { type: 'text', text: '本游戏为个人学习项目，不用于商业用途', fontSize: 24, fadeIn: 0.8, hold: 1.5, fadeOut: 0.8 }
+    { type: 'text', text: t('splash.text'), fontSize: 24, fadeIn: 0.8, hold: 1.5, fadeOut: 0.8 }
 ];
 
 let _canvas = null;
@@ -20,7 +21,11 @@ let _hasSkipped = false;
 function _skipSplash() {
     _hasSkipped = true;
     _cleanup();
-    sceneManager.switchTo('info');
+    // 0.2.8：公告面板化后启动链直达主菜单；仅启动路径自动打开公告面板
+    sceneManager.switchTo('menu');
+    if (typeof window.openAnnouncement === 'function') {
+        window.openAnnouncement();
+    }
 }
 
 function _cleanup() {
@@ -61,7 +66,12 @@ function _advancePhase() {
             _phase = 'fadeIn';
         }
     } else if (_phase === 'blackScreen') {
-        sceneManager.switchTo('info');
+        // 0.2.8：公告面板化后启动链直达主菜单；仅启动路径自动打开公告面板
+        //（其他场景返回主菜单不经此路径 → 不自动打开）
+        sceneManager.switchTo('menu');
+        if (typeof window.openAnnouncement === 'function') {
+            window.openAnnouncement();
+        }
     }
 }
 
@@ -85,7 +95,7 @@ function _drawImageLogo(ctx, config, alpha) {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.font = '40px monospace';
-        ctx.fillText('【逃逸速度】', _canvas.width / 2, _canvas.height / 2);
+        ctx.fillText(t('splash.studio'), _canvas.width / 2, _canvas.height / 2);
         return;
     }
 

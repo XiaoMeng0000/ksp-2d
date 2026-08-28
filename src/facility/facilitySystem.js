@@ -7,6 +7,8 @@ import { getFacilityType } from './facilityTypes.js';
 import { stateToKepler, keplerToState } from '../physics/orbitalMechanics.js';
 import { celestialBodies } from '../physics/physics.js';
 import { shipSystem } from '../ship/shipSystem.js';
+import { SHIP_TEMPLATES } from '../ship/shipTemplates.js';
+import { initFacilityStorage, consumeStorage, addStorage, refuelFromStorage } from '../resources/cargoSystem.js';
 
 class FacilitySystem {
     constructor() {
@@ -78,6 +80,9 @@ class FacilitySystem {
             upgradeLevel: 1,
             missionServices: []
         };
+
+        // 0.2.0 阶段5：按类型 storageProfile 初始化资源存储槽（全资源空仓）
+        initFacilityStorage(facility);
 
         const state = gameState.getState();
         state.facilities.push(facility);
@@ -271,8 +276,14 @@ class FacilitySystem {
             return false;
         }
 
-        // TODO: 点数系统启用后扣除点数
-        ship.fuel = ship.fuelCapacity;
+        // 0.2.0 阶段5：补给 = 设施存储的氢氧 → 飞船燃料罐（按缺口补满，受设施存量限制）
+        const result = refuelFromStorage(facility, ship);
+        if (!result.ok) {
+            console.warn(`[FacilitySystem] 补给失败：设施 ${facilityId} 无可用燃料存储`);
+            return false;
+        }
+        // 0.2.0 阶段2：补给后恢复点火能力（修复 B1：燃料耗尽不再永久置 maxThrust=0）
+        ship.engineOut = false;
 
         this.persistFacility(facility);
         console.log(`[FacilitySystem] 飞船 ${shipId} 燃料已补满`);
@@ -304,6 +315,12 @@ class FacilitySystem {
             return false;
         }
 
+        // 0.2.0 阶段5：安装模块从设施存储扣材料套装（全局资源已退场），不足拒绝
+        if (!consumeStorage(facility, 'materialKits', def.price || 0)) {
+            console.warn(`[FacilitySystem] 安装模块失败：设施材料套装不足 (${moduleTypeId})`);
+            return false;
+        }
+
         ship.modules.push({
             id: 'mod_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7),
             type: def.id,
@@ -311,7 +328,6 @@ class FacilitySystem {
         });
         ship.dryMass += def.massBonus;
         ship.momentOfInertia += def.momentOfInertiaBonus;
-        // TODO: 点数系统启用后扣除点数
 
         this.persistFacility(facility);
         console.log(`[FacilitySystem] 模块 ${moduleTypeId} 已安装到飞船 ${shipId}`);
@@ -343,6 +359,15 @@ class FacilitySystem {
         if (def) {
             ship.dryMass -= def.massBonus;
             ship.momentOfInertia -= def.momentOfInertiaBonus;
+            // 0.2.0 阶段5：卸载返还材料套装到设施存储（装扣卸返，无差价）。
+            // 槽满时扩容保证全额入账 —— 原实现直接 addStorage，容量不足时返还静默丢失
+            if (def.price > 0) {
+                const slot = facility.storage && facility.storage.materialKits;
+                if (slot) {
+                    slot.capacity = Math.max(slot.capacity || 0, (slot.amount || 0) + def.price);
+                    addStorage(facility, 'materialKits', def.price);
+                }
+            }
         }
 
         this.persistFacility(facility);
@@ -358,10 +383,35 @@ class FacilitySystem {
             return null;
         }
 
+        const template = SHIP_TEMPLATES.find(t => t.id === templateId);
+        if (!template) {
+            console.warn(`[FacilitySystem] 模板 ${templateId} 不存在，无法建造`);
+            return null;
+        }
+
+        // 0.2.0 阶段5：建造扣费从设施存储扣（模板 cost + 所选模块 price 合计），不足拒绝
+        const moduleCost = (moduleTypeIds || []).reduce((sum, id) => {
+            const def = shipSystem.getModuleDef(id);
+            return sum + ((def && def.price) || 0);
+        }, 0);
+        const totalCost = (template.cost || 0) + moduleCost;
+        if (!consumeStorage(facility, 'materialKits', totalCost)) {
+            console.warn(`[FacilitySystem] 建造失败：设施材料套装不足 (${templateId})`);
+            return null;
+        }
+
         // 调用 ShipSystem 创建基础飞船实例
         const newShip = shipSystem.createShip(templateId, name, moduleTypeIds);
         if (!newShip) {
+            // 防御：创建失败时返还已扣材料套装（正常路径不可达，但避免意外吞费）
             console.warn(`[FacilitySystem] 飞船创建失败，模板: ${templateId}`);
+            if (totalCost > 0) {
+                const slot = facility.storage && facility.storage.materialKits;
+                if (slot) {
+                    slot.capacity = Math.max(slot.capacity || 0, (slot.amount || 0) + totalCost);
+                    addStorage(facility, 'materialKits', totalCost);
+                }
+            }
             return null;
         }
 
@@ -390,7 +440,6 @@ class FacilitySystem {
         newShip.throttle = 0;
 
         shipSystem.persistShip(newShip);
-        // TODO: 点数系统启用后扣除点数
 
         console.log(`[FacilitySystem] 飞船建造完成: ${newShip.id} (${name}) 在 ${facilityId}`);
         return newShip;

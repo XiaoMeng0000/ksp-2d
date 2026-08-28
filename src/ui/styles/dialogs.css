@@ -1,0 +1,127 @@
+/* ============================================================
+   dialogs.css — 通知 / 存档管理面板
+   覆盖 uiComponents.js（通知）、menuUI.js（存档管理）动态创建的弹层
+   0.2.6：通用对话框组件（.ui-dialog* / .ui-list* / .ui-input）已迁入
+   ksp2_panels.css 第四部分，统一为 KSP2 面板风格
+   ============================================================ */
+
+/* ---- 通知 ---- */
+#notification-container {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10001;
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: center;
+    gap: 8px;
+    pointer-events: none;
+    max-width: 90vw;
+}
+
+.ui-notification {
+    background: var(--panel-bg);
+    border-radius: 3px;
+    padding: 8px 16px;
+    color: var(--text-bright);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.3s ease;
+    pointer-events: none;
+    text-align: center;
+    max-width: 80vw;
+    min-width: 120px;
+}
+.ui-notification-success { border: 1px solid var(--accent); }
+.ui-notification-error   { border: 1px solid var(--danger); }
+.ui-notification-info    { border: 1px solid var(--text-mid); }
+.ui-notification-warning { border: 1px solid var(--warn); }
+
+/* ---- ESC 菜单 ----
+   0.2.5 已抽离为独立组件，样式见 esc_menu.css（--esc-* 独立配色） */
+
+/* ---- 存档管理面板 ----
+   0.2.6 面板/标题/列表等基础样式沿用 ksp2_panels.css 第四部分对话框组件 */
+#archiveManagerPanel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 9999;
+    font-family: var(--font-mono);
+}
+
+#archiveManagerPanel .ui-dialog {
+    min-width: 350px;
+    max-width: 550px;
+    max-height: 80vh;
+    overflow-y: auto;
+    padding: 15px;
+}
+
+#archiveManagerPanel .ui-dialog-title {
+    margin-bottom: 15px;
+}
+
+.archive-world-row,
+.archive-checkpoint-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+}
+
+.archive-world-btn {
+    background: none;
+    border: none;
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    cursor: pointer;
+    text-align: left;
+    font-weight: bold;
+    padding: 0;
+}
+
+.archive-back-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.archive-back-btn {
+    padding: 4px 10px;
+    background: var(--card-bg);
+    color: var(--accent);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.archive-world-name {
+    margin-left: 10px;
+    color: var(--text-mid);
+    font-size: 12px;
+}
+
+.archive-checkpoint-name {
+    color: var(--text-main);
+    font-size: 13px;
+    font-weight: bold;
+    text-align: left;
+}
+
+.archive-checkpoint-sub {
+    color: var(--text-dim);
+    font-size: 11px;
+}

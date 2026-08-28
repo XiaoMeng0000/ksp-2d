@@ -1,0 +1,1913 @@
+/* ============================================================
+   ksp2_panels.css — KSP2 风格覆盖式面板（设置页 / 开始游戏面板）
+   0.2.6 合并自 settings.css + start_game.css（纯物理合并，不改样式值）
+   共用 theme.css 的 --theme-* 变量（实色深底，不透明）
+   · 设置页：#settingsContainer（左侧分类导航 + 右侧内容区）
+   · 开始游戏：#startGamePanel（战役/游戏双列）+ #newCampaignDialog 创建新战役对话框
+   主菜单链接栏 .mm-links 已顺移入 main_menu.css
+   ============================================================ */
+
+/* ============================================================
+   第一部分：设置页
+   ============================================================ */
+
+#settingsContainer {
+    position: fixed;
+    border-radius: 5px;
+    top: 10px;
+    left: 10px;
+    width: 60vw;
+    min-width: 1000px;
+    height: calc(100vh - 20px);
+    background: var(--theme-bg);
+    z-index: 1000;
+    display: flex;
+    font-family: var(--font-mono);
+    color: var(--text-bright);
+}
+
+/* 左侧导航栏 */
+#settingsNav {
+    border-radius: 5px;
+    margin: 15px;
+    margin-right: 0px;
+    width: 240px;
+    min-width: 240px;
+    background: var(--theme-panel);
+    padding: 5px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 14px;
+    overflow-y: auto;
+    box-sizing: border-box;
+}
+
+#settingsNav .settings-nav-title {
+    color: var(--text-bright);
+    text-align: center;
+    margin-bottom: 5px;
+    font-size: 18px;
+    padding-bottom: 8px;
+}
+
+#settingsNav .settings-cat {
+    text-align: center;
+    position: relative;
+    padding: 6px 10px;
+    font-size: 13px;
+    background: var(--theme-panel-deep);
+}
+
+#settingsNav .settings-cat::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 5px;
+    height: calc(100% - 4px);
+    border: 2px solid var(--border);
+    border-right-width: 0px;
+}
+
+#settingsNav .settings-cat::before {
+    content: "";
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 5px;
+    height: calc(100% - 4px);
+    border: 2px solid var(--border);
+    border-left-width: 0px;
+}
+
+#settingsNav .settings-cat.active {
+    color: var(--text-bright);
+    background: var(--theme-active-bg);
+}
+
+#settingsNav .settings-cat.active::after {
+    display: none;
+}
+
+#settingsNav .settings-cat.active::before {
+    display: none;
+}
+
+#settingsNav .settings-cat.disabled {
+    filter: brightness(0.5);
+}
+
+/* 底部返回按钮 */
+#settingsNav .settings-back-btn {
+    padding: 6px 10px;
+    cursor: pointer;
+    color: var(--text-bright);
+    background-color: var(--theme-btn-bg);
+    border: 1px solid var(--theme-border);
+    border-radius: 5px;
+    text-align: center;
+    font-size: 12px;
+}
+
+#settingsNav .settings-back-btn:hover {
+    border-color: var(--theme-border-hover);
+}
+
+/* 右侧内容区 */
+#settingsContent {
+    border-radius: 5px;
+    margin: 15px;
+    background: var(--theme-panel);
+    flex: 1;
+    padding: 12px;
+    overflow-y: auto;
+}
+
+#settingsContent .settings-content-title {
+    color: var(--accent);
+    font-size: 16px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 8px;
+}
+
+#settingsContent .settings-group-header {
+    background: var(--header-bg);
+    color: var(--text-bright);
+    padding: 5px 10px;
+    font-size: 14px;
+    margin-top: 12px;
+}
+
+#settingsContent .settings-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px;
+    border-bottom: 1px solid var(--theme-border-row);
+}
+
+#settingsContent .settings-row:hover {
+    background-color: var(--theme-hover);
+}
+
+#settingsContent .settings-row-label {
+    color: var(--text-main);
+    font-size: 12px;
+}
+
+#settingsContent .settings-row-control {
+    flex: 0 0 55%;
+}
+
+#settingsContent .settings-btn-group {
+    display: flex;
+    gap: 4px;
+}
+
+/* 音量滑条 — KSP2 正式样式（参考总监提供样式图 + 四条修正注解）
+   数字百分比框 + 轨道（描边、深黑底、居中虚线）+ 滑块（竖条完全在轨道内，上下各留 1px） */
+#settingsContent .settings-slider-value {
+    min-width: 72px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    background: var(--theme-btn-bg); /* 通用色 = KSP1/KSP2 按键背景色（总监要求，与滑槽统一） */
+    border: 1px solid var(--border);
+    color: var(--text-bright);
+    font-family: var(--font-mono);
+    font-size: 13px;
+}
+
+#settingsContent .settings-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    flex: 1;
+    height: 24px;
+    background: transparent;
+    cursor: pointer;
+    margin: 0;
+}
+
+/* 轨道：高 = 百分比框(30px)的 4/5 = 24px + 亮描边 + 居中细虚线（约轨道高 5%，段/间隙 4+4）
+   无选中态（参考图音量滑条统一样式）；底色 = KSP1/KSP2 按键背景色通用色 */
+#settingsContent .settings-slider::-webkit-slider-runnable-track {
+    height: 24px;
+    border-radius: 5px;
+    background-color: var(--theme-btn-bg);
+    border: 1px solid #39424f;
+    background-image:
+        linear-gradient(
+            180deg,
+            var(--theme-btn-bg) 0,
+            var(--theme-btn-bg) calc(50% - 0.5px),
+            transparent calc(50% - 0.5px),
+            transparent calc(50% + 0.5px),
+            var(--theme-btn-bg) calc(50% + 0.5px),
+            var(--theme-btn-bg) 100%
+        ),
+        repeating-linear-gradient(
+            90deg,
+            #56647c 0, #56647c 4px,
+            transparent 4px, transparent 8px
+        );
+}
+
+/* 滑块：竖向细条，完全在轨道内（高 22px = 轨道 24px − 两侧各 1px 空隙） */
+#settingsContent .settings-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 6px;
+    height: 22px;
+    margin-top: 1px;
+    border-radius: 3px;
+    background: #c8cdd4;
+    border: none;
+}
+
+/* Firefox 轨道与滑块（thumb 自动垂直居中）；高 = 百分比框(30px)的 4/5 = 24px */
+#settingsContent .settings-slider::-moz-range-track {
+    height: 24px;
+    border-radius: 5px;
+    background-color: var(--theme-btn-bg);
+    border: 1px solid #39424f;
+    background-image:
+        linear-gradient(
+            180deg,
+            var(--theme-btn-bg) 0,
+            var(--theme-btn-bg) calc(50% - 0.5px),
+            transparent calc(50% - 0.5px),
+            transparent calc(50% + 0.5px),
+            var(--theme-btn-bg) calc(50% + 0.5px),
+            var(--theme-btn-bg) 100%
+        ),
+        repeating-linear-gradient(
+            90deg,
+            #56647c 0, #56647c 4px,
+            transparent 4px, transparent 8px
+        );
+}
+
+#settingsContent .settings-slider::-moz-range-thumb {
+    width: 6px;
+    height: 22px;
+    border-radius: 3px;
+    background: #c8cdd4;
+    border: none;
+}
+
+.settings-btn {
+    font-family: var(--font-mono);
+    height: 26px;
+    flex: 1;
+    color: var(--text-bright);
+    background-color: var(--theme-btn-bg);
+    border: 1px var(--border-light) solid;
+    border-radius: 5px;
+    font-size: 12px;
+}
+
+.settings-btn:hover {
+    border-color: var(--theme-border-hover);
+}
+
+.settings-btn.selected {
+    background-color: var(--theme-btn-selected);
+    border: 1px var(--theme-btn-selected) solid;
+}
+
+/* ============================================================
+   第二部分：开始游戏综合面板
+   ============================================================ */
+
+/* ---- 内嵌式综合面板（与设置页/追踪站同款：左上角定位 + 圆角深底） ---- */
+#startGamePanel.start-game-panel {
+    display: none;
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    height: calc(100vh - 20px);
+    width: 62vw;
+    max-width: 860px;
+    background: var(--theme-bg);
+    border-radius: 5px;
+    box-sizing: border-box;
+    flex-direction: column;
+    z-index: 950;
+    font-family: var(--font-mono);
+    color: var(--text-bright);
+    overflow: hidden;
+}
+
+#startGamePanel .sgp-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 14px 14px 0 14px;
+    padding: 10px 14px;
+    background: var(--theme-panel);
+    border-radius: 5px;
+    flex: 0 0 auto;
+}
+
+#startGamePanel .sgp-title {
+    color: var(--text-bright);
+    font-size: 15px;
+    font-family: var(--font-mono-bold);
+}
+
+#startGamePanel .sgp-close {
+    height: 26px;
+    padding: 0 10px;
+    background: var(--theme-btn-bg);
+    color: var(--text-bright);
+    border: 1px solid var(--border-light);
+    border-radius: 5px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+/* 双列主体：外层底色 + 内部圆角面板块 */
+#startGamePanel .sgp-body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    gap: 14px;
+    padding: 14px;
+    box-sizing: border-box;
+}
+
+#startGamePanel .sgp-col {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    padding: 14px;
+    box-sizing: border-box;
+    background: var(--theme-panel);
+    border-radius: 5px;
+}
+
+#startGamePanel .sgp-col-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: var(--text-mid);
+    font-size: 11px;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+}
+
+#startGamePanel .sgp-count {
+    color: var(--text-dim);
+    font-size: 10px;
+}
+
+/* 创建新战役按钮（与"加载游戏"同一中性配色，对齐设置页按钮） */
+#startGamePanel .sgp-new-campaign {
+    height: 26px;
+    padding: 0;
+    margin-bottom: 10px;
+    background: var(--theme-btn-bg);
+    color: var(--text-bright);
+    border: 1px solid var(--border-light);
+    border-radius: 5px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+/* 列表区 */
+#startGamePanel .sgp-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+#startGamePanel .sgp-world-row,
+#startGamePanel .sgp-cp-row {
+    padding: 8px 10px;
+    margin-bottom: 4px;
+    background: var(--theme-panel-deep);
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+#startGamePanel .sgp-world-row:hover,
+#startGamePanel .sgp-cp-row:hover {
+    background: var(--theme-hover);
+}
+
+#startGamePanel .sgp-world-row.sgp-selected,
+#startGamePanel .sgp-cp-row.sgp-selected {
+    background: var(--theme-active-bg);
+}
+
+#startGamePanel .sgp-world-name,
+#startGamePanel .sgp-cp-name {
+    color: var(--text-bright);
+    font-size: 13px;
+    margin-bottom: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#startGamePanel .sgp-world-sub,
+#startGamePanel .sgp-cp-sub {
+    color: var(--text-dim);
+    font-size: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 空态提示 */
+#startGamePanel .sgp-empty {
+    color: var(--text-faint);
+    font-size: 11px;
+    text-align: center;
+    padding: 24px 10px;
+}
+
+/* ---- 选中存档的元信息块（右列顶部） ---- */
+#startGamePanel .sgp-meta-card {
+    flex: 0 0 auto;
+    margin-bottom: 10px;
+    padding: 10px 12px;
+    background: var(--theme-panel-deep);
+    border-radius: 5px;
+}
+
+#startGamePanel .sgp-meta-name {
+    color: var(--text-bright);
+    font-size: 14px;
+    font-family: var(--font-mono-bold);
+    margin-bottom: 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#startGamePanel .sgp-meta-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 4px 0;
+    font-size: 11px;
+    border-bottom: 1px solid var(--theme-border-row);
+}
+
+#startGamePanel .sgp-meta-item:last-child {
+    border-bottom: none;
+}
+
+#startGamePanel .sgp-meta-label {
+    color: var(--text-dim);
+    flex: 0 0 auto;
+}
+
+#startGamePanel .sgp-meta-value {
+    color: var(--text-bright);
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 列底部操作区 */
+#startGamePanel .sgp-col-footer {
+    flex: 0 0 auto;
+    margin-top: 10px;
+    padding-top: 10px;
+    display: flex;
+    gap: 6px;
+}
+
+/* 底部按钮（加载游戏 / 删除战役 / 删除）— 对齐设置页按钮 */
+#startGamePanel .sgp-col-footer .ui-btn,
+#startGamePanel .sgp-col-footer .ui-btn-danger {
+    flex: 1;
+    height: 26px;
+    padding: 0;
+    background: var(--theme-btn-bg);
+    color: var(--text-bright);
+    border: 1px solid var(--border-light);
+    border-radius: 5px;
+}
+
+/* 禁用态（无选中项时） */
+#startGamePanel .sgp-col-footer .ui-btn:disabled,
+#startGamePanel .sgp-col-footer .ui-btn-danger:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+#startGamePanel .sgp-col-footer .ui-btn:disabled:hover,
+#startGamePanel .sgp-col-footer .ui-btn-danger:disabled:hover {
+    background: var(--theme-btn-bg);
+    color: var(--text-bright);
+    border-color: var(--border-light);
+}
+
+/* 悬停统一（与设置页 .settings-btn:hover 一致）：边框高亮为 --theme-border-hover */
+#startGamePanel .sgp-close:hover,
+#startGamePanel .sgp-new-campaign:hover,
+#startGamePanel .sgp-col-footer .ui-btn:not(:disabled):hover,
+#startGamePanel .sgp-col-footer .ui-btn-danger:not(:disabled):hover,
+#newCampaignDialog .nc-actions .ui-btn:hover,
+#newCampaignDialog .nc-actions .ui-btn-primary:hover {
+    border-color: var(--theme-border-hover);
+}
+
+/* ============================================================
+   第三部分：创建新战役对话框（覆盖层）
+   ============================================================ */
+#newCampaignDialog.nc-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.8);
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    font-family: var(--font-mono);
+}
+
+#newCampaignDialog .nc-dialog {
+    width: min(720px, 88vw);
+    max-height: 80vh;
+    overflow-y: auto;
+    background: var(--theme-bg);
+    border: 1px solid var(--theme-border);
+    border-radius: 5px;
+    padding: 14px;
+    box-sizing: border-box;
+    color: var(--text-bright);
+}
+
+/* 标题：accent + 下边框 */
+#newCampaignDialog .nc-title {
+    color: var(--accent);
+    font-size: 16px;
+    font-family: var(--font-mono-bold);
+    padding-bottom: 8px;
+    margin: 0 14px 14px 14px;
+    border-bottom: 1px solid var(--theme-border);
+}
+
+/* 主体双列：左表单 / 右模式卡片，各为独立圆角块 */
+#newCampaignDialog .nc-body {
+    display: flex;
+    gap: 14px;
+    padding: 0 14px;
+    margin-bottom: 14px;
+    box-sizing: border-box;
+}
+
+#newCampaignDialog .nc-form,
+#newCampaignDialog .nc-mode-cards {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--theme-panel);
+    border: 1px solid var(--theme-border-row);
+    border-radius: 5px;
+}
+
+#newCampaignDialog .nc-form {
+    gap: 16px;
+    padding: 14px;
+}
+
+/* 字段标签 */
+#newCampaignDialog .nc-label {
+    color: var(--text-main);
+    font-size: 12px;
+    margin-bottom: 6px;
+}
+
+#newCampaignDialog .nc-input {
+    padding: 6px 8px;
+    background: var(--theme-btn-bg);
+    color: var(--text-bright);
+    border: 1px solid var(--border-light);
+    border-radius: 5px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    outline: none;
+}
+
+#newCampaignDialog .nc-input:focus {
+    border-color: var(--theme-border-hover);
+}
+
+/* 模式回显框（左列下方，随选中卡片联动） */
+#newCampaignDialog .nc-form-input {
+    padding: 6px 8px;
+    background: var(--theme-btn-bg);
+    color: var(--accent);
+    border: 1px solid var(--border-light);
+    border-radius: 5px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+}
+
+/* 右列模式预览卡片（深底 + 圆角，选中高亮） */
+#newCampaignDialog .nc-mode-cards {
+    gap: 10px;
+    padding: 12px;
+}
+
+#newCampaignDialog .nc-mode-card {
+    padding: 12px 14px;
+    background: var(--theme-panel-deep);
+    border: 1px solid var(--theme-border-row);
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+#newCampaignDialog .nc-mode-card:hover {
+    background: var(--theme-hover);
+}
+
+#newCampaignDialog .nc-mode-card.nc-mode-selected {
+    background: var(--theme-active-bg);
+    border-color: var(--theme-border-hover);
+}
+
+#newCampaignDialog .nc-mode-title {
+    color: var(--text-bright);
+    font-size: 14px;
+    font-family: var(--font-mono-bold);
+    margin-bottom: 6px;
+}
+
+#newCampaignDialog .nc-mode-desc {
+    color: var(--text-mid);
+    font-size: 11px;
+    line-height: 1.6;
+}
+
+/* 底部操作区 */
+#newCampaignDialog .nc-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 0 14px 4px 14px;
+}
+
+/* 操作区按钮（取消 / 开始新战役）— 对齐设置页按钮
+   需覆盖 root.css .ui-btn/.ui-btn-primary 的垂直 padding（8px/6px），
+   否则 height:26px 下内容区被压缩导致文字错位 */
+#newCampaignDialog .nc-actions .ui-btn,
+#newCampaignDialog .nc-actions .ui-btn-primary {
+    height: 26px;
+    padding: 0 12px;
+    box-sizing: border-box;
+    background: var(--theme-btn-bg);
+    border: 1px solid var(--border-light);
+    border-radius: 5px;
+    color: var(--text-bright);
+    font-family: var(--font-mono);
+    font-size: 12px;
+}
+
+/* ============================================================
+   第四部分：通用对话框组件（uiComponents.js createDialog 系列）
+   0.2.6 从 dialogs.css 迁入，统一为 KSP2 面板风格
+   覆盖：选择对话框 / 输入对话框 / 确认对话框
+   ============================================================ */
+/* 通用对话框覆盖层 — 全项目最高 z-index 层(10010):
+   任何面板(星系配置 10005 / 新战役 10000 / 通知 10001)弹出的对话框
+   都必须盖过其宿主面板,确保 confirm/info 对话框永远最顶 */
+.ui-dialog-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10010;
+}
+
+.ui-dialog {
+    background: var(--theme-panel);
+    border: 1px solid var(--theme-border);
+    border-radius: 5px;
+    padding: 0;
+    min-width: 400px;
+    max-width: 520px;
+    max-height: 70vh;
+    overflow: hidden;
+    font-family: var(--font-mono);
+    color: var(--text-bright);
+    display: flex;
+    flex-direction: column;
+}
+
+/* 标题（通用蓝 / 危险红）— 顶部条带：浅灰底 + 内边距（与正文靠明暗底色分区） */
+.ui-dialog-title {
+    color: var(--text-bright);
+    margin: 0;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-family: var(--font-mono-bold);
+    background: var(--theme-bg);
+}
+
+.ui-dialog-title-danger {
+    color: var(--text-bright);
+    margin: 0;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-family: var(--font-mono-bold);
+    background: var(--theme-bg);
+}
+
+/* 正文 — 中部深灰区（继承面板 --theme-panel 深灰底色） */
+.ui-dialog-body {
+    color: var(--text-main);
+    margin: 0;
+    padding: 16px 20px;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+/* 按钮行 — 底部条带：浅灰底 + 按钮左右各半（flex:1，与正文靠明暗底色分区） */
+.ui-dialog-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: stretch;
+    background: var(--theme-bg);
+    padding: 10px 20px;
+}
+
+/* 对话框按钮（取消/确认）— 对齐设置页按钮，覆盖 root.css .ui-btn 默认 padding */
+.ui-dialog-actions .ui-btn,
+.ui-dialog-actions .ui-btn-danger-solid {
+    flex: 1;
+    height: 32px;
+    padding: 0 12px;
+    box-sizing: border-box;
+    border-radius: 5px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.ui-dialog-actions .ui-btn {
+    background: var(--theme-btn-bg);
+    color: var(--text-bright);
+    border: 1px solid var(--border-light);
+}
+
+.ui-dialog-actions .ui-btn:hover {
+    border-color: var(--theme-border-hover);
+}
+
+/* 确认对话框删除按钮 — 与开始游戏面板删除按钮统一（中性配色） */
+.ui-dialog-actions .ui-btn-danger-solid {
+    background: var(--theme-btn-bg);
+    color: var(--text-bright);
+    border: 1px solid var(--border-light);
+}
+
+.ui-dialog-actions .ui-btn-danger-solid:hover {
+    border-color: var(--theme-border-hover);
+}
+
+/* 选择对话框列表 — 位于正文区，列表项背景与正文一致 */
+.ui-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 16px 20px;
+    max-height: 50vh;
+    overflow-y: auto;
+}
+
+.ui-list-item {
+    padding: 8px 12px;
+    background: var(--theme-panel-deep);
+    border-radius: 5px;
+    color: var(--text-main);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    cursor: pointer;
+    text-align: left;
+}
+
+.ui-list-item:hover {
+    background: var(--theme-hover);
+}
+
+/* 列表项标题/副标题 — 对齐开始游戏面板行（名称亮白 / 副标题暗灰） */
+.ui-list-item-title {
+    font-weight: bold;
+    color: var(--text-bright);
+}
+
+.ui-list-item-sub {
+    color: var(--text-dim);
+    font-size: 11px;
+}
+
+/* 文本输入框（输入对话框）— 位于正文区，宽度自适应 */
+.ui-input {
+    width: 100%;
+    padding: 8px 10px;
+    margin: 0;
+    box-sizing: border-box;
+    background: var(--theme-btn-bg);
+    color: var(--text-bright);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    outline: none;
+    border: 1px solid var(--border-light);
+    border-radius: 5px;
+}
+
+.ui-input:focus {
+    border-color: var(--theme-border-hover);
+}
+
+/* ============================================================
+   第五部分：飞行工具面板（flightUI #toolbarPanel 内容页）
+   0.2.7 新增：模块/舱室内容页统一为 KSP2 分区布局（扫描页样板先行）
+   全部引用 --theme-*(theme.css)与 root.css 变量，不新增色值
+   结构：页头(.tkp-header) → 分区标题(.tkp-section) → 卡片/行 → 操作区(.tkp-actions)
+   ============================================================ */
+
+/* ---- 面板外壳（原 flight.css #toolbarPanel 视觉迁移，保持浮层定位） ---- */
+#toolbarPanel {
+    display: none;
+    position: fixed;
+    left: 70px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--theme-bg);
+    border: 1px solid var(--theme-menu-border);
+    border-radius: 5px;
+    padding: 14px;
+    width: 550px;
+    box-sizing: border-box;
+    max-height: 70vh;
+    overflow-y: auto;
+    z-index: 998;
+    font-family: var(--font-mono);
+    color: var(--text-bright);
+}
+
+/* ---- 页头（对齐开始游戏面板 .sgp-header） ---- */
+#toolbarPanel .tkp-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    padding: 10px 14px;
+    background: var(--theme-panel);
+    border-radius: 5px;
+}
+
+#toolbarPanel .tkp-title {
+    color: var(--text-bright);
+    font-family: var(--font-mono-bold);
+    font-weight: normal;
+    font-size: 14px;
+}
+
+#toolbarPanel .tkp-close {
+    height: 26px;
+    padding: 0 10px;
+    background: var(--theme-btn-bg);
+    color: var(--text-bright);
+    border: 1px solid var(--border-light);
+    border-radius: 5px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+#toolbarPanel .tkp-close:hover {
+    border-color: var(--theme-border-hover);
+}
+
+/* ---- 分区标题条（// 前缀为纯视觉装饰，文本走 strings；accent 蓝） ---- */
+#toolbarPanel .tkp-section {
+    color: var(--accent);
+    font-size: 12px;
+    letter-spacing: 1px;
+    margin: 12px 0 8px 0;
+    padding: 4px 10px;
+    background: var(--theme-panel);
+    border-radius: 3px;
+}
+
+#toolbarPanel .tkp-section::before {
+    content: '// ';
+    opacity: 0.7;
+}
+
+/* ---- 大卡片（IdentityCard 式：左图右文） ---- */
+#toolbarPanel .tkp-card {
+    background: var(--theme-panel-deep);
+    border: none;
+    border-radius: 5px;
+    padding: 14px;
+}
+
+/* 次级卡片（分区内的第二级背景，如资源行列表）— 与 .tkp-card 同底，内边距收紧 */
+#toolbarPanel .tkp-card-sm {
+    background: var(--theme-panel-deep);
+    border: none;
+    border-radius: 5px;
+    padding: 10px 12px;
+}
+
+/* ---- 两列网格（信息卡/槽位/飞船卡） ---- */
+#toolbarPanel .tkp-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+/* ---- 槽位/飞船卡（视觉统一，布局由使用处内联） ---- */
+#toolbarPanel .tkp-slot {
+    background: var(--theme-panel-deep);
+    border: none;
+    border-radius: 5px;
+    padding: 8px 10px;
+    min-width: 0;
+}
+
+/* 空槽位（虚线框安装按钮） */
+#toolbarPanel .tkp-slot-empty {
+    background: var(--theme-panel);
+    border: none;
+    border-radius: 5px;
+    padding: 8px 10px;
+    cursor: pointer;
+    color: var(--text-mid);
+    font-size: 11px;
+    font-family: var(--font-mono);
+    text-align: left;
+}
+
+#toolbarPanel .tkp-slot-empty:hover {
+    background: var(--accent-bg);
+    color: var(--accent);
+}
+
+/* ---- 信息小卡（label + value） ---- */
+#toolbarPanel .tkp-info {
+    background: var(--theme-panel-deep);
+    border: none;
+    border-radius: 5px;
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+#toolbarPanel .tkp-info-label {
+    color: var(--text-dim);
+    font-size: 10px;
+}
+
+#toolbarPanel .tkp-info-value {
+    color: var(--text-mid);
+    font-size: 13px;
+    font-weight: bold;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ---- 模块安装选择弹窗（0.2.7 当前风格：紫描边外框 + 分组卡，定位仍 JS 内联） ---- */
+.module-selector-popup {
+    background: var(--theme-bg);
+    border: 1px solid var(--theme-menu-border);
+    border-radius: 5px;
+    padding: 6px;
+    min-width: 220px;
+    max-height: 340px;
+    overflow-y: auto;
+    z-index: 10001;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-main);
+}
+
+/* 分类卡（与资源分组卡同款：紫头顶条 + 卡体，可折叠） */
+.module-selector-popup .msp-cat-card {
+    background: var(--theme-panel-deep);
+    border-radius: 5px;
+    margin-bottom: 6px;
+    overflow: hidden;
+}
+
+.module-selector-popup .msp-cat-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: var(--theme-btn-selected);
+    color: var(--text-bright);
+    font-size: 11px;
+    font-family: var(--font-mono-bold);
+    font-weight: normal;
+    letter-spacing: 1px;
+    cursor: pointer;
+}
+
+.module-selector-popup .msp-cat-head:hover {
+    filter: brightness(1.1);
+}
+
+.module-selector-popup .msp-cat-head .tg-arrow {
+    font-size: 10px;
+    transition: transform 0.15s ease;
+}
+
+.module-selector-popup .msp-cat-card.collapsed .msp-cat-head .tg-arrow {
+    transform: rotate(-90deg);
+}
+
+.module-selector-popup .msp-cat-card.collapsed .msp-cat-body {
+    display: none;
+}
+
+.module-selector-popup .msp-cat-body {
+    padding: 4px 6px;
+    display: flex;
+    flex-direction: column;
+}
+
+.module-selector-popup .msp-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 5px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+    color: var(--text-main);
+}
+
+.module-selector-popup .msp-row:hover {
+    background: var(--accent-bg);
+    color: var(--accent);
+}
+
+.module-selector-popup .msp-price {
+    color: var(--ut-gold);
+    font-size: 10px;
+    flex-shrink: 0;
+}
+
+/* 已安装提示行（飞船建造：当前槽位已有模块） */
+.module-selector-popup .msp-installed {
+    background: var(--theme-panel-deep);
+    border-radius: 3px;
+    padding: 4px 8px;
+    margin-bottom: 6px;
+    color: var(--text-dim);
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+}
+
+/* 行尾加成文本（飞船建造：+质量 +惯量 · 价格） */
+.module-selector-popup .msp-bonus {
+    color: var(--text-dim);
+    font-size: 10px;
+    flex-shrink: 0;
+}
+
+/* 卸载危险行（仅已安装模块时显示） */
+.module-selector-popup .msp-uninstall {
+    color: var(--danger);
+    cursor: pointer;
+    padding: 5px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    margin-top: 2px;
+}
+
+.module-selector-popup .msp-uninstall:hover {
+    background: var(--danger-bg);
+}
+
+/* 模块详情悬停提示（飞船建造用，多行富文本）— 背景与分类卡同款深灰 */
+.msp-tooltip {
+    position: fixed;
+    z-index: 10002;
+    background: var(--theme-panel-deep);
+    border: 1px solid var(--theme-menu-border);
+    border-radius: 5px;
+    padding: 8px 10px;
+    min-width: 160px;
+    max-width: 260px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-main);
+    pointer-events: none;
+}
+
+.msp-tooltip-title {
+    color: var(--accent);
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+
+.msp-tooltip-desc {
+    color: var(--text-mid);
+    margin-bottom: 4px;
+    line-height: 1.5;
+}
+
+.msp-tooltip-stats {
+    color: var(--text-dim);
+}
+
+#toolbarPanel .tkp-card-main {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+}
+
+#toolbarPanel .tkp-card-icon {
+    flex-shrink: 0;
+    width: 88px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#toolbarPanel .tkp-card-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+#toolbarPanel .tkp-card-title {
+    color: var(--text-bright);
+    font-size: 16px;
+    font-family: var(--font-mono-bold);
+    font-weight: normal;
+}
+
+#toolbarPanel .tkp-sub {
+    color: var(--text-dim);
+    font-size: 10px;
+}
+
+#toolbarPanel .tkp-desc {
+    color: var(--text-main);
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+/* ---- 数据行（资源/条目列表） ---- */
+#toolbarPanel .tkp-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+#toolbarPanel .tkp-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#toolbarPanel .tkp-row-label {
+    width: 80px;
+    flex-shrink: 0;
+    color: var(--text-mid);
+    font-size: 11px;
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#toolbarPanel .tkp-row-value {
+    flex-shrink: 0;
+    color: var(--text-mid);
+    font-size: 10px;
+    white-space: nowrap;
+}
+
+/* ---- 操作区按钮（主按钮紫色 = --theme-btn-selected，对齐参考图） ---- */
+#toolbarPanel .tkp-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+#toolbarPanel .tkp-btn,
+#toolbarPanel .tkp-btn-primary {
+    height: 28px;
+    padding: 0 12px;
+    box-sizing: border-box;
+    border-radius: 5px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+/* 操作区内的按钮等分；行内小按钮不受影响（不写 flex，布局由使用处控制） */
+#toolbarPanel .tkp-actions .tkp-btn,
+#toolbarPanel .tkp-actions .tkp-btn-primary {
+    flex: 1;
+}
+
+#toolbarPanel .tkp-btn {
+    background: var(--theme-btn-bg);
+    color: var(--text-bright);
+    border: 1px solid var(--border-light);
+}
+
+#toolbarPanel .tkp-btn:hover {
+    border-color: var(--theme-border-hover);
+}
+
+#toolbarPanel .tkp-btn-primary {
+    background: var(--theme-btn-selected);
+    color: var(--text-bright);
+    border: 1px solid var(--theme-btn-selected);
+}
+
+#toolbarPanel .tkp-btn-primary:hover {
+    filter: brightness(1.15);
+}
+
+/* ---- 提示小字 ---- */
+#toolbarPanel .tkp-hint {
+    color: var(--warn);
+    font-size: 11px;
+    text-align: center;
+    margin-top: 10px;
+}
+
+#toolbarPanel .tkp-hint-muted {
+    color: var(--text-dim);
+    font-size: 10px;
+    text-align: center;
+    margin-top: 6px;
+}
+
+/* ---- 扫描进度区（id 供 flightUI setInterval 实时刷新） ---- */
+#toolbarPanel .tkp-progress-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-top: 12px;
+}
+
+#toolbarPanel .tkp-progress-head {
+    display: flex;
+    justify-content: space-between;
+    color: var(--text-dim);
+    font-size: 10px;
+}
+
+#toolbarPanel .tkp-progress {
+    height: 8px;
+    background: var(--theme-panel);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+#toolbarPanel .tkp-progress-bar {
+    width: 0;
+    height: 100%;
+    background: var(--progress-green);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+/* ---- 资源分组卡（0.2.7 v2：一个分类一张卡）
+   卡头 = 紫色顶条（折叠后仅剩此条）；卡体 = 资源条行列表（名字/数量在条外） ---- */
+#toolbarPanel .tkp-res-group-card {
+    background: var(--theme-bg);
+    border: none;
+    border-radius: 5px;
+    padding: 0;
+    margin-bottom: 8px;
+    overflow: hidden;
+}
+
+#toolbarPanel .tkp-res-group-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    background: var(--theme-btn-selected);
+    color: var(--text-bright);
+    font-size: 12px;
+    font-family: var(--font-mono-bold);
+    font-weight: normal;
+    cursor: pointer;
+    letter-spacing: 1px;
+}
+
+#toolbarPanel .tkp-res-group-head:hover {
+    filter: brightness(1.1);
+}
+
+#toolbarPanel .tkp-res-group-head .tg-arrow {
+    font-size: 10px;
+    transition: transform 0.15s ease;
+}
+
+/* 折叠：仅剩紫色顶头（参考图截图） */
+#toolbarPanel .tkp-res-group-card.collapsed .tkp-res-group-head .tg-arrow {
+    transform: rotate(-90deg);
+}
+
+#toolbarPanel .tkp-res-group-card.collapsed .tkp-res-group-body {
+    display: none;
+}
+
+#toolbarPanel .tkp-res-group-body {
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ---- 资源条行（名字/数量在条外，条内无文字；空槽常显 0 量） ---- */
+#toolbarPanel .tkp-res-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 0;
+}
+
+#toolbarPanel .tkp-res-name {
+    width: 88px;
+    flex-shrink: 0;
+    color: var(--text-bright);
+    font-size: 11px;
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#toolbarPanel .tkp-res-track {
+    flex: 1;
+    height: 10px;
+    background: var(--theme-panel);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+#toolbarPanel .tkp-res-fill {
+    display: block;
+    height: 100%;
+    border-radius: 3px;
+}
+
+#toolbarPanel .tkp-res-amount {
+    width: 88px;
+    flex-shrink: 0;
+    color: var(--text-mid);
+    font-size: 10px;
+    text-align: right;
+    white-space: nowrap;
+}
+
+/* 分组卡体内的行按钮（调拨/装卸） */
+#toolbarPanel .tkp-res-group-body .tkp-btn {
+    flex: none;
+    height: 20px;
+    padding: 0 8px;
+    font-size: 10px;
+}
+
+/* ============================================================
+   第六部分：游戏百科 + 公告栏覆盖面板
+   0.2.7 百科由 scene 面板化迁入（原 scenes.css 百科段）
+   0.2.8 公告栏（infoScene.js）复用 .enc-* 结构（左侧导航 + 右侧卡片），
+        选择器扩展为 #encyclopediaPanel, #infoScenePanel 共用
+   打开不切场景 → 菜单 BGM 连续；自动获得 UI_PANEL 音效
+   ============================================================ */
+
+#encyclopediaPanel,
+#infoScenePanel {
+    align-items: center;
+    justify-content: center;
+}
+
+/* 居中大窗口：蓝灰壳 + 紫描边（与三大面板同语言） */
+#encyclopediaPanel .enc-window,
+#infoScenePanel .enc-window {
+    width: min(1100px, 92vw);
+    height: min(760px, 88vh);
+    background: var(--theme-bg);
+    border: 1px solid var(--theme-menu-border);
+    border-radius: 5px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* 顶栏：标题 + 关闭 */
+#encyclopediaPanel .enc-topbar,
+#infoScenePanel .enc-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 10px 10px 0 10px;
+    padding: 10px 14px;
+    background: var(--theme-panel);
+    border-radius: 5px;
+}
+
+#encyclopediaPanel .enc-title,
+#infoScenePanel .enc-title {
+    color: var(--text-bright);
+    font-family: var(--font-mono-bold);
+    font-weight: normal;
+    font-size: 15px;
+}
+
+#encyclopediaPanel .enc-close,
+#infoScenePanel .enc-close {
+    height: 26px;
+    padding: 0 12px;
+    box-sizing: border-box;
+    background: var(--theme-btn-bg);
+    color: var(--text-bright);
+    border: 1px solid var(--border-light);
+    border-radius: 5px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+#encyclopediaPanel .enc-close:hover,
+#infoScenePanel .enc-close:hover {
+    border-color: var(--theme-border-hover);
+}
+
+/* 主体：左导航 + 右内容 */
+#encyclopediaPanel .enc-body,
+#infoScenePanel .enc-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    gap: 14px;
+    padding: 14px;
+    box-sizing: border-box;
+}
+
+#encyclopediaNav,
+#infoSceneNav {
+    width: 220px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px;
+    box-sizing: border-box;
+    background: var(--theme-panel);
+    border-radius: 5px;
+    overflow-y: auto;
+}
+
+#encyclopediaNav .enc-nav-item,
+#infoSceneNav .enc-nav-item {
+    padding: 8px 12px;
+    border-radius: 4px;
+    background: var(--theme-panel-deep);
+    color: var(--text-main);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+#encyclopediaNav .enc-nav-item:hover,
+#infoSceneNav .enc-nav-item:hover {
+    background: var(--theme-hover);
+}
+
+#encyclopediaNav .enc-nav-item.active,
+#infoSceneNav .enc-nav-item.active {
+    background: var(--theme-active-bg);
+    color: var(--text-bright);
+}
+
+#encyclopediaContent,
+#infoSceneContent {
+    flex: 1;
+    min-width: 0;
+    overflow-y: auto;
+    padding: 14px 16px;
+    box-sizing: border-box;
+    background: var(--theme-panel);
+    border-radius: 5px;
+}
+
+/* 当前分类标题条（// 前缀） */
+#encyclopediaContent .enc-content-title,
+#infoSceneContent .enc-content-title {
+    color: var(--accent);
+    font-size: 13px;
+    letter-spacing: 1px;
+    margin: 0 0 12px 0;
+    padding: 6px 12px;
+    background: var(--theme-panel-deep);
+    border-radius: 4px;
+}
+
+#encyclopediaContent .enc-content-title::before,
+#infoSceneContent .enc-content-title::before {
+    content: '// ';
+    opacity: 0.7;
+}
+
+/* 条目卡：紫头 + 深色卡体（无边框，与统一卡片语言一致） */
+#encyclopediaContent .enc-card,
+#infoSceneContent .enc-card {
+    background: var(--theme-panel-deep);
+    border-radius: 4px;
+    margin-bottom: 14px;
+    overflow: hidden;
+}
+
+#encyclopediaContent .enc-card-title,
+#infoSceneContent .enc-card-title {
+    padding: 8px 14px;
+    background: var(--theme-btn-selected);
+    color: var(--text-bright);
+    font-family: var(--font-mono-bold);
+    font-weight: normal;
+    font-size: 14px;
+    letter-spacing: 1px;
+}
+
+#encyclopediaContent .enc-card-body,
+#infoSceneContent .enc-card-body {
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#encyclopediaContent .enc-card-body p,
+#infoSceneContent .enc-card-body p {
+    color: var(--text-main);
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.9;
+    margin: 0;
+}
+
+/* ============================================================
+   滚动条排除：设置页（#settingsContainer）
+   0.2.7 全局滚动条统一为 KSP2 样式后，设置页显式还原浏览器默认外观
+   ============================================================ */
+#settingsContainer {
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+}
+
+#settingsContainer ::-webkit-scrollbar {
+    width: 14px;
+    height: 14px;
+}
+
+#settingsContainer ::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+#settingsContainer ::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 0;
+}
+
+#settingsContainer ::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+#settingsContainer ::-webkit-scrollbar-corner {
+    background: #f1f1f1;
+}
+
+/* ============================================================
+   星系配置入口(创建新战役对话框内)与星系选择面板
+   0.2.5 多星系加载:创建时选择星系组合,创建后不可更改
+   视觉规范:面板壳 --theme-bg + 紫描边;分区头 --theme-btn-selected;
+   内部卡无边框(底色差区分);选中态 --theme-active-bg
+   ============================================================ */
+
+/* 星系配置入口:与 nc-form-input 同型,可点击提示 */
+#newCampaignDialog .nc-system-config {
+    cursor: pointer;
+    user-select: none;
+}
+
+#newCampaignDialog .nc-system-config:hover {
+    border-color: var(--theme-border-hover);
+    background: var(--theme-hover);
+}
+
+/* 星系选择面板覆盖层(压在新战役对话框之上,但低于标准对话框/通知:
+   10000 新战役对话框 < 10005 本面板 < 10001+ 对话框/通知)
+   确保星系配置校验失败弹 info 对话框时不被本面板遮挡 */
+#systemSelectPanel.ssp-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    align-items: center;
+    justify-content: center;
+    z-index: 10005;
+    font-family: var(--font-mono);
+}
+
+/* 面板壳(规范 3.1):--theme-bg + 1px 紫描边 */
+#systemSelectPanel .ssp-dialog {
+    width: min(680px, 90vw);
+    max-height: 82vh;
+    overflow-y: auto;
+    background: var(--theme-bg);
+    border: 1px solid var(--theme-menu-border);
+    border-radius: 5px;
+    padding: 14px;
+    box-sizing: border-box;
+    color: var(--text-bright);
+}
+
+/* 面板标题:accent + 下边框(与 nc-title 同语言) */
+#systemSelectPanel .ssp-title {
+    color: var(--accent);
+    font-size: 16px;
+    font-family: var(--font-mono-bold);
+    font-weight: normal;
+    padding-bottom: 8px;
+    margin: 0 14px 14px 14px;
+    border-bottom: 1px solid var(--theme-border);
+}
+
+#systemSelectPanel .ssp-body {
+    display: flex;
+    gap: 14px;
+    padding: 0 14px;
+    margin-bottom: 14px;
+    box-sizing: border-box;
+}
+
+/* 左列:星系列表(深色容器,与设施面板 tkp-card-sm 同层;
+   分组卡嵌于其中形成"深容器→浅卡"分级) */
+#systemSelectPanel .ssp-list {
+    flex: 1;
+    min-width: 0;
+    background: var(--theme-panel-deep);
+    border-radius: 5px;
+    padding: 10px;
+    max-height: 46vh;
+    overflow-y: auto;
+    box-sizing: border-box;
+}
+
+/* 分类卡(与设施货物储备分组卡同款:浅卡体 + 紫头条,嵌在深容器内) */
+#systemSelectPanel .ssp-group-card {
+    background: var(--theme-bg);
+    border: none;
+    border-radius: 5px;
+    margin-bottom: 8px;
+    overflow: hidden;
+}
+
+#systemSelectPanel .ssp-group-card:last-child {
+    margin-bottom: 0;
+}
+
+#systemSelectPanel .ssp-group-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    background: var(--theme-btn-selected);
+    color: var(--text-bright);
+    font-size: 12px;
+    font-family: var(--font-mono-bold);
+    font-weight: normal;
+    letter-spacing: 1px;
+}
+
+#systemSelectPanel .ssp-group-body {
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+/* 星系条目:裸行 + 左侧状态竖条(与飞行工具栏 tool-item 同款:无方框底) */
+#systemSelectPanel .ssp-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+#systemSelectPanel .ssp-item:hover {
+    background: var(--theme-hover);
+    color: var(--accent);
+}
+
+/* 状态竖条:未选中暗条 / 选中亮绿条(与 #leftToolbar .toolbar-item-bar 同款) */
+#systemSelectPanel .ssp-bar {
+    width: 4px;
+    height: 24px;
+    flex-shrink: 0;
+    border-radius: 2px;
+    background: var(--border-dark);
+    transition: background 0.15s ease;
+}
+
+#systemSelectPanel .ssp-item.ssp-selected .ssp-bar {
+    background: var(--progress-green);
+}
+
+#systemSelectPanel .ssp-name {
+    color: var(--text-main);
+    font-size: 13px;
+    font-family: var(--font-mono-bold);
+    font-weight: normal;
+}
+
+#systemSelectPanel .ssp-item.ssp-selected .ssp-name {
+    color: var(--text-bright);
+}
+
+#systemSelectPanel .ssp-item:hover .ssp-name {
+    color: var(--accent);
+}
+
+#systemSelectPanel .ssp-sub {
+    color: var(--text-dim);
+    font-size: 11px;
+    margin-left: auto;
+}
+
+/* 占位星系:灰显不可交互(竖条为暗灰,不变绿) */
+#systemSelectPanel .ssp-item.ssp-disabled {
+    cursor: default;
+    opacity: 0.5;
+}
+
+#systemSelectPanel .ssp-item.ssp-disabled:hover {
+    background: transparent;
+    color: inherit;
+}
+
+#systemSelectPanel .ssp-item.ssp-disabled:hover .ssp-name {
+    color: var(--text-main);
+}
+
+/* 右列:分布示意图(内容卡,无边框) */
+#systemSelectPanel .ssp-chart-box {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    background: var(--theme-panel);
+    border-radius: 5px;
+    padding: 12px;
+    box-sizing: border-box;
+}
+
+#systemSelectPanel #sspChart {
+    background: var(--theme-panel-deep);
+    border-radius: 5px;
+    width: 240px;
+    height: 240px;
+}
+
+#systemSelectPanel .ssp-chart-hint {
+    color: var(--text-dim);
+    font-size: 11px;
+    text-align: center;
+}
+
+/* 底部操作区 */
+#systemSelectPanel .ssp-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 0 14px 4px 14px;
+}
+
+#systemSelectPanel .ssp-actions .ui-btn,
+#systemSelectPanel .ssp-actions .ui-btn-primary {
+    height: 26px;
+    padding: 0 12px;
+    box-sizing: border-box;
+    background: var(--theme-btn-bg);
+    border: 1px solid var(--border-light);
+    border-radius: 5px;
+    color: var(--text-bright);
+    font-family: var(--font-mono);
+    font-size: 12px;
+}
+
+/* 弹性布局:小屏下面板允许纵向排列 */
+@media (max-width: 620px) {
+    #systemSelectPanel .ssp-body {
+        flex-direction: column;
+    }
+
+    #systemSelectPanel .ssp-chart-box {
+        width: 100%;
+    }
+}
+
+/* ---- 轨道线右键菜单（0.3.0 提交5 占位版；参考图式样后续美化） ---- */
+.orbit-context-menu {
+    position: fixed;
+    z-index: 950;
+    background: #10151f;
+    border: 1px solid var(--toolbar-border);
+    box-shadow: 0 0 0 2px #000;
+    border-radius: 4px;
+    padding: 6px;
+    min-width: 180px;
+    font-family: var(--font-mono);
+    user-select: none;
+}
+
+.orbit-context-menu .ocm-title {
+    color: #7DA6E8;
+    font-size: 11px;
+    padding: 2px 6px 6px 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    margin-bottom: 4px;
+}
+
+.orbit-context-menu .ocm-item {
+    padding: 5px 8px;
+    font-size: 12px;
+    color: var(--text-main);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 3px;
+    margin-bottom: 4px;
+    cursor: pointer;
+}
+
+.orbit-context-menu .ocm-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--toolbar-border);
+}
+
+/* ---- 轨道右键菜单锚点层（0.3.0 提交5：菱形选择点 + 竖线连面板，KSP2 式） ---- */
+/* 显示优先级：锚点层 945 > 标签 500 < 面板 950（菜单显示在标签之上） */
+#orbitContextMenuAnchor {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 0;
+    height: 0;
+    z-index: 945;
+    pointer-events: none;
+}
+
+#orbitContextMenuAnchor .ocm-diamond {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    box-sizing: border-box;
+    border: 2px solid var(--toolbar-border);
+    background: rgba(0, 0, 0, 0.4);
+    transform: rotate(45deg);
+}
+
+#orbitContextMenuAnchor .ocm-line {
+    position: absolute;
+    width: 2px;
+    background: var(--toolbar-border);
+}

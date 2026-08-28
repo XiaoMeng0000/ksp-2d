@@ -1,0 +1,348 @@
+/* ============================================================
+   flight.css — 飞行场景 HUD(左侧工具栏 / 舱室面板 / 对接提示 /
+   时间加速面板 / SAS 底部按钮区 / 可见性筛选)
+   ============================================================ */
+
+/* ---- 左侧工具栏(飞船/设施操作图标列,KSP2 风格:紫色外框 + 纯黑底 + 状态条) ---- */
+#leftToolbar {
+    position: fixed;
+    left: 3px;
+    top: 25%;
+    background: #000;
+    border: 1px solid var(--toolbar-border);
+    /* 紫框外再加 2px 黑色外框 */
+    box-shadow: 0 0 0 2px #000;
+    border-radius: 5px;
+    padding: 7px 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 75vh;
+    overflow-y: auto;
+    z-index: 900;
+    opacity: 0;
+    pointer-events: none;
+    font-family: var(--font-mono);
+}
+
+/* 图标行:裸图标 + 右侧状态竖条(无方框底,参考图样式) */
+#leftToolbar .toolbar-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 0;
+}
+
+#leftToolbar .toolbar-item .toolbar-icon-btn {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    color: var(--text-main);
+    font-family: var(--font-mono);
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+#leftToolbar .toolbar-item:hover .toolbar-icon-btn {
+    color: var(--accent);
+}
+
+/* 状态竖条:未选中暗条 / 选中(已打开入口)亮绿条 */
+#leftToolbar .toolbar-item-bar {
+    width: 4px;
+    height: 24px;
+    border-radius: 2px;
+    background: var(--border-dark);
+    transition: background 0.15s ease;
+}
+
+#leftToolbar .toolbar-item.active .toolbar-item-bar {
+    background: var(--progress-green);
+}
+
+#leftToolbar .toolbar-item.active .toolbar-icon-btn {
+    color: var(--accent);
+}
+
+/* ---- 对接提示弹窗 ---- */
+#dockPrompt {
+    display: none;
+    position: fixed;
+    left: 50%;
+    top: calc(50% + 45px);
+    transform: translateX(-50%);
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 10px 14px;
+    z-index: 990;
+    font-family: var(--font-mono);
+}
+
+#dockPromptFacName {
+    color: #888;
+    font-size: 10px;
+}
+
+#dockPrompt .ui-btn {
+    padding: 5px 14px;
+    background: var(--accent-bg);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    font-size: 13px;
+}
+
+/* ---- 时间加速面板（timeWarpUI.js 单例，结构与状态色由 JS 动态控制） ---- */
+#timeWarpWrap {
+    display: none;
+    position: fixed;
+    left: 70%;
+    bottom: 18px;
+    transform: translateX(-50%) scale(0.75);
+    transform-origin: center center;
+    z-index: 950;
+    flex-direction: column;
+    user-select: none;
+    font-family: var(--font-mono);
+    color: var(--text-bright);
+}
+
+#timeWarpPanel {
+    display: flex;
+    flex-direction: column;
+    background: var(--panel-bg);
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    padding: 0;
+    min-width: 280px;
+}
+
+#timeWarpHeader {
+    font-size: 11px;
+    font-weight: bold;
+    color: var(--accent);
+    padding: 3px 12px;
+    text-align: center;
+    letter-spacing: 2px;
+    border-bottom: 1px solid rgba(120, 140, 180, 0.25);
+    cursor: pointer;
+}
+
+.timewarp-body {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 10px 3px 10px;
+}
+
+.timewarp-ut-badge {
+    font-size: 10px;
+    font-weight: bold;
+    color: var(--ut-gold);
+    border: 1px solid var(--ut-gold-border);
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 1px 6px;
+    letter-spacing: 1px;
+    flex-shrink: 0;
+}
+
+.timewarp-ut {
+    font-size: 12px;
+    color: #9ecbff;
+    cursor: pointer;
+    letter-spacing: 1px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.timewarp-cells {
+    display: flex;
+    gap: 1px;
+    justify-content: flex-end;
+    flex: 1;
+}
+
+.timewarp-cell {
+    padding: 0;
+    background: rgba(0, 0, 0, 0.55);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+.timewarp-cell-img {
+    width: 82%;
+    height: 82%;
+    object-fit: contain;
+    display: none;
+}
+
+.timewarp-cell-fb {
+    font-size: 12px;
+    font-weight: bold;
+    line-height: 1;
+    display: none;
+}
+
+.timewarp-footer {
+    font-size: 9px;
+    color: #bbbbbb;
+    text-align: center;
+    letter-spacing: 2px;
+    padding: 1px 0 3px 0;
+}
+
+/* ---- SAS 底部按钮区（0.2.7 统一为工具栏风格：黑底 + 紫框 + 2px 黑外框） ---- */
+#sasBottomButtons {
+    position: fixed;
+    z-index: 900;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: #000;
+    border: 1px solid var(--toolbar-border);
+    /* 紫框外再加 2px 黑色外框 */
+    box-shadow: 0 0 0 2px #000;
+    border-radius: 5px;
+    padding: 8px;
+    user-select: none;
+}
+
+#sasBottomButtons button {
+    padding: 0;
+    background: #000;
+    border: 1px solid var(--toolbar-border);
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+#sasBottomButtons button:hover {
+    background: var(--accent-bg);
+}
+
+/* ---- 可见性筛选面板(右下角) ---- */
+#visibilityPanel {
+    position: fixed;
+    right: 10px;
+    bottom: 10px;
+    z-index: 1000;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-main);
+}
+
+#visibilityPanel .vis-toggle-btn {
+    width: 28px;
+    height: 28px;
+    background: rgba(0, 0, 0, 0.75);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    user-select: none;
+    font-size: 14px;
+    margin-left: auto;
+}
+#visibilityPanel .vis-toggle-btn.active {
+    border-color: var(--accent);
+}
+
+#visibilityPanel .vis-content {
+    display: none;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 4px;
+    padding: 6px 8px;
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    min-width: 80px;
+}
+
+#visibilityPanel label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    user-select: none;
+    padding: 2px 0;
+}
+
+/* ---- 轨道标签（0.3.0 提交 2：Canvas 锚点 + DOM 文字本体） ---- */
+/* 容器：fixed 于视口 0,0，不拦截鼠标；每个标签 absolute 0,0 + transform 平移 */
+#orbitLabels {
+    position: fixed;
+    left: 0;
+    top: 0;
+    pointer-events: none;
+    z-index: 500;
+}
+
+.orbit-label {
+    position: absolute;
+    left: 0;
+    top: 0;
+    /* 宽度收缩到内容（max-content）：防止面板在窄容器下被逐字符断行竖排 */
+    width: max-content;
+    pointer-events: none;
+}
+
+/* 文字本体：小面板样式；边框统一飞行界面紫（--toolbar-border，与 Canvas 锚点/折线一致），
+   文字颜色由注册表内联注入（类型区分色，Ap/Pe 各一）；
+   可悬停/右键锁定展开（0.3.0）：宽度同样收缩到内容，保证展开面板各行为完整单行 */
+.orbit-label-body {
+    background: rgba(0, 0, 0, 0.75);
+    border: 1px solid var(--toolbar-border);
+    border-radius: 3px;
+    padding: 1px 6px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.4;
+    width: max-content;
+    pointer-events: auto;
+    cursor: pointer;
+    user-select: none;
+}
+
+/* 展开态：信息面板加大底色衬底 */
+.orbit-label.expanded .orbit-label-body {
+    padding: 3px 7px;
+    font-size: 12px;
+}
+
+/* 展开面板行结构（0.3.0）：标题=类型色（内联注入），T- 行=HUD 绿，高度行=主文本色 */
+.orbit-label-body .olb-title {
+    display: block;
+    color: var(--text-main);
+}
+
+.orbit-label-body .olb-t {
+    display: block;
+    color: rgba(64, 224, 80, 0.9);
+}
+
+.orbit-label-body .olb-alt {
+    display: block;
+    color: var(--text-main);
+}
+
+/* 悬停高亮（0.3.0：已去除——锚点与标签本体均无悬停视觉变化，悬停仅用于数据/交互） */

@@ -1,7 +1,7 @@
 'use strict';
 
 import { eventBus, Events } from '../eventBus.js';
-import { buildAudioManifest } from './audioConfig.js';
+import { buildAudioManifest, MUSIC_VOLUME, getSfxChannel, getStoredVolume } from './audioConfig.js';
 
 // 音乐淡入/淡出时长（秒）
 const FADE_DURATION = 0.4;
@@ -21,10 +21,13 @@ class AudioCore {
         this._completed = 0;
         this._ready = false;
 
-        // 音量总线：master → music / sfx（sfx 预留，供后续音效任务使用）
+        // 音量总线：master → { music, sfx → { ui, comms } }
+        // 分类音量（设置面板可调）：总 / 音乐 / UI 音效 / 坎巴拉人通讯音
         this._masterGain = null;
         this._musicGain = null;
         this._sfxGain = null;
+        this._uiSfxGain = null;
+        this._commsGain = null;
 
         // 当前音乐播放状态
         this._currentMusicKey = null;
@@ -32,6 +35,7 @@ class AudioCore {
         this._musicGainNode = null;
 
         this._initContext();
+        this._applyStoredVolumes();
         this._initUnlock();
     }
 
@@ -52,12 +56,30 @@ class AudioCore {
         this._masterGain.connect(this._ctx.destination);
 
         this._musicGain = this._ctx.createGain();
-        this._musicGain.gain.value = 1.0;
+        this._musicGain.gain.value = MUSIC_VOLUME;
         this._musicGain.connect(this._masterGain);
 
         this._sfxGain = this._ctx.createGain();
         this._sfxGain.gain.value = 1.0;
         this._sfxGain.connect(this._masterGain);
+
+        // UI 音效总线（点击/悬停/面板/档位等）
+        this._uiSfxGain = this._ctx.createGain();
+        this._uiSfxGain.gain.value = 1.0;
+        this._uiSfxGain.connect(this._sfxGain);
+
+        // 坎巴拉人通讯音总线（SOI 切换等；未来事件通报/轨道警报走此通道）
+        this._commsGain = this._ctx.createGain();
+        this._commsGain.gain.value = 1.0;
+        this._commsGain.connect(this._sfxGain);
+    }
+
+    // 启动时应用存储的音量设置（无存档回退默认值，如音乐 0.75）
+    _applyStoredVolumes() {
+        this.setMasterVolume(getStoredVolume('master'));
+        this.setMusicVolume(getStoredVolume('music'));
+        this.setUiSfxVolume(getStoredVolume('ui'));
+        this.setCommsVolume(getStoredVolume('comms'));
     }
 
     // 浏览器自动播放策略：首次用户交互（点击/按键）时恢复 AudioContext
@@ -229,6 +251,46 @@ class AudioCore {
         this._musicGainNode = null;
     }
 
+    // 播放一次性音效：从已解码缓冲取音频，走 _sfxGain 总线，播完自动清理节点
+    // 未就绪或资源缺失时静默跳过，绝不阻塞游戏流程
+    // rate 为播放速率(变调)：>1 升高变快、<1 降低变慢(如选中态再点击的"闷"变体)
+    playSfx(id, volume = 1, rate = 1) {
+        if (!this._ctx || !this._ready) {
+            return;
+        }
+        const buffer = this._buffers.get(id);
+        if (!buffer) {
+            console.warn('[AudioCore] 音效资源未找到: ' + id);
+            return;
+        }
+
+        const source = this._ctx.createBufferSource();
+        source.buffer = buffer;
+        source.playbackRate.value = Math.max(0.25, Math.min(4, rate));
+
+        const gainNode = this._ctx.createGain();
+        gainNode.gain.value = Math.max(0, Math.min(1, volume));
+
+        // 按音效通道路由到对应总线（comms 通讯音 / 其余 UI 音效）
+        const key = id.indexOf('sfx:') === 0 ? id.slice(4) : id;
+        const channel = getSfxChannel(key);
+        const bus = channel === 'comms' ? this._commsGain : this._uiSfxGain;
+        gainNode.connect(bus);
+
+        source.connect(gainNode);
+        source.start();
+
+        // 播放结束后自动断开节点，防止长会话内存泄漏
+        source.onended = () => {
+            try {
+                source.disconnect();
+                gainNode.disconnect();
+            } catch (e) {
+                // 已断开时忽略
+            }
+        };
+    }
+
     // === 音量设置（供后续设置面板调用，本次仅提供接口） ===
 
     setMasterVolume(v) {
@@ -246,6 +308,18 @@ class AudioCore {
     setSfxVolume(v) {
         if (this._sfxGain) {
             this._sfxGain.gain.value = Math.max(0, Math.min(1, v));
+        }
+    }
+
+    setUiSfxVolume(v) {
+        if (this._uiSfxGain) {
+            this._uiSfxGain.gain.value = Math.max(0, Math.min(1, v));
+        }
+    }
+
+    setCommsVolume(v) {
+        if (this._commsGain) {
+            this._commsGain.gain.value = Math.max(0, Math.min(1, v));
         }
     }
 

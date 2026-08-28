@@ -30,6 +30,12 @@ const FACILITY_CATEGORIES = [
 ];
 
 // 设施类型配置
+// 0.2.0 阶段5 新增字段：
+//   cost:           部署消耗的材料套装数（从部署飞船货仓扣除）
+//   storageProfile: 存储配置 { base, modifiers }
+//     base      — 每种资源的基准容量（所有设施类型统一）
+//     modifiers — 资源容量倍率表 { resourceId: multiplier }，未列出的资源按 base
+//     例：船坞 materialKits ×5、补给站氢氧 ×5、科研站无加成
 const FACILITY_TYPES = [
     {
         id: 'orbital_dockyard',
@@ -41,7 +47,9 @@ const FACILITY_TYPES = [
         iconTextureKey: 'comp_assembly_shop',
         baseDocks: 2,
         compartments: ['bridge', 'dock_hub', 'supply_terminal', 'assembly_shop'],
-        services: ['dock', 'undock', 'refuel', 'refit', 'build_ship', 'switch_control']
+        services: ['dock', 'undock', 'refuel', 'refit', 'build_ship', 'switch_control'],
+        cost: 100,
+        storageProfile: { base: 1000, modifiers: { materialKits: 5 } }
     },
     {
         id: 'supply_station',
@@ -53,7 +61,9 @@ const FACILITY_TYPES = [
         iconTextureKey: 'comp_supply_terminal',
         baseDocks: 1,
         compartments: ['bridge', 'dock_hub', 'supply_terminal'],
-        services: ['dock', 'undock', 'refuel']
+        services: ['dock', 'undock', 'refuel'],
+        cost: 150,
+        storageProfile: { base: 1000, modifiers: { hydrogen: 5, oxygen: 5 } }
     },
     {
         id: 'research_station',
@@ -65,7 +75,9 @@ const FACILITY_TYPES = [
         iconTextureKey: 'comp_laboratory',
         baseDocks: 1,
         compartments: ['bridge', 'dock_hub', 'supply_terminal', 'laboratory'],
-        services: ['dock', 'undock', 'refuel', 'unlock_blueprint']
+        services: ['dock', 'undock', 'refuel', 'unlock_blueprint'],
+        cost: 200,
+        storageProfile: { base: 1000, modifiers: {} }
     }
 ];
 

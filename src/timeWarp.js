@@ -2,22 +2,19 @@
 
 import { sceneManager } from './sceneManager.js';
 import { eventBus, Events } from './eventBus.js';
+import { t } from './config/strings.js';
 
 // 时间加速档位表（索引 0 = 暂停 / 0x）
 // KSP2 原版档位 + 0x 暂停档：. 升档 / , 降档，0x 即暂停
-// 其中 4x 为物理加速档（点火时最高允许档位）
-const WARP_RATES = [0, 1, 2, 3, 4, 10, 50, 100, 1000, 10000, 100000, 1000000, 10000000];
+// 其中 4x 为物理加速档（点火时最高允许档位，同时占面板第 3 格）
+const WARP_RATES = [0, 1, 2, 4, 10, 50, 100, 1000, 10000, 100000, 1000000, 10000000];
 
 // 面板档位表（时间加速 UI 的 11 格）— 从完整档位表派生，禁止手写第二份常量
-// 过滤掉 0x 暂停档与 4x 物理档（4x 仅 Alt+ 微调可达，不占面板格）
-export const PANEL_RATES = WARP_RATES.filter((r) => r !== 0 && r !== 4);
+// 仅过滤 0x 暂停档：4x 物理档与其余档位均占面板格（第三格 = 4x）
+export const PANEL_RATES = WARP_RATES.filter((r) => r !== 0);
 
 // 物理加速上限（thrust 模式允许的最大倍率）
 const PHYSICS_WARP_MAX = 4;
-
-// SOI 边界接近（≥99% 宿主 SOI 半径）时允许的最大倍率
-// 保证边界穿越帧步长小、位置连续、预测线平滑（KSP1 原版：SOI 边界前自动降档）
-const ESCAPE_WARP_MAX = 100;
 
 // 病态区间（无解析轨道、RK4 兜底积分）时允许的最大倍率
 // stateToKepler 返回 null 且 GM>0 时，物理层走 RK4 子步循环（每帧最多 simDt/0.05 步）。
@@ -36,6 +33,7 @@ class TimeWarp {
         this._index = WARP_RATES.indexOf(1);      // 默认 1x
         this._savedIndex = this._index;           // 大圆按钮暂停前档位
         this._maxIndex = WARP_RATES.length - 1;   // 档位上限（由场景每帧设置）
+        this._warpTarget = null;                  // 定点加速目标 { time, onArrive }（0.3.0）
         this._initKeyListener();
     }
 
@@ -54,7 +52,7 @@ class TimeWarp {
     }
 
     // 暂停前保存的档位倍率值（大圆按钮恢复目标；UI 暂停态高亮显示用）
-    // savedIndex 可能指向 4x 物理档（PANEL_RATES 不含该值），UI 需自行降级处理
+    // savedIndex 恒为面板档位（PANEL_RATES 含全部非 0 档），UI 可直接对应到单格
     getSavedRate() {
         return WARP_RATES[this._savedIndex];
     }
@@ -80,9 +78,27 @@ class TimeWarp {
         return WARP_RATES.indexOf(PHYSICS_WARP_MAX);
     }
 
-    // SOI 边界接近安全档位上限索引（≥99% 宿主半径时最高允许 100x）
-    getEscapeMaxIndex() {
-        return WARP_RATES.indexOf(ESCAPE_WARP_MAX);
+    /**
+     * SOI 切换时间保护：剩余切换时间（游戏秒）→ 保护最高档位索引。
+     * 规则：保护最高档 = WARP_RATES 中 ≤ secondsToSwitch 的最大档位（下限 1x，上限满档）。
+     * 性质（由档位表结构保证）：
+     *   ① 帧预算：60fps 下切换点至少保留 60·T/rate ≥ 60 帧（1 真实秒）——每帧推进 ≤ T/60 游戏秒；
+     *   ② 档位阶梯相邻比值 ≤10 → 到达时间 T/rate < 10 真实秒，保护最高档下 10s 内必达切换；
+     *   ③ T 巨大时饱和返回满档（远途不限制），T 极小（<2s）时下限 1x（1x 下仍 ≤10s 内到达）。
+     * @param {number} secondsToSwitch - 到下一次 SOI 切换的剩余游戏秒（timeToNextSOISwitch 返回值）
+     * @returns {number} 档位索引
+     */
+    getSOIProtectMaxIndex(secondsToSwitch) {
+        const t = secondsToSwitch;
+        if (!(t > 0) || !isFinite(t)) {
+            return WARP_RATES.length - 1;
+        }
+        for (let i = WARP_RATES.length - 1; i >= 1; i--) {
+            if (WARP_RATES[i] <= t) {
+                return i;
+            }
+        }
+        return 1;
     }
 
     // 病态区间安全档位上限索引（kepler=null 且 GM>0 时最高允许 50x，防 RK4 高倍率卡顿）
@@ -111,10 +127,25 @@ class TimeWarp {
         }
     }
 
-    // === 加减档 ===
+    // === 加减档（玩家手动操作 = 打断定点加速） ===
+
+    /**
+     * 取消定点加速（玩家手动切档打断时内部调用）
+     * @param {boolean} notify - 是否弹"已取消"通知（玩家操作触发时 true）
+     */
+    _cancelWarpTarget(notify) {
+        if (!this._warpTarget) {
+            return;
+        }
+        this._warpTarget = null;
+        if (notify && typeof window.showNotification === 'function') {
+            window.showNotification(t('timewarp.warpCanceled'), 'info');
+        }
+    }
 
     // 升档（0x → 1x 即从暂停恢复）
     increase() {
+        this._cancelWarpTarget(true);   // 玩家升档 = 打断定点
         if (this._index >= this._maxIndex) {
             return;
         }
@@ -123,6 +154,7 @@ class TimeWarp {
 
     // 降档（1x → 0x 即暂停）
     decrease() {
+        this._cancelWarpTarget(true);   // 玩家降档 = 打断定点
         if (this._index <= 0) {
             return;
         }
@@ -131,6 +163,7 @@ class TimeWarp {
 
     // 跳到指定倍率
     warpTo(rate) {
+        this._cancelWarpTarget(true);   // 玩家指定倍率 = 打断定点
         const idx = WARP_RATES.indexOf(rate);
         if (idx < 0) {
             return;
@@ -140,6 +173,7 @@ class TimeWarp {
 
     // 一键重置至 1x（0x 暂停状态除外，保持暂停）
     resetTo1x() {
+        this._cancelWarpTarget(true);   // 玩家手动重置 = 打断定点
         if (this._index === 0) {
             return;
         }
@@ -151,11 +185,43 @@ class TimeWarp {
      * 非暂停 → 保存当前档位并跳 0x；暂停 → 跳回暂停前档位（如 10x 暂停恢复回 10x）
      */
     togglePause() {
+        this._cancelWarpTarget(true);   // 玩家暂停/恢复 = 打断定点
         if (this._index === 0) {
             this.warpToIndex(this._savedIndex);
         } else {
             this._savedIndex = this._index;
             this.warpToIndex(0);
+        }
+    }
+
+    // === 目标时刻加速（0.3.0 决策 1B 实现：定点时间加速） ===
+
+    /**
+     * 设定定点时间加速目标（轨道菜单"时间加速至目标点"入口）
+     * 由 flightScene.update 每帧驱动：以当前可用最大档位加速（SOI 保护等限档照常生效），
+     * 到达后自动切 1x 并触发 onArrive；玩家任意手动切档（. , \ 或 UI）即打断并弹通知。
+     * @param {number} targetTime - 目标游戏时刻（秒，与 flightScene 的 _getCelestialTime() 同口径）
+     * @param {Function} [onArrive] - 到达回调（可选）
+     */
+    warpToTime(targetTime, onArrive) {
+        if (targetTime === null || targetTime === undefined || !isFinite(targetTime)) {
+            return;
+        }
+        this._warpTarget = { time: targetTime, onArrive: onArrive || null };
+    }
+
+    /** 查询当前定点加速目标（无则 null）—— flightScene 每帧驱动用 */
+    getWarpTarget() {
+        return this._warpTarget;
+    }
+
+    /** 定点加速完成：清目标 → 直接切 1x → 触发回调 */
+    completeWarpToTime() {
+        const cb = this._warpTarget ? this._warpTarget.onArrive : null;
+        this._warpTarget = null;
+        this.warpToIndex(WARP_RATES.indexOf(1));
+        if (typeof cb === 'function') {
+            cb();
         }
     }
 
@@ -174,18 +240,20 @@ class TimeWarp {
         sceneManager.setPaused(paused);
         if (paused && !wasPaused) {
             if (typeof window.showNotification === 'function') {
-                window.showNotification('游戏已暂停', 'info');
+                window.showNotification(t('timewarp.pausedNotice'), 'info');
             }
         } else if (!paused && wasPaused) {
             if (typeof window.showNotification === 'function') {
-                window.showNotification('游戏已恢复', 'info');
+                window.showNotification(t('timewarp.resumedNotice'), 'info');
             }
         }
 
         eventBus.emit(Events.TIME_WARP_CHANGED, {
             rate: WARP_RATES[this._index],
             index: this._index,
-            paused
+            paused,
+            // 切换前是否处于暂停：供 audioDirector 区分"取消暂停(恢复)"与普通切档
+            wasPaused
         });
     }
 
