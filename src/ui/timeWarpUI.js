@@ -79,6 +79,7 @@ class TimeWarpUI {
         this._lastFooterKey = undefined; // 底部倍率文字变化比对
         this._lastUtText = '';        // UT 文本变化比对
         this._cellActive = [];        // 每格 active 图状态比对
+        this._cellLocked = [];        // 每格灰显（不可达）状态比对（独立于 active：限档即时反映）
 
         this._initDOM();
         this._initEvents();
@@ -282,9 +283,14 @@ class TimeWarpUI {
                 );
                 // 高亮格加淡绿底，其余保持深色底
                 cell.btn.style.background = active ? COLOR_CELL_ACTIVE_BG : COLOR_CELL_BG;
-                // 不可达格灰显：not-allowed 提示不可点
-                cell.btn.style.cursor = (cell.rate <= maxRate) ? 'pointer' : 'not-allowed';
-                cell.btn.style.opacity = (cell.rate <= maxRate) ? '1' : '0.45';
+            }
+            // 不可达格灰显：独立于 active 逐帧对齐（修复——原先嵌在 active 变化块内，
+            // 由"当前档位 rate"触发而非"上限 maxRate"，导致限档解除残留灰、收紧不残留亮）
+            const locked = active ? false : cell.rate > maxRate;
+            if (this._cellLocked[i] !== locked) {
+                this._cellLocked[i] = locked;
+                cell.btn.style.cursor = locked ? 'not-allowed' : 'pointer';
+                cell.btn.style.opacity = locked ? 0.45 : 1;
             }
         }
 
