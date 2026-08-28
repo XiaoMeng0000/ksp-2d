@@ -717,6 +717,32 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 }
             }
             timeWarp.setMaxIndex(warpMaxIndex);
+
+            // 0.3.0 定点时间加速：以当前可用最大档位推进，到达直接切 1x + 通知。
+            // SOI 切换保护/点火物理档/病态限档已在上方 warpMaxIndex 计算中生效，
+            // 此处只在该上限内拉满；剩余时间帧预算（倍率 ≤ 剩余/最大帧长）防一帧越过目标点。
+            const warpTargetNow = timeWarp.getWarpTarget();
+            if (warpTargetNow) {
+                const nowT = _getCelestialTime();
+                const remaining = warpTargetNow.time - nowT;
+                if (remaining <= 0) {
+                    timeWarp.completeWarpToTime();   // 清目标 → 直接 1x → onArrive
+                    if (typeof window.showNotification === 'function') {
+                        window.showNotification(t('orbitMenu.arrived'), 'success');
+                    }
+                } else {
+                    // 帧预算档：复用 SOI 保护的"档位 ≤ 秒数"查询（表内最大 ≤ x，下限 1x），
+                    // x = 剩余时间 / 最大真实帧长(0.05s，保守)
+                    const arriveIdx = timeWarp.getSOIProtectMaxIndex(remaining / 0.05);
+                    // 升档目标 = 当前生效上限（含 SOI 保护/点火/病态限档）与帧预算档的较小者；
+                    // 每帧无条件对齐（warpToIndex 对同值早退、内部钳制到上限）：
+                    //   - 升：保护解除/切换完成后自动恢复最大可用档；
+                    //   - 降：接近目标时按帧预算自动降档，杜绝一帧越过目标点。
+                    const wantIdx = Math.min(timeWarp.getCurrentMaxIndex(), arriveIdx);
+                    timeWarp.warpToIndex(wantIdx);
+                }
+            }
+
             const warpRate = timeWarp.getRate();
             const simDt = dt * warpRate;
 

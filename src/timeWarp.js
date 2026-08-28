@@ -33,6 +33,7 @@ class TimeWarp {
         this._index = WARP_RATES.indexOf(1);      // 默认 1x
         this._savedIndex = this._index;           // 大圆按钮暂停前档位
         this._maxIndex = WARP_RATES.length - 1;   // 档位上限（由场景每帧设置）
+        this._warpTarget = null;                  // 定点加速目标 { time, onArrive }（0.3.0）
         this._initKeyListener();
     }
 
@@ -126,10 +127,25 @@ class TimeWarp {
         }
     }
 
-    // === 加减档 ===
+    // === 加减档（玩家手动操作 = 打断定点加速） ===
+
+    /**
+     * 取消定点加速（玩家手动切档打断时内部调用）
+     * @param {boolean} notify - 是否弹"已取消"通知（玩家操作触发时 true）
+     */
+    _cancelWarpTarget(notify) {
+        if (!this._warpTarget) {
+            return;
+        }
+        this._warpTarget = null;
+        if (notify && typeof window.showNotification === 'function') {
+            window.showNotification(t('timewarp.warpCanceled'), 'info');
+        }
+    }
 
     // 升档（0x → 1x 即从暂停恢复）
     increase() {
+        this._cancelWarpTarget(true);   // 玩家升档 = 打断定点
         if (this._index >= this._maxIndex) {
             return;
         }
@@ -138,6 +154,7 @@ class TimeWarp {
 
     // 降档（1x → 0x 即暂停）
     decrease() {
+        this._cancelWarpTarget(true);   // 玩家降档 = 打断定点
         if (this._index <= 0) {
             return;
         }
@@ -146,6 +163,7 @@ class TimeWarp {
 
     // 跳到指定倍率
     warpTo(rate) {
+        this._cancelWarpTarget(true);   // 玩家指定倍率 = 打断定点
         const idx = WARP_RATES.indexOf(rate);
         if (idx < 0) {
             return;
@@ -155,6 +173,7 @@ class TimeWarp {
 
     // 一键重置至 1x（0x 暂停状态除外，保持暂停）
     resetTo1x() {
+        this._cancelWarpTarget(true);   // 玩家手动重置 = 打断定点
         if (this._index === 0) {
             return;
         }
@@ -166,6 +185,7 @@ class TimeWarp {
      * 非暂停 → 保存当前档位并跳 0x；暂停 → 跳回暂停前档位（如 10x 暂停恢复回 10x）
      */
     togglePause() {
+        this._cancelWarpTarget(true);   // 玩家暂停/恢复 = 打断定点
         if (this._index === 0) {
             this.warpToIndex(this._savedIndex);
         } else {
@@ -174,19 +194,35 @@ class TimeWarp {
         }
     }
 
-    // === 目标时刻加速（0.3.0 骨架 — 决策 1B：实现于 timeWarp 单例） ===
+    // === 目标时刻加速（0.3.0 决策 1B 实现：定点时间加速） ===
 
     /**
-     * 目标时刻加速调度（骨架期仅建立接口，调度逻辑待填）
-     * 设定目标游戏时刻后，由 flightScene.update 每帧驱动：
-     *   1) 每帧按"剩余时间 ≥ 当前倍率×余量"自动降档（不越过场景已算好的档位上限）
-     *   2) 到达目标后 resetTo1x() + 通知
-     * 用途：轨道右键菜单"时间加速至此"（Ap/Pe 标记 / 当前 SOI 轨道点 / 跨 SOI 段点）
+     * 设定定点时间加速目标（轨道菜单"时间加速至目标点"入口）
+     * 由 flightScene.update 每帧驱动：以当前可用最大档位加速（SOI 保护等限档照常生效），
+     * 到达后自动切 1x 并触发 onArrive；玩家任意手动切档（. , \ 或 UI）即打断并弹通知。
      * @param {number} targetTime - 目标游戏时刻（秒，与 flightScene 的 _getCelestialTime() 同口径）
      * @param {Function} [onArrive] - 到达回调（可选）
      */
     warpToTime(targetTime, onArrive) {
-        // TODO: 骨架期占位，调度逻辑待填（含自动降档、到达停表、通知与回调）
+        if (targetTime === null || targetTime === undefined || !isFinite(targetTime)) {
+            return;
+        }
+        this._warpTarget = { time: targetTime, onArrive: onArrive || null };
+    }
+
+    /** 查询当前定点加速目标（无则 null）—— flightScene 每帧驱动用 */
+    getWarpTarget() {
+        return this._warpTarget;
+    }
+
+    /** 定点加速完成：清目标 → 直接切 1x → 触发回调 */
+    completeWarpToTime() {
+        const cb = this._warpTarget ? this._warpTarget.onArrive : null;
+        this._warpTarget = null;
+        this.warpToIndex(WARP_RATES.indexOf(1));
+        if (typeof cb === 'function') {
+            cb();
+        }
     }
 
     // === 核心：设置档位索引并联动暂停 / 事件 ===

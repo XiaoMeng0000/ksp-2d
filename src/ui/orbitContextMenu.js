@@ -15,14 +15,18 @@ import { getCachedTime, bodyFuturePos } from '../physics/orbitalPrediction.js';
 import { celestialBodies } from '../physics/physics.js';
 import { formatGameDurationLong } from '../utils/format.js';
 import { worldToScreen } from '../camera.js';
+import { timeWarp } from '../timeWarp.js';
+import { shipSystem } from '../ship/shipSystem.js';
+import { timeToNextSOISwitch } from '../physics/orbitalPrediction.js';
+import { getLastOrbitMarkers } from '../renderer.js';
 
-// 菜单项定义（数据驱动：图标字符 + strings key）
+// 菜单项定义（数据驱动：action 行为标识 + 图标字符 + strings key）
 const MENU_ITEMS = [
-    { icon: '+', nameKey: 'orbitMenu.createNode' },
-    { icon: '\u27A4', nameKey: 'orbitMenu.warpToPoint' },   // ➤
-    { icon: '\u27A4', nameKey: 'orbitMenu.toApo' },
-    { icon: '\u27A4', nameKey: 'orbitMenu.toPe' },
-    { icon: '\u27A4', nameKey: 'orbitMenu.toSoi' }
+    { action: 'createNode', icon: '+', nameKey: 'orbitMenu.createNode' },
+    { action: 'warpToPoint', icon: '\u27A4', nameKey: 'orbitMenu.warpToPoint' },   // ➤
+    { action: 'toApo', icon: '\u27A4', nameKey: 'orbitMenu.toApo' },
+    { action: 'toPe', icon: '\u27A4', nameKey: 'orbitMenu.toPe' },
+    { action: 'toSoi', icon: '\u27A4', nameKey: 'orbitMenu.toSoi' }
 ];
 
 // 面板底边中点与锚点（轨道点）之间的连接间隙：菱形半径(约10) + 竖线段
@@ -98,7 +102,79 @@ export function showOrbitContextMenu(clientX, clientY, data, canvas) {
         row.textContent = item.icon + ' ' + t(item.nameKey);
         row.addEventListener('click', (e) => {
             e.stopPropagation();
-            // TODO: 占位——具体功能（机动计划/时间加速/快进）后续提交实现
+            // 0.3.0 提交5：定点加速三项（目标点/远点/近点）——统一走 timeWarp.warpToTime
+            let targetTime = null;
+            let targetLabel = null;
+            if (item.action === 'warpToPoint') {
+                // 目标点：点击点快照（菜单打开瞬间冻结的绝对时刻）
+                if (_menuData && _menuData.absTime !== null && _menuData.absTime !== undefined) {
+                    targetTime = _menuData.absTime;
+                    targetLabel = t(item.nameKey);
+                }
+            } else if (item.action === 'toApo' || item.action === 'toPe') {
+                // 快进至远点/近点：取渲染层本帧实时广播的拱点标记 tToNext（标记显示规则不变，
+                // 始终按现有逻辑显示；此处仅判定"功能可用性"）
+                const markerType = item.action === 'toApo' ? 'apoapsis' : 'periapsis';
+                const markers = getLastOrbitMarkers() || [];
+                const mk = markers.find(x => x.type === markerType
+                    && x.tToNext !== null && x.tToNext !== undefined);
+                if (mk) {
+                    // SOI 切换前不可达（切换发生在到达拱点之前）→ 功能不可用（标记照常显示）
+                    const ship = shipSystem.getActiveShip();
+                    const host = ship && ship.currentSOI
+                        ? celestialBodies.find(b => b.name === ship.currentSOI)
+                        : null;
+                    const tSwitch = ship ? timeToNextSOISwitch(ship, host) : null;
+                    if (tSwitch !== null && mk.tToNext > tSwitch) {
+                        if (typeof window.showNotification === 'function') {
+                            window.showNotification(t('orbitMenu.apeUnavailable'), 'warning');
+                        }
+                        closeMenu(false);
+                        return;
+                    }
+                    targetTime = getCachedTime() + mk.tToNext;
+                    targetLabel = t(item.nameKey);
+                }
+            } else if (item.action === 'toSoi') {
+                // 快进至引力范围变化：只加速到最近一次 SOI 切换
+                // （timeToNextSOISwitch 与飞行场景保护/预测线同口径：出界 + 嵌套进入统一；
+                //   返回 null = 稳定轨道/深空/无解析轨道 → 无近期切换）
+                const ship = shipSystem.getActiveShip();
+                const host = ship && ship.currentSOI
+                    ? celestialBodies.find(b => b.name === ship.currentSOI)
+                    : null;
+                const tSwitch = ship ? timeToNextSOISwitch(ship, host) : null;
+                if (tSwitch !== null) {
+                    targetTime = getCachedTime() + tSwitch;
+                    targetLabel = t(item.nameKey);
+                }
+            }
+
+            if (targetTime !== null) {
+                timeWarp.warpToTime(targetTime);
+                if (typeof window.showNotification === 'function') {
+                    window.showNotification(t('orbitMenu.warpStarted', { name: targetLabel }), 'info');
+                }
+                closeMenu(false);
+                return;
+            }
+            if (item.action === 'toSoi') {
+                // 无近期切换：稳定轨道/深空（与"无拱点数据"区分提示）
+                if (typeof window.showNotification === 'function') {
+                    window.showNotification(t('orbitMenu.noSoi'), 'warning');
+                }
+                closeMenu(false);
+                return;
+            }
+            if (item.action === 'warpToPoint' || item.action === 'toApo' || item.action === 'toPe') {
+                // 数据不可用：目标点无时间数据 / 当前轨道无该拱点（逃逸、已过近点等）
+                if (typeof window.showNotification === 'function') {
+                    window.showNotification(t('orbitMenu.noTime'), 'warning');
+                }
+                closeMenu(false);
+                return;
+            }
+            // TODO: 占位——其余功能（机动计划/快进至引力范围变化）后续提交实现
             if (typeof window.showNotification === 'function') {
                 window.showNotification(t('orbitMenu.todo', { name: t(item.nameKey) }), 'info');
             }

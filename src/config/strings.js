@@ -280,6 +280,12 @@ const STRINGS = {
     'orbitMenu.toSoi': '快进至引力范围变化',
     'orbitMenu.targetSuffix': '到目标点',
     'orbitMenu.todo': (p) => `「${p.name}」功能开发中，敬请期待`,
+    // 定点时间加速（0.3.0 提交5 落地）
+    'orbitMenu.warpStarted': '定点加速启动：将以最大可用档位前往目标点',
+    'orbitMenu.arrived': '已到达目标点',
+    'orbitMenu.noTime': '该点无到达时间数据，无法定点加速',
+    'orbitMenu.apeUnavailable': '到达该拱点前将发生 SOI 切换，暂时不可用',
+    'orbitMenu.noSoi': '当前轨道无近期 SOI 切换',
 
     // ---------- 飞船建造 ----------
     'build.title': '飞船建造',
@@ -452,6 +458,7 @@ const STRINGS = {
     'save.systemIncompatible': '该存档的星系配置与当前版本不兼容，无法加载。',
     'timewarp.pausedNotice': '游戏已暂停',
     'timewarp.resumedNotice': '游戏已恢复',
+    'timewarp.warpCanceled': '已取消定点加速',
 
     // ---------- 大气 / 表面危害 ----------
     'atmo.entering': (p) => `⚠ 警告：正在进入 ${p.name} 大气层！`,
