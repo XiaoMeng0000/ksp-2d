@@ -328,8 +328,8 @@ const STRINGS = {
     'sas.stability': '姿态保持',
     'sas.main': 'SAS',
     'sas.node': '节点',
-    'sas.targetPlus': '目标+',
-    'sas.targetMinus': '目标-',
+    'sas.targetPlus': '目标方向',
+    'sas.targetMinus': '目标反向',
     'sas.wip': '功能开发中',
     'sas.showFilter': '显示筛选',
     'sas.ships': '飞船',
@@ -355,9 +355,9 @@ const STRINGS = {
     'timewarp.utTip': '点击切换时间显示模式（任务时间开发中）',
     'timewarp.pauseTip': '点击暂停/恢复时间加速',
     'timewarp.wip': '任务时间开发中',
-    'timewarp.paused': '|| TIME PAUSED',
-    'timewarp.active': '>> TIME WARP ACTIVE',
-    'timewarp.normal': '>> NORMAL FLIGHT',
+    'timewarp.paused': '|| 时间已暂停',
+    'timewarp.active': '>> 时间加速启用 >>',
+    'timewarp.normal': '废弃文本，不应使用',
     'timewarp.label': (p) => `TIME WARP= ${p.rate}x`,
 
     // ---------- 设置场景 ----------

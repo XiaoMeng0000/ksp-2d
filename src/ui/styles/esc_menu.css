@@ -102,7 +102,7 @@
     font-family: var(--font-pixel);
     font-size: 15px;
     right: 0;
-    top: -10px;
+    top: -12px;
     color: var(--esc-dash);
 }
 
@@ -112,7 +112,7 @@
     font-family: var(--font-pixel);
     font-size: 15px;
     left: 0;
-    top: -10px;
+    top: -12px;
     color: var(--esc-dash);
 }
 
@@ -173,7 +173,7 @@
 }
 
 #escMenu .esc-group-title:hover {
-    background: transparent;
+    background: transparent !important;
 }
 
 #escMenu .esc-group-title-text {

@@ -27,16 +27,14 @@ export function createNotification(message, type = 'info', duration = 2000) {
         container.appendChild(div);
     }
 
-    // 堆叠通知 - 触发淡入和上移动画
+    // 堆叠通知 - 触发淡入动画
     requestAnimationFrame(() => {
         div.style.opacity = '1';
-        div.style.transform = 'translateY(0)';
     });
 
     // 堆叠通知 - 定时器结束后淡出并移除
     setTimeout(() => {
         div.style.opacity = '0';
-        div.style.transform = 'translateY(10px)';
         setTimeout(() => {
             if (div.parentNode) div.parentNode.removeChild(div);
         }, 300);

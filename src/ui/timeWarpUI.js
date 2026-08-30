@@ -25,28 +25,27 @@ function bindTooltip(el, text) {
 }
 
 // ==== 纹理 key（textureConfig.js 已注册） ====
-const TEX_CELL_ACTIVE = 'timewarp_cell_active';   // 档位格·启用（绿）
-const TEX_CELL_INACTIVE = 'timewarp_cell_inactive'; // 档位格·未启用（灰）
+const TEX_CELL_ACTIVE = 'timewarp_cell_active';
+const TEX_CELL_INACTIVE = 'timewarp_cell_inactive';
 
 // ==== 显示场景 ====
 const SCENE_SHOW = ['flight', 'tracking'];
 
 // ==== 图标尺寸 ====
-const CELL_SIZE = 22;     // 档位格边长（11 格紧凑排列）
+const CELL_SIZE = 22;
 
-// ==== 配色（KSP2 风格：游戏面板标准黑底 + HUD 蓝/红状态色，简洁无特效） ====
-// 静态底色/边框已迁移至 flight.css；此处仅保留动态状态色（刷新时写入 style）
-const COLOR_RUN = '#88ccff';                // 运行蓝（HUD 数据同色）
-const COLOR_PAUSE = '#ff5050';              // 暂停红（不变）
-const COLOR_CELL_BG = 'rgba(0,0,0,0.55)';   // 档位格底色（半透明黑，与面板一体）
-const COLOR_CELL_ACTIVE_BG = 'rgba(136, 204, 255, 0.25)'; // 档位格高亮底（淡 HUD 蓝）
-const COLOR_FOOTER = '#bbbbbb';             // 底部倍率文字
+// ==== 配色 ====
+const COLOR_RUN = '#6153D0';
+const COLOR_SPEED = '#55CC53';
+const COLOR_PAUSE = '#ff5050';
+const COLOR_CELL_BG = 'rgba(0,0,0,0.55)';
+const COLOR_CELL_ACTIVE_BG = 'rgba(136, 204, 255, 0.25)';
+const COLOR_FOOTER = '#6153D0';
 
-// ==== KSP2 历法：1 年 = 426 天，1 天 = 6 小时 ====
+// ==== KSP2 历法 ====
 const SEC_PER_DAY = 6 * 3600;
 const SEC_PER_YEAR = 426 * SEC_PER_DAY;
 
-// 秒 → KSP2 格式：T+001y 009d 05:36:52（年/日 3 位，时/分/秒 2 位）
 function formatUT(seconds) {
     const t = Math.max(0, Math.floor(seconds));
     const years = Math.floor(t / SEC_PER_YEAR);
@@ -65,43 +64,91 @@ function formatUT(seconds) {
 class TimeWarpUI {
     constructor() {
         // DOM 元素
-        this._wrap = null;       // 面板容器（fixed 定位）
-        this._right = null;      // 面板主体
-        this._header = null;     // 顶栏状态文字
-        this._utLabel = null;    // UT 时间标签
-        this._cells = [];        // [{ rate, btn, img, fb }]
-        this._footer = null;     // 底部倍率文字
+        this._wrap = null;
+        this._right = null;
+        this._header = null;
+        this._headerContainers = {};
+        this._utLabel = null;
+        this._cells = [];
+        this._footer = null;
 
-        // 缓存状态（避免重复写 DOM）
-        this._visible = undefined;    // 面板显隐
-        this._lastPaused = undefined; // 暂停态（大圆图标/边框变化比对）
-        this._lastHeaderKey = undefined; // 顶栏文案 + 颜色变化比对
-        this._lastFooterKey = undefined; // 底部倍率文字变化比对
-        this._lastUtText = '';        // UT 文本变化比对
-        this._cellActive = [];        // 每格 active 图状态比对
-        this._cellLocked = [];        // 每格灰显（不可达）状态比对（独立于 active：限档即时反映）
+        // 缓存状态
+        this._visible = undefined;
+        this._lastHeaderKey = undefined;
+        this._lastFooterKey = undefined;
+        this._lastUtText = '';
+        this._cellActive = [];
+        this._cellLocked = [];
 
         this._initDOM();
         this._initEvents();
 
-        // 模块加载时主动查询初始场景（防读档直达飞行时 SCENE_CHANGED 已错过）
         if (SCENE_SHOW.includes(sceneManager.getCurrentScene())) {
             this.setVisible(true);
         }
     }
 
-    // ==== DOM 构建 ====
-
     _initDOM() {
-        // 面板容器（fixed 定位，偏右底部；整体缩放到 3/4）——布局样式见 flight.css #timeWarpWrap
+        // 注入样式（仅一次）
+        if (!document.getElementById('timewarp-wave-style')) {
+            const style = document.createElement('style');
+            style.id = 'timewarp-wave-style';
+            style.textContent = `
+                .tw-char {
+                    display: inline-block;
+                    transform-origin: center center;
+                    animation: twWaveScale 0.5s ease-in-out infinite alternate;
+                    color: inherit;
+                }
+                @keyframes twWaveScale {
+                    0% { transform: scale(1); }
+                    100% { transform: scale(1.3); }
+                }
+                .tw-char-space {
+                    display: inline-block;
+                    min-width: 0.3em;
+                    animation: none !important;
+                    transform: scale(1) !important;
+                }
+
+                /* 顶栏整体显隐：使用 opacity，不改变 display */
+                #timeWarpHeader {
+                    position: relative;
+                    min-height: 1.8em;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+                #timeWarpHeader.hidden {
+                    opacity: 0;
+                    pointer-events: none;
+                }
+
+                .tw-header-state {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    opacity: 0;
+                    pointer-events: none;
+                    transition: opacity 0.05s;
+                }
+                .tw-header-state.active {
+                    opacity: 1;
+                    pointer-events: auto;
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
         const wrap = document.createElement('div');
         wrap.id = 'timeWarpWrap';
 
-        // 面板主体（无大圆按钮：单一面板，全圆角）——样式见 flight.css #timeWarpPanel
-        const right = document.createElement('div');
-        right.id = 'timeWarpPanel';
-
-        // 顶栏状态文字（点击切换暂停/恢复，替代原大圆按钮入口）——样式见 flight.css #timeWarpHeader
+        // ---- 顶栏 ----
         const header = document.createElement('div');
         header.id = 'timeWarpHeader';
         bindTooltip(header, t('timewarp.pauseTip'));
@@ -109,16 +156,54 @@ class TimeWarpUI {
             timeWarp.togglePause();
         });
 
-        // 主内容行：UT 标签 + UT 时间 + 档位条
+        const stateTexts = {
+            p: t('timewarp.paused'),
+            w: t('timewarp.active'),
+            n: t('timewarp.normal')
+        };
+        const containers = {};
+        for (const [key, text] of Object.entries(stateTexts)) {
+            const container = document.createElement('span');
+            container.className = 'tw-header-state';
+            container.dataset.state = key;
+            const chars = Array.from(text);
+            chars.forEach((ch, index) => {
+                const span = document.createElement('span');
+                // 只有加速状态（'w'）才添加动画类，暂停（'p'）和正常（'n'）不加
+                if (key === 'w') {
+                    span.className = 'tw-char';
+                    span.style.animationDelay = (index % 20) * 0.04 + 's';
+                } else {
+                    span.className = ''; // 无动画
+                }
+                if (ch === ' ' || ch === '\u00A0') {
+                    span.classList.add('tw-char-space');
+                    span.textContent = '\u00A0';
+                } else {
+                    span.textContent = ch;
+                }
+                container.appendChild(span);
+            });
+            header.appendChild(container);
+            containers[key] = container;
+        }
+        this._headerContainers = containers;
+
+        // ---- 面板主体 ----
+        const right = document.createElement('div');
+        right.id = 'timeWarpPanel';
+
         const bodyRow = document.createElement('div');
         bodyRow.className = 'timewarp-body';
 
-        // UT 标签（金色边框小圆角）
+        // ---- UT 组（badge + 时间） ----
+        const utGroup = document.createElement('div');
+        utGroup.className = 'timewarp-ut-group';
+
         const utBadge = document.createElement('div');
         utBadge.textContent = 'UT';
         utBadge.className = 'timewarp-ut-badge';
 
-        // UT 时间
         const ut = document.createElement('div');
         ut.className = 'timewarp-ut';
         ut.textContent = 'T+000y 000d 00:00:00';
@@ -129,16 +214,17 @@ class TimeWarpUI {
             }
         });
 
-        // 档位行（11 格，紧凑排列，占满剩余空间）
+        utGroup.appendChild(utBadge);
+        utGroup.appendChild(ut);
+        bodyRow.appendChild(utGroup);
+
+        // ---- 档位格 ----
         const cellRow = document.createElement('div');
         cellRow.className = 'timewarp-cells';
 
         for (const rate of PANEL_RATES) {
             const cell = document.createElement('button');
             cell.className = 'timewarp-cell';
-            cell.style.width = CELL_SIZE + 'px';
-            cell.style.height = CELL_SIZE + 'px';
-            // 档位值暴露给采集层（uiClickSfx 档位悬停音定位用）
             cell.dataset.rate = String(rate);
             bindTooltip(cell, rate + 'x');
             const img = document.createElement('img');
@@ -148,28 +234,23 @@ class TimeWarpUI {
             cell.appendChild(img);
             cell.appendChild(fb);
             cell.addEventListener('click', () => {
-                // 灰显（不可达）格忽略点击：仅 rate ≤ 当前上限可直达
                 if (rate <= timeWarp.getCurrentMaxRate()) {
                     timeWarp.warpTo(rate);
                 }
             });
             cellRow.appendChild(cell);
-            this._cells.push({ rate: rate, btn: cell, img: img, fb: fb });
+            this._cells.push({ rate, btn: cell, img, fb });
         }
 
-        bodyRow.appendChild(utBadge);
-        bodyRow.appendChild(ut);
         bodyRow.appendChild(cellRow);
 
-        // 底部倍率文字
         const footer = document.createElement('div');
         footer.className = 'timewarp-footer';
 
-        // 组装
-        right.appendChild(header);
         right.appendChild(bodyRow);
         right.appendChild(footer);
 
+        wrap.appendChild(header);
         wrap.appendChild(right);
         document.body.appendChild(wrap);
 
@@ -178,25 +259,19 @@ class TimeWarpUI {
         this._header = header;
         this._utLabel = ut;
         this._footer = footer;
-        this._cellActive = new Array(this._cells.length).fill(undefined);
+        this._cellActive = [];
+        this._cellLocked = [];
     }
 
-    // ==== 事件订阅 ====
-
     _initEvents() {
-        // 场景切换 → 显隐（仅 flight / tracking）
         eventBus.on(Events.SCENE_CHANGED, ({ to }) => {
             this.setVisible(SCENE_SHOW.includes(to));
         });
 
-        // 档位/暂停变化 → 立即刷新（键盘与点击共用 timeWarp 单一入口，天然同步）
         eventBus.on(Events.TIME_WARP_CHANGED, () => {
-            if (this._visible) {
-                this.refresh();
-            }
+            if (this._visible) this.refresh();
         });
 
-        // 每帧时间与档位上限（flight：RENDER_DATA 载荷含 time；tracking：CELESTIAL_TIME_UPDATED）
         eventBus.on(Events.RENDER_DATA, (data) => {
             if (this._visible && typeof data.time === 'number') {
                 this.onFrame(data.time);
@@ -208,28 +283,17 @@ class TimeWarpUI {
             }
         });
 
-        // 纹理加载完成 → 刷新图标（首次加载完成时 fallback 换真实图片）
         eventBus.on(Events.TEXTURES_READY, () => {
-            if (this._visible) {
-                this.refresh();
-            }
+            if (this._visible) this.refresh();
         });
     }
 
-    // ==== 显隐 ====
-
     setVisible(visible) {
-        if (this._visible === visible) {
-            return;
-        }
+        if (this._visible === visible) return;
         this._visible = visible;
         this._wrap.style.display = visible ? 'flex' : 'none';
-        if (visible) {
-            this.refresh();
-        }
+        if (visible) this.refresh();
     }
-
-    // ==== 每帧驱动（UT 时间 + 档位上限灰显随帧更新） ====
 
     onFrame(time) {
         const text = formatUT(time);
@@ -237,36 +301,46 @@ class TimeWarpUI {
             this._lastUtText = text;
             this._utLabel.textContent = text;
         }
-        // 档位上限由场景每帧 setMaxIndex 设置且可能不触发 TIME_WARP_CHANGED
-        // （如点火后上限收紧但当前档未被夹取），因此每帧同步一次状态
         this.refresh();
     }
 
-    // ==== 状态刷新（全部带变化比对，每帧调用开销低） ====
-
     refresh() {
-        if (!this._visible) {
-            return;
-        }
+        if (!this._visible) return;
+
         const paused = timeWarp.isPaused();
         const rate = timeWarp.getRate();
         const maxRate = timeWarp.getCurrentMaxRate();
         const savedRate = paused ? timeWarp.getSavedRate() : rate;
 
-        // 顶栏文字 + 面板边框色（三态：暂停 / 1x 正常运行 / 加速中）
-        const headerKey = paused ? 'p' : (rate > 1 ? 'w' : 'n');
-        if (this._lastHeaderKey !== headerKey) {
-            this._lastHeaderKey = headerKey;
-            this._header.textContent = paused
-                ? t('timewarp.paused')
-                : (rate > 1 ? t('timewarp.active') : t('timewarp.normal'));
-            this._header.style.color = paused ? COLOR_PAUSE : COLOR_RUN;
-            this._right.style.borderColor = paused ? COLOR_PAUSE : COLOR_RUN;
+        // 决定当前状态 key
+        let stateKey;
+        if (paused) {
+            stateKey = 'p';
+        } else if (rate > 1) {
+            stateKey = 'w';
+        } else {
+            stateKey = 'n';
         }
 
-        // 档位格：
-        // - 运行态：累积高亮（rate ≤ 当前倍率 且 ≤ 上限）为绿，其余灰
-        // - 暂停态：仅 savedRate 对应单格亮（savedRate 均在面板档位表内，直接对应单格；_computeTargetRate 仅兜底）
+        // ---- 控制状态容器的显隐（opacity） ----
+        for (const [key, container] of Object.entries(this._headerContainers)) {
+            const isActive = (key === stateKey);
+            container.classList.toggle('active', isActive);
+        }
+
+        // ---- 控制顶栏整体显隐（用 hidden 类） ----
+        const isNormal = (stateKey === 'n');
+        this._header.classList.toggle('hidden', isNormal);
+
+        // ---- 边框颜色（只在状态改变时更新） ----
+        const headerKey = stateKey;
+        if (this._lastHeaderKey !== headerKey) {
+            this._lastHeaderKey = headerKey;
+            this._right.style.borderColor = paused ? COLOR_PAUSE : COLOR_RUN;
+            this._header.style.borderColor = paused ? COLOR_PAUSE : COLOR_SPEED;
+        }
+
+        // ---- 档位格 ----
         const targetRate = paused ? this._computeTargetRate(savedRate) : null;
         for (let i = 0; i < this._cells.length; i++) {
             const cell = this._cells[i];
@@ -281,11 +355,7 @@ class TimeWarpUI {
                     '>',
                     active ? COLOR_RUN : '#888'
                 );
-                // 高亮格加淡绿底，其余保持深色底
-                cell.btn.style.background = active ? COLOR_CELL_ACTIVE_BG : COLOR_CELL_BG;
             }
-            // 不可达格灰显：独立于 active 逐帧对齐（修复——原先嵌在 active 变化块内，
-            // 由"当前档位 rate"触发而非"上限 maxRate"，导致限档解除残留灰、收紧不残留亮）
             const locked = active ? false : cell.rate > maxRate;
             if (this._cellLocked[i] !== locked) {
                 this._cellLocked[i] = locked;
@@ -294,7 +364,7 @@ class TimeWarpUI {
             }
         }
 
-        // 底部倍率文字（运行显示当前倍率，暂停显示恢复目标倍率）
+        // ---- 底部倍率 ----
         const footerKey = (paused ? 'p' : 'r') + ':' + savedRate;
         if (this._lastFooterKey !== footerKey) {
             this._lastFooterKey = footerKey;
@@ -303,20 +373,15 @@ class TimeWarpUI {
         }
     }
 
-    // 暂停态高亮目标：PANEL_RATES 中 ≤ savedRate 的最大档位（savedRate 在面板内时为自身，兜底处理异常值）
     _computeTargetRate(savedRate) {
         let target = null;
         for (const r of PANEL_RATES) {
-            if (r <= savedRate) {
-                target = r;
-            } else {
-                break;
-            }
+            if (r <= savedRate) target = r;
+            else break;
         }
         return target;
     }
 
-    // 图标应用：纹理就绪用图片，否则 fallback 文本（沿用 textureManager + emoji 模式）
     _applyIcon(imgEl, fbEl, texKey, fbText, fbColor) {
         const tex = textureManager.get(texKey);
         if (tex && tex.complete && tex.naturalWidth > 0) {
@@ -332,11 +397,9 @@ class TimeWarpUI {
     }
 }
 
-// 导出单例
 export const timeWarpUI = new TimeWarpUI();
 
-// 控制台调试暴露
 if (typeof window !== 'undefined') {
     window.__timeWarpUI = timeWarpUI;
-    console.log('[TimeWarpUI] 时间加速面板已创建，可通过 window.__timeWarpUI 访问');
+    console.log('[TimeWarpUI] 时间加速面板已创建（暂停文本无动画，加速文本有动画）');
 }

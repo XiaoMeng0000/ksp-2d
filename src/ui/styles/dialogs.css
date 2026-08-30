@@ -8,7 +8,7 @@
 /* ---- 通知 ---- */
 #notification-container {
     position: fixed;
-    bottom: 20px;
+    top: 20px;
     left: 50%;
     transform: translateX(-50%);
     z-index: 10001;
@@ -21,6 +21,7 @@
 }
 
 .ui-notification {
+    position: relative;
     background: var(--panel-bg);
     border-radius: 3px;
     padding: 8px 16px;
@@ -28,17 +29,38 @@
     font-family: var(--font-mono);
     font-size: 12px;
     opacity: 0;
-    transform: translateY(10px);
     transition: all 0.3s ease;
     pointer-events: none;
     text-align: center;
     max-width: 80vw;
     min-width: 120px;
 }
-.ui-notification-success { border: 1px solid var(--accent); }
-.ui-notification-error   { border: 1px solid var(--danger); }
-.ui-notification-info    { border: 1px solid var(--text-mid); }
-.ui-notification-warning { border: 1px solid var(--warn); }
+
+.ui-notification-success {
+    background-color: #0D0D0D;
+}
+
+.ui-notification-error {
+    border: 1px solid var(--danger);
+}
+
+.ui-notification-info {
+    background-color: #0D0D0D;
+}
+
+.ui-notification-info::after {
+    content: "";
+    background-color: #FFD54F;
+    position: absolute;
+    top: 5px;
+    left: 10px;
+    width: 5px;
+    height: calc(100% - 10px);
+}
+
+.ui-notification-warning {
+    border: 1px solid var(--warn);
+}
 
 /* ---- ESC 菜单 ----
    0.2.5 已抽离为独立组件，样式见 esc_menu.css（--esc-* 独立配色） */

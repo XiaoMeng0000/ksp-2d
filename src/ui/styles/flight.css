@@ -102,9 +102,9 @@
 #timeWarpWrap {
     display: none;
     position: fixed;
-    left: 70%;
-    bottom: 18px;
-    transform: translateX(-50%) scale(0.75);
+    left: 50%;
+    bottom: 12px;
+    transform: translateX(-50%);
     transform-origin: center center;
     z-index: 950;
     flex-direction: column;
@@ -113,11 +113,18 @@
     color: var(--text-bright);
 }
 
+#timeWarpWrap * {
+    outline: none;
+}
+
 #timeWarpPanel {
+    position: relative;
     display: flex;
     flex-direction: column;
     background: var(--panel-bg);
-    border: 1px solid var(--accent);
+    border: 1px solid var(--toolbar-border);
+    /* 紫框外再加 2px 黑色外框 */
+    box-shadow: 0 0 0 2px #000;
     border-radius: 6px;
     padding: 0;
     min-width: 280px;
@@ -126,19 +133,35 @@
 #timeWarpHeader {
     font-size: 11px;
     font-weight: bold;
-    color: var(--accent);
+    color: var(--text-bright);
     padding: 3px 12px;
     text-align: center;
     letter-spacing: 2px;
     border-bottom: 1px solid rgba(120, 140, 180, 0.25);
     cursor: pointer;
+
+    background: var(--panel-bg);
+    border: 1px solid var(--toolbar-border);
+    /* 紫框外再加 2px 黑色外框 */
+    box-shadow: 0 0 0 2px #000;
+    border-radius: 6px;
+    margin-bottom: 10px;
 }
 
 .timewarp-body {
+    justify-content: flex-start;
     display: flex;
+    flex-direction: column;
     align-items: center;
+    gap: 5px;
+    padding: 5px 5px 10px 5px;
+}
+
+.timewarp-ut-group {
+    width: 100%;
     gap: 8px;
-    padding: 5px 10px 3px 10px;
+    display: flex;
+    flex-direction: row;
 }
 
 .timewarp-ut-badge {
@@ -146,7 +169,7 @@
     font-weight: bold;
     color: var(--ut-gold);
     border: 1px solid var(--ut-gold-border);
-    border-radius: 3px;
+    border-radius: 7px;
     background: rgba(0, 0, 0, 0.6);
     padding: 1px 6px;
     letter-spacing: 1px;
@@ -163,13 +186,16 @@
 }
 
 .timewarp-cells {
+    width: 100%;
     display: flex;
     gap: 1px;
     justify-content: flex-end;
+    padding-right: 5px;
     flex: 1;
 }
 
 .timewarp-cell {
+    position: relative;
     padding: 0;
     background: rgba(0, 0, 0, 0.55);
     border: none;
@@ -182,11 +208,54 @@
     box-sizing: border-box;
 }
 
+
+.timewarp-cell:first-child::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 2px;
+    height: 2px;
+    background-color: #000;
+}
+
+.timewarp-cell:first-child::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 2px;
+    height: 2px;
+    background-color: #000;
+}
+
+.timewarp-cell:last-child::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 2px;
+    height: 2px;
+    background-color: #000;
+}
+
+.timewarp-cell:last-child::before {
+    content: "";
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 2px;
+    height: 2px;
+    background-color: #000;
+}
+
+
 .timewarp-cell-img {
-    width: 82%;
-    height: 82%;
-    object-fit: contain;
-    display: none;
+    width: auto;
+    height: auto;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .timewarp-cell-fb {
@@ -197,11 +266,27 @@
 }
 
 .timewarp-footer {
+    white-space: nowrap;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: -4px;
     font-size: 9px;
     color: #bbbbbb;
     text-align: center;
     letter-spacing: 2px;
-    padding: 1px 0 3px 0;
+}
+
+.timewarp-footer::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    z-index: -1;
+    transform: translateX(-50%);
+    bottom: 3px;
+    width: 100%;
+    height: 1px;
+    background-color: #000;
 }
 
 /* ---- SAS 底部按钮区（0.2.7 统一为工具栏风格：黑底 + 紫框 + 2px 黑外框） ---- */
@@ -233,6 +318,7 @@
     box-sizing: border-box;
     overflow: hidden;
 }
+
 #sasBottomButtons button:hover {
     background: var(--accent-bg);
 }
@@ -262,6 +348,7 @@
     font-size: 14px;
     margin-left: auto;
 }
+
 #visibilityPanel .vis-toggle-btn.active {
     border-color: var(--accent);
 }
