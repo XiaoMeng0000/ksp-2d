@@ -42,8 +42,8 @@
       "numNodes": 3
     },
     "src/renderer.js": {
-      "mtimeMs": 1787761244370.8228,
-      "hash": "dd33d2c8f9638d5de1faf1531fed9880",
+      "mtimeMs": 1787925650876.56,
+      "hash": "6dacaeac2683c657b6bf5f9b8f77bd7f",
       "numNodes": 44
     },
     "src/saveManager.js": {
@@ -57,8 +57,8 @@
       "numNodes": 4
     },
     "src/timeWarp.js": {
-      "mtimeMs": 1787761244386.5776,
-      "hash": "6d859a5457bb6e259817ee9c781ea32e",
+      "mtimeMs": 1787925650899.038,
+      "hash": "ef61e30775f21c02e6219cb38403c2f8",
       "numNodes": 7
     },
     "src/utils/format.js": {
@@ -82,8 +82,8 @@
       "numNodes": 13
     },
     "src/ui/escMenuUI.js": {
-      "mtimeMs": 1787761244389.587,
-      "hash": "d423e8059662b8d117eb661400d002dd",
+      "mtimeMs": 1788530497609.1074,
+      "hash": "b878e9d04f766e338cea767c6adf0f44",
       "numNodes": 31
     },
     "src/ui/facilityDeployUI.js": {
@@ -107,9 +107,9 @@
       "numNodes": 16
     },
     "src/ui/orbitContextMenu.js": {
-      "mtimeMs": 1787761244397.0403,
-      "hash": "0b03f1d8b1a4644e9bcc9c4c15a85ae6",
-      "numNodes": 3
+      "mtimeMs": 1788530548615.4148,
+      "hash": "9841c5baef2ed7b04cf85ae0c5c5d018",
+      "numNodes": 17
     },
     "src/ui/orbitLabels.js": {
       "mtimeMs": 1787761244397.546,
@@ -147,13 +147,13 @@
       "numNodes": 22
     },
     "src/ui/systemSelectPanel.js": {
-      "mtimeMs": 1787765589930.8826,
-      "hash": "01c7e304e9f7e199e63a1a0b5dcdd489",
+      "mtimeMs": 1787925650928.362,
+      "hash": "b03e788bb6cac2412bbf599d2f1fc902",
       "numNodes": 15
     },
     "src/ui/timeWarpUI.js": {
-      "mtimeMs": 1787761244421.8438,
-      "hash": "126e1e32c0e00c099ae57b6b21ddf234",
+      "mtimeMs": 1788530497613.6353,
+      "hash": "9c1a1d6f49a64d32c6003e08ef5a7507",
       "numNodes": 11
     },
     "src/ui/trackingUI.js": {
@@ -167,8 +167,8 @@
       "numNodes": 3
     },
     "src/ui/uiComponents.js": {
-      "mtimeMs": 1787765536398.567,
-      "hash": "4c009a2e2864baa3facd1a8fe4e7828a",
+      "mtimeMs": 1788530497614.6772,
+      "hash": "5b2073c0e968c54ac71682c1f8116077",
       "numNodes": 16
     },
     "src/ui/uiManager.js": {
@@ -222,9 +222,9 @@
       "numNodes": 2
     },
     "src/scenes/flightScene.js": {
-      "mtimeMs": 1787761244378.4368,
-      "hash": "40bef2e1ba8c2d27490d83df388f029d",
-      "numNodes": 34
+      "mtimeMs": 1787925650887.5525,
+      "hash": "979f0cfdb67ee1f55e72e7b12631242a",
+      "numNodes": 35
     },
     "src/scenes/galaxiesScene.js": {
       "mtimeMs": 1787763835867.4407,
@@ -312,8 +312,8 @@
       "numNodes": 22
     },
     "src/physics/physics.js": {
-      "mtimeMs": 1787761629539.4575,
-      "hash": "1cbbf80364d099151a375ea3027aa61b",
+      "mtimeMs": 1787925650873.6123,
+      "hash": "1c2b5cec1b353a07e38b561082c37053",
       "numNodes": 14
     },
     "src/physics/physicsUpdate.js": {
@@ -417,8 +417,8 @@
       "numNodes": 8
     },
     "src/config/solarSystem.js": {
-      "mtimeMs": 1787761603449.5144,
-      "hash": "4f5916fb6cfc1e42e27ac8c2c80d4d48",
+      "mtimeMs": 1787925650854.3508,
+      "hash": "a5b43663b4b9e21c5db6e18dfb253e9e",
       "numNodes": 3
     },
     "src/config/starfieldConfig.js": {
@@ -427,13 +427,13 @@
       "numNodes": 3
     },
     "src/config/starSystemIndex.js": {
-      "mtimeMs": 1787765363141.2395,
-      "hash": "ec70e7d0b6754d5b9a234d82d6dacf26",
+      "mtimeMs": 1787925650854.3508,
+      "hash": "bfcbfc3b4725c38c5159f5047710453f",
       "numNodes": 19
     },
     "src/config/strings.js": {
-      "mtimeMs": 1787765579361.9868,
-      "hash": "fd6f63b12f15f3ce7990525247399d75",
+      "mtimeMs": 1788530548614.3953,
+      "hash": "9193b8bbc838e0d3510154864c382d49",
       "numNodes": 4
     },
     "src/config/version.js": {
@@ -442,28 +442,28 @@
       "numNodes": 3
     },
     "src/config/systems/debdebSystem.js": {
-      "mtimeMs": 1787761477967.4556,
-      "hash": "97b3429ab881318feb2959532b2e477e",
+      "mtimeMs": 1787925650857.8967,
+      "hash": "6157fd5dc71b1809e5619c237153ee50",
       "numNodes": 4
     },
     "src/config/systems/debdebTestSystem.js": {
-      "mtimeMs": 1787765858485.9722,
-      "hash": "2ad05e91cf5a615ce3a43e36f54b8e64",
+      "mtimeMs": 1787925650858.9028,
+      "hash": "4bfdd2b4fb85fa764480b482a6b006bc",
       "numNodes": 5
     },
     "src/config/systems/kerbolarSystem.js": {
-      "mtimeMs": 1787761523224.0134,
-      "hash": "389c6d117b2aaaf07cc619cf179c7b04",
+      "mtimeMs": 1787925650858.9028,
+      "hash": "625dbf1d1e150e1a1ddc6319ae19dfbf",
       "numNodes": 5
     },
     "src/config/systems/testSystem.js": {
-      "mtimeMs": 1787764401431.705,
-      "hash": "5e78fe6712aa6b2abd58327691951be1",
+      "mtimeMs": 1787925650860.612,
+      "hash": "b20a8968860106f496dc32889c69b613",
       "numNodes": 5
     },
     "src/config/systems/tuunSystem.js": {
-      "mtimeMs": 1787761477983.136,
-      "hash": "3cbb88dca926a8dcbfbd8e421ad87c9d",
+      "mtimeMs": 1787925650860.612,
+      "hash": "dbc9abf83f8040e094ba38ebc85197e6",
       "numNodes": 4
     },
     "src/audio/audioConfig.js": {
@@ -520,6 +520,11 @@
       "mtimeMs": 1787761244347.0564,
       "hash": "ffbaae751f1a0ec055a1bc33e8ed1f7d",
       "numNodes": 27
+    },
+    "CONTRIBUTING.md": {
+      "mtimeMs": 1788530323887.2495,
+      "hash": "8fa66ebfcf6b16d1efeb389eed3b7650",
+      "numNodes": 20
     }
   }
 }

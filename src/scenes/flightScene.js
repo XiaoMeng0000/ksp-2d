@@ -174,10 +174,11 @@ eventBus.on(Events.SHIP_COMMAND, ({ action, params }) => {
             // 0.2.0 阶段5：部署设施消耗材料套装（从部署飞船货仓扣除）
             // 修复：扣费校验前置但实际扣除后移 —— 原实现在所有轨道校验之前扣费，
             // 校验失败（逃逸轨道/危险区）时材料套装已被扣但设施未部署（资源丢失）
-            // 0.2.0 阶段7：自由模式跳过余额检查（不足不拦截），货仓存在性检查保留
+            // 0.2.0 阶段7：自由模式跳过全部资费检查（货仓+余额均不拦截，无货仓不扣费，
+            // 有货仓扣到 0 为止）；生涯模式严格校验货仓与余额
             const deployTypeCfg = getFacilityType(typeId);
             const deployCost = (deployTypeCfg && deployTypeCfg.cost) || 0;
-            if (deployCost > 0 && (!hasCargoHold(ship) || (isBalanceEnforced() && getCargoAmount(ship, 'materialKits') < deployCost))) {
+            if (deployCost > 0 && isBalanceEnforced() && (!hasCargoHold(ship) || getCargoAmount(ship, 'materialKits') < deployCost)) {
                 window.showNotification(t('deploy.noKits'), 'warning');
                 break;
             }
