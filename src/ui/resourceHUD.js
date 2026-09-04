@@ -20,6 +20,11 @@ const POLL_INTERVAL = 1000;
 
 const hudEl = document.createElement('div');
 hudEl.id = 'playerResourceHud';
+// 0.3.0：内容放入子容器，hudEl 自身可被其他模块追加元素（可见性筛选按钮挂尾端），
+// renderHud 只重写内容容器，避免 innerHTML 整体重写清掉追加元素
+const contentEl = document.createElement('div');
+contentEl.id = 'prhContent';
+hudEl.appendChild(contentEl);
 document.body.appendChild(hudEl);
 
 // 当前载具名（活动飞船；无则空）
@@ -46,7 +51,7 @@ function renderHud() {
     if (shipName) {
         html += `<span class="prh-ship-name" title="${shipName}">${shipName}</span>`;
     }
-    hudEl.innerHTML = html;
+    contentEl.innerHTML = html;
 }
 
 // 模式按钮 → 切换 ESC 菜单（经 uiManager 显隐，自动触发 UI_PANEL_OPENED/CLOSED 音频）

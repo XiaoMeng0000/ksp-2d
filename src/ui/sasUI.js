@@ -993,8 +993,8 @@ class SASUI {
         }
         // 仅"从非显示→显示"广播打开事件：重复调用不重复发声
         // opts.silent = true 用于场景 enter 自动打开（不产生打开音效）
-        if (this._visibilityPanel.style.display !== 'block') {
-            this._visibilityPanel.style.display = 'block';
+        if (this._visibilityPanel.style.display !== 'flex') {
+            this._visibilityPanel.style.display = 'flex';
             if (!opts.silent) {
                 eventBus.emit(Events.UI_PANEL_OPENED, { panelId: 'visibility' });
             }
@@ -1008,7 +1008,7 @@ class SASUI {
     hideVisibilityPanel(opts = {}) {
         // 仅"从显示→非显示"广播关闭事件：已隐藏时静默
         // opts.silent = true 用于场景 exit 自动关闭（不产生关闭音效）
-        if (this._visibilityPanel && this._visibilityPanel.style.display === 'block') {
+        if (this._visibilityPanel && this._visibilityPanel.style.display === 'flex') {
             this._visibilityPanel.style.display = 'none';
             if (!opts.silent) {
                 eventBus.emit(Events.UI_PANEL_CLOSED, { panelId: 'visibility' });
@@ -1065,7 +1065,9 @@ class SASUI {
         content.appendChild(soiLabel);
 
         panel.appendChild(content);
-        document.body.appendChild(panel);
+        // 0.3.0：挂入左上玩家 HUD 黑条尾端（黑条不存在时兜底 body，正常时序黑条必已创建）
+        const hudHost = document.getElementById('playerResourceHud');
+        (hudHost || document.body).appendChild(panel);
 
         this._visibilityPanel = panel;
         this._visibilityContent = content;

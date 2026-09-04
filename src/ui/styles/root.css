@@ -64,6 +64,8 @@
     --doc-section-tittle: #0DD9FE;
 
     --danger: #ff6666;
+/* 大红色（0.3.0 飞行状态 ΔV 卡耗尽态专用；黑字对比约 5.3:1 可读） */
+--danger-pure: #ff0000;
     /* 危险红 */
     --danger-bg: rgba(255, 80, 80, 0.1);
     --danger-border: rgba(255, 80, 80, 0.3);
@@ -99,6 +101,8 @@
     --ut-gold-border: #a8984a;
 
     --progress-green: #3dff3d;
+/* 燃料条空槽灰白（0.3.0 飞行状态卡独有：条内黑字在空槽上仍可读） */
+--fuel-track-empty: #d9d9d9;
     /* 进度条绿（参考 KSP 资源条，扫描进度条等） */
 
     --hud-bg: #0d0d0d;
@@ -364,6 +368,13 @@ body.panel-drag-active * {
     color: var(--text-mid);
     pointer-events: none;
     user-select: none;
+}
+
+/* 0.3.0：黑条内容子容器（模式 + 载具名），供尾端追加元素（可见性筛选）后仍可整体重写 */
+#playerResourceHud #prhContent {
+    display: flex;
+    align-items: center;
+    gap: 14px;
 }
 
 #playerResourceHud .prh-item {

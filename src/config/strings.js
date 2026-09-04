@@ -411,6 +411,12 @@ const STRINGS = {
     'dock.success': '对接成功',
     'dock.failFull': '对接失败（对接口已满或其他原因）',
 
+    // ---------- 飞行状态 HUD（0.3.0 右下燃料/ΔV 卡） ----------
+    'hud.dvLabel': '剩余 ΔV',
+    'hud.twr': '推重比',
+    'hud.burnTime': '燃烧时间',
+    'hud.expandHint': '展开/收起',
+
     // ---------- 星系图场景 ----------
     'galaxies.star': '恒星',
     'galaxies.planet': '行星',

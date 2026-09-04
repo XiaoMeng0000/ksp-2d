@@ -323,20 +323,21 @@
     background: var(--accent-bg);
 }
 
-/* ---- 可见性筛选面板(右下角) ---- */
+/* ---- 可见性筛选面板（0.3.0 迁入左上玩家 HUD 黑条尾端） ---- */
 #visibilityPanel {
-    position: fixed;
-    right: 10px;
-    bottom: 10px;
-    z-index: 1000;
+    position: relative;
+    display: none;               /* 显隐由 sasUI show/hide（'flex'/'none'）控制 */
+    pointer-events: auto;        /* 黑条整体 pointer-events:none，本区单独放开 */
+    align-self: center;
+    margin-left: 4px;
     font-family: var(--font-mono);
     font-size: 11px;
     color: var(--text-main);
 }
 
 #visibilityPanel .vis-toggle-btn {
-    width: 28px;
-    height: 28px;
+    width: 22px;
+    height: 22px;
     background: rgba(0, 0, 0, 0.75);
     border: 1px solid var(--border);
     border-radius: 4px;
@@ -345,7 +346,7 @@
     justify-content: center;
     cursor: pointer;
     user-select: none;
-    font-size: 14px;
+    font-size: 12px;
     margin-left: auto;
 }
 
@@ -353,16 +354,20 @@
     border-color: var(--accent);
 }
 
+/* 下拉内容：从按钮下方展开（飞行 HUD 组件风格：黑底 + 紫描边 + 2px 黑外框） */
 #visibilityPanel .vis-content {
     display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
     flex-direction: column;
     gap: 4px;
-    margin-top: 4px;
     padding: 6px 8px;
-    background: var(--panel-bg);
-    border: 1px solid var(--border);
+    background: rgba(0, 0, 0, 0.92);
+    border: 1px solid var(--toolbar-border);
+    box-shadow: 0 0 0 2px #000;
     border-radius: 4px;
-    min-width: 80px;
+    min-width: 120px;
 }
 
 #visibilityPanel label {
@@ -433,3 +438,216 @@
 }
 
 /* 悬停高亮（0.3.0：已去除——锚点与标签本体均无悬停视觉变化，悬停仅用于数据/交互） */
+
+/* ---- 飞行状态 HUD：右下燃料卡 + 总 ΔV 卡（0.3.0 打磨 v2：并入飞行组件体系）----
+   统一：黑底 + 紫描边 + 2px 黑外框 + 5px 圆角；
+   燃料行文字收敛进进度条内（满油黑字=样板，低油切白保可读）；
+   展开态只显示推重比/燃烧时间（金色数值），燃料行隐藏；右侧引擎图标（emoji 占位） */
+#shipStatusPanel {
+    position: fixed;
+    right: 10px;
+    bottom: 10px;
+    z-index: 950;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    font-family: var(--font-mono);
+    user-select: none;
+    pointer-events: auto;
+}
+
+#shipStatusPanel .ss-card {
+    box-sizing: border-box;
+    /* 0.3.0 打磨：并入飞行界面组件体系 —— 紫描边 + 紫框外 2px 黑外框 + 5px 圆角 */
+    border: 1px solid var(--toolbar-border);
+    box-shadow: 0 0 0 2px #000;
+    border-radius: 5px;
+}
+
+#shipStatusPanel .ss-fuel-card {
+    width: 240px;
+}
+
+#shipStatusPanel .ss-dv-card {
+    width: 180px;                /* 打磨 v13：240 × 3/4，与燃料卡不对齐 */
+}
+
+/* ---- 总 ΔV 卡（贴底）：绿底黑字；耗尽整体切红 ---- */
+#shipStatusPanel .ss-dv-card {
+    background: var(--progress-green);
+    padding: 6px 12px 8px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;     /* 打磨 v7：卡高 +1/2 后内容垂直居中 */
+    gap: 2px;
+    min-height: 65.6px;          /* 打磨 v14：82 × 4/5 */
+}
+
+#shipStatusPanel .ss-dv-card.depleted {
+    background: var(--danger-pure);   /* 打磨 v15：耗尽用大红（原 --danger 粉红不够红） */
+}
+
+#shipStatusPanel .ss-dv-label {
+    color: #000;
+    font-family: var(--font-mono-bold);
+    font-weight: normal;
+    font-size: 12px;
+    letter-spacing: 1px;
+}
+
+#shipStatusPanel .ss-dv-value {
+    color: #000;
+    /* 打磨 v13：180px 卡内宽约 159px，数字降为 22px（11×2 整倍；
+       "1,360,000 m/s" 14 字符 ≈ 202px 会溢出 → JS 降档 .compact 11px） */
+    font-family: var(--font-pixel);
+    font-weight: normal;
+    font-size: 22px;
+    line-height: 1.1;
+    white-space: nowrap;
+}
+
+#shipStatusPanel .ss-dv-value.compact {
+    font-size: 11px;
+}
+
+/* ---- 燃料卡（ΔV 卡上方）：黑底 + 绿色资源条行；展开显示附加信息列 ---- */
+#shipStatusPanel .ss-fuel-card {
+    position: relative;
+    background: #000;
+    padding: 8px 6px 8px 8px;   /* 打磨 v6：右内边距收窄，为 192 宽展开布局让空间 */
+    /* 打磨 v7：卡高 +1/2 后内容垂直居中 */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 68px;            /* 打磨 v9：76 × 0.9 */
+}
+
+#shipStatusPanel .ss-expand-btn {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 18px;
+    height: 15px;
+    padding: 0;
+    line-height: 1;
+    font-size: 9px;
+    background: #000;
+    color: var(--text-mid);
+    border: 1px solid var(--border-dark);
+    border-radius: 3px;
+    cursor: pointer;
+    z-index: 3;
+}
+
+#shipStatusPanel .ss-fuel-card-body {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+}
+
+#shipStatusPanel .ss-details {
+    display: none;               /* 折叠态隐藏，展开时变 flex */
+    flex: 1;
+    flex-direction: column;
+    justify-content: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 2px 4px;
+}
+
+#shipStatusPanel .ss-fuel-card.expanded .ss-details {
+    display: flex;
+}
+
+#shipStatusPanel .ss-detail-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 6px;
+    font-size: 11px;             /* 打磨 v6：192 宽下详情行紧凑化 */
+    white-space: nowrap;
+}
+
+#shipStatusPanel .ss-detail-label {
+    color: var(--text-mid);
+}
+
+/* 展开态数值：项目通用黄色（时间金/价格金） */
+#shipStatusPanel .ss-detail-val {
+    color: var(--ut-gold);
+    font-family: var(--font-mono-bold);
+    font-weight: normal;
+}
+
+/* ---- 引擎图标（样板右端白色图标，emoji 灰化代替） ---- */
+#shipStatusPanel .ss-engine-icon {
+    flex: none;
+    width: 28px;                 /* 打磨 v8：22 × 5/4 */
+    align-self: center;
+    text-align: center;
+    font-size: 22px;             /* 18 × 5/4 */
+    line-height: 1;
+    filter: grayscale(1) brightness(1.6);
+    user-select: none;
+}
+
+#shipStatusPanel .ss-fuel-rows {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+    /* 0.3.0 打磨 v4：条高缩至 3/4 后容器高度不变 —— 面板大小与条组中轴线均不位移 */
+    min-height: 33px;
+    justify-content: center;
+}
+
+/* 展开态：燃料条保留（纯条无数据），收至右侧窄列（打磨 v7 卡宽回 240px，
+   三列可容纳，引擎图标恢复显示） */
+#shipStatusPanel .ss-fuel-card.expanded .ss-fuel-rows {
+    flex: none;
+    width: 72px;                 /* 打磨 v8：图标 +1/4 后收窄，保详情列余量 */
+    justify-content: center;
+}
+
+/* 燃料行 = 进度条本体：空槽灰白（--fuel-track-empty，燃料卡独有）；
+   黑字在灰白空槽与绿块上均清晰，无需低油切白切换；0 量空槽常显 */
+#shipStatusPanel .ss-fuel-row {
+    position: relative;
+    height: 10.5px;
+    border-radius: 4px;
+    overflow: hidden;
+    background: var(--fuel-track-empty);
+}
+
+#shipStatusPanel .ss-fuel-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 0;
+    border-radius: 4px;
+    background: var(--progress-green);
+}
+
+#shipStatusPanel .ss-fuel-name,
+#shipStatusPanel .ss-fuel-val {
+    position: absolute;
+    top: 0;
+    line-height: 10.5px;
+    /* 0.3.0 打磨 v5：燃料类型与数据用项目像素字体（像素对齐标准 11px 整倍） */
+    font-family: var(--font-pixel);
+    font-size: 11px;
+    color: #000;                /* 满油黑字（样板：文字在条内） */
+    white-space: nowrap;
+    z-index: 2;
+}
+
+#shipStatusPanel .ss-fuel-name {
+    left: 6px;
+}
+
+#shipStatusPanel .ss-fuel-val {
+    right: 6px;
+    font-weight: normal;
+}
