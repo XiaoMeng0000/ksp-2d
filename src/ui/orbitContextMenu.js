@@ -32,6 +32,9 @@ const MENU_ITEMS = [
 // 面板底边中点与锚点（轨道点）之间的连接间隙：菱形半径(约10) + 竖线段
 const ANCHOR_GAP = 26;
 
+// 快进至 Ap/Pe 的提前停表余量（秒）：在"距离到达拱点该值时"停止加速，1x 滑行至拱点
+const APE_ARRIVE_MARGIN = 15;
+
 let _menuEl = null;      // 菜单面板
 let _anchorEl = null;    // 锚点层（菱形选择点 + 竖线）
 let _titleEl = null;     // 标题元素（倒计时实时刷新）
@@ -132,8 +135,16 @@ export function showOrbitContextMenu(clientX, clientY, data, canvas) {
                         closeMenu(false);
                         return;
                     }
-                    targetTime = getCachedTime() + mk.tToNext;
-                    targetLabel = t(item.nameKey);
+                    // 优化：目标 = "距离到达拱点 APE_ARRIVE_MARGIN 秒处"——提前停表，1x 滑行至拱点
+                    //（避免到点即停的突兀；不足余量时无需加速）
+                    if (mk.tToNext > APE_ARRIVE_MARGIN) {
+                        targetTime = getCachedTime() + mk.tToNext - APE_ARRIVE_MARGIN;
+                        targetLabel = t(item.nameKey);
+                    } else if (typeof window.showNotification === 'function') {
+                        window.showNotification(t('orbitMenu.apeClose'), 'info');
+                        closeMenu(false);
+                        return;
+                    }
                 }
             } else if (item.action === 'toSoi') {
                 // 快进至引力范围变化：只加速到最近一次 SOI 切换

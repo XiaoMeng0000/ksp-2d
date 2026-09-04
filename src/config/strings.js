@@ -286,6 +286,7 @@ const STRINGS = {
     'orbitMenu.noTime': '该点无到达时间数据，无法定点加速',
     'orbitMenu.apeUnavailable': '到达该拱点前将发生 SOI 切换，暂时不可用',
     'orbitMenu.noSoi': '当前轨道无近期 SOI 切换',
+    'orbitMenu.apeClose': '目标拱点已不足 15 秒，无需加速',
 
     // ---------- 飞船建造 ----------
     'build.title': '飞船建造',
