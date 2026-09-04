@@ -36,6 +36,9 @@ export const textureConfig = {
     icon_soi_enter: 'assets/images/ui/icon_soi_enter.png',
     icon_soi_exit: 'assets/images/ui/icon_soi_exit.png',
 
+    // 飞行状态卡引擎图标（0.3.0，白色单色 SVG 模板稿）
+    icon_engine: 'assets/images/ui/icon_engine.svg',
+
     // tracking station
     icon_tracking_all: 'assets/images/ui/tracking_station/all.svg',
     icon_tracking_ship: 'assets/images/ui/tracking_station/ship_port.svg',

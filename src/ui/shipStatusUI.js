@@ -9,6 +9,7 @@
 
 import { eventBus, Events } from '../eventBus.js';
 import { t } from '../config/strings.js';
+import { renderIconHtml } from './uiComponents.js';
 import { getTotalMass, computeDeltaV, G0 } from '../resources/resourceSystem.js';
 import { getResourceType } from '../resources/resourceTypes.js';
 import { celestialBodies } from '../physics/physics.js';
@@ -29,8 +30,8 @@ fuelCard.innerHTML =
     '<div class="ss-fuel-card-body">' +
     '<div class="ss-details"></div>' +
     '<div class="ss-fuel-rows"></div>' +
-    // 0.3.0 打磨：样板右端引擎图标（原图未画，emoji 灰化占位）
-    '<div class="ss-engine-icon">🚀</div>' +
+    // 0.3.0 打磨：样板右端引擎图标（白色单色 SVG，纹理未就绪回退 emoji）
+    '<div class="ss-engine-icon">' + renderIconHtml('icon_engine', '🚀', 20) + '</div>' +
     '</div>';
 
 // 总 ΔV 卡（静态骨架）
@@ -45,6 +46,7 @@ container.appendChild(dvCard);
 
 let _expanded = false;
 let _lastUpdate = 0;
+let _lastIconHtml = '';   // 引擎图标内容缓存：纹理异步就绪后由 emoji 切换到 SVG img
 
 // 展开/收起（折叠仅隐藏附加信息列，燃料行常显）
 fuelCard.querySelector('[data-action="toggle-expand"]').addEventListener('click', () => {
@@ -146,6 +148,13 @@ function render(ship) {
     renderFuelRows(ship);
     renderDetails(ship);
     renderDeltaVCard(ship);
+    // 0.3.0 修复：引擎图标纹理异步加载，模块构建时 get() 尚不可用会回退 emoji；
+    // 放入刷新循环，内容变化（emoji → SVG img）时才写 DOM，避免静态骨架永驻 emoji
+    const iconHtml = renderIconHtml('icon_engine', '🚀', 20);
+    if (iconHtml !== _lastIconHtml) {
+        _lastIconHtml = iconHtml;
+        fuelCard.querySelector('.ss-engine-icon').innerHTML = iconHtml;
+    }
 }
 
 // 每帧数据广播 → 节流写 DOM（RENDER_DATA 仅飞行场景发射）
