@@ -21,6 +21,7 @@ import {
 import { getResourceType } from '../resources/resourceTypes.js';
 import { celestialBodies } from '../physics/physics.js';
 import { t } from '../config/strings.js';
+import { makePanelDraggable, cascadePanelOpen } from './panelDrag.js';
 
 // EventBus 迁移 — 缓存最近一帧的飞船渲染数据，供 UI 只读函数使用
 let _cachedShipData = null;
@@ -37,31 +38,76 @@ leftToolbar.id = 'leftToolbar';
 leftToolbar.innerHTML = '';
 document.body.appendChild(leftToolbar);
 
-// 统一工具栏 — 动态图标渲染（0.2.7 KSP2 重构：竖排标题 + 裸图标行 + 状态竖条选中态）
-// mode: 'ship' | 'facility' | 'off'
-// data: { modules, shipId } 或 { facilityId } 或 null
-let _activeToolbarId = null;   // 当前已打开入口的图标 id（选中态 = 右侧亮绿条）
+// 已打开面板对应的工具栏图标 id 集合(选中态 = 右侧亮绿条)
+// 0.3.0 多面板并存:图标与"打开的面板"一一挂接,允许多条亮条同时存在
+let _activeToolbarIds = new Set();
+let _panelOpenerIcon = {};   // panelId → 打开该面板的图标 id
 
 function setActiveToolbar(id) {
-    _activeToolbarId = id;
-    leftToolbar.querySelectorAll('.toolbar-item').forEach((el) => {
-        el.classList.toggle('active', el.dataset.toolbarId === id);
-    });
+    if (!id) return;
+    _activeToolbarIds.add(id);
+    syncToolbarActive();
 }
 
 function clearActiveToolbar() {
-    _activeToolbarId = null;
-    leftToolbar.querySelectorAll('.toolbar-item.active').forEach((el) => {
-        el.classList.remove('active');
+    _activeToolbarIds.clear();
+    _panelOpenerIcon = {};
+    syncToolbarActive();
+}
+
+function syncToolbarActive() {
+    // 自愈:静默关闭(模式切换/直接置 display:none 不发 UI_PANEL_CLOSED)的面板,
+    // 其图标亮条一并移除,保证"亮条 = 面板确实打开"
+    for (const [panelId, iconId] of Object.entries(_panelOpenerIcon)) {
+        if (!isPanelOpen(panelId)) {
+            delete _panelOpenerIcon[panelId];
+            _activeToolbarIds.delete(iconId);
+        }
+    }
+    leftToolbar.querySelectorAll('.toolbar-item').forEach((el) => {
+        el.classList.toggle('active', _activeToolbarIds.has(el.dataset.toolbarId));
     });
 }
 
+// 面板是否处于打开状态(图标亮条自愈判断;页面面板按 _pages 注册表查询)
+function isPanelOpen(panelId) {
+    if (panelId === 'shipBuilder' || panelId === 'facilityDeploy') {
+        return uiManager.isPanelVisible(panelId);
+    }
+    return isPageOpen(panelId);
+}
+
+// 工具栏页面面板是否打开(_pages 注册表在模块下方初始化,仅运行时调用)
+function isPageOpen(pageId) {
+    const page = _pages[pageId];
+    return page ? page.el.style.display === 'block' : false;
+}
+
+// 关闭图标对应的面板(0.3.0 图标点击切换语义:页面面板与 uiManager 面板统一入口)
+function closePanel(panelId) {
+    if (panelId === 'shipBuilder' || panelId === 'facilityDeploy') {
+        uiManager.hidePanel(panelId);
+    } else {
+        setPageVisible(panelId, false);
+    }
+}
+
+// 工具栏能力图标 → 面板 id 映射(0.3.0 图标点击切换语义:图标与其面板 1:1)
+const CAPABILITY_PANEL = {
+    deploy_facility: 'facilityDeploy',
+    cargo_hold: 'cargo',
+    scan_resources: 'scan'
+};
+
+// 统一工具栏 — 动态图标渲染（0.2.7 KSP2 重构：竖排标题 + 裸图标行 + 状态竖条选中态）
+// mode: 'ship' | 'facility' | 'off'
+// data: { modules, shipId } 或 { facilityId } 或 null
 function renderToolbarIcons(mode, data) {
     leftToolbar.innerHTML = '';
     if (mode === 'off' || !data) return;
 
     // 图标行：裸图标 + 右侧状态竖条（无方框底，参考图样式）
-    const createIcon = (icon, title, onClick, textureKey, iconId) => {
+    const createIcon = (icon, title, onClick, textureKey, iconId, panelId) => {
         const item = document.createElement('div');
         item.className = 'toolbar-item';
         item.dataset.toolbarId = iconId || '';
@@ -93,9 +139,17 @@ function renderToolbarIcons(mode, data) {
         }
 
         btn.addEventListener('click', () => {
-            // 先执行业务（可能隐藏其他面板 → 触发 UI_PANEL_CLOSED 清除旧选中），再设置新选中
+            // 0.3.0 切换语义:图标与其面板 1:1 映射,点已打开面板的图标 → 关闭该面板
+            if (panelId && isPanelOpen(panelId) && _panelOpenerIcon[panelId] === iconId) {
+                closePanel(panelId);
+                return;
+            }
+            // 否则打开/刷新面板,并记录打开者图标(供关闭时精确熄灭亮条)
             onClick();
-            setActiveToolbar(iconId);
+            if (panelId) {
+                setActiveToolbar(iconId);
+                _panelOpenerIcon[panelId] = iconId;
+            }
         });
 
         const bar = document.createElement('span');
@@ -122,13 +176,13 @@ function renderToolbarIcons(mode, data) {
                     window.openFacilityDeployPanel();
                 } else if (def.capability === 'cargo_hold') {
                     const ship = window.__shipSystem?.getActiveShip();
-                    if (ship) openUtilityPanel(t('cargo.title'), buildShipCargoContent(ship));
+                    if (ship) openPage('cargo', t('cargo.title'), buildShipCargoContent(ship));
                 } else if (def.capability === 'scan_resources') {
                     const ship = window.__shipSystem?.getActiveShip();
-                    if (ship) openUtilityPanel(t('scan.menuTitle'), buildScanContent(ship));
+                    if (ship) openPage('scan', t('scan.menuTitle'), buildScanContent(ship));
                 }
             };
-            createIcon(tb.icon, t(tb.labelKey), onClick, tb.iconId, tb.iconId);
+            createIcon(tb.icon, t(tb.labelKey), onClick, tb.iconId, tb.iconId, CAPABILITY_PANEL[def.capability] || null);
         }
     } else if (mode === 'facility') {
         const facility = facilitySystem.getFacility(data.facilityId);
@@ -144,28 +198,28 @@ function renderToolbarIcons(mode, data) {
             if (comp.id === 'assembly_shop') {
                 createIcon(compIcon, compName, () => {
                     window.openShipBuilder();
-                }, 'comp_' + comp.id, comp.id);
+                }, 'comp_' + comp.id, comp.id, 'shipBuilder');
             } else {
+                // 0.3.0 多面板并存:不再先关闭建造面板,舱室面板与建造面板可同时存在
                 createIcon(compIcon, compName, () => {
-                    uiManager.hidePanel('shipBuilder');
                     openCompartmentPanel(facility, comp.id);
-                }, 'comp_' + comp.id, comp.id);
+                }, 'comp_' + comp.id, comp.id, comp.id);
             }
         }
     }
+    // 0.3.0 多面板并存:重建图标列表后,按当前仍打开的面板同步亮条
+    syncToolbarActive();
 }
 window.renderToolbarIcons = renderToolbarIcons;
 
-// ========== 通用工具面板（0.2.0 阶段5） ==========
-// 复用 toolbarPanel 容器展示非舱室内容（货仓/货物表/模块管理/调拨）
-function openUtilityPanel(title, html) {
-    const panel = document.getElementById('toolbarPanel');
-    const titleEl = document.getElementById('toolbarPanelTitle');
-    const content = document.getElementById('toolbarPanelContent');
-    if (!panel || !content) return;
-    if (titleEl) titleEl.textContent = title;
-    content.innerHTML = html;
-    _setToolbarPanelVisible(true);
+// ========== 工具栏页面面板（0.3.0 重构：每个内容页独立浮层,可并存/拖动/错位） ==========
+// 打开(或刷新)一个工具栏页面面板:页面对应独立 .tkp-page 浮层,互不覆盖 —
+// 货仓/扫描/指令舱/对接枢纽/补给站/实验室/仓储/模块管理/货仓调拨可同时打开
+function openPage(pageId, title, html) {
+    const page = getPage(pageId);
+    page.titleEl.textContent = title;
+    page.contentEl.innerHTML = html;
+    setPageVisible(pageId, true);
 }
 
 // 资源条行（货仓/存储共用）— 0.2.7 v2：名字/数量在条外（条内无文字），空槽常显
@@ -400,7 +454,7 @@ function startFacilityTransfer(fromFacility, resId) {
                         window.showNotification(t('cargo.transferFailed'), 'error');
                     }
                     // 刷新货物表面板
-                    openUtilityPanel(t('facility.storage'), buildFacilityStorageContent(fromFacility));
+                    openPage('storage', t('facility.storage'), buildFacilityStorageContent(fromFacility));
                 }
             );
         }
@@ -463,7 +517,7 @@ function showFacilityModuleSelector(facility, shipId, anchorEl) {
             } else {
                 window.showNotification(t('dock.moduleInstalled', { name: def.name }), 'success');
             }
-            openUtilityPanel(t('dock.moduleManage'), buildModuleManageContent(facilitySystem.getFacility(facility.id), shipId));
+            openPage('moduleManage', t('dock.moduleManage'), buildModuleManageContent(facilitySystem.getFacility(facility.id), shipId));
         }
     });
 }
@@ -547,20 +601,15 @@ function promptTransferAmount(facility, shipId, resId, dir) {
             }
             const updated = facilitySystem.getFacility(facility.id);
             _currentFacility = updated;
-            openUtilityPanel(t('dock.cargoHold'), buildCargoTransferContent(updated, shipId));
+            openPage('cargoTransfer', t('dock.cargoHold'), buildCargoTransferContent(updated, shipId));
         }
     );
 }
 
 // ========== 舱室内容渲染 ==========
 function openCompartmentPanel(facility, compartmentId) {
-    const panel = document.getElementById('toolbarPanel');
-    const title = document.getElementById('toolbarPanelTitle');
-    const content = document.getElementById('toolbarPanelContent');
-    if (!panel || !content) return;
-
     const compDef = getCompartmentDef(compartmentId);
-    if (title) title.textContent = compDef ? compDef.name : compartmentId;
+    const title = compDef ? compDef.name : compartmentId;
 
     let html = '';
     switch (compartmentId) {
@@ -580,8 +629,7 @@ function openCompartmentPanel(facility, compartmentId) {
             html = '<div style="color:var(--text-faint);">' + t('facility.unknownCompartment') + '</div>';
     }
 
-    content.innerHTML = html;
-    _setToolbarPanelVisible(true);
+    openPage(compartmentId, title, html);
 
     // 舱室初始化钩子（绑定事件）
     if (compartmentId === 'dock_hub') bindDockHubEvents(facility);
@@ -687,7 +735,9 @@ function buildDockHubContent(facility) {
 }
 
 function bindDockHubEvents(facility) {
-    const dockBtn = document.getElementById('dockCurrentShipBtn');
+    const page = _pages['dock_hub'];
+    if (!page) return;
+    const dockBtn = page.contentEl.querySelector('#dockCurrentShipBtn');
     if (dockBtn) {
         dockBtn.addEventListener('click', () => {
             const activeShip = window.__shipSystem?.getActiveShip();
@@ -729,11 +779,12 @@ function buildSupplyTerminalContent(facility) {
     return html;
 }
 
-// 扫描菜单进度实时刷新（0.2.0 阶段6）：面板可见且进度区存在时，每 500ms 重算进度条
+// 扫描菜单进度实时刷新（0.2.0 阶段6）：扫描页面可见且进度区存在时，每 500ms 重算进度条
 setInterval(() => {
-    const panel = document.getElementById('toolbarPanel');
-    const section = document.getElementById('scanProgressSection');
-    if (!panel || panel.style.display === 'none' || !section) return;
+    const page = _pages['scan'];
+    if (!page || page.el.style.display === 'none') return;
+    const section = page.contentEl.querySelector('#scanProgressSection');
+    if (!section) return;
     const bodyId = section.dataset.bodyId;
     if (!bodyId) return;
     const p = getScanProgress(bodyId);
@@ -741,13 +792,13 @@ setInterval(() => {
     // （原实现只 return，导致完成后进度条残留、按钮不变回）
     if (p && !p.scanning) {
         const ship = gameState.getActiveShip();
-        if (ship) openUtilityPanel(t('scan.menuTitle'), buildScanContent(ship));
+        if (ship) openPage('scan', t('scan.menuTitle'), buildScanContent(ship));
         return;
     }
     if (!p || !p.scanning) return;
     const pct = p.scanDuration > 0 ? Math.min(100, p.progress / p.scanDuration * 100) : 0;
-    const bar = document.getElementById('scanProgressBar');
-    const text = document.getElementById('scanProgressText');
+    const bar = page.contentEl.querySelector('#scanProgressBar');
+    const text = page.contentEl.querySelector('#scanProgressText');
     if (bar) bar.style.width = pct + '%';
     if (text) {
         const daysLeft = Math.max(0, (p.scanDuration - p.progress) / GAME_DAY_SECONDS);
@@ -834,109 +885,145 @@ window.hideDockPrompt = function() {
     _dockCallback = null;
 };
 
-// 统一工具栏 — 浮层面板（舱室内容显示容器，0.2.7 页头升级为 KSP2 风格 .tkp-header）
-const toolbarPanel = document.createElement('div');
-toolbarPanel.id = 'toolbarPanel';
-toolbarPanel.style.display = 'none';
-toolbarPanel.innerHTML = `
-    <div class="tkp-header">
-        <span id="toolbarPanelTitle" class="tkp-title">${t('facility.typeName')}</span>
-        <button id="toolbarPanelCloseBtn" class="tkp-close">✕</button>
-    </div>
-    <div id="toolbarPanelContent"></div>
-`;
-document.body.appendChild(toolbarPanel);
+// ========== 工具栏页面面板注册表（0.3.0 重构：每个内容页独立 .tkp-page 浮层） ==========
+// 页面 id:货仓 cargo / 扫描 scan / 指令舱 bridge / 对接枢纽 dock_hub /
+// 补给站 supply_terminal / 实验室 laboratory / 仓储 storage /
+// 模块管理 moduleManage / 货仓调拨 cargoTransfer
+// 每页独立实例:可并存打开、页头可拖动、关闭互不影响(不再共用单容器互斥替换)
+const _pages = {};   // pageId → { el, titleEl, contentEl }
 
-const toolbarPanelContentEl = document.getElementById('toolbarPanelContent');
-if (toolbarPanelContentEl) {
-    toolbarPanelContentEl.addEventListener('click', (e) => {
-        const btn = e.target.closest('[data-action]');
-        if (!btn) return;
-        const action = btn.dataset.action;
-        const shipId = btn.dataset.shipId;
-        const resId = btn.dataset.resId;
-        if (action === 'release-control') {
-            releaseShipControl();
-        } else if (action === 'undock-ship') {
-            facilityUndockShip(shipId);
-        } else if (action === 'refuel-ship') {
-            facilityRefuelShip(shipId);
-        } else if (action === 'open-storage') {
-            // 0.2.0 阶段5：指令舱 → 设施货物表
-            if (_currentFacility) openUtilityPanel(t('facility.storage'), buildFacilityStorageContent(_currentFacility));
-        } else if (action === 'transfer-out') {
-            // 0.2.0 阶段5：设施间资源调拨（货物表行内按钮）
-            if (_currentFacility && resId) startFacilityTransfer(_currentFacility, resId);
-        } else if (action === 'module-manage') {
-            // 0.2.0 阶段5：对接枢纽 → 模块管理
-            if (_currentFacility) openUtilityPanel(t('dock.moduleManage'), buildModuleManageContent(_currentFacility, shipId));
-        } else if (action === 'install-module') {
-            if (_currentFacility) showFacilityModuleSelector(_currentFacility, shipId, btn);
-        } else if (action === 'uninstall-module') {
-            if (_currentFacility && btn.dataset.modId) {
-                facilitySystem.removeModuleFromShip(_currentFacility.id, shipId, btn.dataset.modId);
-                const updated = facilitySystem.getFacility(_currentFacility.id);
-                _currentFacility = updated;
-                window.showNotification(t('dock.moduleRemoved'), 'info');
-                openUtilityPanel(t('dock.moduleManage'), buildModuleManageContent(updated, shipId));
-            }
-        } else if (action === 'cargo-transfer') {
-            // 0.2.0 阶段5：对接枢纽 → 货仓调拨（船舱 ↔ 设施存储）
-            if (_currentFacility) openUtilityPanel(t('dock.cargoHold'), buildCargoTransferContent(_currentFacility, shipId));
-        } else if (action === 'load-cargo') {
-            if (_currentFacility) promptTransferAmount(_currentFacility, shipId, resId, 'load');
-        } else if (action === 'unload-cargo') {
-            if (_currentFacility) promptTransferAmount(_currentFacility, shipId, resId, 'unload');
-        } else if (action === 'start-scan') {
-            // 0.2.0 阶段6：开始扫描（失败分支通知提示，含"资源已知"）
-            const ship = window.__shipSystem?.getActiveShip();
-            if (ship && ship.currentSOI) {
-                const result = startScan(ship, ship.currentSOI);
-                if (!result.ok) {
-                    window.showNotification(
-                        t('scan.reason.' + result.reason, { name: ship.currentSOI, tier: getShipScanTier(ship) }),
-                        'warning'
-                    );
-                }
-                openUtilityPanel(t('scan.menuTitle'), buildScanContent(ship));
-            }
-        } else if (action === 'cancel-scan') {
-            const ship = window.__shipSystem?.getActiveShip();
-            cancelScan();
-            if (ship) openUtilityPanel(t('scan.menuTitle'), buildScanContent(ship));
-        } else if (action === 'toggle-res-group') {
-            // 0.2.7 资源分类折叠（DOM class 切换，折叠后仅剩紫色顶头）
-            const card = btn.closest('.tkp-res-group-card');
-            if (card) card.classList.toggle('collapsed');
-        }
+// 惰性创建页面面板(结构与旧 #toolbarPanel 一致,样式走 ksp2_panels.css .tkp-page)
+function getPage(pageId) {
+    let page = _pages[pageId];
+    if (page) return page;
+    const el = document.createElement('div');
+    el.className = 'tkp-page';
+    el.dataset.pageId = pageId;
+    el.style.display = 'none';
+    el.innerHTML = `
+        <div class="tkp-header">
+            <span class="tkp-title"></span>
+            <button class="tkp-close">✕</button>
+        </div>
+        <div class="tkp-page-content"></div>
+    `;
+    document.body.appendChild(el);
+    makePanelDraggable(el, el.querySelector('.tkp-header'));
+    el.querySelector('.tkp-close').addEventListener('click', () => {
+        setPageVisible(pageId, false);
     });
+    el.querySelector('.tkp-page-content').addEventListener('click', onPageContentClick);
+    page = {
+        el,
+        titleEl: el.querySelector('.tkp-title'),
+        contentEl: el.querySelector('.tkp-page-content')
+    };
+    _pages[pageId] = page;
+    return page;
 }
 
-// 工具栏弹出面板显隐辅助：统一控制 display 并广播 UI_PANEL_OPENED/CLOSED
-// 幂等判断避免重复调用重复发声；程序自动隐藏（互斥/场景切换）走静默直接改 display
-function _setToolbarPanelVisible(visible) {
-    const isBlock = toolbarPanel.style.display === 'block';
+// 页面显隐辅助：统一控制 display 并广播 UI_PANEL_OPENED/CLOSED
+// 幂等判断避免重复调用重复发声；程序自动隐藏（场景切换/模式切换）走静默直接改 display
+function setPageVisible(pageId, visible) {
+    const page = _pages[pageId];
+    if (!page) return;
+    const isBlock = page.el.style.display === 'block';
     if (visible) {
         if (!isBlock) {
-            toolbarPanel.style.display = 'block';
-            eventBus.emit(Events.UI_PANEL_OPENED, { panelId: 'toolbarPanel' });
+            page.el.style.display = 'block';
+            eventBus.emit(Events.UI_PANEL_OPENED, { panelId: pageId });
+            // 0.3.0 多面板并存:与其它浮层面板同开时错位,避免完全重叠
+            cascadePanelOpen(page.el);
         }
     } else if (isBlock) {
-        toolbarPanel.style.display = 'none';
-        eventBus.emit(Events.UI_PANEL_CLOSED, { panelId: 'toolbarPanel' });
+        page.el.style.display = 'none';
+        eventBus.emit(Events.UI_PANEL_CLOSED, { panelId: pageId });
     }
 }
 
-document.getElementById('toolbarPanelCloseBtn').addEventListener('click', () => {
-    _setToolbarPanelVisible(false);
-});
-
-// 0.2.7：任何可能经工具栏图标打开的面板关闭时，清除图标选中态（绿条）
-// 覆盖：✕ 关工具栏面板 / 建造面板 / 设施部署面板（uiManager 面板的关闭路径）
-eventBus.on(Events.UI_PANEL_CLOSED, (data) => {
-    if (data && data.panelId && ['toolbarPanel', 'shipBuilder', 'facilityDeploy'].includes(data.panelId)) {
-        clearActiveToolbar();
+// 静默关闭全部页面面板(场景切换用;不发事件,亮条由 clearActiveToolbar 清空)
+function closeAllPages() {
+    for (const pageId of Object.keys(_pages)) {
+        const page = _pages[pageId];
+        if (page.el.style.display !== 'none') {
+            page.el.style.display = 'none';
+        }
     }
+}
+
+// 页面面板内容点击 — data-action 事件委托(每个页面容器各绑一份)
+function onPageContentClick(e) {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const action = btn.dataset.action;
+    const shipId = btn.dataset.shipId;
+    const resId = btn.dataset.resId;
+    if (action === 'release-control') {
+        releaseShipControl();
+    } else if (action === 'undock-ship') {
+        facilityUndockShip(shipId);
+    } else if (action === 'refuel-ship') {
+        facilityRefuelShip(shipId);
+    } else if (action === 'open-storage') {
+        // 0.2.0 阶段5：指令舱 → 设施货物表(独立仓储页面,与指令舱并存)
+        if (_currentFacility) openPage('storage', t('facility.storage'), buildFacilityStorageContent(_currentFacility));
+    } else if (action === 'transfer-out') {
+        // 0.2.0 阶段5：设施间资源调拨（货物表行内按钮）
+        if (_currentFacility && resId) startFacilityTransfer(_currentFacility, resId);
+    } else if (action === 'module-manage') {
+        // 0.2.0 阶段5：对接枢纽 → 模块管理(独立页面,与对接枢纽并存)
+        if (_currentFacility) openPage('moduleManage', t('dock.moduleManage'), buildModuleManageContent(_currentFacility, shipId));
+    } else if (action === 'install-module') {
+        if (_currentFacility) showFacilityModuleSelector(_currentFacility, shipId, btn);
+    } else if (action === 'uninstall-module') {
+        if (_currentFacility && btn.dataset.modId) {
+            facilitySystem.removeModuleFromShip(_currentFacility.id, shipId, btn.dataset.modId);
+            const updated = facilitySystem.getFacility(_currentFacility.id);
+            _currentFacility = updated;
+            window.showNotification(t('dock.moduleRemoved'), 'info');
+            openPage('moduleManage', t('dock.moduleManage'), buildModuleManageContent(updated, shipId));
+        }
+    } else if (action === 'cargo-transfer') {
+        // 0.2.0 阶段5：对接枢纽 → 货仓调拨（船舱 ↔ 设施存储,独立页面与对接枢纽并存）
+        if (_currentFacility) openPage('cargoTransfer', t('dock.cargoHold'), buildCargoTransferContent(_currentFacility, shipId));
+    } else if (action === 'load-cargo') {
+        if (_currentFacility) promptTransferAmount(_currentFacility, shipId, resId, 'load');
+    } else if (action === 'unload-cargo') {
+        if (_currentFacility) promptTransferAmount(_currentFacility, shipId, resId, 'unload');
+    } else if (action === 'start-scan') {
+        // 0.2.0 阶段6：开始扫描（失败分支通知提示，含"资源已知"）
+        const ship = window.__shipSystem?.getActiveShip();
+        if (ship && ship.currentSOI) {
+            const result = startScan(ship, ship.currentSOI);
+            if (!result.ok) {
+                window.showNotification(
+                    t('scan.reason.' + result.reason, { name: ship.currentSOI, tier: getShipScanTier(ship) }),
+                    'warning'
+                );
+            }
+            openPage('scan', t('scan.menuTitle'), buildScanContent(ship));
+        }
+    } else if (action === 'cancel-scan') {
+        const ship = window.__shipSystem?.getActiveShip();
+        cancelScan();
+        if (ship) openPage('scan', t('scan.menuTitle'), buildScanContent(ship));
+    } else if (action === 'toggle-res-group') {
+        // 0.2.7 资源分类折叠（DOM class 切换，折叠后仅剩紫色顶头）
+        const card = btn.closest('.tkp-res-group-card');
+        if (card) card.classList.toggle('collapsed');
+    }
+}
+
+// 0.2.7:任何可能经工具栏图标打开的面板关闭时,清除图标选中态(绿条)
+// 覆盖:✕ 关工具栏页面面板 / 建造面板 / 设施部署面板(uiManager 面板的关闭路径)
+// 0.3.0 多面板并存:只清除"打开该面板的图标"的亮条,其它仍打开的面板保持亮条
+eventBus.on(Events.UI_PANEL_CLOSED, (data) => {
+    if (!data || !data.panelId) return;
+    const openerId = _panelOpenerIcon[data.panelId];
+    if (!openerId) return;
+    delete _panelOpenerIcon[data.panelId];
+    _activeToolbarIds.delete(openerId);
+    syncToolbarActive();
 });
 
 // 飞船建造UI - 场景切换时显示/隐藏工具栏
@@ -950,7 +1037,7 @@ eventBus.on(Events.SCENE_CHANGED, (data) => {
         leftToolbar.style.pointerEvents = 'none';
         uiManager.hidePanel('shipBuilder');
         uiManager.hidePanel('facilityDeploy');
-        toolbarPanel.style.display = 'none';
+        closeAllPages();
         clearActiveToolbar();
         // 兜底隐藏对接提示框，防止场景切换时遗留
         window.hideDockPrompt?.();

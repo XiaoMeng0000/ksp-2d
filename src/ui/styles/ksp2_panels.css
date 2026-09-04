@@ -841,14 +841,14 @@
 }
 
 /* ============================================================
-   第五部分：飞行工具面板（flightUI #toolbarPanel 内容页）
+   第五部分：飞行工具面板（flightUI .tkp-page 内容页）
    0.2.7 新增：模块/舱室内容页统一为 KSP2 分区布局（扫描页样板先行）
    全部引用 --theme-*(theme.css)与 root.css 变量，不新增色值
    结构：页头(.tkp-header) → 分区标题(.tkp-section) → 卡片/行 → 操作区(.tkp-actions)
    ============================================================ */
 
-/* ---- 面板外壳（原 flight.css #toolbarPanel 视觉迁移，保持浮层定位） ---- */
-#toolbarPanel {
+/* ---- 面板外壳（原 flight.css .tkp-page 视觉迁移，保持浮层定位） ---- */
+.tkp-page {
     display: none;
     position: fixed;
     left: 70px;
@@ -868,7 +868,7 @@
 }
 
 /* ---- 页头（对齐开始游戏面板 .sgp-header） ---- */
-#toolbarPanel .tkp-header {
+.tkp-page .tkp-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -878,14 +878,14 @@
     border-radius: 5px;
 }
 
-#toolbarPanel .tkp-title {
+.tkp-page .tkp-title {
     color: var(--text-bright);
     font-family: var(--font-mono-bold);
     font-weight: normal;
     font-size: 14px;
 }
 
-#toolbarPanel .tkp-close {
+.tkp-page .tkp-close {
     height: 26px;
     padding: 0 10px;
     background: var(--theme-btn-bg);
@@ -897,12 +897,12 @@
     cursor: pointer;
 }
 
-#toolbarPanel .tkp-close:hover {
+.tkp-page .tkp-close:hover {
     border-color: var(--theme-border-hover);
 }
 
 /* ---- 分区标题条（// 前缀为纯视觉装饰，文本走 strings；accent 蓝） ---- */
-#toolbarPanel .tkp-section {
+.tkp-page .tkp-section {
     color: var(--accent);
     font-size: 12px;
     letter-spacing: 1px;
@@ -912,13 +912,13 @@
     border-radius: 3px;
 }
 
-#toolbarPanel .tkp-section::before {
+.tkp-page .tkp-section::before {
     content: '// ';
     opacity: 0.7;
 }
 
 /* ---- 大卡片（IdentityCard 式：左图右文） ---- */
-#toolbarPanel .tkp-card {
+.tkp-page .tkp-card {
     background: var(--theme-panel-deep);
     border: none;
     border-radius: 5px;
@@ -926,7 +926,7 @@
 }
 
 /* 次级卡片（分区内的第二级背景，如资源行列表）— 与 .tkp-card 同底，内边距收紧 */
-#toolbarPanel .tkp-card-sm {
+.tkp-page .tkp-card-sm {
     background: var(--theme-panel-deep);
     border: none;
     border-radius: 5px;
@@ -934,14 +934,14 @@
 }
 
 /* ---- 两列网格（信息卡/槽位/飞船卡） ---- */
-#toolbarPanel .tkp-grid {
+.tkp-page .tkp-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 8px;
 }
 
 /* ---- 槽位/飞船卡（视觉统一，布局由使用处内联） ---- */
-#toolbarPanel .tkp-slot {
+.tkp-page .tkp-slot {
     background: var(--theme-panel-deep);
     border: none;
     border-radius: 5px;
@@ -950,7 +950,7 @@
 }
 
 /* 空槽位（虚线框安装按钮） */
-#toolbarPanel .tkp-slot-empty {
+.tkp-page .tkp-slot-empty {
     background: var(--theme-panel);
     border: none;
     border-radius: 5px;
@@ -962,13 +962,13 @@
     text-align: left;
 }
 
-#toolbarPanel .tkp-slot-empty:hover {
+.tkp-page .tkp-slot-empty:hover {
     background: var(--accent-bg);
     color: var(--accent);
 }
 
 /* ---- 信息小卡（label + value） ---- */
-#toolbarPanel .tkp-info {
+.tkp-page .tkp-info {
     background: var(--theme-panel-deep);
     border: none;
     border-radius: 5px;
@@ -979,12 +979,12 @@
     min-width: 0;
 }
 
-#toolbarPanel .tkp-info-label {
+.tkp-page .tkp-info-label {
     color: var(--text-dim);
     font-size: 10px;
 }
 
-#toolbarPanel .tkp-info-value {
+.tkp-page .tkp-info-value {
     color: var(--text-mid);
     font-size: 13px;
     font-weight: bold;
@@ -1142,13 +1142,13 @@
     color: var(--text-dim);
 }
 
-#toolbarPanel .tkp-card-main {
+.tkp-page .tkp-card-main {
     display: flex;
     gap: 14px;
     align-items: flex-start;
 }
 
-#toolbarPanel .tkp-card-icon {
+.tkp-page .tkp-card-icon {
     flex-shrink: 0;
     width: 88px;
     display: flex;
@@ -1156,7 +1156,7 @@
     justify-content: center;
 }
 
-#toolbarPanel .tkp-card-info {
+.tkp-page .tkp-card-info {
     flex: 1;
     min-width: 0;
     display: flex;
@@ -1164,38 +1164,38 @@
     gap: 6px;
 }
 
-#toolbarPanel .tkp-card-title {
+.tkp-page .tkp-card-title {
     color: var(--text-bright);
     font-size: 16px;
     font-family: var(--font-mono-bold);
     font-weight: normal;
 }
 
-#toolbarPanel .tkp-sub {
+.tkp-page .tkp-sub {
     color: var(--text-dim);
     font-size: 10px;
 }
 
-#toolbarPanel .tkp-desc {
+.tkp-page .tkp-desc {
     color: var(--text-main);
     font-size: 12px;
     line-height: 1.6;
 }
 
 /* ---- 数据行（资源/条目列表） ---- */
-#toolbarPanel .tkp-rows {
+.tkp-page .tkp-rows {
     display: flex;
     flex-direction: column;
     gap: 4px;
 }
 
-#toolbarPanel .tkp-row {
+.tkp-page .tkp-row {
     display: flex;
     align-items: center;
     gap: 8px;
 }
 
-#toolbarPanel .tkp-row-label {
+.tkp-page .tkp-row-label {
     width: 80px;
     flex-shrink: 0;
     color: var(--text-mid);
@@ -1206,7 +1206,7 @@
     text-overflow: ellipsis;
 }
 
-#toolbarPanel .tkp-row-value {
+.tkp-page .tkp-row-value {
     flex-shrink: 0;
     color: var(--text-mid);
     font-size: 10px;
@@ -1214,14 +1214,14 @@
 }
 
 /* ---- 操作区按钮（主按钮紫色 = --theme-btn-selected，对齐参考图） ---- */
-#toolbarPanel .tkp-actions {
+.tkp-page .tkp-actions {
     display: flex;
     gap: 8px;
     margin-top: 12px;
 }
 
-#toolbarPanel .tkp-btn,
-#toolbarPanel .tkp-btn-primary {
+.tkp-page .tkp-btn,
+.tkp-page .tkp-btn-primary {
     height: 28px;
     padding: 0 12px;
     box-sizing: border-box;
@@ -1232,40 +1232,40 @@
 }
 
 /* 操作区内的按钮等分；行内小按钮不受影响（不写 flex，布局由使用处控制） */
-#toolbarPanel .tkp-actions .tkp-btn,
-#toolbarPanel .tkp-actions .tkp-btn-primary {
+.tkp-page .tkp-actions .tkp-btn,
+.tkp-page .tkp-actions .tkp-btn-primary {
     flex: 1;
 }
 
-#toolbarPanel .tkp-btn {
+.tkp-page .tkp-btn {
     background: var(--theme-btn-bg);
     color: var(--text-bright);
     border: 1px solid var(--border-light);
 }
 
-#toolbarPanel .tkp-btn:hover {
+.tkp-page .tkp-btn:hover {
     border-color: var(--theme-border-hover);
 }
 
-#toolbarPanel .tkp-btn-primary {
+.tkp-page .tkp-btn-primary {
     background: var(--theme-btn-selected);
     color: var(--text-bright);
     border: 1px solid var(--theme-btn-selected);
 }
 
-#toolbarPanel .tkp-btn-primary:hover {
+.tkp-page .tkp-btn-primary:hover {
     filter: brightness(1.15);
 }
 
 /* ---- 提示小字 ---- */
-#toolbarPanel .tkp-hint {
+.tkp-page .tkp-hint {
     color: var(--warn);
     font-size: 11px;
     text-align: center;
     margin-top: 10px;
 }
 
-#toolbarPanel .tkp-hint-muted {
+.tkp-page .tkp-hint-muted {
     color: var(--text-dim);
     font-size: 10px;
     text-align: center;
@@ -1273,28 +1273,28 @@
 }
 
 /* ---- 扫描进度区（id 供 flightUI setInterval 实时刷新） ---- */
-#toolbarPanel .tkp-progress-wrap {
+.tkp-page .tkp-progress-wrap {
     display: flex;
     flex-direction: column;
     gap: 5px;
     margin-top: 12px;
 }
 
-#toolbarPanel .tkp-progress-head {
+.tkp-page .tkp-progress-head {
     display: flex;
     justify-content: space-between;
     color: var(--text-dim);
     font-size: 10px;
 }
 
-#toolbarPanel .tkp-progress {
+.tkp-page .tkp-progress {
     height: 8px;
     background: var(--theme-panel);
     border-radius: 4px;
     overflow: hidden;
 }
 
-#toolbarPanel .tkp-progress-bar {
+.tkp-page .tkp-progress-bar {
     width: 0;
     height: 100%;
     background: var(--progress-green);
@@ -1304,7 +1304,7 @@
 
 /* ---- 资源分组卡（0.2.7 v2：一个分类一张卡）
    卡头 = 紫色顶条（折叠后仅剩此条）；卡体 = 资源条行列表（名字/数量在条外） ---- */
-#toolbarPanel .tkp-res-group-card {
+.tkp-page .tkp-res-group-card {
     background: var(--theme-bg);
     border: none;
     border-radius: 5px;
@@ -1313,7 +1313,7 @@
     overflow: hidden;
 }
 
-#toolbarPanel .tkp-res-group-head {
+.tkp-page .tkp-res-group-head {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -1327,39 +1327,39 @@
     letter-spacing: 1px;
 }
 
-#toolbarPanel .tkp-res-group-head:hover {
+.tkp-page .tkp-res-group-head:hover {
     filter: brightness(1.1);
 }
 
-#toolbarPanel .tkp-res-group-head .tg-arrow {
+.tkp-page .tkp-res-group-head .tg-arrow {
     font-size: 10px;
     transition: transform 0.15s ease;
 }
 
 /* 折叠：仅剩紫色顶头（参考图截图） */
-#toolbarPanel .tkp-res-group-card.collapsed .tkp-res-group-head .tg-arrow {
+.tkp-page .tkp-res-group-card.collapsed .tkp-res-group-head .tg-arrow {
     transform: rotate(-90deg);
 }
 
-#toolbarPanel .tkp-res-group-card.collapsed .tkp-res-group-body {
+.tkp-page .tkp-res-group-card.collapsed .tkp-res-group-body {
     display: none;
 }
 
-#toolbarPanel .tkp-res-group-body {
+.tkp-page .tkp-res-group-body {
     padding: 8px 10px;
     display: flex;
     flex-direction: column;
 }
 
 /* ---- 资源条行（名字/数量在条外，条内无文字；空槽常显 0 量） ---- */
-#toolbarPanel .tkp-res-row {
+.tkp-page .tkp-res-row {
     display: flex;
     align-items: center;
     gap: 8px;
     padding: 3px 0;
 }
 
-#toolbarPanel .tkp-res-name {
+.tkp-page .tkp-res-name {
     width: 88px;
     flex-shrink: 0;
     color: var(--text-bright);
@@ -1370,7 +1370,7 @@
     text-overflow: ellipsis;
 }
 
-#toolbarPanel .tkp-res-track {
+.tkp-page .tkp-res-track {
     flex: 1;
     height: 10px;
     background: var(--theme-panel);
@@ -1378,13 +1378,13 @@
     overflow: hidden;
 }
 
-#toolbarPanel .tkp-res-fill {
+.tkp-page .tkp-res-fill {
     display: block;
     height: 100%;
     border-radius: 3px;
 }
 
-#toolbarPanel .tkp-res-amount {
+.tkp-page .tkp-res-amount {
     width: 88px;
     flex-shrink: 0;
     color: var(--text-mid);
@@ -1394,7 +1394,7 @@
 }
 
 /* 分组卡体内的行按钮（调拨/装卸） */
-#toolbarPanel .tkp-res-group-body .tkp-btn {
+.tkp-page .tkp-res-group-body .tkp-btn {
     flex: none;
     height: 20px;
     padding: 0 8px;

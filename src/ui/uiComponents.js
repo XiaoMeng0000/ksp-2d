@@ -15,7 +15,7 @@ export function createNotification(message, type = 'info', duration = 2000) {
         document.body.appendChild(container);
     }
 
-    // 堆叠通知 - 创建独立通知元素（边框颜色由类型 class 控制）
+    // 堆叠通知 - 创建独立通知元素（外观由 dialogs.css 统一定义，type 仅作语义标记）
     const div = document.createElement('div');
     div.className = 'ui-notification ui-notification-' + type;
     div.textContent = message;

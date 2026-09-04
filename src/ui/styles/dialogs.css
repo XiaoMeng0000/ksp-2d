@@ -20,35 +20,30 @@
     max-width: 90vw;
 }
 
+/* 统一版式（2026-09 决策）：所有类型一律 深黑实底 + 左侧黄竖条、无边框；
+   type class 保留在 DOM 中，仅作语义标记（success/error/warning/info 外观一致）
+   布局策略：盒子收缩到内容宽（fit-content），长文本在 480px 舒适行宽内换行，
+   文本居中 + 1.5 行距，避免"文字占满盒子/横跨屏幕"与多行拥挤 */
 .ui-notification {
     position: relative;
-    background: var(--panel-bg);
+    background: #0D0D0D;
     border-radius: 3px;
-    padding: 8px 16px;
+    padding: 10px 20px;
     color: var(--text-bright);
     font-family: var(--font-mono);
     font-size: 12px;
+    line-height: 1.5;
     opacity: 0;
     transition: all 0.3s ease;
     pointer-events: none;
     text-align: center;
-    max-width: 80vw;
+    width: fit-content;
+    max-width: min(480px, calc(100vw - 48px));
     min-width: 120px;
+    overflow-wrap: anywhere;
 }
 
-.ui-notification-success {
-    background-color: #0D0D0D;
-}
-
-.ui-notification-error {
-    border: 1px solid var(--danger);
-}
-
-.ui-notification-info {
-    background-color: #0D0D0D;
-}
-
-.ui-notification-info::after {
+.ui-notification::after {
     content: "";
     background-color: #FFD54F;
     position: absolute;
@@ -56,10 +51,6 @@
     left: 10px;
     width: 5px;
     height: calc(100% - 10px);
-}
-
-.ui-notification-warning {
-    border: 1px solid var(--warn);
 }
 
 /* ---- ESC 菜单 ----

@@ -5,6 +5,7 @@ import { eventBus, Events } from '../eventBus.js';
 import { getFacilityType, getFacilityCompartments, getFacilityCategories, getFacilitiesByCategory, getServiceName } from '../facility/facilityTypes.js';
 import { textureManager } from '../graphics/textureManager.js';
 import { renderIconHtml } from './uiComponents.js';
+import { makePanelDraggable, cascadePanelOpen } from './panelDrag.js';
 import { t } from '../config/strings.js';
 
 // 设施部署面板 — 设施类型选择面板
@@ -26,6 +27,9 @@ facilityDeployPanel.innerHTML = `
     </div>
 `;
 document.body.appendChild(facilityDeployPanel);
+
+// 部署面板 — 页头可拖动(panelDrag.js 共享工具)
+makePanelDraggable(facilityDeployPanel, facilityDeployPanel.querySelector('.ui-panel-header'));
 
 // 设施部署 - 事件委托（避免字符串 onclick）
 facilityDeployPanel.addEventListener('click', (e) => {
@@ -161,9 +165,10 @@ window.openFacilityDeployPanel = function() {
     selectedFacilityTypeId = null;
     document.getElementById('facilityDeployDetail').innerHTML =
         '<div>' + t('facility.deployHint') + '</div>';
-    const tp = document.getElementById('toolbarPanel');
-    if (tp) tp.style.display = 'none';
+    // 0.3.0 多面板并存:不再关闭工具栏面板,部署/舱室/建造可同时打开
     uiManager.showPanel('facilityDeploy');
+    // 0.3.0 多面板并存:与其它浮层面板同开时错位,避免完全重叠
+    cascadePanelOpen(facilityDeployPanel);
 };
 
 // 设施部署面板 — 注册到 uiManager

@@ -1032,9 +1032,10 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 if (typeof window.renderToolbarIcons === 'function') {
                     window.renderToolbarIcons(nextMode, nextData);
                 }
-                // 模式切换时关闭弹出面板
-                const panel = document.getElementById('toolbarPanel');
-                if (panel) panel.style.display = 'none';
+                // 模式切换时关闭弹出页面面板（0.3.0:页面为多实例 .tkp-page）
+                for (const el of document.querySelectorAll('.tkp-page')) {
+                    el.style.display = 'none';
+                }
             }
 
             // SAS UI 渲染（仅在有活动飞船时显示）

@@ -8,6 +8,7 @@ import { getModuleDef } from '../ship/moduleTypes.js';
 import { stateToKepler } from '../physics/orbitalMechanics.js';
 import { textureManager } from '../graphics/textureManager.js';
 import { renderIconHtml, showModuleSelectorPopup } from './uiComponents.js';
+import { makePanelDraggable, cascadePanelOpen } from './panelDrag.js';
 import { sceneManager } from '../sceneManager.js';
 import { consumeStorage } from '../resources/cargoSystem.js';
 import { t } from '../config/strings.js';
@@ -46,6 +47,9 @@ shipBuilderPanel.innerHTML = `
     </div>
 `;
 document.body.appendChild(shipBuilderPanel);
+
+// 建造面板 — 页头可拖动(panelDrag.js 共享工具)
+makePanelDraggable(shipBuilderPanel, shipBuilderPanel.querySelector('.ui-panel-header'));
 
 // 飞船建造 - 事件委托（避免字符串 onclick）
 shipBuilderPanel.addEventListener('click', (e) => {
@@ -385,10 +389,10 @@ window.openShipBuilder = function() {
     document.getElementById('shipBuilderStats').innerHTML = 
         '<div>' + t('build.selectHint') + '</div>';
     document.getElementById('shipBuilderSlots').innerHTML = '';
-    // 关闭 toolbarPanel（与 shipBuilderPanel 互斥）
-    const tp = document.getElementById('toolbarPanel');
-    if (tp) tp.style.display = 'none';
+    // 0.3.0 多面板并存:不再关闭工具栏面板,建造/舱室/部署可同时打开
     uiManager.showPanel('shipBuilder');
+    // 0.3.0 多面板并存:与其它浮层面板同开时错位,避免完全重叠
+    cascadePanelOpen(shipBuilderPanel);
 };
 
 // 飞船建造UI - 注册到 uiManager

@@ -283,6 +283,32 @@ textarea,
     background: var(--accent-bg);
 }
 
+/* ============================================================
+   面板拖动(panelDrag.js 共享工具):
+   .drag-handle = 页头拖动手柄(模块自动加该类);
+   拖动中全局禁止文本选中并显示抓取光标
+   ============================================================ */
+.drag-handle {
+    cursor: grab;
+    touch-action: none;
+}
+
+.drag-handle:active {
+    cursor: grabbing;
+}
+
+body.panel-drag-active,
+body.panel-drag-active * {
+    cursor: grabbing !important;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.panel-dragging {
+    user-select: none;
+    -webkit-user-select: none;
+}
+
 /* 通用卡片/数据行 */
 .ui-card {
     background: var(--card-bg);

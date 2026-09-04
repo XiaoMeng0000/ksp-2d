@@ -32,8 +32,9 @@ src/
 ├── ui/                     # UI 模块,按功能一文件
 │   ├── uiManager.js        # 面板注册/显隐管理器
 │   ├── uiComponents.js     # 通用组件:对话框/通知/确认框/图标渲染
+│   ├── panelDrag.js        # 面板拖动工具(共享,浮层面板页头拖动)
 │   ├── menuUI.js           # ESC 菜单 + 存档管理 + 全局通知桥
-│   ├── flightUI.js         # 左侧工具栏 + 设施舱室面板 + 对接提示
+│   ├── flightUI.js         # 左侧工具栏 + 工具栏页面面板(多实例并存) + 对接提示
 │   ├── timeWarpUI.js       # 时间加速面板(常驻 HUD)
 │   ├── sasUI.js            # 导航球/SAS 圆盘/可见性筛选(Canvas+DOM 混合)
 │   ├── shipBuilderUI.js    # 飞船建造面板
@@ -82,6 +83,7 @@ src/
 .ui-panel / .ui-panel-header / .ui-panel-title   面板骨架
 .ui-btn / .ui-btn-sm / .ui-btn-danger / .ui-btn-primary   按钮四型
 .ui-card / .ui-hint / .ui-divider / .ui-label / .ui-value  数据展示
+.drag-handle  页头拖动手柄(panelDrag.js 自动加,拖动中 body.panel-drag-active)
 ```
 
 **4.3 按场景拆分的 CSS 文件**(新增 UI 时按归属落位):
@@ -90,9 +92,9 @@ src/
 |----------|------|--------------------|
 | `main_menu.css` | 主菜单 | `#mainMenuContainer` / `.mm-*` |
 | `dialogs.css` | 通知 / 存档管理面板（0.2.6 对话框组件迁入 ksp2_panels.css） | `.ui-notification*` / `#archiveManagerPanel` |
-| `ksp2_panels.css` | KSP2 覆盖式面板：设置页 / 开始游戏面板 / 通用对话框组件 / 游戏百科（0.2.7 面板化）/ 公告栏（0.2.8 面板化，复用 .enc-* 结构）（0.2.6 由 settings.css + start_game.css 合并，并迁入 uiComponents 对话框样式） | `#settings*` / `.settings-*` / `#startGamePanel` / `.sgp-*` / `#newCampaignDialog` / `.nc-*` / `.ui-dialog*` / `.ui-list*` / `.ui-input` / `#encyclopediaPanel` / `#infoScenePanel` / `.enc-*` |
+| `ksp2_panels.css` | KSP2 覆盖式面板：设置页 / 开始游戏面板 / 通用对话框组件 / 游戏百科（0.2.7 面板化）/ 公告栏（0.2.8 面板化，复用 .enc-* 结构）/ 工具栏页面面板（0.3.0 多实例 `.tkp-page`，飞行工具内容页）（0.2.6 由 settings.css + start_game.css 合并，并迁入 uiComponents 对话框样式） | `#settings*` / `.settings-*` / `#startGamePanel` / `.sgp-*` / `#newCampaignDialog` / `.nc-*` / `.ui-dialog*` / `.ui-list*` / `.ui-input` / `#encyclopediaPanel` / `#infoScenePanel` / `.enc-*` / `.tkp-page` |
 | `tracking.css` | 追踪站 | `#tracking*` / `.tracking-*` |
-| `flight.css` | 飞行 HUD | `#leftToolbar` / `#toolbarPanel` / `#timeWarp*` / `#sasBottomButtons` / `#visibilityPanel` |
+| `flight.css` | 飞行 HUD | `#leftToolbar` / `#timeWarp*` / `#sasBottomButtons` / `#visibilityPanel`(工具栏页面面板样式在 ksp2_panels.css `.tkp-page`) |
 | `ship_builder.css` | 飞船建造 | `#shipBuilderPanel` / `.builder-*` |
 | `facility.css` | 设施部署 | `#facilityDeployPanel` / `.deploy-*` |
 | `scenes.css` | 星系图鉴 / 版权声明 / 制作人员（公告栏 0.2.8 面板化迁入 ksp2_panels.css） | `.scene-fullscreen` / `.galaxies-*` / `.doc-*` |
