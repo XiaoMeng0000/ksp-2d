@@ -671,24 +671,18 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             let warpMaxIndex = timeWarp.getMaxIndex();
             if (activeShip && activeShip.throttle > 0) {
                 warpMaxIndex = timeWarp.getPhysicsMaxIndex();
-            } else if (getSOIWarpProtectEnabled()) {
+            } else if (activeShip && getSOIWarpProtectEnabled()) {
                 // SOI 切换时间保护（替代旧"≥99% 半径 → 限 100x"距离制）：
-                // 与追踪站同口径——全部飞船按"到下一次 SOI 切换剩余时间 T"限档，
-                // 取最早切换者（最严）；保护最高档 = ≤T 的最大档位。
+                // 仅活动飞船按"到下一次 SOI 切换剩余时间 T"限档（保护最高档 = ≤T 的最大档位）；
+                // 非活动飞船即将切 SOI 不触发降档（与追踪站一致）。
                 // 深空/无解析轨道/永不切换返回 null → 不限档；设置 → 游戏 可关闭
                 //（关闭后放开全部档位，物理加速/RK4 兜底限档不受影响）
-                let tSwitchMin = Infinity;
-                for (const s of allShips) {
-                    const warpHost = s.currentSOI
-                        ? celestialBodies.find(b => b.name === s.currentSOI)
-                        : null;
-                    const tSwitch = timeToNextSOISwitch(s, warpHost);
-                    if (tSwitch !== null && tSwitch < tSwitchMin) {
-                        tSwitchMin = tSwitch;
-                    }
-                }
-                if (isFinite(tSwitchMin)) {
-                    warpMaxIndex = Math.min(warpMaxIndex, timeWarp.getSOIProtectMaxIndex(tSwitchMin));
+                const warpHost = activeShip.currentSOI
+                    ? celestialBodies.find(b => b.name === activeShip.currentSOI)
+                    : null;
+                const tSwitch = timeToNextSOISwitch(activeShip, warpHost);
+                if (tSwitch !== null) {
+                    warpMaxIndex = Math.min(warpMaxIndex, timeWarp.getSOIProtectMaxIndex(tSwitch));
                 }
             }
             // 病态区间限档：任一飞船/设施处于"无解析轨道且受引力"（RK4 兜底积分）时，
