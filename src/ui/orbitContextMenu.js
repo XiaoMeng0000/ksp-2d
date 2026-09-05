@@ -14,7 +14,7 @@ import { eventBus, Events } from '../eventBus.js';
 import { getCachedTime, bodyFuturePos } from '../physics/orbitalPrediction.js';
 import { celestialBodies } from '../physics/physics.js';
 import { formatGameDurationLong } from '../utils/format.js';
-import { worldToScreen } from '../camera.js';
+import { worldToScreen, canvasToCss } from '../camera.js';
 import { timeWarp } from '../timeWarp.js';
 import { shipSystem } from '../ship/shipSystem.js';
 import { timeToNextSOISwitch } from '../physics/orbitalPrediction.js';
@@ -255,8 +255,11 @@ export function updateOrbitContextMenu(canvas) {
         wy = anchor.y + _menuData.relY;
     }
     const s = worldToScreen(wx, wy, canvas);
-    const ax = s.x;
-    const ay = s.y;
+    // 0.2.5（高清屏）：锚点/竖线是 DOM 元素（CSS 像素定位），画布物理坐标统一转 CSS；
+    // 出屏判断与钳制一律用视口 CSS 尺寸（window.inner*），不再使用画布物理尺寸
+    const cssPt = canvasToCss(s.x, s.y, canvas);
+    const ax = cssPt.x;
+    const ay = cssPt.y;
     const w = _menuEl.offsetWidth || 200;
     const h = _menuEl.offsetHeight || 230;
 
@@ -267,8 +270,8 @@ export function updateOrbitContextMenu(canvas) {
     if (flip) {
         top = ay + ANCHOR_GAP;
     }
-    const viewW = (canvas && canvas.width) || window.innerWidth;
-    const viewH = (canvas && canvas.height) || window.innerHeight;
+    const viewW = window.innerWidth;
+    const viewH = window.innerHeight;
     left = Math.max(4, Math.min(left, viewW - w - 4));
     top = Math.max(4, Math.min(top, viewH - h - 4));
     _menuEl.style.left = left + 'px';

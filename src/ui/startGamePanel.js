@@ -276,11 +276,17 @@ function importWorldFile(file) {
 
 // 导入落地：成功后停留在面板，自动选中导入的世界与其第一个检查点
 function commitImport(world, nameOverride) {
-    const worldId = saveManager.commitImportedWorld(world, nameOverride);
-    if (!worldId) {
-        window.showNotification(t('startgame.importFailedInvalid'), 'error');
+    const result = saveManager.commitImportedWorld(world, nameOverride);
+    if (!result || !result.ok) {
+        // 0.2.5：区分失败原因提示（存储写入失败 → 专用文案，绝不"假成功"）
+        const reason = result ? result.reason : 'invalid';
+        const msg = reason === 'system' ? t('startgame.importFailedSystem')
+            : reason === 'storage' ? t('startgame.importFailedStorage')
+            : t('startgame.importFailedInvalid');
+        window.showNotification(msg, 'error');
         return;
     }
+    const worldId = result.worldId;
     _selectedWorldId = worldId;
     const cps = saveManager.getCheckpointList(worldId);
     _selectedCheckpointId = cps.length > 0 ? cps[0].id : null;

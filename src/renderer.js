@@ -85,20 +85,22 @@ function renderBodyLayers(ctx, cx, cy, drawRadius, layers) {
  * 生成天空盒星空（屏幕空间固定背景）
  * @param {number} canvasWidth - 画布物理像素宽度
  * @param {number} canvasHeight - 画布物理像素高度
+ * @param {number} [dpr=1] - 设备像素比（星点半径/边缘余量按物理像素放大，保持视觉尺寸与密度恒定）
  */
-function createStars(canvasWidth, canvasHeight) {
+function createStars(canvasWidth, canvasHeight, dpr = 1) {
     const cfg = STARFIELD_CONFIG;
+    const pr = dpr || 1;
     // 按屏幕面积（含边缘余量）计算星数，限制在 [minCount, maxCount] 防失控
-    const totalArea = (canvasWidth + cfg.margin * 2) * (canvasHeight + cfg.margin * 2);
+    const totalArea = (canvasWidth + cfg.margin * 2 * pr) * (canvasHeight + cfg.margin * 2 * pr);
     const count = Math.round(totalArea / cfg.density);
     const n = Math.max(cfg.minCount, Math.min(cfg.maxCount, count));
 
     stars = [];
     for (let i = 0; i < n; i++) {
         stars.push({
-            x: Math.random() * (canvasWidth + cfg.margin * 2) - cfg.margin,
-            y: Math.random() * (canvasHeight + cfg.margin * 2) - cfg.margin,
-            radius: cfg.radiusRange.min + Math.random() * (cfg.radiusRange.max - cfg.radiusRange.min),
+            x: Math.random() * (canvasWidth + cfg.margin * 2 * pr) - cfg.margin * pr,
+            y: Math.random() * (canvasHeight + cfg.margin * 2 * pr) - cfg.margin * pr,
+            radius: (cfg.radiusRange.min + Math.random() * (cfg.radiusRange.max - cfg.radiusRange.min)) * pr,
             brightness: cfg.brightnessRange.min + Math.random() * (cfg.brightnessRange.max - cfg.brightnessRange.min),
             color: cfg.colors[Math.floor(Math.random() * cfg.colors.length)],
             // 闪烁参数：随机相位 + 周期 + 振幅

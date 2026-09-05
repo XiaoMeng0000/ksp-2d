@@ -20,6 +20,7 @@ import { ORBIT_POINT_TYPES } from '../config/orbitPointTypes.js';
 import { formatGameDurationLong, formatMeters } from '../utils/format.js';
 import { textureManager } from '../graphics/textureManager.js';
 import { escapeHtml } from './uiComponents.js';
+import { canvasToCss } from '../camera.js';
 
 let _container = null;
 let _hoveredTypes = new Set();   // 悬停临时展开的标签 key 集合（key = m.id || m.type）
@@ -119,11 +120,11 @@ export function clearOrbitLabels() {
 
 /**
  * 同步轨道标签 DOM：与 markers 列表全量对齐（创建缺失 / 更新已有 / 移除多余）
- * 坐标为视口 CSS 像素（markers.bodyX/bodyY 由 renderer 按锚点偏移计算）
  * @param {Array} markers - renderOrbitMarkers 产出
  *   [{ id, type, bodyX, bodyY, icon, label, value, tToNext, arrivalUt, statusText, isHover }]；
  *   id 为实例唯一标识（SOI 标签同 type 可出现多次），空数组/null 清空全部
- * @param {HTMLCanvasElement} canvas - 保留签名对称，当前坐标已为视口系，不使用
+ *   bodyX/bodyY 为画布物理像素（0.2.5：与 Canvas 锚点同空间），此处转 CSS 后定位 DOM
+ * @param {HTMLCanvasElement} canvas - 供物理像素 → 视口 CSS 像素换算（0.2.5 高清屏）
  */
 export function syncOrbitLabels(markers, canvas) {
     if (!markers || markers.length === 0) {
@@ -198,7 +199,9 @@ export function syncOrbitLabels(markers, canvas) {
         el.classList.toggle('expanded', isExpanded(key));
 
         // 坐标同步：锚点偏移后的本体位置（fixed 容器 0,0 + transform 平移）
-        el.style.transform = 'translate(' + Math.round(m.bodyX) + 'px,' + Math.round(m.bodyY) + 'px)';
+        // 0.2.5：markers 坐标为画布物理像素，经 canvasToCss 统一转 CSS 后定位（DPR≠1 时不再偏移）
+        const cssPt = canvasToCss(m.bodyX, m.bodyY, canvas);
+        el.style.transform = 'translate(' + Math.round(cssPt.x) + 'px,' + Math.round(cssPt.y) + 'px)';
         // 0.3.0：标签本体悬停高亮已去除（isHover 数据流保留，供未来交互使用）
     }
 }

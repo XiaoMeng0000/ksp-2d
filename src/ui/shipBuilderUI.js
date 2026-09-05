@@ -5,12 +5,9 @@ import { eventBus, Events } from '../eventBus.js';
 import { SHIP_TEMPLATES } from '../ship/shipTemplates.js';
 import { SHIP_CATEGORIES } from '../ship/shipCategories.js';
 import { getModuleDef } from '../ship/moduleTypes.js';
-import { stateToKepler } from '../physics/orbitalMechanics.js';
 import { textureManager } from '../graphics/textureManager.js';
 import { renderIconHtml, showModuleSelectorPopup } from './uiComponents.js';
 import { makePanelDraggable, cascadePanelOpen } from './panelDrag.js';
-import { sceneManager } from '../sceneManager.js';
-import { consumeStorage } from '../resources/cargoSystem.js';
 import { t } from '../config/strings.js';
 
 // EventBus 迁移 — 缓存最近一帧的飞船渲染数据，供 UI 只读函数使用
@@ -297,89 +294,46 @@ function renderShipBuilderSlots() {
 }
 
 // 飞船建造UI - 建造按钮（完整闭环）
+// 0.2.5 决策⑤：出生逻辑统一走 facilitySystem.buildShip（唯一入口：扣费→创建→失败退款→
+// 新船出生在船坞旁伴飞）；本函数只负责 UI 收尾 + 立即切换到新船控制。
+// 旧"手填轨道半径绕家园行星"的出生流程已删除（半径危险校验问题随之消失）。
 function buildShip() {
     if (!selectedShip) {
         window.showNotification(t('build.selectShipFirst'), 'warning');
         return;
     }
 
-    // 获取起始天体数据
-    const bodies = window.__celestialBodies || [];
-    const homeworld = bodies.find(b => b.isHomeworld);
-    if (!homeworld) {
-        window.showNotification(t('build.noHomeBody'), 'error');
+    // 建造必须在受控船坞的装配车间进行（扣费来源 = 当前受控设施存储）
+    const facility = window.__getControlledFacility ? window.__getControlledFacility() : null;
+    if (!facility) {
+        window.showNotification(t('build.noFacility'), 'error');
         return;
     }
 
-    const defaultOrbitR = homeworld.radius + (homeworld.defaultOrbitAltitude || 0);
+    const shipName = t('build.shipNameSuffix', { name: selectedShip.name });
+    const installedModules = selectedModules.filter(m => m !== null);
 
-    // 弹出轨道高度输入框
-    window.__createInputDialog(
-        t('build.chooseAltitude'),
-        t('build.altitudePrompt', { name: homeworld.name }),
-        String(defaultOrbitR),
-        (radiusStr) => {
-            const radius = parseFloat(radiusStr);
-            if (isNaN(radius) || radius <= 0) {
-                window.showNotification(t('build.invalidNumber'), 'error');
-                return;
-            }
-
-            // 计算速度和位置（圆形轨道）
-            const orbitalSpeed = Math.sqrt(homeworld.gm / radius);
-            // 顺行（逆时针，与天体公转同向）：pos 在 +x 时速度应沿 +y
-            const vel = { x: 0, y: orbitalSpeed };
-
-            // 创建飞船实例
-            const shipName = t('build.shipNameSuffix', { name: selectedShip.name });
-            const installedModules = selectedModules.filter(m => m !== null);
-            // 0.2.0 阶段5：建造扣费从当前设施存储扣（全局资源已退场，只留科技点）
-            const moduleCost = installedModules.reduce((sum, id) => {
-                const def = getModuleDef(id);
-                return sum + ((def && def.price) || 0);
-            }, 0);
-            const totalCost = (selectedShip.cost || 0) + moduleCost;
-            const facility = window.__getControlledFacility ? window.__getControlledFacility() : null;
-            if (!facility) {
-                window.showNotification(t('build.noFacility'), 'error');
-                return;
-            }
-            if (!consumeStorage(facility, 'materialKits', totalCost)) {
-                window.showNotification(t('economy.insufficientKits'), 'error');
-                return;
-            }
-
-            const newShip = window.__shipSystem.createShip(selectedShip.id, shipName, installedModules);
-            if (!newShip) {
-                window.showNotification(t('build.createFailed'), 'error');
-                return;
-            }
-
-            // 设置初始轨道状态（pos 为相对宿主坐标）
-            newShip.pos = { x: radius, y: 0 };
-            newShip.vel = { x: vel.x, y: vel.y };
-            newShip.currentSOI = homeworld.name;
-            newShip.currentGM = homeworld.gm;
-            newShip.kepler = stateToKepler(newShip.pos, vel, homeworld.gm);
-            newShip.orbitTime = 0;
-            newShip.mode = 'on_rails';
-
-            // 持久化并切换活动飞船
-            window.__shipSystem.persistShip(newShip);
-            window.__shipSystem.switchShip(newShip.id);
-
-            // 模块系统 - 建造完成后重置模块选择
-            selectedModules = [];
-
-            // 关闭建造面板，切换到飞行场景
-            uiManager.hidePanel('shipBuilder');
-            window.showNotification(t('build.launched'), 'success');
-            sceneManager.switchTo('flight');
-        },
-        () => {
-            window.showNotification(t('build.cancelled'), 'info');
+    const result = window.__facilitySystem.buildShip(facility.id, selectedShip.id, shipName, installedModules);
+    if (!result || !result.ok) {
+        // 失败原因分类提示（材料不足 / 模板异常等）；扣费失败/退款均由 facilitySystem 闭环
+        const reason = result ? result.reason : 'createFailed';
+        if (reason === 'insufficientKits') {
+            window.showNotification(t('economy.insufficientKits'), 'error');
+        } else {
+            window.showNotification(t('build.createFailed'), 'error');
         }
-    );
+        return;
+    }
+
+    // 0.2.5：立即切换到新船控制（相机与工具栏由飞行场景下一帧自动跟随）
+    window.__shipSystem.switchShip(result.ship.id);
+
+    // 模块系统 - 建造完成后重置模块选择
+    selectedModules = [];
+
+    // 关闭建造面板，保持在飞行场景
+    uiManager.hidePanel('shipBuilder');
+    window.showNotification(t('build.launched'), 'success');
 }
 
 // 飞船建造UI - 打开建造界面

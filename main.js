@@ -84,10 +84,12 @@ let lastTime = 0;
 let frameCount = 0;
 
 function resize() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    // 星空为屏幕空间天空盒，需按画布尺寸重新铺满
-    createStars(canvas.width, canvas.height);
+    // 高清屏（0.2.5）：缓冲按物理像素创建，画面锐利；所有 CSS↔画布换算统一走 camera.js 的 cssToCanvas/canvasToCss
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(window.innerWidth * dpr);
+    canvas.height = Math.round(window.innerHeight * dpr);
+    // 星空为屏幕空间天空盒，需按画布尺寸重新铺满（dpr 用于星点半径保持视觉尺寸）
+    createStars(canvas.width, canvas.height, dpr);
 }
 
 function gameLoop(timestamp) {
@@ -374,13 +376,16 @@ window.applyNewGameCreation = function(name, starSystems) {
     if (homeworld) {
         // Bug修复 — 船坞与初始飞船使用同一轨道半径，避免旧硬编码 70m 使船坞埋在行星内部
         const dockyardOrbitR = homeworld.radius + (homeworld.defaultOrbitAltitude || 0);
+        // 0.2.5 — 船坞与开局飞船错开微小角度（同轨但不同相位），消除出生重叠的观感问题
+        const dockAngle = 0.01;
         const dockyardPos = {
-            x: homeworld.position.x + dockyardOrbitR,
-            y: homeworld.position.y
+            x: homeworld.position.x + dockyardOrbitR * Math.cos(dockAngle),
+            y: homeworld.position.y + dockyardOrbitR * Math.sin(dockAngle)
         };
+        const dockV = Math.sqrt(homeworld.gm / dockyardOrbitR);
         const dockyardVel = {
-            x: 0,
-            y: Math.sqrt(homeworld.gm / dockyardOrbitR)  // 顺行：pos 在 +x 时速度沿 +y
+            x: -dockV * Math.sin(dockAngle),  // 顺行圆轨：速度沿切向（与径向垂直）
+            y: dockV * Math.cos(dockAngle)
         };
         facilitySystem.createFacility(
             'orbital_dockyard',
@@ -415,9 +420,9 @@ window.applyNewGameCreation = function(name, starSystems) {
         sceneManager.switchTo('flight');
         window.showNotification(t('newgame.success'), 'success');
     } else {
-        // 名称冲突 — 回滚已创建的飞船/设施，不切场景
+        // 失败（名称冲突 / 存储写入失败）— 具体原因通知已在 createWorld 内部弹出，
+        // 此处只回滚已创建的飞船/设施，不切场景
         gameState.reset();
-        window.showNotification(t('newgame.nameExists'), 'error');
     }
     return worldId;
 };

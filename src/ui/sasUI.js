@@ -148,19 +148,27 @@ class SASUI {
         this._bottomVisible = undefined; // 按钮框当前显隐（避免每帧重复写 DOM）
         this._bottomLastPos = null;     // 上次定位 key（避免每帧改 style）
         this._bottomLastSas = -1;       // 上次 SAS 激活态（避免每帧改 style）
+        this._dpr = 1;                  // 物理/逻辑像素比（0.2.5 高清屏：渲染时 CSS 布局坐标 → 物理缓冲）
     }
 
     // ========== 布局 ==========
 
     /**
      * 每帧根据 canvas 尺寸重算导航球 / SAS 圆盘圆心与缩放
+     * 0.2.5（高清屏）：布局统一用「CSS 像素」口径（DOM 定位与鼠标命中同空间）；
+     * 渲染时整体 ctx.scale(dpr) 映射到画布物理像素（见 render）。
      * @param {HTMLCanvasElement} canvas
      */
     updateLayout(canvas) {
+        // CSS 尺寸：clientWidth/Height 即画布布局尺寸（CSS px），不受 DPR 影响
+        const cssW = canvas.clientWidth || (canvas.width / (window.devicePixelRatio || 1));
+        const cssH = canvas.clientHeight || (canvas.height / (window.devicePixelRatio || 1));
+        // 物理/逻辑比例：渲染时把 CSS 布局坐标映射到画布物理缓冲
+        this._dpr = cssW > 0 ? canvas.width / cssW : 1;
         // 缩放下限 0.15：canvas 尺寸为 0/极小的瞬间（预览面板 resize 等）会算得 _scale=0，
         // 导致导航球装饰环 R-21/R-23 等硬编码偏移变成负半径，ctx.arc 抛 IndexSizeError。
         // 下限 0.15 保证 R=175×0.15=26.25 > 23，所有装饰偏移均为正。
-        this._scale = Math.max(0.15, Math.min(canvas.width / 1920, canvas.height / 1080, 1.0));
+        this._scale = Math.max(0.15, Math.min(cssW / 1920, cssH / 1080, 1.0));
         const margin = MARGIN * this._scale;
         // 底部预留：取两个约束较大者（均在屏幕外不再画，只影响导航球上移量）
         //  a) 节流阀弧外缘(210)距底 ≥ 16
@@ -169,7 +177,7 @@ class SASUI {
             THROTTLE_ARC_OUTER + 16 - NAVBALL_RADIUS,
             SAS_PANEL_DOWN_SHIFT + SAS_PANEL_RADIUS + BOTTOM_BTN_GAP_BELOW + BOTTOM_MAIN_SIZE + BOTTOM_FRAME_PAD * 2 + 16 - NAVBALL_RADIUS
         ) * this._scale;
-        const navY = canvas.height - bottomPad - NAVBALL_RADIUS * this._scale;
+        const navY = cssH - bottomPad - NAVBALL_RADIUS * this._scale;
         this._navballCenter = {
             x: margin,
             y: navY
@@ -222,6 +230,8 @@ class SASUI {
 
     /**
      * 渲染导航球 + SAS 控制圆盘
+     * 0.2.5（高清屏）：本模块全部几何为 CSS 像素口径，绘制前整体 scale(dpr)
+     * 映射到画布物理缓冲；save/restore 包裹保证不泄漏变换到其它渲染层。
      * @param {CanvasRenderingContext2D} ctx
      * @param {string} sasMode - 当前 SAS 模式
      * @param {number} throttle - 油门值 [0, 1]
@@ -233,6 +243,12 @@ class SASUI {
         const heading = typeof data.heading === 'number' ? data.heading : 0;
         const directions = data.directions || null;
 
+        ctx.save();
+        const dpr = this._dpr || 1;
+        if (dpr !== 1) {
+            ctx.scale(dpr, dpr);
+        }
+
         // 节流阀弧形分段（导航球外圈左侧，先绘制在底层）
         this._drawThrottleArc(ctx, this._navballCenter.x, this._navballCenter.y, s, throttle);
 
@@ -241,6 +257,8 @@ class SASUI {
 
         // SAS 控制圆盘（导航球右侧，本步仅渲染）
         this._drawSasPanel(ctx, this._panelCenter.x, this._panelCenter.y, s, sasMode, heading);
+
+        ctx.restore();
 
         // 悬停提示已迁移到全局 DOM tooltip（uiTooltip.js），由 flightScene 的 mousemove 驱动
     }

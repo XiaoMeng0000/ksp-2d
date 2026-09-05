@@ -62,6 +62,8 @@ const STRINGS = {
     'startgame.importSuccess': (p) => `✅ 世界「${p.name}」已导入`,
     'startgame.importFailedFormat': '❌ 导入失败：文件格式不匹配',
     'startgame.importFailedInvalid': '❌ 导入失败：存档文件内容无效',
+    // 0.2.5 导入落地写入本地存储失败(配额满等)专用提示
+    'startgame.importFailedStorage': '❌ 导入失败：本地存储写入失败，请删除部分战役后重试。',
     'startgame.importFailedSystem': '❌ 导入失败：该世界的星系配置与当前版本不兼容',
     'startgame.importFailedRead': '❌ 导入失败：文件读取出错',
     'startgame.renameTitle': '世界名称已存在',
@@ -224,7 +226,6 @@ const STRINGS = {
     'facility.unknownCompartment': '未知舱室',
     'facility.infoSection': '设施信息',
     'facility.storageSection': '存储',
-    'facility.controlSection': '当前控制',
     'facility.nameLabel': '设施名称',
     'facility.typeLabel': '设施类型',
     'facility.dockLabel': '对接口',
@@ -237,7 +238,6 @@ const STRINGS = {
     'facility.fuelLabel': '燃料',
     'facility.dryMassLabel': '干质量',
     'facility.modulesLabel': '模块',
-    'facility.backToOverview': '返回设施总览',
     'facility.shipBuilt': '飞船已建造在设施附近',
     'facility.newShipName': '新建飞船',
     'facility.deployTitle': '部署设施',
@@ -326,14 +326,11 @@ const STRINGS = {
     'build.slotIndex': (p) => `槽${p.i}`,
     'build.slotEmpty': '空',
     'build.selectShipFirst': '请先选择一艘飞船',
-    'build.noHomeBody': '找不到起始天体数据',
-    'build.chooseAltitude': '选择轨道高度',
-    'build.altitudePrompt': (p) => `请输入绕 ${p.name} 的轨道半径（米）`,
     'build.invalidNumber': '请输入有效数字',
     'build.shipNameSuffix': (p) => `${p.name}号`,
     'build.createFailed': '飞船创建失败',
-    'build.launched': '飞船建造完成，已发射！',
-    'build.cancelled': '建造已取消',
+    // 0.2.5：飞船出生在船坞旁并立即切控制（旧"输入轨道半径"流程文案已清理）
+    'build.launched': '飞船建造完成，已出坞！',
 
     // ---------- SAS / 导航球 ----------
     'sas.prograde': '顺向',
@@ -477,6 +474,8 @@ const STRINGS = {
     // 0.2.5 星系组合兼容性(读档校验)
     'save.systemIncompatibleTitle': '无法加载存档',
     'save.systemIncompatible': '该存档的星系配置与当前版本不兼容，无法加载。',
+    // 0.2.5 存储写入失败可感知(存档/删除/导入共用)
+    'save.storageFull': '⚠ 存档写入失败：本地存储空间不足或被浏览器限制，请清理后重试。',
     'timewarp.pausedNotice': '游戏已暂停',
     'timewarp.resumedNotice': '游戏已恢复',
     'timewarp.warpCanceled': '已取消定点加速',

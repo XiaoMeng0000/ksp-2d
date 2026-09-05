@@ -30,7 +30,6 @@ eventBus.on(Events.RENDER_DATA, (data) => {
 });
 let _currentFacility = null;
 let _facilityMenuOpen = false;
-let _controlledDockedShipId = null;
 
 // 飞船建造UI - 左侧工具栏
 const leftToolbar = document.createElement('div');
@@ -188,7 +187,6 @@ function renderToolbarIcons(mode, data) {
         const facility = facilitySystem.getFacility(data.facilityId);
         if (!facility) return;
         _currentFacility = facility;
-        _controlledDockedShipId = null;
 
         const compartments = getFacilityCompartments(facility.typeId);
         for (const comp of compartments) {
@@ -664,27 +662,8 @@ function buildBridgeContent(facility) {
     // 0.2.0 阶段5：指令舱货物表入口（所属天体/交互范围卡片已按需求移除）
     html += '<div class="tkp-actions"><button data-action="open-storage" class="tkp-btn">' + t('facility.storage') + '</button></div>';
 
-    // 分区二：当前受控飞船卡（仅当存在）
-    if (_controlledDockedShipId) {
-        const ship = facility.dockedShips?.find(s => s.id === _controlledDockedShipId);
-        if (ship) {
-            html += '<div class="tkp-section">' + t('facility.controlSection') + '</div>'
-                + '<div class="tkp-card">'
-                + '<div style="font-size:13px;color:var(--text-bright);font-weight:bold;margin-bottom:8px;">'
-                + renderIconHtml('ship_default_active', '🚀', 12) + ' ' + (ship.displayName || ship.id) + '</div>'
-                + '<div class="tkp-grid" style="margin-bottom:10px;">';
-            html += info(t('facility.dryMassLabel'), (ship.dryMass ?? '-') + ' t');
-            html += info(t('facility.modulesLabel'), (ship.modules?.length || 0) + t('common.unitCount'));
-            html += '</div>'
-                // 0.2.0 阶段4：燃料分槽进度条（每种推进剂独立一条，占满整行）
-                + '<div style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px;">'
-                + '<span class="tkp-info-label">' + t('facility.fuelLabel') + '</span>'
-                + renderFuelBarsHtml(ship)
-                + '</div>'
-                + '<button data-action="release-control" class="tkp-btn">' + t('facility.backToOverview') + '</button>'
-                + '</div>';
-        }
-    }
+    // 0.2.5：原"当前受控飞船卡 + release-control 按钮"已移除（_controlledDockedShipId 恒为 null 的死代码，
+    // 0.2.0 阶段5 起控制切换改走模块管理/起飞；未来"远程接管停靠飞船"可从 git 历史恢复）
     return html;
 }
 
@@ -809,14 +788,6 @@ setInterval(() => {
 // 全局辅助函数：获取当前受控设施（建造扣费等外部面板使用，0.2.0 阶段5）
 window.__getControlledFacility = function() {
     return _currentFacility;
-};
-
-// 全局辅助函数：释放停靠飞船控制权
-function releaseShipControl() {
-    _controlledDockedShipId = null;
-    if (_currentFacility) {
-        openCompartmentPanel(_currentFacility, 'bridge');
-    }
 };
 
 // 全局辅助函数：起飞
@@ -958,9 +929,7 @@ function onPageContentClick(e) {
     const action = btn.dataset.action;
     const shipId = btn.dataset.shipId;
     const resId = btn.dataset.resId;
-    if (action === 'release-control') {
-        releaseShipControl();
-    } else if (action === 'undock-ship') {
+    if (action === 'undock-ship') {
         facilityUndockShip(shipId);
     } else if (action === 'refuel-ship') {
         facilityRefuelShip(shipId);

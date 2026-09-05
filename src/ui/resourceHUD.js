@@ -36,8 +36,9 @@ function _getActiveShipName() {
 let _lastShipName = null;
 
 function renderHud() {
-    const player = gameState.getState().player;
-    const mode = player.gameMode || 'sandbox';
+    // 0.2.5（方案 A）：直接引用读取 —— 旧实现每秒 getState() 全量深拷贝整个游戏状态
+    const player = gameState.getPlayerRef();
+    const mode = (player && player.gameMode) || 'sandbox';
     const modeText = MODE_TEXT[mode] || mode;
     const shipName = _getActiveShipName();
 

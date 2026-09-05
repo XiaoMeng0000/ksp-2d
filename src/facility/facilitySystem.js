@@ -84,9 +84,8 @@ class FacilitySystem {
         // 0.2.0 阶段5：按类型 storageProfile 初始化资源存储槽（全资源空仓）
         initFacilityStorage(facility);
 
-        const state = gameState.getState();
-        state.facilities.push(facility);
-        gameState.setState({ facilities: state.facilities });
+        // 0.2.5（方案 A）：增量入列 —— 返回 GameState 内的规范引用（数组与其余设施引用不变）
+        gameState.addToCollection('facilities', facility);
 
         eventBus.emit(Events.FACILITY_CREATED, { facilityId, name, typeId, hostName });
         console.log(`[FacilitySystem] 设施创建成功: ${facilityId} (${name})`);
@@ -95,19 +94,16 @@ class FacilitySystem {
     }
 
     // ========== 删除设施 ==========
+    // 0.2.5（方案 A）：停靠飞船逐条增量回流 ships（数组引用不变），设施按 id 增量移除
     deleteFacility(id) {
-        const state = gameState.getState();
-        const index = state.facilities.findIndex(f => f.id === id);
-        if (index === -1) {
+        const facility = this.getFacility(id);
+        if (!facility) {
             console.warn(`[FacilitySystem] 设施 ${id} 不存在，无法删除`);
             return false;
         }
 
-        const facility = state.facilities[index];
-
         // 将停靠飞船移回 GameState.ships
         if (facility.dockedShips.length > 0) {
-            const ships = gameState.getState().ships;
             // 从 kepler 反算设施相对速度（所有停靠飞船共用，提到循环外）
             const relState = keplerToState(facility.kepler, facility.currentGM, facility.orbitTime);
             for (const dockedShip of facility.dockedShips) {
@@ -129,13 +125,11 @@ class FacilitySystem {
                 dockedShip.mode = 'on_rails';
                 dockedShip.thrust = { ax: 0, ay: 0 };
                 dockedShip.throttle = 0;
-                ships.push(dockedShip);
+                gameState.addToCollection('ships', dockedShip);
             }
-            gameState.setState({ ships });
         }
 
-        state.facilities.splice(index, 1);
-        gameState.setState({ facilities: state.facilities });
+        gameState.removeFromCollection('facilities', id);
 
         if (this.lastDockedFacilityId === id) {
             this.lastDockedFacilityId = null;
@@ -156,6 +150,8 @@ class FacilitySystem {
     }
 
     // ========== 对接 ==========
+    // 0.2.5（方案 A）：取 _state 内规范引用 → 按 id 增量移出 ships → 存入设施 dockedShips。
+    // 停靠船对象全程同一引用，不经过深拷贝，运行时字段不丢失
     dockShip(facilityId, shipId) {
         const facility = this.getFacility(facilityId);
         if (!facility) {
@@ -168,28 +164,24 @@ class FacilitySystem {
             return false;
         }
 
-        const ships = gameState.getState().ships;
-        const shipIndex = ships.findIndex(s => s.id === shipId);
-        if (shipIndex === -1) {
+        const ship = gameState.getShipRef(shipId);
+        if (!ship) {
             console.warn(`[FacilitySystem] 飞船 ${shipId} 不在活动列表中，无法对接`);
             return false;
         }
 
-        // 从活动列表移除
-        const ship = ships.splice(shipIndex, 1)[0];
+        // 从活动列表移除（增量：数组引用不变）
+        gameState.removeFromCollection('ships', shipId);
 
-        // 存入设施
+        // 存入设施（同一引用）
         facility.dockedShips.push(ship);
         facility.usedDocks += 1;
 
-        // 更新 GameState.ships
-        gameState.setState({ ships });
-
         // 如果对接的是活动飞船
-        const state = gameState.getState();
-        if (state.activeShipId === shipId) {
-            if (ships.length > 0) {
-                gameState.setState({ activeShipId: ships[0].id });
+        if (gameState.getActiveShip() && gameState.getActiveShip().id === shipId) {
+            const remaining = gameState.getAllShipsRef();
+            if (remaining.length > 0) {
+                gameState.setState({ activeShipId: remaining[0].id });
             } else {
                 this.lastDockedFacilityId = facilityId;
                 gameState.setState({ activeShipId: null });
@@ -246,10 +238,8 @@ class FacilitySystem {
         ship.thrust = { ax: 0, ay: 0 };
         ship.throttle = 0;
 
-        // 放回活动飞船列表
-        const state = gameState.getState();
-        state.ships.push(ship);
-        gameState.setState({ ships: state.ships });
+        // 放回活动飞船列表（0.2.5：增量入列，数组与其余飞船引用不变）
+        gameState.addToCollection('ships', ship);
 
         // 设为活动飞船
         gameState.setState({ activeShipId: shipId });
@@ -375,18 +365,22 @@ class FacilitySystem {
         return true;
     }
 
-    // ========== 建造飞船 ==========
+    // ========== 建造飞船（0.2.5 决策⑤：唯一建造入口，UI 直接调用） ==========
+    // 流程：校验设施/模板 → 扣材料（不足拒绝）→ 创建（失败全额退款）→
+    // 新船出生在船坞旁（同轨道小偏移伴飞，速度/相位与船坞一致）→ 返回规范引用。
+    // 返回值 { ok, ship?, reason? }：reason 'noFacility' | 'noTemplate' | 'insufficientKits'
+    // 控制切换（switchShip）由 UI 调用方负责（0.2.5：建造后立即切控制新船）
     buildShip(facilityId, templateId, name, moduleTypeIds = []) {
         const facility = this.getFacility(facilityId);
         if (!facility) {
             console.warn(`[FacilitySystem] 设施 ${facilityId} 不存在，无法建造`);
-            return null;
+            return { ok: false, reason: 'noFacility' };
         }
 
         const template = SHIP_TEMPLATES.find(t => t.id === templateId);
         if (!template) {
             console.warn(`[FacilitySystem] 模板 ${templateId} 不存在，无法建造`);
-            return null;
+            return { ok: false, reason: 'noTemplate' };
         }
 
         // 0.2.0 阶段5：建造扣费从设施存储扣（模板 cost + 所选模块 price 合计），不足拒绝
@@ -397,7 +391,7 @@ class FacilitySystem {
         const totalCost = (template.cost || 0) + moduleCost;
         if (!consumeStorage(facility, 'materialKits', totalCost)) {
             console.warn(`[FacilitySystem] 建造失败：设施材料套装不足 (${templateId})`);
-            return null;
+            return { ok: false, reason: 'insufficientKits' };
         }
 
         // 调用 ShipSystem 创建基础飞船实例
@@ -412,7 +406,7 @@ class FacilitySystem {
                     addStorage(facility, 'materialKits', totalCost);
                 }
             }
-            return null;
+            return { ok: false, reason: 'createFailed' };
         }
 
         // 计算设施当前轨道速度
@@ -442,20 +436,22 @@ class FacilitySystem {
         shipSystem.persistShip(newShip);
 
         console.log(`[FacilitySystem] 飞船建造完成: ${newShip.id} (${name}) 在 ${facilityId}`);
-        return newShip;
+        return { ok: true, ship: newShip };
     }
 
     // ========== 持久化 ==========
+    // 0.2.5（方案 A）：按 id 增量替换单个设施 —— 数组与其余设施引用保持不变，
+    // 各模块持有的设施引用（如 flightUI._currentFacility）不再因整组替换而悬空
     persistFacility(facilityData) {
-        const state = gameState.getState();
-        const index = state.facilities.findIndex(f => f.id === facilityData.id);
-        if (index === -1) {
-            console.warn(`[FacilitySystem] 设施 ${facilityData.id} 不存在，无法持久化`);
+        if (!facilityData || !facilityData.id) {
+            console.warn('[FacilitySystem] persistFacility 需要有效的设施对象');
             return false;
         }
-        state.facilities[index] = facilityData;
-        gameState.setState({ facilities: state.facilities });
-        return true;
+        const ok = gameState.replaceInCollection('facilities', facilityData);
+        if (!ok) {
+            console.warn(`[FacilitySystem] 设施 ${facilityData.id} 不存在，无法持久化`);
+        }
+        return ok;
     }
 }
 

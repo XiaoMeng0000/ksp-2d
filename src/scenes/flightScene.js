@@ -1,5 +1,5 @@
 import { shipSystem } from '../ship/shipSystem.js';
-import { camera, screenToWorld } from '../camera.js';
+import { camera, screenToWorld, cssToCanvas } from '../camera.js';
 import { inputManager } from '../input.js';
 import { eventBus, Events } from '../eventBus.js';
 import { updateShipPhysics } from '../physics/physicsUpdate.js';
@@ -322,10 +322,10 @@ function updateOrbitHover(cssX, cssY) {
         return;
     }
 
-    const rect = _canvas.getBoundingClientRect();
-    // canvas 坐标空间换算（画布物理像素 = CSS 像素 × canvas.width/rect.width，兼容 DPR/缩放）
-    const canvasX = cssX * (_canvas.width / rect.width);
-    const canvasY = cssY * (_canvas.height / rect.height);
+    // canvas 坐标空间统一换算（0.2.5：CSS 像素 → 画布物理像素，与设施命中/轨道点击同口径）
+    const canvasPt = cssToCanvas(cssX, cssY, _canvas);
+    const canvasX = canvasPt.x;
+    const canvasY = canvasPt.y;
 
     // 1. 标记锚点命中（菱形锚点）
     let hoveredMarker = null;
@@ -425,6 +425,9 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
         enter: () => {
             inputManager.enable();
 
+            // 0.2.5：进入飞行场景时间加速归 1x（读档已在 saveManager 重置，此处兜底新建战役/追踪站切入路径）
+            timeWarp.resetOnLoad();
+
             // 接收追踪站的设施聚焦请求
             if (window.__pendingFacilityId) {
                 const fac = facilitySystem.getFacility(window.__pendingFacilityId);
@@ -451,11 +454,12 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             // SAS 集成 — Canvas 点击处理
             const onClick = (e) => {
                 const rect = _canvas.getBoundingClientRect();
-                const dpr = window.devicePixelRatio || 1;
                 const cssX = e.clientX - rect.left;
                 const cssY = e.clientY - rect.top;
-                const canvasX = cssX * dpr;
-                const canvasY = cssY * dpr;
+                // 0.2.5：统一换算（与轨道命中/悬停同口径；旧实现直接乘 dpr，高清屏点击偏移）
+                const canvasPt = cssToCanvas(cssX, cssY, _canvas);
+                const canvasX = canvasPt.x;
+                const canvasY = canvasPt.y;
 
                 // 1. 检测是否点击了设施
                 const allFacilities = facilitySystem.getAllFacilities();
@@ -481,8 +485,9 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 const result = sasUI.handleClick(cssX, cssY, ship.sasMode || 'off');
                 // 3. 0.3.0 提交5：SAS 未命中 → 左键点击轨道线打开锚定菜单（拦截；未命中则无操作）
                 if (!result.hit) {
-                    const canvasHitX = cssX * (_canvas.width / rect.width);
-                    const canvasHitY = cssY * (_canvas.height / rect.height);
+                    const canvasHit = cssToCanvas(cssX, cssY, _canvas);
+                    const canvasHitX = canvasHit.x;
+                    const canvasHitY = canvasHit.y;
                     const segments = getLastOrbitSegments();
                     if (segments && segments.length > 0) {
                         const mouseWorld = screenToWorld(canvasHitX, canvasHitY, _canvas);
