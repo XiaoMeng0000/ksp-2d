@@ -54,6 +54,20 @@ const STRINGS = {
     'startgame.metaGameTime': '游戏时间',
     'startgame.metaGameMode': '游戏模式',
 
+    // ---------- 世界导入导出（0.2.5 存档交流） ----------
+    'startgame.exportWorld': '导出世界',
+    'startgame.importWorld': '导入世界',
+    'startgame.exportSuccess': '✅ 世界已导出',
+    'startgame.exportFailed': '❌ 导出失败：未找到该世界',
+    'startgame.importSuccess': (p) => `✅ 世界「${p.name}」已导入`,
+    'startgame.importFailedFormat': '❌ 导入失败：文件格式不匹配',
+    'startgame.importFailedInvalid': '❌ 导入失败：存档文件内容无效',
+    'startgame.importFailedSystem': '❌ 导入失败：该世界的星系配置与当前版本不兼容',
+    'startgame.importFailedRead': '❌ 导入失败：文件读取出错',
+    'startgame.renameTitle': '世界名称已存在',
+    'startgame.renamePrompt': (p) => `已存在同名世界「${p.name}」。请为导入的世界输入新名称：`,
+    'startgame.renameDefault': (p) => `${p.name} (导入)`,
+
     // ---------- 创建新战役对话框 ----------
     'newcampaign.title': '创建新战役',
     'newcampaign.gameMode': '游戏模式',

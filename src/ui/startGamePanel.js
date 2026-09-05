@@ -7,6 +7,7 @@ import { gameState } from '../gameState.js';
 import { t } from '../config/strings.js';
 import { formatGameTime, formatGameDate } from '../utils/format.js';
 import { openNewCampaignDialog } from './newCampaignDialog.js';
+import { createInputDialog } from './uiComponents.js';
 
 // 开始游戏面板 — 0.2.5 新增
 // 主菜单"开始游戏"打开的内嵌式综合面板（0.2.6 由左侧滑出改为内嵌圆角，与设置页同款），
@@ -32,6 +33,10 @@ panel.innerHTML = `
                 <span class="sgp-count" id="sgpWorldCount"></span>
             </div>
             <button class="sgp-new-campaign" data-action="sgp-new-campaign">${t('startgame.newCampaign')}</button>
+            <div class="sgp-transfer-row">
+                <button class="sgp-new-campaign" data-action="sgp-export-world" disabled>${t('startgame.exportWorld')}</button>
+                <button class="sgp-new-campaign" data-action="sgp-import-world">${t('startgame.importWorld')}</button>
+            </div>
             <div class="sgp-list" id="sgpWorldList"></div>
             <div class="sgp-col-footer">
                 <button class="ui-btn-danger" data-action="sgp-delete-world" disabled>${t('startgame.deleteWorld')}</button>
@@ -205,13 +210,83 @@ function renderAll() {
 // 同步底部按钮可用态
 function syncFooterButtons() {
     const delWorldBtn = panel.querySelector('[data-action="sgp-delete-world"]');
+    const exportBtn = panel.querySelector('[data-action="sgp-export-world"]');
     const loadBtn = panel.querySelector('[data-action="sgp-load-game"]');
     const delCpBtn = panel.querySelector('[data-action="sgp-delete-checkpoint"]');
     const hasWorld = !!_selectedWorldId;
     const hasCp = !!_selectedCheckpointId;
     delWorldBtn.disabled = !hasWorld;
+    exportBtn.disabled = !hasWorld;
     loadBtn.disabled = !hasCp;
     delCpBtn.disabled = !hasCp;
+}
+
+// ---------- 世界导入导出（0.2.5 存档交流） ----------
+
+// 隐藏文件选择框（导入用，常驻 body，避免重复创建）
+const importFileInput = document.createElement('input');
+importFileInput.type = 'file';
+importFileInput.accept = '.json,application/json';
+importFileInput.style.display = 'none';
+document.body.appendChild(importFileInput);
+importFileInput.addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    // 清空选择，允许再次选择同一文件
+    e.target.value = '';
+    if (file) importWorldFile(file);
+});
+
+// 导出选中世界（下载 JSON 文件）
+function exportSelectedWorld() {
+    if (!_selectedWorldId) {
+        window.showNotification(t('startgame.selectWorldHint'), 'warning');
+        return;
+    }
+    if (saveManager.exportWorldToFile(_selectedWorldId)) {
+        window.showNotification(t('startgame.exportSuccess'), 'success');
+    } else {
+        window.showNotification(t('startgame.exportFailed'), 'error');
+    }
+}
+
+// 导入世界：读取校验 → 重名弹命名框 → 落地 → 选中
+function importWorldFile(file) {
+    saveManager.readWorldExportFile(file).then((world) => {
+        const nameExists = saveManager.getWorldList()
+            .some(w => w.name === world.metadata.name);
+        if (nameExists) {
+            createInputDialog(
+                t('startgame.renameTitle'),
+                t('startgame.renamePrompt', { name: world.metadata.name }),
+                t('startgame.renameDefault', { name: world.metadata.name }),
+                (value) => commitImport(world, value)
+            );
+        } else {
+            commitImport(world);
+        }
+    }).catch((err) => {
+        const code = err && err.code;
+        const msg = code === 'format' ? t('startgame.importFailedFormat')
+            : code === 'system' ? t('startgame.importFailedSystem')
+            : code === 'read' ? t('startgame.importFailedRead')
+            : t('startgame.importFailedInvalid');
+        window.showNotification(msg, 'error');
+    });
+}
+
+// 导入落地：成功后停留在面板，自动选中导入的世界与其第一个检查点
+function commitImport(world, nameOverride) {
+    const worldId = saveManager.commitImportedWorld(world, nameOverride);
+    if (!worldId) {
+        window.showNotification(t('startgame.importFailedInvalid'), 'error');
+        return;
+    }
+    _selectedWorldId = worldId;
+    const cps = saveManager.getCheckpointList(worldId);
+    _selectedCheckpointId = cps.length > 0 ? cps[0].id : null;
+    renderAll();
+    const imported = saveManager.getWorldList().find(w => w.id === worldId);
+    window.showNotification(t('startgame.importSuccess', { name: imported ? imported.name : '' }), 'success');
 }
 
 // 加载选中的存档并进入飞行
@@ -297,6 +372,12 @@ panel.addEventListener('click', (e) => {
             break;
         case 'sgp-new-campaign':
             openNewCampaignDialog();
+            break;
+        case 'sgp-import-world':
+            importFileInput.click();
+            break;
+        case 'sgp-export-world':
+            exportSelectedWorld();
             break;
         case 'sgp-load-game':
             loadSelectedGame();

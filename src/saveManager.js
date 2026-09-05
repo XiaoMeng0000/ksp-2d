@@ -10,6 +10,7 @@ import { stateToKepler } from './physics/orbitalMechanics.js';
 import { celestialBodies, setActiveSystems, getActiveSystemIds } from './physics/physics.js';
 import { eventBus, Events } from './eventBus.js';
 import { t } from './config/strings.js';
+import { VERSION_TEXT } from './config/version.js';
 import { validateSystemSelection } from './config/starSystemIndex.js';
 import { createInfoDialog } from './ui/uiComponents.js';
 import { initFacilityStorage, addStorage } from './resources/cargoSystem.js';
@@ -609,6 +610,160 @@ class SaveManager {
             }
         }
         return null;
+    }
+
+    // ============================================================
+    // 世界导入导出（0.2.5 存档交流：本地 JSON 文件跨设备迁移）
+    // 导出：世界（含全部检查点）→ 单文件下载；导入分两步：
+    //   readWorldExportFile 读取+校验（不落地）→ commitImportedWorld 落地
+    // 导出不改变任何存储逻辑；导入走 _saveToStorage()，与本地存档同路径
+    // ============================================================
+
+    // 导出世界为本地 JSON 文件（浏览器下载）
+    exportWorldToFile(worldId) {
+        const world = this.getWorld(worldId);
+        if (!world) {
+            console.warn(`[SaveManager] 导出失败:世界 ${worldId} 不存在`);
+            return false;
+        }
+
+        const exportData = {
+            format: 'ksp2d_world_export',
+            version: '1.0',
+            exportedAt: Date.now(),
+            appVersion: VERSION_TEXT,
+            world: world
+        };
+
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${this._sanitizeFileName(world.metadata.name)}_${this._formatFileTimestamp(Date.now())}.json`;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        // 延迟回收：部分浏览器在 click 后立即 revoke 会中断下载
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 1000);
+
+        console.log(`[SaveManager] 世界导出成功: ${worldId} (${world.metadata.name})`);
+        return true;
+    }
+
+    // 清洗导出文件名：Windows 非法字符 → 下划线，去首尾点/空格
+    _sanitizeFileName(name) {
+        const cleaned = String(name || 'world')
+            .replace(/[\\/:*?"<>|]/g, '_')
+            .replace(/^[\s.]+|[\s.]+$/g, '')
+            .trim();
+        return cleaned || 'world';
+    }
+
+    // 导出时间戳格式：YYYYMMDD-HHMMSS
+    _formatFileTimestamp(ts) {
+        const d = new Date(ts);
+        const pad = (n) => String(n).padStart(2, '0');
+        return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+    }
+
+    // 读取并校验世界导出文件（不落地）
+    // resolve(world) | reject(Error，err.code: 'format' | 'invalid' | 'system' | 'read')
+    readWorldExportFile(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (!data || data.format !== 'ksp2d_world_export') {
+                        reject(this._makeExportError('format', '文件格式不匹配'));
+                        return;
+                    }
+                    const world = data.world;
+                    if (!world || !world.metadata
+                        || typeof world.metadata.name !== 'string' || !world.metadata.name.trim()) {
+                        reject(this._makeExportError('invalid', '世界数据无效'));
+                        return;
+                    }
+                    if (!Array.isArray(world.checkpoints) || world.checkpoints.length === 0) {
+                        reject(this._makeExportError('invalid', '存档点数据无效'));
+                        return;
+                    }
+                    // activeCheckpointId 指向不存在时重置为第一个检查点
+                    if (!world.checkpoints.some(c => c.id === world.activeCheckpointId)) {
+                        world.activeCheckpointId = world.checkpoints[0].id;
+                    }
+                    // 星系组合校验（与 loadCheckpoint 同一校验函数）
+                    const savedSystems = world.metadata.starSystems || ['kerbolar'];
+                    if (!validateSystemSelection(savedSystems).ok) {
+                        reject(this._makeExportError('system', '星系配置不兼容'));
+                        return;
+                    }
+                    resolve(world);
+                } catch (err) {
+                    if (err && err.code) {
+                        reject(err);
+                    } else {
+                        reject(this._makeExportError('invalid', err && err.message ? err.message : '文件解析失败'));
+                    }
+                }
+            };
+            reader.onerror = () => reject(this._makeExportError('read', '文件读取失败'));
+            reader.readAsText(file);
+        });
+    }
+
+    // 构造带错误码的导入错误（供 UI 层分类提示）
+    _makeExportError(code, message) {
+        const err = new Error(message);
+        err.code = code;
+        return err;
+    }
+
+    // 导入世界落地：新 id、列表置顶、写入存储
+    // nameOverride：导入命名（重名时由 UI 弹窗提供；缺省用世界原名称）
+    commitImportedWorld(world, nameOverride) {
+        if (!world || !world.metadata) {
+            console.warn('[SaveManager] 导入失败:世界数据无效');
+            return null;
+        }
+        const override = (typeof nameOverride === 'string' && nameOverride.trim()) ? nameOverride.trim() : '';
+        const baseName = override || String(world.metadata.name || '').trim();
+        if (!baseName) {
+            console.warn('[SaveManager] 导入失败:世界名称为空');
+            return null;
+        }
+        // 星系校验兜底（防调用方篡改；正常流程 readWorldExportFile 已校验）
+        const savedSystems = world.metadata.starSystems || ['kerbolar'];
+        if (!validateSystemSelection(savedSystems).ok) {
+            console.warn('[SaveManager] 导入失败:星系配置不兼容');
+            return null;
+        }
+
+        // 名称唯一兜底：冲突时追加 (2) (3)…（玩家自命名若重名同样生效）
+        const name = this._ensureUniqueWorldName(baseName);
+        const worldId = `world_${this._generateId()}`;
+        // 深拷贝落地，切断与导入对象的外部引用
+        const stored = JSON.parse(JSON.stringify(world));
+        stored.metadata.name = name;
+        this._worlds[worldId] = stored;
+        this._worldList.unshift(worldId);
+        this._saveToStorage();
+
+        console.log(`[SaveManager] 世界导入成功: ${worldId} (${name})`);
+        return worldId;
+    }
+
+    // 保证世界名唯一：冲突时追加 (2) (3)… 后缀
+    _ensureUniqueWorldName(name) {
+        const exists = (n) => this._worldList.some(id =>
+            this._worlds[id] && this._worlds[id].metadata.name === n);
+        if (!exists(name)) return name;
+        let i = 2;
+        while (exists(`${name} (${i})`)) i++;
+        return `${name} (${i})`;
     }
 
     clearAll() {

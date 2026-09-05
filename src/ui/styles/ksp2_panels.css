@@ -381,6 +381,28 @@
     cursor: pointer;
 }
 
+/* 导出/导入世界并排按钮行（位于"创建新战役"下方，两钮等宽，样式与创建按钮一致） */
+#startGamePanel .sgp-transfer-row {
+    display: flex;
+    gap: 6px;
+    margin: 0 0 10px 0;
+}
+
+#startGamePanel .sgp-transfer-row .sgp-new-campaign {
+    flex: 1;
+    margin-bottom: 0;
+}
+
+#startGamePanel .sgp-transfer-row .sgp-new-campaign:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+#startGamePanel .sgp-transfer-row .sgp-new-campaign:disabled:hover {
+    background: var(--theme-btn-bg);
+    border-color: var(--border-light);
+}
+
 /* 列表区 */
 #startGamePanel .sgp-list {
     flex: 1;
