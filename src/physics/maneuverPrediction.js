@@ -192,13 +192,32 @@ export function computePlan(ship, node, baseSegments) {
         segments: []
     };
 
-    const nodeState = walkToTime(baseSegments, node.time);
+    // 节点状态获取（0.3.0 修复"燃烧后节点整体跳变"）：
+    //   · 冻结快照（创建/拖动时保存的 relX/relY/relVelX/relVelY + anchorBody）**优先**——
+    //     节点位置锁定在规划点（相对宿主固定），燃烧开始后轨道改变也不漂移；
+    //   · 无快照（旧存档/控制台裸建节点）→ 沿当前预测链 walk（节点时刻已过则重建）。
+    let nodeState = null;
+    const hasSnapshot = node.relX !== undefined && node.relX !== null
+        && node.relVelX !== undefined && isFinite(node.relVelX)
+        && node.anchorBody;
+    if (hasSnapshot) {
+        const b = celestialBodies.find(x => x.name === node.anchorBody);
+        if (b) {
+            nodeState = {
+                relPos: { x: node.relX, y: node.relY },
+                relVel: { x: node.relVelX, y: node.relVelY },
+                host: b,
+                time: node.time,
+                kepler: null,
+                pinned: true
+            };
+        }
+    }
+    if (!nodeState) {
+        nodeState = walkToTime(baseSegments, node.time);
+    }
     plan.nodeState = nodeState;
     if (!nodeState) return plan;
-
-    // 节点参考系轴（host 局部系单位向量）：方向手柄与读数共用。
-    // 注意：必须先于 dvMag 守卫计算——节点初始 Δv 为 0 时手柄仍需显示，
-    // 玩家从零拖拽建立目标 Δv。
     const dirs = getOrbitalDirectionAngles(nodeState.relPos, nodeState.relVel);
     plan.axes = {
         pro: { x: Math.cos(dirs.prograde), y: Math.sin(dirs.prograde) },

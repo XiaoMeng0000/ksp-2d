@@ -80,6 +80,18 @@ const ORBIT_BRIGHT_COLORS = [
     'rgba(136, 68, 255, 0.8)'
 ];
 
+// 机动预测线（燃烧后段）颜色池（0.3.0 打磨）：品红/粉/紫系，
+// 与普通轨道线 ORBIT_BRIGHT_COLORS 完全错开（无同值项）；
+// 当前 SOI 段 = 已定稿粉色（MANEUVER_CONFIG.postBurnColor），其余按 SOI 名哈希取池
+const MANEUVER_BRIGHT_COLORS = [
+    'rgba(255, 96, 190, 0.95)',
+    'rgba(200, 96, 255, 0.95)',
+    'rgba(255, 60, 120, 0.95)',
+    'rgba(170, 92, 255, 0.95)',
+    'rgba(255, 130, 230, 0.95)',
+    'rgba(255, 82, 255, 0.95)'
+];
+
 /**
  * 渲染天体图层（贴图 + 程序效果）
  * @param {CanvasRenderingContext2D} ctx
@@ -607,6 +619,17 @@ function getSOIDirection(fromName, toName) {
     return null;
 }
 
+// 机动预测线分段配色（0.3.0 打磨）：与 getOrbitColor 同机制——
+// 当前 SOI 段固定粉色主色（对照样式稿），其余段按 SOI 名哈希取机动专属色池
+// （池与普通轨道线色池无同值项，机动线与绿线可并列分辨）
+function getManeuverColor(soiName, isCurrentSoi) {
+    if (isCurrentSoi) return MANEUVER_CONFIG.postBurnColor;
+    const safeName = soiName || t('orbit.type.deepSpace');
+    let hash = 0;
+    for (let i = 0; i < safeName.length; i++) hash = (hash * 31 + safeName.charCodeAt(i)) | 0;
+    return MANEUVER_BRIGHT_COLORS[Math.abs(hash) % MANEUVER_BRIGHT_COLORS.length];
+}
+
 // 段锚点：anchorBody 在当前游戏时刻的绝对世界位置（返回原点兜底 = 深空段）。
 // 锚定"当前时刻"而非段起始时刻 → 每段以自身宿主为参考系并跟随宿主移动（KSP 语义）；
 // 锚点不同的两段在 SOI 边界处会有断层，由跨 SOI 衔接虚线接线。
@@ -708,26 +731,30 @@ function renderOrbit(ship, ctx, canvas, isActive = true) {
     }
 
     // 机动节点预测：计算 + 绘制红色预测线（燃烧弧 + 机动后轨道），缓存供 UI/交互层读取
-    // （先于 renderOrbitMarkers：燃料耗尽点标记经 extraDefs 并入同一标签管线）
+    // （先于 renderOrbitMarkers：燃料耗尽点/Ap/Pe 标记经 extraDefs 并入同一标签管线）
     _lastManeuverPrediction = prepareManeuverPrediction(ship, segments, canvas);
     renderManeuverOrbits(ship, ctx, canvas, _lastManeuverPrediction);
 
     // 骨架：Ap/Pe 标记绘制调用点（renderOrbitMarkers 功能体待填，当前返回 []）
     // 输出缓存到 _lastOrbitMarkers，供交互层命中检测（此处已过 isActive 提前返回，恒为活动飞船）
+    const mvPred = _lastManeuverPrediction;
     _lastOrbitMarkers = renderOrbitMarkers(ctx, canvas, ship, _orbitHoverState,
-        (_lastManeuverPrediction && _lastManeuverPrediction.fuelOutMarkerDef)
-            ? [_lastManeuverPrediction.fuelOutMarkerDef] : null) || [];
+        (mvPred && mvPred.maneuverMarkerDefs && mvPred.maneuverMarkerDefs.length
+            ? mvPred.maneuverMarkerDefs : null),
+        (mvPred && mvPred.plan && mvPred.plan.segments && mvPred.plan.segments.length > 1
+            ? mvPred.plan.segments : null)) || [];
 }
 
 // ship.maneuverNodes 由 shipSystem.createShip 初始化为空数组，数据结构：
 // { time: Number, deltaV: {x, y}, executed: Boolean }
 // 0.3.0 机动节点：扩展字段 relX/relY/anchorBody（节点在轨道上的冻结坐标，供图标锚定）
 
-// 机动节点预测准备：返回 { plan, segments, burnArc, fuelOutMarkerDef, nodeScreen, node }
-// 无可预测节点（无节点 / 非 on_rails / 已执行）→ null
+// 机动节点预测准备：返回 { plan, segments, burnArc, maneuverMarkerDefs, nodeScreen, node }
+// 无可预测节点（无节点 / 已执行）→ null。
+// 注意：不按 ship.mode 过滤——推力模式下（玩家按机动计划手动燃烧中）预测线必须保持显示，
+// 否则一开节流阀机动规划即消失，玩家无法按计划执行（0.3.0 修复）。
 function prepareManeuverPrediction(ship, baseSegments, canvas) {
     if (!ship || !Array.isArray(ship.maneuverNodes) || ship.maneuverNodes.length === 0) return null;
-    if (ship.mode !== 'on_rails') return null;
 
     const node = ship.maneuverNodes.find(n => !n.executed) || null;
     if (!node) return null;
@@ -747,36 +774,80 @@ function prepareManeuverPrediction(ship, baseSegments, canvas) {
         nodeScreen = worldToScreen(node.relX + hp.x, node.relY + hp.y, canvas);
     }
 
-    // 燃料耗尽点标记（0.3.0）：仅当节点 Δv 超出飞船能力（真实段耗尽）时存在；
-    // 绝对世界坐标直通（worldAbs），不依赖当前宿主锚点
-    let fuelOutMarkerDef = null;
+    // ===== 机动线专用标记 def（0.3.0 打磨：与主线共用轨道点标签管线） =====
+    // ① 燃料耗尽点（仅当节点 Δv 超出飞船能力时存在）
+    // ② 机动后轨道的 Ap/Pe（与主线同口径可达性：出界/已过近点不显示）
+    const markerDefs = [];
     const fo = result.fuelOutPoint;
     if (fo && fo.body) {
         const b = celestialBodies.find(x => x.name === fo.body);
         const hp = b ? bodyFuturePos(b, getCachedTime()) : { x: 0, y: 0 };
         const r = Math.sqrt(fo.relPos.x * fo.relPos.x + fo.relPos.y * fo.relPos.y);
-        fuelOutMarkerDef = {
+        markerDefs.push({
+            id: 'mv_fuelOut',
             typeId: 'fuelOut',
             worldAbs: { x: fo.relPos.x + hp.x, y: fo.relPos.y + hp.y },
             alt: r,
             altM: r - (b ? b.radius : 0),
             tToNext: Math.max(0, (node.time + fo.t) - getCachedTime())
-        };
+        });
+    }
+    if (plan && plan.nodeState && plan.burnResult && plan.segments.length > 0) {
+        const s0 = plan.segments[0];
+        const st = s0.startState;
+        const body0 = (st && st.body) ? celestialBodies.find(x => x.name === st.body) : null;
+        if (st && body0 && body0.gm > 0) {
+            const postKepler = stateToKepler(st.relPos, st.relVel, body0.gm);
+            if (postKepler) {
+                const apPe = computeApPePositions(postKepler);
+                const burnEndAbs = node.time + plan.burnResult.burnDuration;
+                const anchorNow = bodyFuturePos(body0, getCachedTime());
+                const pushMv = (typeId, idSuffix, relPt, altR, tOffset) => {
+                    if (!relPt) return;
+                    markerDefs.push({
+                        id: 'mv_' + idSuffix,
+                        typeId,
+                        worldAbs: { x: relPt.x + anchorNow.x, y: relPt.y + anchorNow.y },
+                        alt: altR,
+                        altM: altR - body0.radius,
+                        tToNext: Math.max(0, burnEndAbs + (tOffset || 0) - getCachedTime())
+                    });
+                };
+                // 可达性口径与主线一致：出界（tExit）后无 Ap；已过近点不显示 Pe
+                const tExit = findSOIExitTime(postKepler, body0.gm, body0.soiRadius);
+                if (postKepler.a > 0) {
+                    const info = getOrbitalInfo(postKepler, body0.gm, body0, st.relPos);
+                    if (tExit === null || (info && info.tToPe !== null && info.tToPe < tExit)) {
+                        pushMv('periapsis', 'pe', apPe.pe, apPe.peAlt, info ? info.tToPe : 0);
+                    }
+                    if (tExit === null) {
+                        pushMv('apoapsis', 'ap', apPe.ap, apPe.apAlt, info ? info.tToAp : 0);
+                    }
+                } else if (postKepler.a < 0) {
+                    const tToPe = timeToHyperPeriapsis(postKepler, body0.gm);
+                    if (tToPe !== null) {
+                        pushMv('periapsis', 'pe', apPe.pe, apPe.peAlt, tToPe);
+                    }
+                }
+            }
+        }
     }
 
-    return { plan, segments: result.segments, burnArc: result.burnArc, fuelOutMarkerDef, nodeScreen, node };
+    return { plan, segments: result.segments, burnArc: result.burnArc, maneuverMarkerDefs: markerDefs, nodeScreen, node };
 }
 
-// 机动节点预测线绘制（0.3.0）：红色燃烧弧（真实段亮红 / 虚拟续烧段暗红）+ 机动后轨道红虚线
+// 机动节点预测线绘制（0.3.0）：燃烧弧（真实段亮红 / 虚拟续烧段暗红）+
+// 机动后轨道（0.3.0 打磨：实线粉色，对照样式稿）+ 跨 SOI 衔接线（粉色实线）
 function renderManeuverOrbits(ship, ctx, canvas, pred) {
     if (!pred || !pred.segments || pred.segments.length === 0) return;
 
-    for (const seg of pred.segments) {
+    for (let si = 0; si < pred.segments.length; si++) {
+        const seg = pred.segments[si];
         if (!seg.relPoints || seg.relPoints.length < 2) continue;
         const anchor = getSegmentAnchor(seg);
         const isBurn = !!seg.isBurnArc;
 
-        // 燃烧弧内按 ghost 标记切色（虚拟续烧段暗红），机动后段统一红虚线
+        // 燃烧弧内按 ghost 标记切色（虚拟续烧段暗红），机动后段统一粉色实线
         const subPaths = isBurn ? splitBurnSubPaths(seg.relPoints) : [seg.relPoints];
         for (const pts of subPaths) {
             if (!pts || pts.length < 2) continue;
@@ -792,13 +863,43 @@ function renderManeuverOrbits(ship, ctx, canvas, pred) {
                 ctx.lineWidth = 2.5;
                 ctx.setLineDash([]);
             } else {
-                ctx.strokeStyle = getOrbitColor(seg.soiName, true, seg.isCurrentSoi);
+                // 0.3.0 打磨：机动后段按 SOI 分段配色（当前 SOI = 定稿粉色，其余取机动色池）
+                ctx.strokeStyle = getManeuverColor(seg.soiName, seg.isCurrentSoi);
                 ctx.lineWidth = 2;
-                ctx.setLineDash([6, 5]);
+                ctx.setLineDash([]);
             }
             ctx.stroke();
             ctx.setLineDash([]);
         }
+    }
+
+    // 跨 SOI 衔接线（机动后段链，与主线同口径：仅"子→父"方向；0.3.0 打磨：
+    // 粉色虚线——衔接线保持虚线语义，与主线衔接线 [4,6] 同款，超长降级实线防 dash 段数爆炸）
+    for (let si = 0; si < pred.segments.length - 1; si++) {
+        const seg = pred.segments[si];
+        const nextSeg = pred.segments[si + 1];
+        if (!seg.relPoints || seg.relPoints.length < 2) continue;
+        if (!nextSeg.relPoints || nextSeg.relPoints.length < 2) continue;
+        if (getSOIDirection(seg.soiName, nextSeg.soiName) !== 'up') continue;
+
+        const anchorA = getSegmentAnchor(seg);
+        const anchorB = getSegmentAnchor(nextSeg);
+        const lastP = seg.relPoints[seg.relPoints.length - 1];
+        const firstP = nextSeg.relPoints[0];
+        ctx.beginPath();
+        const s0 = worldToScreen(lastP.x + anchorA.x, lastP.y + anchorA.y, canvas);
+        const s1 = worldToScreen(firstP.x + anchorB.x, firstP.y + anchorB.y, canvas);
+        ctx.moveTo(s0.x, s0.y);
+        ctx.lineTo(s1.x, s1.y);
+        // 衔接线颜色沿用下一段机动配色（与主线衔接线同口径）
+        ctx.strokeStyle = getManeuverColor(nextSeg.soiName, nextSeg.isCurrentSoi);
+        ctx.lineWidth = 2;
+        const linkScreenLen = Math.hypot(s1.x - s0.x, s1.y - s0.y);
+        if (linkScreenLen <= DASHED_RING_MAX_RADIUS) {
+            ctx.setLineDash([4, 6]);
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
     }
 }
 
@@ -922,12 +1023,14 @@ const ORBIT_LABEL_DY = -16;
  * @param {HTMLCanvasElement} canvas
  * @param {Object} ship - 活动飞船
  * @param {Object|null} hoveredMarker - 悬停状态 { type: 'ap'|'pe'|'orbitPoint', ... }（提交 4 接入）
- * @param {Array|null} extraDefs - 外部标记 def（0.3.0 机动节点：燃料耗尽点等），
- *                                形态同 defs（可选 worldAbs 绝对坐标直通 / altM 海拔）
+ * @param {Array|null} extraDefs - 外部标记 def（0.3.0 机动节点：燃料耗尽点/机动后 Ap/Pe 等），
+ *                                形态同 defs（可选 worldAbs 绝对坐标直通 / altM 海拔 / id 覆盖）
+ * @param {Array|null} extraSegments - 附加预测段（0.3.0 打磨：机动后段链），
+ *                                    与主线同口径生成 SOI 穿越标签（id 前缀 mv_ 防与主线冲突）
  * @returns {Array} markers - [{ type, worldX, worldY, screenX, screenY, bodyX, bodyY,
  *                              icon, label, value, tToNext, contextMenu, isHover }]
  */
-function renderOrbitMarkers(ctx, canvas, ship, hoveredMarker, extraDefs = null) {
+function renderOrbitMarkers(ctx, canvas, ship, hoveredMarker, extraDefs = null, extraSegments = null) {
     const markers = [];
 
     // 无活动飞船 / 深空 / 逃逸：清空标签
@@ -987,8 +1090,9 @@ function renderOrbitMarkers(ctx, canvas, ship, hoveredMarker, extraDefs = null) 
         const wy = d.worldAbs ? d.worldAbs.y : (d.world.y + anchor.y);
         const s = worldToScreen(wx, wy, canvas);
         markers.push({
-            // 实例唯一 id（DOM 标签元素标识）：Ap/Pe 每类唯一，用类型本身
-            id: d.typeId,
+            // 实例唯一 id（DOM 标签元素标识）：Ap/Pe 每类唯一，用类型本身；
+            // 外部标记（机动后 Ap/Pe）用显式 id 覆盖（mv_ 前缀）防 DOM 标签冲突
+            id: d.id || d.typeId,
             type: d.typeId,
             worldX: wx, worldY: wy,
             screenX: s.x, screenY: s.y,
@@ -1034,6 +1138,26 @@ function renderOrbitMarkers(ctx, canvas, ship, hoveredMarker, extraDefs = null) 
             if (si > 0) {
                 pushSoiTag(markers, 'soi_entry', si, seg.relPoints[0],
                     seg, segAnchor, hostBody, now, canvas, hoveredMarker);
+            }
+        }
+    }
+
+    // ===== 机动后预测段的 SOI 标签（0.3.0 打磨）：与主线同口径，id 前缀 mv_ 防冲突 =====
+    const mvSegs = extraSegments;
+    if (mvSegs && mvSegs.length > 1 && _lastVisibility.soiLabels !== false) {
+        const now = getCachedTime();
+        for (let si = 0; si < mvSegs.length; si++) {
+            const seg = mvSegs[si];
+            if (!seg.relPoints || seg.relPoints.length < 2) continue;
+            const segAnchor = getSegmentAnchor(seg);
+            const hostBody = celestialBodies.find(b => b.name === seg.anchorBody);
+            if (si < mvSegs.length - 1) {
+                pushSoiTag(markers, 'soi_exit', si, seg.relPoints[seg.relPoints.length - 1],
+                    seg, segAnchor, hostBody, now, canvas, hoveredMarker, 'mv_');
+            }
+            if (si > 0) {
+                pushSoiTag(markers, 'soi_entry', si, seg.relPoints[0],
+                    seg, segAnchor, hostBody, now, canvas, hoveredMarker, 'mv_');
             }
         }
     }
@@ -1092,13 +1216,13 @@ function renderOrbitMarkers(ctx, canvas, ship, hoveredMarker, extraDefs = null) 
 // relPt 为段内相对锚点坐标；id 用"类型+段索引+头尾"保证实例唯一
 // （同一 type 可出现多次——多次穿越有多个离开/进入标签，DOM 元素必须按 id 区分）；
 // name 防御：soiName 缺失时回退 anchorBody，再回退深空文案（防"离开 undefined"）
-function pushSoiTag(markers, typeId, segIndex, relPt, seg, segAnchor, hostBody, now, canvas, hoveredMarker) {
+function pushSoiTag(markers, typeId, segIndex, relPt, seg, segAnchor, hostBody, now, canvas, hoveredMarker, idPrefix = '') {
     const def = ORBIT_POINT_TYPES[typeId];
     if (!def) return;
 
     const name = seg.soiName || seg.anchorBody || t('orbit.type.deepSpace');
     const isExit = typeId === 'soi_exit';
-    const id = typeId + '_' + segIndex + (isExit ? '_out' : '_in');
+    const id = idPrefix + typeId + '_' + segIndex + (isExit ? '_out' : '_in');
     const wx = relPt.x + segAnchor.x;
     const wy = relPt.y + segAnchor.y;
     const s = worldToScreen(wx, wy, canvas);
@@ -1268,7 +1392,7 @@ function getLastOrbitSegments() {
     return _lastOrbitSegments;
 }
 
-// 本帧机动节点预测缓存（0.3.0）：机动 UI 面板/图标读取（plan/segments/nodeScreen/fuelOutMarkerDef）
+// 本帧机动节点预测缓存（0.3.0）：机动 UI 面板/图标读取（plan/segments/nodeScreen/maneuverMarkerDefs）
 function getLastManeuverPrediction() {
     return _lastManeuverPrediction;
 }

@@ -1,10 +1,12 @@
 'use strict';
 
-// 机动节点 UI（0.3.0）— 加速计时器面板 + 节点图标 + 四向分离手柄（DOM 层）
+// 机动节点 UI（0.3.0）— 加速计时器面板 + 节点图标 + 十字型四向手柄（DOM 层）
 // 架构：UI 只订阅事件 + 每帧读渲染层预测缓存（getLastManeuverPrediction），
 //       不直连物理引擎；数据写操作统一走 maneuverSystem
 // 命中分层：图标/手柄/面板为 DOM 元素置于画布之上，天然拦截 canvas 事件
 //   → 图标覆盖区优先于轨道线悬停/右键菜单（KSP 样式）
+// 交互（0.3.0 定稿）：节点存在期间 图标/十字手柄/面板 全部常驻可操作；
+//   空白点击仅终止进行中的拖拽（不隐藏任何元素，拖动能力永不失能）
 
 import { t } from '../config/strings.js';
 import { eventBus, Events } from '../eventBus.js';
@@ -12,7 +14,9 @@ import { maneuverSystem } from '../ship/maneuverSystem.js';
 import { getLastManeuverPrediction, getLastOrbitSegments, findNearestOrbitPoint, resolveOrbitHit } from '../renderer.js';
 import { screenToWorld, cssToCanvas, canvasToCss, worldToScreen } from '../camera.js';
 import { getCachedTime, bodyFuturePos } from '../physics/orbitalPrediction.js';
+import { walkToTime } from '../physics/maneuverPrediction.js';
 import { celestialBodies } from '../physics/physics.js';
+import { textureManager } from '../graphics/textureManager.js';
 import { timeWarp } from '../timeWarp.js';
 import { formatTCountdown } from '../utils/format.js';
 import { MANEUVER_CONFIG } from '../config/maneuverConfig.js';
@@ -20,34 +24,43 @@ import { MANEUVER_CONFIG } from '../config/maneuverConfig.js';
 // ===== 模块状态 =====
 let _panel = null;          // 加速计时器面板
 let _icon = null;           // 节点图标（空心圆）
-let _handles = {};          // 四向分离手柄 DOM
+let _handles = {};          // 十字型四向手柄 DOM
+let _lines = {};            // 中心圆 → 方向图标的实线衔接线
 let _canvas = null;
 let _initialized = false;
-let _drag = null;           // { mode:'time' } | { mode:'dv', axis, startClientX/Y, lastDelta, axes }
+let _editing = true;        // 编辑态开关：true=十字手柄+衔接线显示；false=完全隐藏（点节点图标重开）
+let _drag = null;           // { mode:'time' } | { mode:'dv', axis, dist, lastTick, rafId, axes }
 let _lastShip = null;       // 本帧活动飞船（按钮点击/拖拽事件用）
 
-// 手柄轴顺序：pro / retro / radIn / radOut
+// 十字型手柄布局（屏幕空间固定，不随轨道方向旋转）：
+//   上=径向朝外 下=径向朝内 右=顺向 左=逆向（dy 向下为正，0.3.0 打磨定稿）
 const HANDLE_AXES = ['pro', 'retro', 'radIn', 'radOut'];
+const HANDLE_LAYOUT = {
+    pro: { dx: 1, dy: 0 },
+    retro: { dx: -1, dy: 0 },
+    radIn: { dx: 0, dy: 1 },
+    radOut: { dx: 0, dy: -1 }
+};
+// 手柄图标：复用 SAS 方向图标纹理（dir_*）+ 导航球配色（白线模板 source-in 染色）
+const HANDLE_ICONS = {
+    pro: { tex: 'dir_prograde', color: MANEUVER_CONFIG.handleProgradeColor },
+    retro: { tex: 'dir_retrograde', color: MANEUVER_CONFIG.handleProgradeColor },
+    radIn: { tex: 'dir_radial_in', color: MANEUVER_CONFIG.handleRadialColor },
+    radOut: { tex: 'dir_radial_out', color: MANEUVER_CONFIG.handleRadialColor }
+};
+// 染色 dataURL 缓存（texture/color 组合，40px 高清底图）
+const _iconDataUrlCache = new Map();
 
 // ===== DOM 构建（懒初始化） =====
 function ensureDom() {
     if (_initialized) return;
 
-    // 主题变量注入（CSS var 兜底之外由配置显式驱动）
-    const root = document.documentElement;
-    root.style.setProperty('--node-icon-border', MANEUVER_CONFIG.nodeIconBorder);
-    root.style.setProperty('--handle-prograde', MANEUVER_CONFIG.handleProgradeColor);
-    root.style.setProperty('--handle-radial', MANEUVER_CONFIG.handleRadialColor);
-
     // 面板
     _panel = document.createElement('div');
     _panel.id = 'maneuverPanel';
     _panel.style.display = 'none';
-    _panel.style.left = MANEUVER_CONFIG.panelLeft + 'px';
-    _panel.style.bottom = MANEUVER_CONFIG.panelBottom + 'px';
     _panel.innerHTML =
         '<div class="maneuver-title">' +
-            '<div class="maneuver-badge"></div>' +
             '<div class="maneuver-title-text"></div>' +
             '<div class="maneuver-title-line"></div>' +
         '</div>' +
@@ -84,14 +97,13 @@ function ensureDom() {
 
     // 静态文案
     _panel.querySelector('.maneuver-title-text').textContent = t('maneuver.panelTitle');
-    _panel.querySelector('.maneuver-badge').textContent = t('maneuver.badge');
     const rows = _panel.querySelectorAll('.maneuver-row');
     const rowKeys = ['maneuver.dvNeeded', 'maneuver.burnStartAt', 'maneuver.burnStopAt'];
     for (let i = 0; i < rows.length; i++) {
         rows[i].querySelector('.maneuver-label').textContent = t(rowKeys[i]);
     }
     const greenBtn = _panel.querySelector('.maneuver-btn-green');
-    greenBtn.textContent = '➤➤';
+    greenBtn.textContent = '>>';
     greenBtn.title = t('maneuver.warpToBurnTip');
     const redBtn = _panel.querySelector('.maneuver-btn-red');
     redBtn.textContent = '🗑';
@@ -127,7 +139,7 @@ function ensureDom() {
         }
     });
 
-    // 节点图标 + 四向手柄
+    // 节点图标 + 十字手柄
     _icon = document.createElement('div');
     _icon.className = 'maneuver-node-icon';
     _icon.style.display = 'none';
@@ -144,14 +156,22 @@ function ensureDom() {
             e.preventDefault();
             beginDvDrag(axis, e);
         });
+        // 中心圆 → 方向图标衔接线（轴对齐实线，颜色 = 对应图标色；拖拽随手柄延伸）
+        const ln = document.createElement('div');
+        ln.className = 'maneuver-handle-line';
+        ln.style.display = 'none';
+        ln.style.background = HANDLE_ICONS[axis].color;
+        document.body.appendChild(ln);
+        _lines[axis] = ln;
     }
     _icon.addEventListener('pointerdown', (e) => {
         e.stopPropagation();
         e.preventDefault();
+        _editing = true;          // 点图标 → 展开编辑
         beginTimeDrag(e);
     });
 
-    // 拖拽期间全局监听（mouseup/pointerup 到 window，防拖出元素丢事件）
+    // 拖拽期间全局监听（pointerup 到 window，防拖出元素丢事件）
     window.addEventListener('pointermove', onDragMove);
     window.addEventListener('pointerup', onDragEnd);
 
@@ -166,7 +186,29 @@ function emitClickSound(el) {
     eventBus.emit(Events.UI_CLICKED, { variant: 'normal', yRatio });
 }
 
-// ===== 拖拽（时间 / Δv 轴） =====
+// 方向图标染色 dataURL（与 sasUI._tintImage 同款：白色单色模板 + source-in 纯色填充；
+// 输出缓存，避免每帧重建）
+function tintedIconDataUrl(texKey, color) {
+    const cacheKey = texKey + '|' + color;
+    if (_iconDataUrlCache.has(cacheKey)) return _iconDataUrlCache.get(cacheKey);
+    const img = textureManager.get(texKey);
+    if (!img) return null;
+    const size = 40;
+    const off = document.createElement('canvas');
+    off.width = size;
+    off.height = size;
+    const octx = off.getContext('2d');
+    octx.drawImage(img, 0, 0, size, size);
+    octx.globalCompositeOperation = 'source-in';
+    octx.fillStyle = color;
+    octx.fillRect(0, 0, size, size);
+    octx.globalCompositeOperation = 'source-over';
+    const url = off.toDataURL();
+    _iconDataUrlCache.set(cacheKey, url);
+    return url;
+}
+
+// ===== 拖拽（时间 / Δv 轴速率式） =====
 function beginTimeDrag(e) {
     _drag = { mode: 'time' };
     _icon.setPointerCapture(e.pointerId);
@@ -178,24 +220,44 @@ function beginDvDrag(axis, e) {
     _drag = {
         mode: 'dv',
         axis,
+        // 拖拽基准 = 图标初始位置（按下点 client 坐标）：未拖动时零速率
         startClientX: e.clientX,
         startClientY: e.clientY,
-        lastDelta: 0,
+        dist: 0,                        // 当前拖拽距离（CSS px，从初始位置沿布局轴向外）
+        lastTick: performance.now(),    // 速率累计计时基准（真实秒）
+        rafId: null,
         axes: pred.plan.axes
     };
     _handles[axis].setPointerCapture(e.pointerId);
+}
+
+// 速率式累计循环：rate = (拖拽距离/拖拽范围) × 最大速率(150 m/s·s)，按真实时间注入 Δv；
+// 拖拽距离从图标初始位置起算（拖前零速率），反向被 clamp 为 0
+function tickDvAccumulate() {
+    if (!_drag || _drag.mode !== 'dv') return;
+    const now = performance.now();
+    const dtReal = Math.max(0, (now - _drag.lastTick) / 1000);
+    _drag.lastTick = now;
+    if (dtReal > 0) {
+        const cfg = MANEUVER_CONFIG;
+        const rate = (Math.min(_drag.dist, cfg.handleDragRange) / cfg.handleDragRange) * cfg.handleMaxRate;
+        if (rate > 0.001 && _lastShip) {
+            maneuverSystem.updateNodeDeltaV(_lastShip, _drag.axis, rate * dtReal, _drag.axes);
+        }
+    }
+    _drag.rafId = window.requestAnimationFrame(tickDvAccumulate);
 }
 
 function onDragMove(e) {
     if (!_drag || !_canvas) return;
     const ship = _lastShip;
     if (!ship) {
-        _drag = null;
+        onDragEnd();
         return;
     }
 
     if (_drag.mode === 'time') {
-        // 图标沿轨道拖动 → 命中当前帧预测链 → 重算节点时刻与轨道坐标
+        // 图标沿轨道拖动 → 命中当前帧预测链 → 重算节点时刻/轨道坐标/速度快照
         const rect = _canvas.getBoundingClientRect();
         const canvasPt = cssToCanvas(e.clientX - rect.left, e.clientY - rect.top, _canvas);
         const world = screenToWorld(canvasPt.x, canvasPt.y, _canvas);
@@ -206,34 +268,40 @@ function onDragMove(e) {
                 const seg = segments[hit.segmentIndex];
                 const absTime = seg.anchorTime + hit.timeOffset;
                 const cur = resolveOrbitHit(hit, _canvas);
+                let velRel = null;
+                try {
+                    const st = walkToTime(segments, absTime);
+                    if (st && st.relVel) velRel = st.relVel;
+                } catch (err) { /* 瞬时缺失 → 跳过速度快照 */ }
                 maneuverSystem.updateNodeTime(ship, {
                     time: absTime,
                     relX: cur ? cur.relX : null,
                     relY: cur ? cur.relY : null,
-                    anchorBody: cur ? cur.anchorBody : null
+                    anchorBody: cur ? cur.anchorBody : null,
+                    velRel
                 });
             }
         }
     } else if (_drag.mode === 'dv') {
-        // 手柄沿节点参考系轴拖动 → 屏幕位移投影到轴方向 → Δv（灵敏度配置）
-        const pred = getLastManeuverPrediction();
-        if (!pred || !pred.plan || !pred.nodeScreen || !pred.plan.nodeState) return;
-        const axis = _drag.axes[_drag.axis];
-        if (!axis) return;
-        const dir = axisScreenDir(axis, pred, _canvas);
-        const signed = (e.clientX - _drag.startClientX) * dir.x + (e.clientY - _drag.startClientY) * dir.y;
-        // CSS 像素 → Δv（灵敏度配置）
-        const delta = signed * MANEUVER_CONFIG.handleDvPerPixel;
-        maneuverSystem.updateNodeDeltaV(ship, _drag.axis, delta - _drag.lastDelta, _drag.axes);
-        _drag.lastDelta = delta;
+        // 速率式手柄：拖拽距离 = 从"图标初始位置（按下点）"沿布局轴的投影位移；
+        // 从图标起算 → 未拖动时零速率；反向（向内）clamp 0，仅允许向外拖
+        const dir = HANDLE_LAYOUT[_drag.axis];
+        const signed = (e.clientX - _drag.startClientX) * dir.dx + (e.clientY - _drag.startClientY) * dir.dy;
+        _drag.dist = Math.max(0, signed);
+        if (!_drag.rafId) {
+            _drag.rafId = window.requestAnimationFrame(tickDvAccumulate);
+        }
     }
 }
 
 function onDragEnd() {
+    if (_drag && _drag.rafId) {
+        window.cancelAnimationFrame(_drag.rafId);
+    }
     _drag = null;
 }
 
-// ===== 事件订阅：到达 / 完成 通知（音效由 audioDirector 订阅同一事件） =====
+// ===== 事件订阅：到达 / 完成（音效由 audioDirector 订阅同一事件） =====
 eventBus.on(Events.MANEUVER_ARRIVED, () => {
     if (typeof window.showNotification === 'function') {
         window.showNotification(t('maneuver.arrived'), 'info');
@@ -280,27 +348,76 @@ export function updateManeuverUI(canvas, ship) {
         _icon.style.display = 'block';
         _icon.style.left = iconCss.x + 'px';
         _icon.style.top = iconCss.y + 'px';
-        // 手柄：沿节点参考系轴偏移（无轴数据时隐藏手柄）
+        // 十字手柄：编辑态开关控制（true=显示；false=完全隐藏——空白点击关闭后
+        // 需点击节点图标重新进入编辑；轴数据不可用/节点完成时同样隐藏）。
         const axes = plan ? plan.axes : null;
-        const showHandles = !!axes && !node.executed;
+        const showHandles = _editing && !!axes && !node.executed;
+        const iconHalf = cfg.handleIconSize / 2;
         for (const axis of HANDLE_AXES) {
             const h = _handles[axis];
+            const ln = _lines[axis];
             if (!showHandles || !axes[axis]) {
                 h.style.display = 'none';
+                if (ln) ln.style.display = 'none';
                 continue;
             }
-            // 轴屏幕方向
-            const sDir = axisScreenDir(axes[axis], pred, canvas);
+            // 屏幕固定十字方向；拖拽该轴时从初始位置向外递进（动画反馈，距离∝速率；
+            // 反向被 clamp 0 → 手柄不低于静止位）
+            const dir = HANDLE_LAYOUT[axis];
+            const dragDist = (_drag && _drag.mode === 'dv' && _drag.axis === axis)
+                ? _drag.dist
+                : null;
+            const dist = dragDist !== null
+                ? cfg.handleOffset + Math.min(dragDist, cfg.handleDragRange)
+                : cfg.handleOffset;
             h.style.display = 'block';
-            h.style.left = (iconCss.x + sDir.x * cfg.handleOffset) + 'px';
-            h.style.top = (iconCss.y + sDir.y * cfg.handleOffset) + 'px';
+            h.style.left = (iconCss.x + dir.dx * dist) + 'px';
+            h.style.top = (iconCss.y + dir.dy * dist) + 'px';
+            // 图标：现行 SAS 方向图标（dir_* 纹理 + 导航球色染色），纹理未就绪时兜底无底色
+            const icon = HANDLE_ICONS[axis];
+            if (icon) {
+                const url = tintedIconDataUrl(icon.tex, icon.color);
+                if (url && h.style.backgroundImage !== 'url(' + url + ')') {
+                    h.style.backgroundImage = 'url(' + url + ')';
+                }
+            }
+            // 衔接线：编辑态显示（中心圆边缘 → 当前手柄图标边缘，各让 4px 间隙）
+            const startD = 11 + 4;
+            const endD = dist - iconHalf - 4;
+            if (endD > startD + 1) {
+                ln.style.display = 'block';
+                if (dir.dx === 0) {
+                    // 垂直轴（上/下）
+                    const yTop = dir.dy < 0 ? (iconCss.y - endD) : (iconCss.y + startD);
+                    ln.style.left = (iconCss.x - 1) + 'px';
+                    ln.style.top = yTop + 'px';
+                    ln.style.width = '2px';
+                    ln.style.height = (endD - startD) + 'px';
+                } else {
+                    // 水平轴（左/右）
+                    const xLeft = dir.dx < 0 ? (iconCss.x - endD) : (iconCss.x + startD);
+                    ln.style.left = xLeft + 'px';
+                    ln.style.top = (iconCss.y - 1) + 'px';
+                    ln.style.width = (endD - startD) + 'px';
+                    ln.style.height = '2px';
+                }
+            } else {
+                ln.style.display = 'none';
+            }
         }
     } else {
         _icon.style.display = 'none';
-        for (const axis of HANDLE_AXES) _handles[axis].style.display = 'none';
+        for (const axis of HANDLE_AXES) {
+            _handles[axis].style.display = 'none';
+            if (_lines[axis]) _lines[axis].style.display = 'none';
+        }
     }
 
-    // ---- 面板读卡 ----
+    // ---- 面板（常驻：节点存在即显示；空白点击仅收起手柄编辑） ----
+    // 锚定：时间加速面板（#timeWarpWrap bottom 12px 居中）正上方居中
+    const warpWrap = document.getElementById('timeWarpWrap');
+    const warpH = warpWrap ? warpWrap.offsetHeight : 0;
+    _panel.style.bottom = (12 + warpH + cfg.panelGap) + 'px';
     _panel.style.display = 'block';
     const rows = _panel.querySelectorAll('.maneuver-row');
     const values = rows[0].querySelector('.maneuver-value');
@@ -310,11 +427,11 @@ export function updateManeuverUI(canvas, ship) {
     const stopVal = rows[2].querySelector('.maneuver-value');
     stopVal.textContent = 'T-' + formatTCountdown(Math.max(0, node.time + burnT - now));
 
-    // ---- 进度条（Δv 达成比例） ----
+    // ---- 进度条（0.3.0 打磨：项目绿满 → 消耗式向左缩小归零；宽度 = 剩余/计划） ----
     const fill = _panel.querySelector('.maneuver-bar-fill');
     const ratio = progress.planned > 0
-        ? Math.max(0, Math.min(1, 1 - progress.remaining / progress.planned))
-        : 0;
+        ? Math.max(0, Math.min(1, progress.remaining / progress.planned))
+        : 1;
     fill.style.width = (ratio * 100).toFixed(1) + '%';
 
     // ---- 三段倒计时状态灯 ----
@@ -360,20 +477,6 @@ function ledsToClasses(total, count, topClass, baseClass) {
     return arr;
 }
 
-// 轴向量 → 屏幕方向单位向量（画布物理像素空间；方向无量纲，CSS 空间点积同值）
-function axisScreenDir(axis, pred, canvas) {
-    if (!pred.nodeScreen || !pred.plan.nodeState) return { x: 1, y: 0 };
-    const hp = bodyFuturePos(pred.plan.nodeState.host, getCachedTime());
-    const wx = pred.plan.nodeState.relPos.x + hp.x;
-    const wy = pred.plan.nodeState.relPos.y + hp.y;
-    const tip = worldToScreen(wx + axis.x * 1000, wy + axis.y * 1000, canvas);
-    const dx = tip.x - pred.nodeScreen.x;
-    const dy = tip.y - pred.nodeScreen.y;
-    const len = Math.hypot(dx, dy);
-    if (len < 1e-6) return { x: 1, y: 0 };
-    return { x: dx / len, y: dy / len };
-}
-
 // 世界坐标 → CSS 坐标（与 renderer.worldToScreen 同口径后转 CSS）
 function worldToCanvasCss(wx, wy, canvas) {
     const s = worldToScreen(wx, wy, canvas);
@@ -382,12 +485,21 @@ function worldToCanvasCss(wx, wy, canvas) {
 
 // ===== 场景退出清理（flightScene exit 调用） =====
 export function hideManeuverUI() {
-    _drag = null;
+    onDragEnd();
+    _editing = true;          // 下次进入恢复展开态
     if (_panel) _panel.style.display = 'none';
     if (_icon) _icon.style.display = 'none';
     for (const axis of HANDLE_AXES) {
         if (_handles[axis]) _handles[axis].style.display = 'none';
+        if (_lines[axis]) _lines[axis].style.display = 'none';
     }
+}
+
+// 空白点击：彻底关闭编辑（收起方向图标与衔接线；面板/节点图标常驻；
+// 点击节点图标重新进入编辑）
+export function collapseManeuverEditing() {
+    onDragEnd();
+    _editing = false;
 }
 
 // 拖拽中（flightScene 跳过轨道悬停检测）

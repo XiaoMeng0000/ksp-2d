@@ -82,5 +82,16 @@ const r4 = predictManeuverTrajectories(ship, { time: tNode, deltaV: { x: 0, y: 0
 check('T7 零Δv节点 axes 可用', !!r4.plan.axes && !!r4.plan.axes.pro);
 check('T7 零Δv节点无燃烧弧/时长null', r4.segments.length === 0 && r4.plan.burnDuration === null);
 
+// T8: 节点时刻已过（walk 链外）→ 冻结快照重建状态，预测线保持（永不失效）
+const snap = { relX: walked.relPos.x, relY: walked.relPos.y, relVelX: walked.relVel.x, relVelY: walked.relVel.y };
+const nodePast = {
+    time: -60, deltaV: { x: 50 * Math.cos(dvPro), y: 50 * Math.sin(dvPro) }, executed: false,
+    relX: snap.relX, relY: snap.relY, relVelX: snap.relVelX, relVelY: snap.relVelY,
+    anchorBody: home.name
+};
+const r5 = predictManeuverTrajectories(ship, nodePast, segments);
+check('T8 冻结快照优先（燃烧后不漂移）', r5.segments.length > 0 && !!r5.burnArc);
+check('T8 快照状态标记 pinned', r5.plan.nodeState && r5.plan.nodeState.pinned === true);
+
 console.log(`\n结果: ${pass} 通过 / ${fail} 失败`);
 process.exit(fail > 0 ? 1 : 0);

@@ -19,7 +19,8 @@ import { timeWarp } from '../timeWarp.js';
 import { shipSystem } from '../ship/shipSystem.js';
 import { maneuverSystem } from '../ship/maneuverSystem.js';
 import { timeToNextSOISwitch } from '../physics/orbitalPrediction.js';
-import { getLastOrbitMarkers } from '../renderer.js';
+import { getLastOrbitMarkers, getLastOrbitSegments } from '../renderer.js';
+import { walkToTime } from '../physics/maneuverPrediction.js';
 
 // 菜单项定义（数据驱动：action 行为标识 + 图标字符 + strings key）
 const MENU_ITEMS = [
@@ -115,11 +116,20 @@ export function showOrbitContextMenu(clientX, clientY, data, canvas) {
                     return;
                 }
                 if (_menuData && _menuData.absTime !== null && _menuData.absTime !== undefined) {
+                    // 冻结节点时刻速度快照（0.3.0 打磨：节点时刻已过时重建预测状态，永不失效）
+                    let velRel = null;
+                    try {
+                        const st = walkToTime(getLastOrbitSegments(), _menuData.absTime);
+                        if (st && st.relVel) velRel = st.relVel;
+                    } catch (err) {
+                        // 预测链瞬时缺失（如模式切换过渡帧）→ 跳过速度快照，走退化显示
+                    }
                     const result = maneuverSystem.createNode(ship, {
                         time: _menuData.absTime,
                         relX: _menuData.relX,
                         relY: _menuData.relY,
-                        anchorBody: _menuData.anchorBody || _menuData.soiName || null
+                        anchorBody: _menuData.anchorBody || _menuData.soiName || null,
+                        velRel
                     });
                     if (result.ok) {
                         if (typeof window.showNotification === 'function') {

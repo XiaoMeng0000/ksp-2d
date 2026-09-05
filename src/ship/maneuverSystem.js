@@ -63,7 +63,10 @@ class ManeuverSystem {
             // 轨道坐标冻结锚（图标随轨道线移动、预测不可用时回退显示）
             relX: (data.relX !== null && data.relX !== undefined) ? data.relX : null,
             relY: (data.relY !== null && data.relY !== undefined) ? data.relY : null,
-            anchorBody: data.anchorBody || null
+            anchorBody: data.anchorBody || null,
+            // 节点时刻速度快照（host 局部系，0.3.0 打磨）：节点时刻已过/链外时重建预测状态
+            relVelX: (data.velRel && isFinite(data.velRel.x)) ? data.velRel.x : null,
+            relVelY: (data.velRel && isFinite(data.velRel.y)) ? data.velRel.y : null
         };
         ship.maneuverNodes.push(node);
         this._resetTracking(this._nodeKey(node));
@@ -95,7 +98,8 @@ class ManeuverSystem {
         return true;
     }
 
-    // 沿轨道拖动改节点时刻（data: { time, relX, relY, anchorBody }）
+    // 沿轨道拖动改节点时刻（data: { time, relX, relY, anchorBody, velRel? }；
+    // velRel 可选——拖动命中链内时由调用方经 walkToTime 给出速度快照）
     updateNodeTime(ship, data) {
         const node = this.getNode(ship);
         if (!node || !data || !isFinite(data.time)) return false;
@@ -103,6 +107,10 @@ class ManeuverSystem {
         if (data.relX !== null && data.relX !== undefined) node.relX = data.relX;
         if (data.relY !== null && data.relY !== undefined) node.relY = data.relY;
         if (data.anchorBody) node.anchorBody = data.anchorBody;
+        if (data.velRel && isFinite(data.velRel.x) && isFinite(data.velRel.y)) {
+            node.relVelX = data.velRel.x;
+            node.relVelY = data.velRel.y;
+        }
         this._resetTracking(this._nodeKey(node));
         return true;
     }
@@ -136,10 +144,12 @@ class ManeuverSystem {
             this._applied.y += ship.thrust.ay * dt;
         }
 
-        // 3) 完成判定（零 Δv 节点不算完成：需玩家拖手柄给出目标后才有判定意义）
+        // 3) 完成判定（防假完成：计划 Δv 需 ≥ completionMinDv 才有判定意义，
+        // 否则点一下手柄注入的 0.x m/s 会瞬间判完成 → 节点灰态、手柄全消失）
         if (!node.executed) {
             const progress = this.getProgress(ship);
-            if (progress.planned > 0 && progress.remaining <= MANEUVER_CONFIG.completionTolerance) {
+            if (progress.planned >= MANEUVER_CONFIG.completionMinDv
+                && progress.remaining <= MANEUVER_CONFIG.completionTolerance) {
                 node.executed = true;
                 // 冲量对齐到节点 Δv：剩余精确归零，进度条满格、读数 0/47
                 this._applied = { x: node.deltaV.x, y: node.deltaV.y };
@@ -161,7 +171,8 @@ class ManeuverSystem {
             applied: { x: this._applied.x, y: this._applied.y },
             remaining,
             planned,
-            done: planned > 0 && (node.executed || remaining <= MANEUVER_CONFIG.completionTolerance)
+            done: planned >= MANEUVER_CONFIG.completionMinDv
+                && (node.executed || remaining <= MANEUVER_CONFIG.completionTolerance)
         };
     }
 }

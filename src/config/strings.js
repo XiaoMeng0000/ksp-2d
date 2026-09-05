@@ -304,7 +304,6 @@ const STRINGS = {
 
     // ---------- 机动节点（0.3.0：加速计时器面板 / 节点交互） ----------
     'maneuver.panelTitle': '加速计时器',
-    'maneuver.badge': '动',
     'maneuver.dvNeeded': '需要ΔV',
     'maneuver.burnStartAt': '加速开始于',
     'maneuver.burnStopAt': '加速停止于',

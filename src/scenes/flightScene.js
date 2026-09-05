@@ -8,7 +8,7 @@ import { stateToKepler } from '../physics/orbitalMechanics.js';
 import { getTimeToNextSOISwitch } from '../physics/orbitalPrediction.js';
 import { render, renderFlightHud, getLastOrbitSegments, getLastOrbitMarkers, setOrbitHoverState, findNearestOrbitPoint, resolveOrbitHit } from '../renderer.js';
 import { showOrbitContextMenu, updateOrbitContextMenu } from '../ui/orbitContextMenu.js';
-import { updateManeuverUI, hideManeuverUI, isManeuverDragging } from '../ui/maneuverUI.js';
+import { updateManeuverUI, hideManeuverUI, isManeuverDragging, collapseManeuverEditing } from '../ui/maneuverUI.js';
 import { maneuverSystem } from '../ship/maneuverSystem.js';
 import { formatDuration } from '../utils/format.js';
 import { sceneManager } from '../sceneManager.js';
@@ -515,6 +515,8 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                             return;
                         }
                     }
+                    // 0.3.0 打磨：点击空白（未命中设施/SAS/轨道线）→ 收起机动节点编辑
+                    collapseManeuverEditing();
                     return;
                 }
 
