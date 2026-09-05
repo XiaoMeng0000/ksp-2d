@@ -485,6 +485,8 @@ export function registerTrackingScene({ getTime, setTime, canvas }) {
             render(ctx, _canvas, activeShip, {
                 visibility: { ships: true, facilities: true, bodyOrbits: true },
                 facilities: renderFacilities,
+                // 0.2.5（H4）：渲染层不直连业务模块，飞船列表由场景层注入
+                ships: shipSystem.getAllShips(),
                 selectedFacilityId: selectedFacId
             });
         }

@@ -33,7 +33,9 @@ function _getActiveShipName() {
     return ship ? (ship.displayName || ship.id) : '';
 }
 
-let _lastShipName = null;
+// 0.2.5（M10）：缓存键 = 模式 + 船名 —— 旧实现只比较船名，
+// 游戏模式变化而船名不变时（同场景内改模式）左上角模式文字不刷新
+let _lastHudKey = null;
 
 function renderHud() {
     // 0.2.5（方案 A）：直接引用读取 —— 旧实现每秒 getState() 全量深拷贝整个游戏状态
@@ -42,11 +44,11 @@ function renderHud() {
     const modeText = MODE_TEXT[mode] || mode;
     const shipName = _getActiveShipName();
 
-    // 载具名变化才重写 DOM（避免每帧/每次轮询无谓刷新）
-    if (shipName === _lastShipName) {
+    const key = mode + '|' + shipName;
+    if (key === _lastHudKey) {
         return;
     }
-    _lastShipName = shipName;
+    _lastHudKey = key;
 
     let html = `<button class="prh-mode prh-mode-${mode}" title="${t('common.settings')}">${modeText}</button>`;
     if (shipName) {
@@ -77,7 +79,7 @@ eventBus.on(Events.GAME_STATE_CHANGED, (data) => {
 eventBus.on(Events.SCENE_CHANGED, (data) => {
     const gameScenes = ['flight', 'tracking', 'galaxies'];
     hudEl.style.display = gameScenes.includes(data.to) ? 'flex' : 'none';
-    _lastShipName = null;
+    _lastHudKey = null;
     renderHud();
 });
 hudEl.style.display = 'none';

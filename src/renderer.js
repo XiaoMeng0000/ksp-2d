@@ -47,12 +47,29 @@ let _lastOrbitMarkers = [];      // 本帧 Ap/Pe 标记屏幕位置（renderOrbi
 let _orbitHoverState = null;     // 悬停状态（setOrbitHoverState 写入，标记绘制消费）
 let _lastVisibility = {};        // 本帧可见性选项（render 写入，SOI 标签开关等消费）
 
+// rgba 字符串缓存（0.2.5 A8：hexToRgba 每帧对每个天体/设施重复 parse+拼接，按 (hex,alpha) 缓存）
+const _rgbaCache = new Map();
 function hexToRgba(hex, alpha) {
+    const key = hex + '|' + alpha;
+    const cached = _rgbaCache.get(key);
+    if (cached) return cached;
     const r = parseInt(hex.slice(1, 3), 16);
     const g = parseInt(hex.slice(3, 5), 16);
     const b = parseInt(hex.slice(5, 7), 16);
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    const out = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    if (_rgbaCache.size < 512) _rgbaCache.set(key, out);   // 有界缓存防无限增长
+    return out;
 }
+
+// 轨道线非当前 SOI 的颜色池（0.2.5 A8：原为 getOrbitColor 内每帧新建数组 → 模块常量）
+const ORBIT_BRIGHT_COLORS = [
+    'rgba(68, 255, 136, 0.8)',
+    'rgba(255, 255, 68, 0.8)',
+    'rgba(255, 68, 255, 0.8)',
+    'rgba(68, 255, 255, 0.8)',
+    'rgba(255, 136, 68, 0.8)',
+    'rgba(136, 68, 255, 0.8)'
+];
 
 /**
  * 渲染天体图层（贴图 + 程序效果）
@@ -259,7 +276,14 @@ function drawBodyOrbits(ctx, canvas) {
 }
 
 function render(ctx, canvas, activeShip, options = {}) {
-    const { visibility = { ships: false, facilities: false, bodyOrbits: true }, facilities = [], selectedFacilityId = null } = options;
+    // 0.2.5（H4）：渲染层无业务逻辑 —— 非活动飞船列表由场景层经 options 注入，
+    // 不再直连 window.__shipSystem（旧实现绕过 GameState/eventBus，依赖全局挂载时序）
+    const {
+        visibility = { ships: false, facilities: false, bodyOrbits: true },
+        facilities = [],
+        ships = [],
+        selectedFacilityId = null
+    } = options;
     // 供标记层消费本次可见性（SOI 切换标签开关等；模块级状态，与悬停通道同风格）
     _lastVisibility = visibility;
     ctx.fillStyle = 'black';
@@ -392,9 +416,8 @@ function render(ctx, canvas, activeShip, options = {}) {
     let shipsToRender = [];
     if (activeShip) shipsToRender.push(activeShip);
     if (visibility.ships) {
-        const allShips = window.__shipSystem?.getAllShips() || [];
-        for (const s of allShips) {
-            if (s.id !== activeShip?.id) shipsToRender.push(s);
+        for (const s of ships) {
+            if (s && s.id !== (activeShip && activeShip.id)) shipsToRender.push(s);
         }
     }
 
@@ -541,18 +564,10 @@ function getOrbitColor(soiName, isManeuver = false, isCurrentSoi = false) {
     if (isManeuver) return 'rgba(255, 68, 68, 0.8)';
     if (isCurrentSoi) return 'rgba(64, 224, 80, 0.85)';
 
-    const brightColors = [
-        'rgba(68, 255, 136, 0.8)',
-        'rgba(255, 255, 68, 0.8)',
-        'rgba(255, 68, 255, 0.8)',
-        'rgba(68, 255, 255, 0.8)',
-        'rgba(255, 136, 68, 0.8)',
-        'rgba(136, 68, 255, 0.8)'
-    ];
     const safeName = soiName || t('orbit.type.deepSpace');
     let hash = 0;
     for (let i = 0; i < safeName.length; i++) hash = (hash * 31 + safeName.charCodeAt(i)) | 0;
-    return brightColors[Math.abs(hash) % brightColors.length];
+    return ORBIT_BRIGHT_COLORS[Math.abs(hash) % ORBIT_BRIGHT_COLORS.length];
 }
 
 // 判断两个 SOI 天体之间的层级方向
@@ -594,7 +609,17 @@ function renderOrbit(ship, ctx, canvas, isActive = true) {
     }
 
     // 非活动飞船只显示当前 SOI 段（第 0 段），避免跨 SOI 预测复杂性
-    if (!segments || !Array.isArray(segments)) return;
+    if (!segments || !Array.isArray(segments)) {
+        // 0.2.5（M1）：预测段缺失/非法（如模式切换过渡帧）时显式清空轨道缓存与标签——
+        // 旧实现直接 return，_lastOrbitSegments/_lastOrbitMarkers 保留上一帧旧轨道，
+        // 悬停检测与右键菜单会读到过期几何（与 ship=null 分支行为不一致）
+        if (isActive) {
+            _lastOrbitSegments = null;
+            _lastOrbitMarkers = [];
+            syncOrbitLabels([], canvas);
+        }
+        return;
+    }
     // 骨架：缓存本帧活动飞船的预测段，供悬停检测 / 右键菜单读取（通道，交互层只读）
     if (isActive) _lastOrbitSegments = segments;
     const maxSegIdx = isActive ? segments.length - 1 : 0;

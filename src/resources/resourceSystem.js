@@ -15,22 +15,22 @@ export function getResource(holder, resourceId) {
 }
 
 // 设置资源存量（amount 自动截断到 [0, capacity]）
+// 0.2.5（M13）：容量为数字（含 0）时按其钳制 —— 0 容量槽 = 不可存，与 addResource 一致；
+// 仅容量字段缺失/非数字时视为无上限（玩家全局资源如科技点没有 capacity 字段）
 export function setResource(holder, resourceId, amount) {
     const slot = getResource(holder, resourceId);
     if (!slot) return false;
-    const cap = typeof slot.capacity === 'number' && slot.capacity > 0 ? slot.capacity : Infinity;
+    const cap = typeof slot.capacity === 'number' ? slot.capacity : Infinity;
     slot.amount = Math.max(0, Math.min(cap, amount));
     return true;
 }
 
-// 增加资源存量（不超容量）
+// 增加资源存量（不超容量；0.2.5 M13：负值入账被下限钳制，容量 0 时不可存）
 export function addResource(holder, resourceId, amount) {
     const slot = getResource(holder, resourceId);
     if (!slot) return false;
-    slot.amount += amount;
-    if (typeof slot.capacity === 'number' && slot.capacity > 0) {
-        slot.amount = Math.min(slot.amount, slot.capacity);
-    }
+    const cap = typeof slot.capacity === 'number' ? slot.capacity : Infinity;
+    slot.amount = Math.max(0, Math.min(cap, slot.amount + amount));
     return true;
 }
 

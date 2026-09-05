@@ -84,8 +84,13 @@ class SaveManager {
         return this._playerProfile;
     }
 
+    // 0.2.5（H2d）：先拷贝再合并 —— _playerProfile 可能与最近存档世界的 world.player 共享引用
+    //（saveCheckpoint 末尾赋值），旧实现直接 Object.assign 会顺带改写该世界的 player 数据
+    //（脏写不进磁盘，刷新后该世界档案与本地档案不一致）
     updatePlayerProfile(updates) {
-        Object.assign(this._playerProfile, updates);
+        const merged = JSON.parse(JSON.stringify(this._playerProfile));
+        Object.assign(merged, updates);
+        this._playerProfile = merged;
         this._savePlayerProfile();
     }
 
@@ -320,7 +325,8 @@ class SaveManager {
         // 0.2.5 修复 H2a：写入前必须过 _sanitizePlayerForSave（与 createWorld/loadCheckpoint 口径一致），
         // 否则进行中的扫描任务（scanning:true）会经 world.player 泄漏进存档/导出文件，卡死扫描单通道
         world.player = this._sanitizePlayerForSave(gameState.getState().player);
-        this._playerProfile = world.player;
+        // 0.2.5（H2d）：_playerProfile 存独立副本，避免与 world.player 共享引用（见 updatePlayerProfile）
+        this._playerProfile = JSON.parse(JSON.stringify(world.player));
         this._savePlayerProfile();
         // 0.2.5 修复 H2b：存储写入失败 → 回滚本检查点与玩家状态，明确失败而非"假成功"
         if (!this._saveToStorage()) {

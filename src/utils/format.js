@@ -11,10 +11,14 @@ export const GAME_DAY_SECONDS = 21600;
 const GAME_YEAR_SECONDS = GAME_DAY_SECONDS * 426;
 
 // 游戏时间格式化：秒 → "X日 X时" / "X时 X分" / "X分 X秒"
+// 0.2.5（M15）：与其它 format 函数一致补 !isFinite / 负数守卫；
+// 天分支小时位由 round 改 floor —— 余数 5h59m 时 round 会进位显示"6时"（超一天上限，语义误导）
 export function formatGameTime(s) {
+    if (!isFinite(s)) return '--';
+    s = Math.max(0, s);
     if (s >= GAME_DAY_SECONDS) {
         const d = Math.floor(s / GAME_DAY_SECONDS);
-        const h = Math.round((s % GAME_DAY_SECONDS) / 3600);
+        const h = Math.floor((s % GAME_DAY_SECONDS) / 3600);
         return h > 0 ? d + '日 ' + h + '时' : d + '日';
     }
     if (s >= 3600) {
@@ -29,7 +33,9 @@ export function formatGameTime(s) {
 
 // 宇宙时间格式化：秒 → "Y:D:H:M"（KSP2 风格，例：1Y:10D:00H:01M）
 // 与示例图 ESC 菜单元信息展示一致
+// 0.2.5（M15）：补 !isFinite 守卫（原实现 NaN 会显示 "NaNY:NaN D:..."）
 export function formatUniverseTime(s) {
+    if (!isFinite(s)) return '--';
     const yearSeconds = GAME_YEAR_SECONDS;
     const daySeconds = GAME_DAY_SECONDS;
     const hourSeconds = 3600;
