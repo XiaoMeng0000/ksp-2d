@@ -16,6 +16,29 @@ import { formatDuration } from './utils/format.js';
 let stars = [];
 const BODY_MIN_SCREEN_RADIUS = 3;  // 天体最低屏幕半径，防止远距离缩成一个像素以下
 
+// 大圆虚线环的屏幕半径上限（0.2.5 卡顿修复）：
+// setLineDash 会让浏览器把圆周按弧长逐段展开成小线段，段数 = 周长 / 虚线周期。
+// zoom 放大时半径随 camera.zoom 线性增长，屏幕半径超过该阈值后虚线展开段数
+// 每帧可达数百万(危险环 zoom=10 时 ≈420 万段) → 巨卡。超大环降级为实线绘制。
+const DASHED_RING_MAX_RADIUS = 20000;
+
+/**
+ * 大圆环屏幕可见性判定（0.2.5 卡顿修复）：
+ * 圆周与屏幕区域相交（|r − 圆心距屏心| ≤ 屏幕外接半径）才需要绘制。
+ * zoom 放大时半径可远超屏幕：整屏落入圆内(圆周在屏外)或圆远离屏幕时直接跳过，
+ * 避免无谓的 path 构造与光栅化；同时把虚线环的可见半径约束在
+ * "圆心距 + 屏外接半径"量级，虚线展开段数有界。
+ * @param {number} cx, cy - 圆心的屏幕（画布物理像素）坐标
+ * @param {number} r - 圆半径（画布物理像素）
+ * @param {HTMLCanvasElement} canvas
+ */
+function isRingOnScreen(cx, cy, r, canvas) {
+    if (!(r > 1) || !isFinite(r) || !canvas) return false;
+    const farCorner = Math.hypot(canvas.width, canvas.height) / 2;
+    const dc = Math.hypot(cx - canvas.width / 2, cy - canvas.height / 2);
+    return Math.abs(r - dc) <= farCorner;
+}
+
 // ===== 轨道交互骨架（0.3.0）：渲染层持有"本帧已绘制的轨道几何"，供交互层读取 =====
 // 交互层（flightScene）通过访问器读取，不与预测引擎直接耦合；
 // hover 状态由交互层写入，渲染层在绘制标记时消费。功能体待后续提交填充。
@@ -326,9 +349,10 @@ function render(ctx, canvas, activeShip, options = {}) {
             ctx.fill();
         }
 
-        // SOI 边界圆（屏幕半径小于 1 时不绘制，避免画面混乱）
+        // SOI 边界圆（屏幕半径小于 1 时不绘制，避免画面混乱；
+        // 0.2.5：放大后圆周可能整体在屏外，加可见性判定跳过无谓绘制）
         const soiScreenR = body.soiRadius * camera.zoom;
-        if (soiScreenR >= 1) {
+        if (isRingOnScreen(screen.x, screen.y, soiScreenR, canvas)) {
             ctx.beginPath();
             ctx.arc(screen.x, screen.y, soiScreenR, 0, Math.PI * 2);
             ctx.strokeStyle = 'rgba(100, 150, 255, 0.3)';
@@ -347,10 +371,14 @@ function render(ctx, canvas, activeShip, options = {}) {
             const hazardBoundary = hasAtmo ? body.radius + body.atmosphereHeight : body.radius;
             if (shipDist < hazardBoundary * 2) {
                 const hazardScreenR = hazardBoundary * camera.zoom;
-                if (hazardScreenR >= 1) {
+                // 0.2.5 卡顿修复：圆周穿过屏幕才绘制（虚线按弧长逐段展开，屏外巨圆
+                // 会导致每帧数百万 dash 线段）；半径过大时降级为实线（虚线段数有界）。
+                if (isRingOnScreen(screen.x, screen.y, hazardScreenR, canvas)) {
                     ctx.beginPath();
                     ctx.arc(screen.x, screen.y, hazardScreenR, 0, Math.PI * 2);
-                    ctx.setLineDash([6, 4]);
+                    if (hazardScreenR <= DASHED_RING_MAX_RADIUS) {
+                        ctx.setLineDash([6, 4]);
+                    }
                     ctx.strokeStyle = hasAtmo ? 'rgba(120, 200, 255, 0.5)' : 'rgba(255, 80, 80, 0.6)';
                     ctx.lineWidth = Math.max(1, 2 * camera.zoom);
                     ctx.stroke();
@@ -468,18 +496,24 @@ function renderFacilities(ctx, canvas, facilities, selectedFacilityId, visibilit
         }
 
         // 对接范围虚线圆（常态显示，可通过筛选菜单隐藏）
+        // 0.2.5：可见性判定 + 超大半径降级实线（虚线按弧长展开，防止放大后段数爆炸）
         if (visibility.facilityRange !== false) {
-            ctx.beginPath();
-            ctx.arc(screen.x, screen.y, f.interactionRange * camera.zoom, 0, Math.PI * 2);
-            // 选中设施用高亮色，未选中用类型色（半透明）
-            const rangeColor = f.id === selectedFacilityId
-                ? 'rgba(255, 255, 100, 0.35)'
-                : hexToRgba(color, 0.15);
-            ctx.strokeStyle = rangeColor;
-            ctx.lineWidth = 1;
-            ctx.setLineDash([4, 4]);
-            ctx.stroke();
-            ctx.setLineDash([]);
+            const rangeScreenR = f.interactionRange * camera.zoom;
+            if (isRingOnScreen(screen.x, screen.y, rangeScreenR, canvas)) {
+                ctx.beginPath();
+                ctx.arc(screen.x, screen.y, rangeScreenR, 0, Math.PI * 2);
+                // 选中设施用高亮色，未选中用类型色（半透明）
+                const rangeColor = f.id === selectedFacilityId
+                    ? 'rgba(255, 255, 100, 0.35)'
+                    : hexToRgba(color, 0.15);
+                ctx.strokeStyle = rangeColor;
+                ctx.lineWidth = 1;
+                if (rangeScreenR <= DASHED_RING_MAX_RADIUS) {
+                    ctx.setLineDash([4, 4]);
+                }
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
         }
     }
 }
@@ -611,7 +645,11 @@ function renderOrbit(ship, ctx, canvas, isActive = true) {
         ctx.lineTo(s1.x, s1.y);
         ctx.strokeStyle = nextColor;
         ctx.lineWidth = 2;
-        ctx.setLineDash([4, 6]);
+        // 0.2.5：衔接线屏幕长度超过虚线展开上限时降级实线（防高倍放大下 dash 段数爆炸）
+        const linkScreenLen = Math.hypot(s1.x - s0.x, s1.y - s0.y);
+        if (linkScreenLen <= DASHED_RING_MAX_RADIUS) {
+            ctx.setLineDash([4, 6]);
+        }
         ctx.stroke();
         ctx.setLineDash([]);
     }
