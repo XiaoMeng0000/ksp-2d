@@ -16,6 +16,12 @@ import { formatDuration } from './utils/format.js';
 let stars = [];
 const BODY_MIN_SCREEN_RADIUS = 3;  // 天体最低屏幕半径，防止远距离缩成一个像素以下
 
+// 星空离屏缓存（0.2.5 B9）：静态星点一次性预渲染，每帧一次 drawImage
+// （旧实现每帧对 ~1000 颗星各自 beginPath/arc/fill + globalAlpha/fillStyle 状态切换）
+let _starfieldCanvas = null;   // 离屏画布（尺寸 = 画布 + 2×margin 余量）
+let _starfieldOffX = 0;        // 离屏内容相对画布的偏移（负值 = 画在画布左/上外侧的部分）
+let _starfieldOffY = 0;
+
 // 大圆虚线环的屏幕半径上限（0.2.5 卡顿修复）：
 // setLineDash 会让浏览器把圆周按弧长逐段展开成小线段，段数 = 周长 / 虚线周期。
 // zoom 放大时半径随 camera.zoom 线性增长，屏幕半径超过该阈值后虚线展开段数
