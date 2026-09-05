@@ -1,0 +1,226 @@
+/* ============================================================
+   maneuver.css — 机动节点系统（0.3.0）
+   · 加速计时器面板（#maneuverPanel，KSP2 式覆盖面板）
+   · 节点图标（.maneuver-node-icon）+ 四向分离手柄（.maneuver-handle）
+   共用 theme.css 的 --theme-* 变量；面板读数用 --font-mono
+   ============================================================ */
+
+/* ===== 加速计时器面板 ===== */
+#maneuverPanel {
+    position: fixed;
+    left: 16px;
+    bottom: 132px;
+    width: 350px;
+    background: var(--theme-panel);
+    border: 1px solid var(--theme-menu-border);
+    border-radius: 10px;
+    padding: 10px 12px 12px 12px;
+    z-index: 940;   /* 锚点层(945)/面板(950)之下，轨道标签(500)之上 */
+    color: var(--text-bright);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+    user-select: none;
+}
+
+/* 标题行：徽章 + 标题 + 右侧虚线延伸 */
+.maneuver-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+.maneuver-badge {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 1px solid var(--toolbar-border);
+    background: var(--theme-btn-bg);
+    color: var(--text-bright);
+    font-size: 11px;
+    line-height: 18px;
+    text-align: center;
+    flex: none;
+}
+.maneuver-title-text {
+    color: #7FD4FF;
+    font-size: 13px;
+    white-space: nowrap;
+}
+.maneuver-title-line {
+    flex: 1;
+    border-top: 1px dashed var(--theme-border);
+    margin-left: 2px;
+}
+
+/* 主体：左按钮列 + 中信息卡 + 右状态灯列 */
+.maneuver-body {
+    display: flex;
+    align-items: stretch;
+    gap: 10px;
+}
+.maneuver-btns {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    justify-content: center;
+}
+.maneuver-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
+    border: 1px solid;
+    background: var(--theme-btn-bg);
+    font-size: 14px;
+    line-height: 28px;
+    text-align: center;
+    cursor: pointer;
+}
+.maneuver-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+.maneuver-btn-green {
+    color: #7CE38B;
+    border-color: #4CAF6E;
+}
+.maneuver-btn-red {
+    color: #EF5350;
+    border-color: #B84D45;
+    font-size: 12px;
+}
+
+/* 信息卡（三行读卡，带指向进度条的左下小尾巴） */
+.maneuver-card {
+    flex: 1;
+    background: var(--theme-panel-deep);
+    border: 1px solid var(--theme-card-border);
+    border-radius: 6px;
+    padding: 6px 8px;
+    position: relative;
+}
+.maneuver-card::after {
+    /* 气泡尾巴：左下角指向进度条 */
+    content: '';
+    position: absolute;
+    left: 26px;
+    bottom: -7px;
+    width: 10px;
+    height: 10px;
+    background: var(--theme-panel-deep);
+    border-right: 1px solid var(--theme-card-border);
+    border-bottom: 1px solid var(--theme-card-border);
+    transform: rotate(45deg);
+}
+.maneuver-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    line-height: 20px;
+}
+.maneuver-check {
+    color: var(--text-bright);
+    font-size: 11px;
+    width: 12px;
+    text-align: center;
+    flex: none;
+}
+.maneuver-label {
+    color: var(--text-bright);
+    flex: none;
+}
+.maneuver-row.maneuver-time-row .maneuver-label {
+    color: #FFD37A;
+}
+.maneuver-value {
+    margin-left: auto;
+    text-align: right;
+    white-space: nowrap;
+}
+.maneuver-row.maneuver-time-row .maneuver-value {
+    color: #FFC966;
+}
+
+/* 右侧三枚倒计时状态灯（自上而下） */
+.maneuver-leds {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 2px 0;
+}
+.maneuver-led {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    background: #3A4148;
+    border: 1px solid #565E66;
+}
+.maneuver-led.lit {
+    background: #E8EAF0;
+    border-color: #FFFFFF;
+}
+.maneuver-led.green {
+    background: #43C05C;
+    border-color: #7CE38B;
+}
+.maneuver-led.red {
+    background: #D84343;
+    border-color: #EF5350;
+}
+
+/* 底部进度条 */
+.maneuver-bar-wrap {
+    margin-top: 8px;
+    height: 10px;
+    border: 1px solid var(--theme-border);
+    border-radius: 5px;
+    background: var(--theme-btn-bg);
+    overflow: hidden;
+}
+.maneuver-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #E85D4A, #FF9A8B);
+}
+
+/* ===== 节点图标与手柄（DOM 覆盖层，画布之上） ===== */
+.maneuver-node-icon {
+    position: fixed;
+    width: 22px;
+    height: 22px;
+    margin-left: -11px;
+    margin-top: -11px;
+    border-radius: 50%;
+    border: 2px solid var(--node-icon-border, #E3F2FD);
+    background: rgba(12, 18, 28, 0.55);
+    box-shadow: 0 0 8px rgba(79, 195, 247, 0.75);
+    cursor: move;
+    z-index: 935;
+}
+.maneuver-handle {
+    position: fixed;
+    width: 16px;
+    height: 16px;
+    margin-left: -8px;
+    margin-top: -8px;
+    border-radius: 3px;
+    border: 2px solid #CCCCCC;
+    background: rgba(12, 18, 28, 0.7);
+    cursor: grab;
+    z-index: 936;
+}
+.maneuver-handle:active {
+    cursor: grabbing;
+}
+.maneuver-handle-pro {
+    border-color: var(--handle-prograde, #7CE38B);
+}
+.maneuver-handle-retro {
+    border-color: var(--handle-prograde, #7CE38B);
+}
+.maneuver-handle-radIn {
+    border-color: var(--handle-radial, #7DA6E8);
+}
+.maneuver-handle-radOut {
+    border-color: var(--handle-radial, #7DA6E8);
+}

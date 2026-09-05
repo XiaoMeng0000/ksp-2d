@@ -52,5 +52,16 @@ export const ORBIT_POINT_TYPES = {
         labelFullKey: 'orbitPoint.soiEnter',
         contextMenu: false,
         labelStyle: { side: 'outside' }
+    },
+    // 机动节点燃料耗尽点（0.3.0）：节点 Δv 超出飞船能力时真实燃烧段的终点；
+    // 收起态图标 ❌，展开显示"燃料耗尽点"全称
+    fuelOut: {
+        id: 'fuelOut',
+        icon: '❌',
+        color: '#EF5350',
+        labelKey: 'orbitPoint.fuelOut',
+        labelFullKey: 'orbitPoint.fuelOut',
+        contextMenu: false,
+        labelStyle: { side: 'outside' }
     }
 };

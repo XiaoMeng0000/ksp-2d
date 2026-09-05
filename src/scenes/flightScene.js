@@ -8,6 +8,8 @@ import { stateToKepler } from '../physics/orbitalMechanics.js';
 import { getTimeToNextSOISwitch } from '../physics/orbitalPrediction.js';
 import { render, renderFlightHud, getLastOrbitSegments, getLastOrbitMarkers, setOrbitHoverState, findNearestOrbitPoint, resolveOrbitHit } from '../renderer.js';
 import { showOrbitContextMenu, updateOrbitContextMenu } from '../ui/orbitContextMenu.js';
+import { updateManeuverUI, hideManeuverUI, isManeuverDragging } from '../ui/maneuverUI.js';
+import { maneuverSystem } from '../ship/maneuverSystem.js';
 import { formatDuration } from '../utils/format.js';
 import { sceneManager } from '../sceneManager.js';
 import { gameState } from '../gameState.js';
@@ -640,6 +642,9 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             // 隐藏悬停提示（防切场景后 tooltip 残留）
             hideTooltip();
 
+            // 隐藏机动节点 UI（面板/图标/手柄），防遗留到其他场景
+            hideManeuverUI();
+
             // 清空轨道标签（标签由渲染循环每帧驱动，退出场景后无人同步 → 必须显式清理）
             clearOrbitLabels();
 
@@ -968,6 +973,12 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 activeShip.thrust = { ax: 0, ay: 0 };
             }
 
+            // 机动节点进度跟踪（0.3.0）：到达检测 / 手动燃烧冲量累计 / 完成判定。
+            // 只读 ship.thrust 与模式，绝不写 mode/throttle/thrust（无自动执行原则）
+            if (activeShip) {
+                maneuverSystem.update(activeShip, simDt);
+            }
+
             // 相机跟随活动飞船，无活动飞船且选中设施时跟随设施
             if (activeShip) {
                 const shipAbs = getAbsolutePosition(activeShip);
@@ -1003,13 +1014,18 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             });
 
             // 0.3.0 提交4：每帧驱动轨道悬停检测（渲染循环兜底：圆点必跟手；
-            // 用最近鼠标位置，节流阀拖拽时跳过）
-            if (activeShip && _lastMouseX >= 0 && !sasUI._isDragging) {
+            // 用最近鼠标位置，节流阀拖拽时跳过；机动节点手柄/图标拖拽时同样跳过）
+            if (activeShip && _lastMouseX >= 0 && !sasUI._isDragging && !isManeuverDragging()) {
                 updateOrbitHover(_lastMouseX, _lastMouseY);
             }
 
             // 0.3.0 提交5：右键菜单锚定轨道点（每帧同源重算，菜单跟点走不漂移）
             updateOrbitContextMenu(_canvas);
+
+            // 0.3.0 机动节点：加速计时器面板 / 节点图标 / 手柄（每帧驱动，仅活动飞船）
+            if (activeShip) {
+                updateManeuverUI(_canvas, activeShip);
+            }
 
             // 状态驱动：统一工具栏图标切换
             let nextMode = 'off';

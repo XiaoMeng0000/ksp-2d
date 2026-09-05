@@ -84,6 +84,20 @@ export function formatGameDurationLong(sec) {
         + String(m).padStart(2, '0') + '分:' + String(s).padStart(2, '0') + '秒';
 }
 
+// 机动节点倒计时格式："00:00:55:22"（日:时:分:秒 冒号四段紧凑式，0.3.0 加速计时器面板用）
+// 日 = GAME_DAY_SECONDS（21600s = 6 游戏小时）；守卫口径与 formatGameDurationLong 一致
+export function formatTCountdown(sec) {
+    if (sec === null || sec === undefined || !isFinite(sec)) return '--';
+    sec = Math.max(0, Math.floor(sec));
+    const d = Math.floor(sec / GAME_DAY_SECONDS);
+    sec %= GAME_DAY_SECONDS;
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    return String(d).padStart(2, '0') + ':' + String(h).padStart(2, '0') + ':'
+        + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+}
+
 // 精确米数格式化（千分位）："499,999 m"（0.3.0 轨道标签展开面板高度行用）
 export function formatMeters(m) {
     if (m === null || m === undefined || !isFinite(m)) return '--';

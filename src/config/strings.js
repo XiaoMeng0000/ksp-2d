@@ -302,6 +302,25 @@ const STRINGS = {
     'orbitMenu.noSoi': '当前轨道无近期 SOI 切换',
     'orbitMenu.apeClose': '目标拱点已不足 15 秒，无需加速',
 
+    // ---------- 机动节点（0.3.0：加速计时器面板 / 节点交互） ----------
+    'maneuver.panelTitle': '加速计时器',
+    'maneuver.badge': '动',
+    'maneuver.dvNeeded': '需要ΔV',
+    'maneuver.burnStartAt': '加速开始于',
+    'maneuver.burnStopAt': '加速停止于',
+    'maneuver.warpToBurnTip': '时间加速至节点前10秒',
+    'maneuver.deleteTip': '删除机动计划',
+    'maneuver.created': '机动计划已创建',
+    'maneuver.alreadyExists': '已存在机动计划，请先删除旧计划',
+    'maneuver.createFailed': '机动计划创建失败：该点不在可预测范围内',
+    'maneuver.arrived': '已到达机动节点时刻，请按计划点火',
+    'maneuver.completed': '机动计划 ΔV 已达成',
+    'maneuver.deleted': '机动计划已删除',
+    'maneuver.warpStarted': '定点加速启动：前往机动节点时刻前 10 秒',
+    'maneuver.warpTooClose': '距节点时刻已不足 10 秒，无需加速',
+    // 燃料耗尽点轨道标签（0.3.0：收起态 ❌，展开显示全称）
+    'orbitPoint.fuelOut': '燃料耗尽点',
+
     // ---------- 飞船建造 ----------
     'build.title': '飞船建造',
     'build.selectHint': '选择飞船查看数据',

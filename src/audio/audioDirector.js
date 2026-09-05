@@ -115,6 +115,14 @@ class AudioDirector {
         eventBus.on(Events.UI_WARP_HOVERED, ({ rate }) => {
             audioCore.playSfx('sfx:warp_hover', warpSfxConfig.hover.volume, getWarpSfxRate(rate));
         });
+
+        // 机动节点到达 / 完成 → 专属提示音（0.3.0；资产缺失时 playSfx 静默跳过）
+        eventBus.on(Events.MANEUVER_ARRIVED, () => {
+            audioCore.playSfx('sfx:maneuver_arrive', 1, 1);
+        });
+        eventBus.on(Events.MANEUVER_COMPLETED, () => {
+            audioCore.playSfx('sfx:maneuver_complete', 1, 1);
+        });
     }
 
     // 排队点击音效：窗口期内重触发重置（快速连点合并为最后一声）

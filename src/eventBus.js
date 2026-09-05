@@ -39,6 +39,11 @@ export const Events = {
     FACILITY_UNDOCKED: 'facility:undocked',
     // 环境危害事件
     SHIP_DESTROYED: 'ship:destroyed',    // 飞船被摧毁（大气引爆/表面撞击），payload: { shipId, reason: 'atmosphere' | 'surface' }
+    // 机动节点事件（0.3.0）
+    MANEUVER_CREATED: 'maneuver:created',        // 节点创建，payload: { shipId, node }
+    MANEUVER_DELETED: 'maneuver:deleted',        // 节点删除，payload: { shipId }
+    MANEUVER_ARRIVED: 'maneuver:arrived',        // 到达节点时刻（倒计时归零），payload: { shipId, node }
+    MANEUVER_COMPLETED: 'maneuver:completed',    // 手动燃烧达成节点 Δv，payload: { shipId, node }
     // 时间加速事件
     TIME_WARP_CHANGED: 'timeWarp:changed'       // 档位/暂停状态变化
 };

@@ -17,6 +17,7 @@ import { formatGameDurationLong } from '../utils/format.js';
 import { worldToScreen, canvasToCss } from '../camera.js';
 import { timeWarp } from '../timeWarp.js';
 import { shipSystem } from '../ship/shipSystem.js';
+import { maneuverSystem } from '../ship/maneuverSystem.js';
 import { timeToNextSOISwitch } from '../physics/orbitalPrediction.js';
 import { getLastOrbitMarkers } from '../renderer.js';
 
@@ -105,6 +106,39 @@ export function showOrbitContextMenu(clientX, clientY, data, canvas) {
         row.textContent = item.icon + ' ' + t(item.nameKey);
         row.addEventListener('click', (e) => {
             e.stopPropagation();
+
+            // 0.3.0 机动节点：创建机动计划（菜单冻结快照 → maneuverSystem）
+            if (item.action === 'createNode') {
+                const ship = shipSystem.getActiveShip();
+                if (!ship) {
+                    closeMenu(false);
+                    return;
+                }
+                if (_menuData && _menuData.absTime !== null && _menuData.absTime !== undefined) {
+                    const result = maneuverSystem.createNode(ship, {
+                        time: _menuData.absTime,
+                        relX: _menuData.relX,
+                        relY: _menuData.relY,
+                        anchorBody: _menuData.anchorBody || _menuData.soiName || null
+                    });
+                    if (result.ok) {
+                        if (typeof window.showNotification === 'function') {
+                            window.showNotification(t('maneuver.created'), 'success');
+                        }
+                    } else if (result.reason === 'exists') {
+                        if (typeof window.showNotification === 'function') {
+                            window.showNotification(t('maneuver.alreadyExists'), 'warning');
+                        }
+                    } else if (typeof window.showNotification === 'function') {
+                        window.showNotification(t('maneuver.createFailed'), 'warning');
+                    }
+                } else if (typeof window.showNotification === 'function') {
+                    window.showNotification(t('maneuver.createFailed'), 'warning');
+                }
+                closeMenu(false);
+                return;
+            }
+
             // 0.3.0 提交5：定点加速三项（目标点/远点/近点）——统一走 timeWarp.warpToTime
             let targetTime = null;
             let targetLabel = null;

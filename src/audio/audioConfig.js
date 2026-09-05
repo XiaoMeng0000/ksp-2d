@@ -65,7 +65,11 @@ export const sfxMap = {
     warp_hover: { path: 'assets/audio/sfx/warp_hover.ogg' },
     // 0x 暂停专属音效:进入暂停(激活)与取消暂停(恢复)各一,原调不变调
     warp_pause: { path: 'assets/audio/sfx/warp_pause.ogg' },
-    warp_resume: { path: 'assets/audio/sfx/warp_resume.ogg' }
+    warp_resume: { path: 'assets/audio/sfx/warp_resume.ogg' },
+    // 机动节点提示音（0.3.0）：到达节点时刻 / 手动燃烧达成节点 Δv
+    // （音频资产按《音频标准化流程》补充；文件缺失时 playSfx 静默跳过）
+    maneuver_arrive: { path: 'assets/audio/sfx/maneuver_arrive.ogg' },
+    maneuver_complete: { path: 'assets/audio/sfx/maneuver_complete.ogg' }
 };
 
 // 面板打开音效专属映射：面板 id → 音效 key
@@ -161,8 +165,10 @@ export const sfxChannelMap = {
     ui_panel_open: 'ui', ui_panel_close: 'ui', ui_esc_open: 'ui',
     ui_click: 'ui', ui_hover: 'ui',
     warp: 'ui', warp_hover: 'ui', warp_pause: 'ui', warp_resume: 'ui',
-    // 坎巴拉人通讯音（SOI 切换提示等，后续事件通报/轨道警报均归此类）
-    soi_change: 'comms'
+    // 坎巴拉人通讯音（SOI 切换提示 / 机动节点到达与完成提示等，后续事件通报/轨道警报均归此类）
+    soi_change: 'comms',
+    maneuver_arrive: 'comms',
+    maneuver_complete: 'comms'
 };
 
 // 返回音效所属通道（未登记默认 'ui'）
