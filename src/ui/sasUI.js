@@ -149,6 +149,8 @@ class SASUI {
         this._bottomLastPos = null;     // 上次定位 key（避免每帧改 style）
         this._bottomLastSas = -1;       // 上次 SAS 激活态（避免每帧改 style）
         this._dpr = 1;                  // 物理/逻辑像素比（0.2.5 高清屏：渲染时 CSS 布局坐标 → 物理缓冲）
+        this._bottomLayoutScale = -1;   // 0.2.5 B11：底部按钮内部布局的最后生效 scale（变化才写 DOM）
+        this._bottomGeom = null;        // 底部按钮几何量缓存（随 scale 重算）
     }
 
     // ========== 布局 ==========
@@ -932,46 +934,61 @@ class SASUI {
 
     /**
      * 更新按钮框位置（SAS 圆盘正下方居中；位置变化才写 DOM）
+     * 0.2.5 B11：内部尺寸/间距只依赖 _scale —— scale 未变(窗口未 resize)时跳过
+     * querySelectorAll + 逐按钮 style 写入（旧实现每帧无条件执行）；left/top 保持 key 缓存
      */
     _updateBottomButtonsLayout() {
         if (!this._bottomButtons) return;
         const s = this._scale;
-        const pad = BOTTOM_FRAME_PAD * s;
-        const mainSize = BOTTOM_MAIN_SIZE * s;
-        const subSize = BOTTOM_SUB_SIZE * s;
-        const gap = BOTTOM_BTN_GAP * s;
 
-        // 框总宽 = 内边距×2 + 主开关 + 4×gap（主-分隔线-节点-目标+-目标-）+ 分隔线 + 3 副钮
-        const dividerW = 1 * s;
-        const totalW = pad * 2 + mainSize + gap * 4 + dividerW + subSize * 3;
-        const x = this._panelCenter.x - totalW / 2;
-        const y = this._panelCenter.y + SAS_PANEL_RADIUS * s + BOTTOM_BTN_GAP_BELOW * s;
+        // 几何量缓存在实例上：scale 变化才重算并写内部 DOM
+        if (s !== this._bottomLayoutScale) {
+            this._bottomLayoutScale = s;
+            const pad = BOTTOM_FRAME_PAD * s;
+            const mainSize = BOTTOM_MAIN_SIZE * s;
+            const subSize = BOTTOM_SUB_SIZE * s;
+            const gap = BOTTOM_BTN_GAP * s;
 
-        // 统一用 flex gap 控制间距（分隔线两侧各一个 gap，实现主/副钮组的分隔）
-        this._bottomButtons.style.gap = gap + 'px';
-        const btns = this._bottomButtons.querySelectorAll('[data-btn-id]');
-        btns.forEach(b => {
-            const isMain = b.dataset.btnMain === '1';
-            const size = isMain ? mainSize : subSize;
-            b.style.width = size + 'px';
-            b.style.height = size + 'px';
-            b.style.marginRight = '0px';
-            const span = b.querySelector('span');
-            if (span) {
-                span.style.fontSize = 20 * s + 'px';
+            // 框总宽 = 内边距×2 + 主开关 + 4×gap（主-分隔线-节点-目标+-目标-）+ 分隔线 + 3 副钮
+            const dividerW = 1 * s;
+            this._bottomGeom = {
+                pad,
+                mainSize,
+                subSize,
+                gap,
+                dividerW,
+                totalW: pad * 2 + mainSize + gap * 4 + dividerW + subSize * 3
+            };
+
+            // 统一用 flex gap 控制间距（分隔线两侧各一个 gap，实现主/副钮组的分隔）
+            this._bottomButtons.style.gap = gap + 'px';
+            const btns = this._bottomButtons.querySelectorAll('[data-btn-id]');
+            btns.forEach(b => {
+                const isMain = b.dataset.btnMain === '1';
+                const size = isMain ? mainSize : subSize;
+                b.style.width = size + 'px';
+                b.style.height = size + 'px';
+                b.style.marginRight = '0px';
+                const span = b.querySelector('span');
+                if (span) {
+                    span.style.fontSize = 20 * s + 'px';
+                }
+            });
+            // 分隔线缩放
+            const divider = this._bottomButtons.querySelector('[data-divider="1"]');
+            if (divider) {
+                divider.style.width = dividerW + 'px';
+                divider.style.height = 28 * s + 'px';
             }
-        });
-        // 分隔线缩放
-        const divider = this._bottomButtons.querySelector('[data-divider="1"]');
-        if (divider) {
-            divider.style.width = dividerW + 'px';
-            divider.style.height = 28 * s + 'px';
+            // 框内边距缩放
+            this._bottomButtons.style.padding = pad + 'px';
         }
 
-        // 框内边距缩放
-        this._bottomButtons.style.padding = pad + 'px';
+        const geom = this._bottomGeom || { totalW: 200 };
+        const x = this._panelCenter.x - geom.totalW / 2;
+        const y = this._panelCenter.y + SAS_PANEL_RADIUS * s + BOTTOM_BTN_GAP_BELOW * s;
 
-        const key = [x, y, totalW].map(v => v.toFixed(1)).join(',');
+        const key = [x, y].map(v => v.toFixed(1)).join(',');
         if (key !== this._bottomLastPos) {
             this._bottomLastPos = key;
             this._bottomButtons.style.left = x + 'px';

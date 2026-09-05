@@ -143,45 +143,61 @@ function createStars(canvasWidth, canvasHeight, dpr = 1) {
             radius: (cfg.radiusRange.min + Math.random() * (cfg.radiusRange.max - cfg.radiusRange.min)) * pr,
             brightness: cfg.brightnessRange.min + Math.random() * (cfg.brightnessRange.max - cfg.brightnessRange.min),
             color: cfg.colors[Math.floor(Math.random() * cfg.colors.length)],
-            // 闪烁参数：随机相位 + 周期 + 振幅
+            // 闪烁参数：随机相位 + 周期 + 振幅（0.2.5 B9：渲染改整层慢波后不再逐星读取，字段保留供未来恢复逐星闪烁）
             phase: Math.random() * Math.PI * 2,
             period: cfg.twinkle.periodRange.min + Math.random() * (cfg.twinkle.periodRange.max - cfg.twinkle.periodRange.min),
             amplitude: cfg.twinkle.amplitudeRange.min + Math.random() * (cfg.twinkle.amplitudeRange.max - cfg.twinkle.amplitudeRange.min)
         });
     }
+
+    // 0.2.5 B9：静态层预渲染到离屏（星点坐标平移 +margin 落入离屏空间，blit 时按负偏移贴回画布）
+    _starfieldOffX = -cfg.margin * pr;
+    _starfieldOffY = -cfg.margin * pr;
+    const sw = Math.ceil(canvasWidth + cfg.margin * 2 * pr);
+    const sh = Math.ceil(canvasHeight + cfg.margin * 2 * pr);
+    if (!_starfieldCanvas) {
+        _starfieldCanvas = document.createElement('canvas');
+    }
+    if (_starfieldCanvas.width !== sw || _starfieldCanvas.height !== sh) {
+        _starfieldCanvas.width = sw;
+        _starfieldCanvas.height = sh;
+    }
+    const sctx = _starfieldCanvas.getContext('2d');
+    sctx.clearRect(0, 0, sw, sh);
+    const shiftX = cfg.margin * pr;
+    const shiftY = cfg.margin * pr;
+    for (const star of stars) {
+        sctx.globalAlpha = Math.max(0, Math.min(1, star.brightness));
+        sctx.fillStyle = star.color;
+        sctx.beginPath();
+        sctx.arc(star.x + shiftX, star.y + shiftY, star.radius, 0, Math.PI * 2);
+        sctx.fill();
+    }
+    sctx.globalAlpha = 1.0;
 }
 
 /**
  * 绘制天空盒星空：屏幕空间固定坐标 + 固定像素尺寸
- * 不随相机平移/缩放变化（恒星无限远语义）；
- * 亮度按真实时间微闪烁，不受游戏时间加速影响
+ * 不随相机平移/缩放变化（恒星无限远语义）
+ * 0.2.5 B9：静态星点一次 drawImage 贴回 + 整层慢波"呼吸"（两路不同周期正弦叠加），
+ * 替代旧版每帧 ~1000 次 beginPath/arc/fill 的逐星微闪烁（视觉为整体明暗起伏，收益显著）
  * @param {CanvasRenderingContext2D} ctx
  * @param {HTMLCanvasElement} canvas
  * @param {number} [globalAlpha=1] - 整层透明度乘数（0~1），用于恒星遮挡淡出
  */
 function renderStarfield(ctx, canvas, globalAlpha = 1) {
-    const cfg = STARFIELD_CONFIG;
-    // 闪烁时间基准：performance.now（真实时间，秒），与游戏时间加速无关
-    const t = performance.now() / 1000;
-    const W = canvas.width;
-    const H = canvas.height;
+    if (!_starfieldCanvas) return;
 
-    for (const star of stars) {
-        if (star.x < -50 || star.x > W + 50 ||
-            star.y < -50 || star.y > H + 50) continue;
-
-        // 微闪烁：alpha = 基准亮度 × (1 + 振幅 × sin(2π·t/周期 + 相位))
-        let alpha = star.brightness;
-        if (cfg.twinkle.enabled) {
-            alpha = star.brightness * (1 + star.amplitude * Math.sin(2 * Math.PI * t / star.period + star.phase));
-        }
-
-        ctx.globalAlpha = Math.max(0, Math.min(1, alpha * globalAlpha));
-        ctx.fillStyle = star.color;
-        ctx.beginPath();
-        ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
-        ctx.fill();
+    let alpha = globalAlpha;
+    if (STARFIELD_CONFIG.twinkle.enabled) {
+        // 呼吸时间基准：performance.now（真实时间，秒），与游戏时间加速无关
+        const t = performance.now() / 1000;
+        // 两路慢波叠加近似"星空整体起伏"（幅度小，不破坏静态层基准亮度观感）
+        alpha *= 1 + 0.05 * Math.sin(2 * Math.PI * t / 3.7) + 0.03 * Math.sin(2 * Math.PI * t / 5.9 + 2.1);
     }
+    alpha = Math.max(0, Math.min(1, alpha));
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(_starfieldCanvas, _starfieldOffX, _starfieldOffY);
     ctx.globalAlpha = 1.0;
 }
 

@@ -836,6 +836,39 @@ export function timeToNextSOISwitch(ship, host) {
     return switchT;
 }
 
+// ===== 0.2.5 B10：SOI 切换剩余时间的缓存包装（供飞行/追踪场景每帧档位保护调用）=====
+// timeToNextSOISwitch 每帧全量重算：stateToKepler + 开普勒交点求解 + 嵌套 SOI 全周期扫描
+// （稳定轨道 ≈1.4ms/船，多船会挤爆帧预算，模块内注释自述）。
+// 缓存原理：无边界事件时，解析轨道上"到下一次边界交点的时间"随沿轨推进严格线性递减
+// （减少量 = 推进的游戏时间），因此缓存窗口内用一阶外推即可得到精确值，O(1) 每帧。
+// 窗口策略（按游戏时间，与倍率解耦）：
+//   - 缓存为 null（本轮扫描判定无切换/无嵌套）：20 游戏秒后重扫一次（探测轨道相位变化）；
+//   - 缓存值 > 20s：线性外推直至剩余 ≤20s 或窗口用满 20 游戏秒；
+//   - 剩余 ≤20s：进入保护区间，每帧精算（档位必须逐帧精确）。
+// 边界事件（实际发生切换）由 host 键变化使缓存失效兜底；换船同理。
+const SOI_SWITCH_CACHE_WINDOW = 20;   // 游戏秒
+let _soiSwitchCache = { shipId: null, hostName: null, gameTimeAt: 0, remaining0: null };
+
+export function getTimeToNextSOISwitch(ship, host) {
+    if (!ship || !host) return null;
+    const nowGame = getCachedTime();
+    const c = _soiSwitchCache;
+    const hostName = host.name || '';
+    if (c.shipId === ship.id && c.hostName === hostName) {
+        const elapsed = nowGame - c.gameTimeAt;
+        if (c.remaining0 === null) {
+            if (elapsed >= 0 && elapsed < SOI_SWITCH_CACHE_WINDOW) return null;
+        } else if (c.remaining0 > SOI_SWITCH_CACHE_WINDOW
+            && elapsed >= 0 && elapsed < Math.min(SOI_SWITCH_CACHE_WINDOW, c.remaining0 - SOI_SWITCH_CACHE_WINDOW)) {
+            const est = c.remaining0 - elapsed;
+            return est > 0 ? est : null;
+        }
+    }
+    const remaining = timeToNextSOISwitch(ship, host);
+    _soiSwitchCache = { shipId: ship.id, hostName: hostName, gameTimeAt: nowGame, remaining0: remaining };
+    return remaining;
+}
+
 // 解析解分段预测 — 多段拼接完整轨道（含 SOI 穿越）
 export function predictTrajectoryPatched(ship, maxSegments = 5) {
     const segments = [];

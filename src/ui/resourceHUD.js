@@ -84,8 +84,12 @@ eventBus.on(Events.SCENE_CHANGED, (data) => {
 });
 hudEl.style.display = 'none';
 
-// 兜底轮询（低频）
-setInterval(renderHud, POLL_INTERVAL);
+// 兜底轮询（低频；0.2.5 B12：HUD 隐藏（主菜单/设置等非游戏场景）时跳过，避免常驻空转 ——
+// 事件驱动已覆盖绝大部分刷新，轮询仅补偿不发事件的调试写入）
+setInterval(() => {
+    if (hudEl.style.display === 'none') return;
+    renderHud();
+}, POLL_INTERVAL);
 
 // 挂载到 window 供调试
 if (typeof window !== 'undefined') {

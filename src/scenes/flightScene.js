@@ -5,7 +5,7 @@ import { eventBus, Events } from '../eventBus.js';
 import { updateShipPhysics } from '../physics/physicsUpdate.js';
 import { updateCelestialBodies, getSOIHost, getAbsolutePosition, getRelativePosition, convertVelocityFrame, celestialBodies } from '../physics/physics.js';
 import { stateToKepler } from '../physics/orbitalMechanics.js';
-import { timeToNextSOISwitch } from '../physics/orbitalPrediction.js';
+import { getTimeToNextSOISwitch } from '../physics/orbitalPrediction.js';
 import { render, renderFlightHud, getLastOrbitSegments, getLastOrbitMarkers, setOrbitHoverState, findNearestOrbitPoint, resolveOrbitHit } from '../renderer.js';
 import { showOrbitContextMenu, updateOrbitContextMenu } from '../ui/orbitContextMenu.js';
 import { formatDuration } from '../utils/format.js';
@@ -685,7 +685,8 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 const warpHost = activeShip.currentSOI
                     ? celestialBodies.find(b => b.name === activeShip.currentSOI)
                     : null;
-                const tSwitch = timeToNextSOISwitch(activeShip, warpHost);
+                // 0.2.5 B10：走缓存版（解析轨道剩余时间随推进线性递减，窗口外推 O(1)；剩余 ≤20s 精算）
+        const tSwitch = getTimeToNextSOISwitch(activeShip, warpHost);
                 if (tSwitch !== null) {
                     warpMaxIndex = Math.min(warpMaxIndex, timeWarp.getSOIProtectMaxIndex(tSwitch));
                 }
