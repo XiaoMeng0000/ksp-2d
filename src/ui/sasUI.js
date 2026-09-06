@@ -56,6 +56,7 @@ const DIR_SYMBOL_ON_BG = '#000';            // 未激活实底圆上的符号黑
 // 导航球标记色（沿用 v1：正逆黄 / 径向青，与按钮语义色分离；如需同步按钮配色请告知）
 const NAV_DIR_PROGRADE_COLOR = '#ffcc33';   // 导航球 顺向/逆向 标记黄
 const NAV_DIR_RADIAL_COLOR = '#4fc3f7';     // 导航球 径向内/外 标记青
+const NAV_DIR_MANEUVER_COLOR = '#ff4aff';   // 导航球 机动节点方向 标记粉（与机动预测线同色系）
 const DIR_INACTIVE_COLOR = '#555';          // 未激活 图标/框 深灰（--border / --text-faint）
 const SAS_ACTIVE_COLOR = '#3dff3d';         // SAS 主开关 激活绿（--progress-green 工具栏激活条）
 const SAS_INACTIVE_COLOR = '#555';          // SAS 主开关 未激活深灰（--border）
@@ -108,8 +109,10 @@ const NAV_DIRECTIONS = [
     { key: 'prograde',   label: t('sas.prograde'),   color: NAV_DIR_PROGRADE_COLOR, tex: 'dir_prograde' },
     { key: 'retrograde', label: t('sas.retrograde'), color: NAV_DIR_PROGRADE_COLOR, tex: 'dir_retrograde' },
     { key: 'radialIn',   label: t('sas.radialIn'),   color: NAV_DIR_RADIAL_COLOR,  tex: 'dir_radial_in' },
-    { key: 'radialOut',  label: t('sas.radialOut'),  color: NAV_DIR_RADIAL_COLOR,  tex: 'dir_radial_out' }
-    // 未来：{ key: 'maneuverNode', label: '机动节点', color: '#4FC3F7' }
+    { key: 'radialOut',  label: t('sas.radialOut'),  color: NAV_DIR_RADIAL_COLOR,  tex: 'dir_radial_out' },
+    // 机动节点方向（0.3.0）：存在可执行机动节点时显示，与其他四方向一样实时变化
+    //   （过节点前=节点加速方向；过节点后=达到目标轨道方向）；纹理未就绪用虚线圆环 fallback
+    { key: 'maneuver',   label: t('sas.node'),       color: NAV_DIR_MANEUVER_COLOR, tex: null }
 ];
 
 // ========== SAS 圆盘方向按钮（X 斜角布局） ==========
@@ -148,6 +151,7 @@ class SASUI {
         this._bottomVisible = undefined; // 按钮框当前显隐（避免每帧重复写 DOM）
         this._bottomLastPos = null;     // 上次定位 key（避免每帧改 style）
         this._bottomLastSas = -1;       // 上次 SAS 激活态（避免每帧改 style）
+        this._bottomLastMv = null;      // 上次机动节点副钮状态键（可用性|激活态，避免每帧改 style）
         this._dpr = 1;                  // 物理/逻辑像素比（0.2.5 高清屏：渲染时 CSS 布局坐标 → 物理缓冲）
         this._bottomLayoutScale = -1;   // 0.2.5 B11：底部按钮内部布局的最后生效 scale（变化才写 DOM）
         this._bottomGeom = null;        // 底部按钮几何量缓存（随 scale 重算）
@@ -202,8 +206,9 @@ class SASUI {
      * @param {number} dt - 时间步长（秒）
      * @param {string} sasMode - 当前 SAS 模式（'off' / 'stability' / ...）
      * @param {number} throttle - 油门值 [0, 1]
+     * @param {boolean} [hasManeuver] - 是否存在可执行的机动节点（节点副钮可用性，0.3.0）
      */
-    update(dt, sasMode, throttle) {
+    update(dt, sasMode, throttle, hasManeuver) {
         // 方向标记常驻显示（不随 SAS 开关淡出；角度无效时由渲染层单独隐藏）
         this._appearance = 1.0;
 
@@ -214,7 +219,7 @@ class SASUI {
         }
 
         // 下方按钮区 SAS 激活态同步（值变化才写 DOM）
-        this._updateBottomButtonsState(sasMode);
+        this._updateBottomButtonsState(sasMode, hasManeuver);
     }
 
     // ========== 角度换算 ==========
@@ -427,10 +432,11 @@ class SASUI {
             const markerR = MARKER_RADIUS * s * appearance;
             for (const dir of NAV_DIRECTIONS) {
                 const d = directions ? directions[dir.key] : null;
-                if (!d || typeof d.angle !== 'number') continue;
+                if (!d || typeof d.angle !== 'number' || !isFinite(d.angle)) continue;
                 const rad = this._toNavAngle(d.angle) * Math.PI / 180;
                 const mx = cx + Math.cos(rad) * dirR;
                 const my = cy + Math.sin(rad) * dirR;
+                if (!isFinite(mx) || !isFinite(my)) continue;   // 防御：坐标非有限 → arc 抛 IndexSizeError
 
                 const img = dir.tex ? textureManager.get(dir.tex) : null;
                 if (img) {
@@ -446,6 +452,22 @@ class SASUI {
                     const tinted = this._tintImage(img, dir.color, size, size);
                     ctx.globalAlpha = 0.9 * appearance;
                     ctx.drawImage(tinted, mx - size / 2, my - size / 2, size, size);
+                    ctx.globalAlpha = 1.0;
+                } else if (dir.key === 'maneuver') {
+                    // 机动方向标记 fallback（0.3.0）：粉色虚线圆环 + 中心圆点，
+                    // 与实心圆点方向标记区分；纹理素材后补即走上方 img 分支
+                    ctx.globalAlpha = 0.95 * appearance;
+                    ctx.beginPath();
+                    ctx.arc(mx, my, markerR * 0.8, 0, Math.PI * 2);
+                    ctx.setLineDash([3 * s, 3 * s]);
+                    ctx.strokeStyle = dir.color;
+                    ctx.lineWidth = 2 * s;
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    ctx.beginPath();
+                    ctx.arc(mx, my, markerR * 0.28, 0, Math.PI * 2);
+                    ctx.fillStyle = dir.color;
+                    ctx.fill();
                     ctx.globalAlpha = 1.0;
                 } else {
                     ctx.beginPath();
@@ -898,6 +920,11 @@ class SASUI {
                     if (ship) {
                         ship.sasMode = ship.sasMode === 'off' ? 'stability' : 'off';
                     }
+                } else if (def.id === 'node') {
+                    // 机动节点指向（0.3.0）：无节点时按钮 disabled（根本点不到，不弹通知）；
+                    // 有节点：点击 = 开启/切换回姿态保持（与圆盘方向按钮同交互
+                    if (btn.disabled || !ship) return;
+                    ship.sasMode = (ship.sasMode === 'maneuver') ? 'stability' : 'maneuver';
                 } else if (typeof window.showNotification === 'function') {
                     window.showNotification(t('sas.wip'), 'info');
                 }
@@ -999,9 +1026,12 @@ class SASUI {
     /**
      * 同步 SAS 按钮激活态（sasMode 变化才写 DOM）
      * 0.3.0 状态色规范：激活=通用绿(--progress-green) / 未激活=通用深灰(--border)
+     * 0.3.0 机动节点副钮：hasManeuver=false → disabled（无法点击、不弹通知）；
+     *   sasMode==='maneuver' → 激活绿
      * @param {string} sasMode
+     * @param {boolean} [hasManeuver] - 是否存在可执行的机动节点
      */
-    _updateBottomButtonsState(sasMode) {
+    _updateBottomButtonsState(sasMode, hasManeuver) {
         if (!this._sasBtnEl) return;
         const active = sasMode !== 'off' ? 1 : 0;
         if (active !== this._bottomLastSas) {
@@ -1013,6 +1043,27 @@ class SASUI {
             const iconEl = this._sasBtnEl.querySelector('.sas-btn-icon');
             if (iconEl) {
                 iconEl.style.background = stateColor;
+            }
+        }
+
+        // 机动节点副钮：禁用/激活态（少量写 DOM，状态键变化才写）
+        const nodeBtn = this._bottomButtons
+            ? this._bottomButtons.querySelector('[data-btn-id="node"]')
+            : null;
+        if (!nodeBtn) return;
+        const has = hasManeuver !== false;
+        const isMvActive = sasMode === 'maneuver';
+        const mvKey = (has ? '1' : '0') + '|' + (isMvActive ? '1' : '0');
+        if (mvKey !== this._bottomLastMv) {
+            this._bottomLastMv = mvKey;
+            const mvColor = isMvActive ? SAS_ACTIVE_COLOR : SAS_INACTIVE_COLOR;
+            nodeBtn.disabled = !has;
+            nodeBtn.style.opacity = has ? '1' : '0.35';
+            nodeBtn.style.borderColor = mvColor;
+            nodeBtn.style.color = mvColor;
+            const mvIcon = nodeBtn.querySelector('.sas-btn-icon');
+            if (mvIcon) {
+                mvIcon.style.background = mvColor;
             }
         }
     }

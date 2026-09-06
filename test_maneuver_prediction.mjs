@@ -6,7 +6,7 @@ globalThis.window = globalThis.window || {};
 const { celestialBodies, updateCelestialBodies } = await import('./src/physics/physics.js');
 const { stateToKepler, keplerPositionAtTime } = await import('./src/physics/orbitalMechanics.js');
 const { predictTrajectoryPatched } = await import('./src/physics/orbitalPrediction.js');
-const { predictManeuverTrajectories, walkToTime, planBurnArc } = await import('./src/physics/maneuverPrediction.js');
+const { predictManeuverTrajectories, walkToTime, planBurnArc, computeManeuverDirection } = await import('./src/physics/maneuverPrediction.js');
 
 // 天体位置初始化（浏览器侧由 main.js 每帧推进；node 测试需手动初始化）
 updateCelestialBodies(0);
@@ -92,6 +92,53 @@ const nodePast = {
 const r5 = predictManeuverTrajectories(ship, nodePast, segments);
 check('T8 冻结快照优先（燃烧后不漂移）', r5.segments.length > 0 && !!r5.burnArc);
 check('T8 快照状态标记 pinned', r5.plan.nodeState && r5.plan.nodeState.pinned === true);
+
+// T9: 两态机动方向（SAS 指向/导航球标记）
+// 说明：computeManeuverDirection 返回 heading 约定角（0=+Y 顺时针，atan2(x,y)），
+// 测试的 dvPro 为数学角（atan2(y,x)）→ 期望 heading = atan2(cos(dvPro), sin(dvPro))
+const beforeAngle = computeManeuverDirection(ship, r1, 0);   // now=0 < tNode=60 → 过节点前
+const expectedHeading = Math.atan2(Math.cos(dvPro), Math.sin(dvPro));
+const proErr = Math.abs(Math.atan2(Math.sin(beforeAngle - expectedHeading), Math.cos(beforeAngle - expectedHeading)));
+check('T9 过节点前方向=节点Δv方向', proErr < 1e-9);
+// 过节点后且恰在燃烧终点（目标轨道上）→ 无有效指向（null）
+const shipOnTarget = {
+    ...ship,
+    pos: { x: r1.plan.burnResult.finalRelPos.x, y: r1.plan.burnResult.finalRelPos.y },
+    vel: { x: r1.plan.burnResult.finalRelVel.x, y: r1.plan.burnResult.finalRelVel.y }
+};
+const afterAngle = computeManeuverDirection(shipOnTarget, r1, 200);
+check('T9 已在目标轨道 → 方向 null', afterAngle === null);
+// 过节点后偏离目标轨道 → 有限方向（实时变化的燃烧方向）
+const shipOff = {
+    ...ship,
+    pos: { x: r1.plan.burnResult.finalRelPos.x, y: r1.plan.burnResult.finalRelPos.y + 100000 },
+    vel: { x: r1.plan.burnResult.finalRelVel.x - 5, y: r1.plan.burnResult.finalRelVel.y }
+};
+const afterAngle2 = computeManeuverDirection(shipOff, r1, 200);
+check('T9 偏离目标轨道 → 有指向', afterAngle2 !== null && isFinite(afterAngle2));
+
+// T10: 默认时间路径（不传 now）不得抛错 —— 回归：computeManeuverDirection 曾引用
+// 未 import 的 getCachedTime，导致飞行场景每帧 ReferenceError（卡死+黑屏）根因
+let t10ok = true;
+try {
+    computeManeuverDirection(ship, r1);
+} catch (e) {
+    t10ok = false;
+}
+check('T10 默认 now 路径不抛错（getCachedTime 回归）', t10ok);
+
+// T11: 质量快照 → 燃烧期（燃料下降）预测零漂移（"燃烧期漂移"修复回归）
+const snapNode = {
+    time: tNode, deltaV: { x: 50 * Math.cos(dvPro), y: 50 * Math.sin(dvPro) }, executed: false,
+    relX: snap.relX, relY: snap.relY, relVelX: snap.relVelX, relVelY: snap.relVelY,
+    anchorBody: home.name, massWet: 8000, massFuel: 3000
+};
+const r11a = predictManeuverTrajectories(ship, snapNode, segments);   // 满燃料
+ship.resources.fuel.amount = 500;                                     // 模拟已燃烧大部分
+const r11b = predictManeuverTrajectories(ship, snapNode, segments);   // 少燃料
+check('T11 快照下 dvMax 不随燃料变化', Math.abs(r11b.plan.dvMax - r11a.plan.dvMax) < 1e-9);
+check('T11 快照下燃烧时长不漂移', Math.abs(r11b.plan.burnDuration - r11a.plan.burnDuration) < 1e-9);
+ship.resources.fuel.amount = 3000;                                    // 还原
 
 console.log(`\n结果: ${pass} 通过 / ${fail} 失败`);
 process.exit(fail > 0 ? 1 : 0);

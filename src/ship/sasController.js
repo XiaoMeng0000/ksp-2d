@@ -34,7 +34,8 @@ export class SASController {
         // 跨帧可变状态，传给 computeTargetHeading 使用
         this._state = {
             lastValidProgradeHeading: null,
-            externalTargetHeading: null
+            externalTargetHeading: null,
+            maneuverHeading: null
         };
     }
 
@@ -78,6 +79,18 @@ export class SASController {
     /** @returns {boolean} 是否有有效的外部目标朝向 */
     hasValidTarget() {
         return this._state.externalTargetHeading !== null;
+    }
+
+    // ========== 机动节点指向（MANEUVER 模式） ==========
+
+    /**
+     * 外部注入机动节点指向（0.3.0）：
+     *   过节点前 = 节点加速方向；过节点后 = 达成目标轨道的当前燃烧方向。
+     * 每帧由飞行场景计算并注入；angle 为 null（无有效方向）时回退当前朝向。
+     * @param {number|null} angle - 机动方向（弧度，heading 约定 0=+Y 顺时针）
+     */
+    setManeuverHeading(angle) {
+        this._state.maneuverHeading = angle;
     }
 
     // ========== 核心控制 ==========

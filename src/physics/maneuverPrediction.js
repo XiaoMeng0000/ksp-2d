@@ -6,7 +6,7 @@
 // 与渲染层/交互层解耦：renderer 每帧调用并缓存结果，UI 只读缓存
 
 import { stateToKepler, keplerToState, getOrbitalDirectionAngles } from './orbitalMechanics.js';
-import { bodyFuturePos, patchedStep } from './orbitalPrediction.js';
+import { bodyFuturePos, patchedStep, getCachedTime } from './orbitalPrediction.js';
 import { celestialBodies } from './physics.js';
 import { getTotalMass, getFuelAmount, G0 } from '../resources/resourceSystem.js';
 import { MANEUVER_CONFIG } from '../config/maneuverConfig.js';
@@ -169,8 +169,15 @@ export function computePlan(ship, node, baseSegments) {
     const dvMag = Math.hypot(node.deltaV.x, node.deltaV.y) || 0;
     const maxThrust = ship.maxThrust || 0;
     const isp = ship.isp || 0;
-    const mWet = getTotalMass(ship) || 0;
-    const mFuel = getFuelAmount(ship) || 0;
+    // 质量参数（0.3.0 "燃烧期预测漂移"修复）：优先用节点时刻质量快照——
+    // 点火燃烧后当前质量逐帧下降，若读当前值，dvMax/燃烧时长/虚拟段会每帧漂移；
+    // 旧存档无快照时回退当前质量（向后兼容）。
+    const mWet = (isFinite(node.massWet) && node.massWet > 0)
+        ? node.massWet
+        : (getTotalMass(ship) || 0);
+    const mFuel = (isFinite(node.massFuel) && node.massFuel >= 0)
+        ? node.massFuel
+        : (getFuelAmount(ship) || 0);
     const mDry = Math.max(mWet - mFuel, 1);
     const c = isp * G0;
     const dvMax = (mWet > mDry && c > 0) ? c * Math.log(mWet / mDry) : 0;
@@ -277,4 +284,57 @@ export function predictManeuverTrajectories(ship, node, baseSegments) {
         fuelOutPoint: result.fuelOutPoint,
         plan
     };
+}
+
+// 机动节点两态方向（0.3.0 SAS 节点指向 / 导航球机动标记）：
+//   过节点前（now < node.time）：恒为节点加速方向（节点 Δv 方向，host 局部系 = 世界向）
+//   过节点后（now >= node.time）：若想达到目标（机动后）轨道的当前燃烧方向——
+//     在"当前位置空间角"处取目标轨道的速度矢量，与当前速度差 = 所需速度增量方向，
+//     随飞船沿轨道滑行实时变化（目标轨道不可解析/宿主改变时返回 null）
+// 角度约定与 heading / computeNavballDirections 一致：0=+Y，顺时针（atan2(x, y)）。
+export function computeManeuverDirection(ship, pred, now) {
+    const plan = pred && pred.plan ? pred.plan : null;
+    if (!plan || !plan.node || !plan.nodeState) return null;
+    const node = plan.node;
+    const dvMag = Math.hypot(node.deltaV.x, node.deltaV.y);
+    if (!(dvMag > 1e-6)) return null;
+
+    const tNow = now !== undefined ? now : getCachedTime();
+    if (tNow < node.time) {
+        // 过节点前：恒为节点加速方向
+        return Math.atan2(node.deltaV.x, node.deltaV.y);
+    }
+
+    // 过节点后：目标轨道速度差方向（仅当当前宿主与节点宿主一致——同参考系）
+    const seg0 = plan.segments && plan.segments[0];
+    const st = seg0 && seg0.startState;
+    if (!st || !st.body) return null;
+    if (ship.currentSOI !== st.body) return null;
+    const body = celestialBodies.find(b => b.name === st.body);
+    if (!body || !(body.gm > 0)) return null;
+    const tKepler = stateToKepler(st.relPos, st.relVel, body.gm);
+    if (!tKepler || !isFinite(tKepler.a)) return null;
+
+    const { a, e, omega } = tKepler;
+    const d = tKepler.dir === undefined ? 1 : tKepler.dir;
+    const p = a * (1 - e * e);
+    if (!(p > 0)) return null;
+
+    const thetaP = Math.atan2(ship.pos.y, ship.pos.x);   // 当前位置空间角
+    const local = thetaP - omega;                        // 目标轨道局部真近点角
+    const denom = 1 + e * Math.cos(local);
+    if (!(denom > 1e-9)) return null;
+
+    // 目标轨道在该空间角上的速度（径向/切向分解，与 keplerToState 同口径）；
+    // 位置角 θp 已含 omega 旋转，切向/径向基直接在世界向
+    const sqrtGMp = Math.sqrt(body.gm / p);
+    const vr = d * sqrtGMp * e * Math.sin(local);
+    const vtheta = d * sqrtGMp * (1 + e * Math.cos(local));
+    const vtx = vr * Math.cos(thetaP) - vtheta * Math.sin(thetaP);
+    const vty = vr * Math.sin(thetaP) + vtheta * Math.cos(thetaP);
+
+    const dvx = vtx - ship.vel.x;
+    const dvy = vty - ship.vel.y;
+    if (Math.hypot(dvx, dvy) < 0.1) return null;   // 已在目标轨道（误差内）→ 无指向意义
+    return Math.atan2(dvx, dvy);
 }

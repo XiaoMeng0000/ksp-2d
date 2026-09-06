@@ -10,6 +10,7 @@
 import { eventBus, Events } from '../eventBus.js';
 import { MANEUVER_CONFIG } from '../config/maneuverConfig.js';
 import { getCachedTime } from '../physics/orbitalPrediction.js';
+import { getTotalMass, getFuelAmount } from '../resources/resourceSystem.js';
 
 class ManeuverSystem {
     constructor() {
@@ -66,7 +67,13 @@ class ManeuverSystem {
             anchorBody: data.anchorBody || null,
             // 节点时刻速度快照（host 局部系，0.3.0 打磨）：节点时刻已过/链外时重建预测状态
             relVelX: (data.velRel && isFinite(data.velRel.x)) ? data.velRel.x : null,
-            relVelY: (data.velRel && isFinite(data.velRel.y)) ? data.velRel.y : null
+            relVelY: (data.velRel && isFinite(data.velRel.y)) ? data.velRel.y : null,
+            // 节点时刻质量快照（0.3.0 "燃烧期预测漂移"修复）：
+            // 计划锚定节点时刻的飞船质量——点火燃烧后当前质量逐帧下降，
+            // 若计划读取当前质量会每帧漂移（dvMax/燃烧时长/虚拟段逐帧变化）。
+            // 旧存档无快照时 computePlan 回退当前质量（向后兼容）。
+            massWet: getTotalMass(ship) || 0,
+            massFuel: getFuelAmount(ship) || 0
         };
         ship.maneuverNodes.push(node);
         this._resetTracking(this._nodeKey(node));
@@ -111,6 +118,9 @@ class ManeuverSystem {
             node.relVelX = data.velRel.x;
             node.relVelY = data.velRel.y;
         }
+        // 编辑即重新锚定计划：刷新质量快照（质量快照 = 最近一次授权的节点时刻质量）
+        node.massWet = getTotalMass(ship) || 0;
+        node.massFuel = getFuelAmount(ship) || 0;
         this._resetTracking(this._nodeKey(node));
         return true;
     }

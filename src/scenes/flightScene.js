@@ -6,7 +6,7 @@ import { updateShipPhysics } from '../physics/physicsUpdate.js';
 import { updateCelestialBodies, getSOIHost, getAbsolutePosition, getRelativePosition, convertVelocityFrame, celestialBodies } from '../physics/physics.js';
 import { stateToKepler } from '../physics/orbitalMechanics.js';
 import { getTimeToNextSOISwitch } from '../physics/orbitalPrediction.js';
-import { render, renderFlightHud, getLastOrbitSegments, getLastOrbitMarkers, setOrbitHoverState, findNearestOrbitPoint, resolveOrbitHit } from '../renderer.js';
+import { render, renderFlightHud, getLastOrbitSegments, getLastOrbitMarkers, setOrbitHoverState, findNearestOrbitPoint, resolveOrbitHit, getLastManeuverPrediction } from '../renderer.js';
 import { showOrbitContextMenu, updateOrbitContextMenu } from '../ui/orbitContextMenu.js';
 import { updateManeuverUI, hideManeuverUI, isManeuverDragging, collapseManeuverEditing } from '../ui/maneuverUI.js';
 import { maneuverSystem } from '../ship/maneuverSystem.js';
@@ -23,6 +23,7 @@ import { getModuleDef } from '../ship/moduleTypes.js';
 import { getFacilityType } from '../facility/facilityTypes.js';
 import { getTotalMass, getResource, getFuelAmount, getFuelCapacity } from '../resources/resourceSystem.js';
 import { updateScanProgress } from '../resources/scanSystem.js';
+import { computeManeuverDirection } from '../physics/maneuverPrediction.js';
 import { getEngineType } from '../resources/engineConfig.js';
 import { consumeCargo, hasCargoHold, getCargoAmount } from '../resources/cargoSystem.js';
 import { isBalanceEnforced } from '../resources/modeRules.js';
@@ -41,6 +42,8 @@ let _activeFacilityId = null;  // 当前控制的设施 ID（无活动飞船时�
 let _dockPromptFacId = null;   // 当前显示对接弹窗的设施 ID（防止重复 show）
 let _lastToolbarMode = null;         // 统一工具栏脏检测：上一次的 mode
 let _lastToolbarFingerprint = null; // 统一工具栏脏检测：上一次的数据指纹（含模块列表）
+let _maneuverAngle = null;          // 机动节点指向（0.3.0：SAS maneuver 模式与导航球机动标记共用）
+let _hasManeuver = false;           // 是否存在可执行机动节点（SAS 节点副钮可用性）
 let _lastMouseX = -1;          // 最近鼠标画布 CSS 坐标（-1 = 未知/离开画布）
 let _lastMouseY = -1;
 let _lastClientX = 0;          // 最近鼠标视口坐标（供工具提示定位）
@@ -873,6 +876,23 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
 
                 // 构建 SAS 目标朝向计算所需的飞行上下文
                 const host = getSOIHost(getAbsolutePosition(activeShip));
+
+                // 机动节点方向（0.3.0）：存在可执行节点时计算两态方向——
+                //   过节点前 = 节点加速方向（恒定）；过节点后 = 达到目标轨道的当前燃烧方向（实时变）；
+                //   供 SAS 'maneuver' 模式指向、导航球机动标记、节点副钮可用性共同使用
+                const mvPred = getLastManeuverPrediction();
+                _hasManeuver = !!(mvPred && mvPred.plan && mvPred.plan.node && !mvPred.plan.node.executed
+                    && mvPred.plan.dvMag > 1e-3);
+                // NaN/Infinity 方向防御：非有限角度会污染导航球 marker 坐标 → ctx.arc NaN
+                // 抛 IndexSizeError → 每帧渲染中断 → 画布全黑 + 控制台刷错
+                const mvRaw = _hasManeuver ? computeManeuverDirection(activeShip, mvPred) : null;
+                _maneuverAngle = (mvRaw !== null && isFinite(mvRaw)) ? mvRaw : null;
+                // 节点消失（删除/完成）时自动退出 maneuver 模式，静默回到姿态保持
+                if (activeShip.sasMode === 'maneuver' && !_hasManeuver) {
+                    activeShip.sasMode = 'stability';
+                }
+                activeShip._sasController.setManeuverHeading(_maneuverAngle);
+
                 const sasContext = {
                     shipVx: activeShip.vel.x,
                     shipVy: activeShip.vel.y,
@@ -1061,7 +1081,7 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             // SAS UI 渲染（仅在有活动飞船时显示）
             if (activeShip) {
                 sasUI.updateLayout(_canvas);
-                sasUI.update(_lastDt, activeShip.sasMode || 'off', activeShip.throttle || 0);
+                sasUI.update(_lastDt, activeShip.sasMode || 'off', activeShip.throttle || 0, _hasManeuver);
                 sasUI.render(ctx, activeShip.sasMode || 'off', activeShip.throttle || 0);
             }
 
@@ -1071,6 +1091,10 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             const directions = activeShip
                 ? computeNavballDirections(activeShip, getSOIHost(getAbsolutePosition(activeShip)))
                 : null;
+            // 机动节点方向（0.3.0）：导航球第 5 枚方向标记数据源（与四方向同构，实时变化）
+            if (directions) {
+                directions.maneuver = _maneuverAngle !== null ? { angle: _maneuverAngle } : null;
+            }
             eventBus.emit(Events.RENDER_DATA, {
                 exists: !!activeShip,
                 // 世界游戏时间（秒）— 时间加速面板 UT 显示数据源（tracking 场景用 CELESTIAL_TIME_UPDATED）

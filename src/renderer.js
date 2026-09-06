@@ -2,7 +2,8 @@ import { camera, worldToScreen } from './camera.js';
 import { celestialBodies, getAbsolutePosition } from './physics/physics.js';
 import { predictTrajectoryPatched, predictTrajectoryBurned, bodyFuturePos, getCachedTime } from './physics/orbitalPrediction.js';
 import { getOrbitalInfo, stateToKepler, findSOIExitTime, timeToHyperPeriapsis } from './physics/orbitalMechanics.js';
-import { predictManeuverTrajectories } from './physics/maneuverPrediction.js';
+import { predictManeuverTrajectories, walkToTime } from './physics/maneuverPrediction.js';
+import { getTotalMass, getFuelAmount } from './resources/resourceSystem.js';
 import { MANEUVER_CONFIG } from './config/maneuverConfig.js';
 import { getFacilityType } from './facility/facilityTypes.js';
 import { renderableManager } from './graphics/renderable.js';
@@ -55,6 +56,8 @@ let _lastOrbitMarkers = [];      // 本帧 Ap/Pe 标记屏幕位置（renderOrbi
 let _orbitHoverState = null;     // 悬停状态（setOrbitHoverState 写入，标记绘制消费）
 let _lastVisibility = {};        // 本帧可见性选项（render 写入，SOI 标签开关等消费）
 let _lastManeuverPrediction = null;  // 本帧机动节点预测缓存（prepareManeuverPrediction 写入，机动 UI 读取）
+let _mvCacheKey = null;              // 机动预测缓存键（0.3.0"有节点就卡"修复：滑行期零重算）
+let _mvCacheResult = null;           // 机动预测缓存结果（pinned 快照下仅依赖节点+质量/引擎参数）
 
 // rgba 字符串缓存（0.2.5 A8：hexToRgba 每帧对每个天体/设施重复 parse+拼接，按 (hex,alpha) 缓存）
 const _rgbaCache = new Map();
@@ -754,12 +757,63 @@ function renderOrbit(ship, ctx, canvas, isActive = true) {
 // 注意：不按 ship.mode 过滤——推力模式下（玩家按机动计划手动燃烧中）预测线必须保持显示，
 // 否则一开节流阀机动规划即消失，玩家无法按计划执行（0.3.0 修复）。
 function prepareManeuverPrediction(ship, baseSegments, canvas) {
-    if (!ship || !Array.isArray(ship.maneuverNodes) || ship.maneuverNodes.length === 0) return null;
+    if (!ship || !Array.isArray(ship.maneuverNodes) || ship.maneuverNodes.length === 0) {
+        _mvCacheKey = null;
+        _mvCacheResult = null;
+        return null;
+    }
 
     const node = ship.maneuverNodes.find(n => !n.executed) || null;
-    if (!node) return null;
+    if (!node) {
+        _mvCacheKey = null;
+        _mvCacheResult = null;
+        return null;
+    }
 
-    const result = predictManeuverTrajectories(ship, node, baseSegments);
+    // 旧节点快照自动回填（0.3.0 "飞船燃烧算进节点"漂移根治）：
+    // 无完整快照的节点（功能上线前的存档/会话遗留）首次在滑行态可见时，
+    // 一次性从当前预测链冻结 位置/速度/质量 快照；回填后 computePlan 走冻结路径，
+    // 计划永久脱离活飞船状态（推力模式基链含燃烧轨迹，故只在 on_rails 回填）。
+    if (ship.mode === 'on_rails'
+        && !(node.relX !== null && node.relX !== undefined && isFinite(node.relVelX))) {
+        try {
+            const st = walkToTime(baseSegments, node.time);
+            if (st && st.relPos && st.relVel) {
+                node.relX = st.relPos.x;
+                node.relY = st.relPos.y;
+                node.relVelX = st.relVel.x;
+                node.relVelY = st.relVel.y;
+                node.anchorBody = node.anchorBody || st.host.name;
+                node.massWet = getTotalMass(ship) || 0;
+                node.massFuel = getFuelAmount(ship) || 0;
+            }
+        } catch (err) {
+            // 链瞬时缺失：本帧跳过，下帧重试
+        }
+    }
+
+    // 每帧重算防护（0.3.0 修复"有节点就卡"）：冻结快照优先下，预测计划只依赖
+    // 节点时间/Δv 与节点时刻质量/引擎参数——点火燃烧（当前质量下降）不影响键，
+    // 燃烧期全帧命中缓存 → 预测线零漂移。
+    // 注：无快照的旧节点在此缓存键中用常量占位（-1），绝不回退到当前燃料——
+    //   否则燃烧期键每帧翻动强制重算（"飞船燃烧算进节点"的漂移路径之一）。
+    const cacheKey = node.time + '|' + node.deltaV.x + '|' + node.deltaV.y + '|'
+        + (isFinite(node.massWet) && node.massWet > 0 ? node.massWet : -1) + '|'
+        + (ship.maxThrust || 0) + '|' + (ship.isp || 0);
+    let result;
+    if (cacheKey === _mvCacheKey && _mvCacheResult) {
+        result = _mvCacheResult;
+    } else {
+        // 隔离异常：机动预测失败仅降级（无红线/无标记），绝不让整帧渲染中断（黑屏防线）
+        try {
+            result = predictManeuverTrajectories(ship, node, baseSegments);
+        } catch (err) {
+            console.error('[Maneuver] 机动预测异常（已降级）:', err);
+            result = { segments: [], burnArc: null, fuelOutPoint: null, plan: null };
+        }
+        _mvCacheKey = cacheKey;
+        _mvCacheResult = result;
+    }
     const plan = result.plan;
 
     // 节点图标屏幕位置：walk 命中（链内）优先；退化用冻结轨道坐标（anchorBody + relX/relY）

@@ -8,6 +8,7 @@ export const SASMode = Object.freeze({
     RETROGRADE: 'retrograde',
     RADIAL_IN:  'radial_in',
     RADIAL_OUT: 'radial_out',
+    MANEUVER:   'maneuver',  // 机动节点指向（SAS 工具栏"节点"副钮；无节点时按钮禁用）
     TARGET:     'target'    // 预留
 });
 
@@ -19,6 +20,7 @@ export const SASModeLabels = {
     retrograde: '逆向',
     radial_in:  '径向内',
     radial_out: '径向外',
+    maneuver:   '节点指向',
     target:     '目标指向'
 };
 
@@ -150,6 +152,13 @@ export function computeTargetHeading(mode, context, state) {
         case SASMode.RADIAL_OUT: {
             const radialIn = computeTargetHeading(SASMode.RADIAL_IN, context, state);
             return wrapAngle(radialIn + Math.PI);
+        }
+
+        // ---- 机动节点指向（0.3.0）：
+        //   方向由飞行场景每帧经 state.maneuverHeading 注入（过节点前=节点加速方向；
+        //   过节点后=达到目标轨道的当前燃烧方向）；无有效方向时回退当前朝向 ----
+        case SASMode.MANEUVER: {
+            return state.maneuverHeading ?? context.shipHeading;
         }
 
         // ---- 目标指向（预留） ----
