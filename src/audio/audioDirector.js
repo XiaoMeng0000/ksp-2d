@@ -116,12 +116,10 @@ class AudioDirector {
             audioCore.playSfx('sfx:warp_hover', warpSfxConfig.hover.volume, getWarpSfxRate(rate));
         });
 
-        // 机动节点到达 / 完成 → 专属提示音（0.3.0；资产缺失时 playSfx 静默跳过）
+        // 机动节点到达 → 到达提示音（0.3.0；资产缺失时 playSfx 静默跳过；
+        // 总监定稿：无"完成音效"——完成仅 UI 通知，不做音效）
         eventBus.on(Events.MANEUVER_ARRIVED, () => {
             audioCore.playSfx('sfx:maneuver_arrive', 1, 1);
-        });
-        eventBus.on(Events.MANEUVER_COMPLETED, () => {
-            audioCore.playSfx('sfx:maneuver_complete', 1, 1);
         });
     }
 

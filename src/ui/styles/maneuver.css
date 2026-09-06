@@ -138,7 +138,8 @@
 .maneuver-leds {
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    justify-content: center;
+    gap: 8px;
     padding: 2px 0;
 }
 .maneuver-led {

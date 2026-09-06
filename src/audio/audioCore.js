@@ -20,6 +20,7 @@ class AudioCore {
         this._total = 0;
         this._completed = 0;
         this._ready = false;
+        this._pendingPlays = [];     // 按需补载中的待播请求（0.3.0：资产后置/加载失败自愈）
 
         // 音量总线：master → { music, sfx → { ui, comms } }
         // 分类音量（设置面板可调）：总 / 音乐 / UI 音效 / 坎巴拉人通讯音
@@ -145,6 +146,12 @@ class AudioCore {
                 total: this._total,
                 success: true
             });
+            // 按需补载成功 → 补播排队中的一次性事件音效（如机动节点到达音）
+            const pending = this._pendingPlays.filter(p => p.id === id);
+            this._pendingPlays = this._pendingPlays.filter(p => p.id !== id);
+            for (const p of pending) {
+                this._playBuffer(id, buffer, p.volume, p.rate);
+            }
         } catch (e) {
             this._completed++;
             console.error('[AudioCore] 加载失败: ' + id + ' → ' + path, e);
@@ -260,10 +267,25 @@ class AudioCore {
         }
         const buffer = this._buffers.get(id);
         if (!buffer) {
-            console.warn('[AudioCore] 音效资源未找到: ' + id);
+            // 0.3.0 加固（"warp 后到达音不响"排查）：物理文件是页面启动后才放入 /
+            // 启动时拉取失败 → 按需补载，成功后立即补播（事件为一次性，错过即失）；
+            // 未配置的 id 直接警告
+            const manifest = buildAudioManifest();
+            const path = manifest[id];
+            if (!path) {
+                console.warn('[AudioCore] 音效资源未配置: ' + id);
+                return;
+            }
+            console.warn('[AudioCore] 音效资源未找到，按需补载后补播: ' + id);
+            this._pendingPlays.push({ id, volume, rate });
+            this._loadBuffer(id, path);
             return;
         }
+        this._playBuffer(id, buffer, volume, rate);
+    }
 
+    // 实际播放（缓冲已就绪路径）
+    _playBuffer(id, buffer, volume, rate) {
         const source = this._ctx.createBufferSource();
         source.buffer = buffer;
         source.playbackRate.value = Math.max(0.25, Math.min(4, rate));
