@@ -52,6 +52,14 @@ const HANDLE_ICONS = {
 // 染色 dataURL 缓存（texture/color 组合，40px 高清底图）
 const _iconDataUrlCache = new Map();
 
+let _tailSvg = null;        // 卡片下方自适应尖角（SVG 容器）
+let _tailBody = null;       // 尖角黑底本体（path）
+let _tailEdge = null;       // 尖角紫色斜边（polyline）
+let _tailLocalW = -1;       // 尖角 viewBox 宽度缓存（布局宽度变化才重设）
+const ARM = 7;              // 尖角两条边的水平跨度（自适应夹取基准）
+const TIP_Y = 9;            // 尖角尖端深度（相对卡片底边框）
+const CORNER_R = 6;         // 卡片倒角半径（与 .maneuver-card border-radius 一致）
+
 // ===== DOM 构建（懒初始化） =====
 function ensureDom() {
     if (_initialized) return;
@@ -71,26 +79,28 @@ function ensureDom() {
                 '<div class="maneuver-btn maneuver-btn-red" title=""></div>' +
             '</div>' +
             '<div class="maneuver-card">' +
-                '<div class="maneuver-row">' +
-                    '<span class="maneuver-check">✓</span>' +
-                    '<span class="maneuver-label"></span>' +
-                    '<span class="maneuver-value"></span>' +
+                '<div class="maneuver-rows">' +
+                    '<div class="maneuver-row">' +
+                        '<span class="maneuver-check"></span>' +
+                        '<span class="maneuver-label"></span>' +
+                        '<span class="maneuver-value"></span>' +
+                    '</div>' +
+                    '<div class="maneuver-row">' +
+                        '<span class="maneuver-check"></span>' +
+                        '<span class="maneuver-label"></span>' +
+                        '<span class="maneuver-value"></span>' +
+                    '</div>' +
+                    '<div class="maneuver-row">' +
+                        '<span class="maneuver-check"></span>' +
+                        '<span class="maneuver-label"></span>' +
+                        '<span class="maneuver-value"></span>' +
+                    '</div>' +
                 '</div>' +
-                '<div class="maneuver-row maneuver-time-row">' +
-                    '<span class="maneuver-check">✓</span>' +
-                    '<span class="maneuver-label"></span>' +
-                    '<span class="maneuver-value"></span>' +
+                '<div class="maneuver-leds">' +
+                    '<div class="maneuver-led"></div>' +
+                    '<div class="maneuver-led"></div>' +
+                    '<div class="maneuver-led"></div>' +
                 '</div>' +
-                '<div class="maneuver-row maneuver-time-row">' +
-                    '<span class="maneuver-check">✓</span>' +
-                    '<span class="maneuver-label"></span>' +
-                    '<span class="maneuver-value"></span>' +
-                '</div>' +
-            '</div>' +
-            '<div class="maneuver-leds">' +
-                '<div class="maneuver-led"></div>' +
-                '<div class="maneuver-led"></div>' +
-                '<div class="maneuver-led"></div>' +
             '</div>' +
         '</div>' +
         '<div class="maneuver-bar-wrap"><div class="maneuver-bar-fill"></div></div>';
@@ -139,6 +149,17 @@ function ensureDom() {
             window.showNotification(t('maneuver.deleted'), 'info');
         }
     });
+
+    // 卡片下方自适应尖角（SVG）：黑底本体 + 两条紫色斜边（颜色走 CSS，顶点每帧按进度前沿重算）
+    _tailSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    _tailSvg.setAttribute('class', 'maneuver-card-tail');
+    _tailBody = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    _tailBody.setAttribute('class', 'maneuver-card-tail-body');
+    _tailEdge = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    _tailEdge.setAttribute('class', 'maneuver-card-tail-edge');
+    _tailSvg.appendChild(_tailBody);
+    _tailSvg.appendChild(_tailEdge);
+    _panel.querySelector('.maneuver-card').appendChild(_tailSvg);
 
     // 节点图标 + 十字手柄
     _icon = document.createElement('div');
@@ -451,6 +472,43 @@ export function updateManeuverUI(canvas, ship) {
         ? Math.max(0, Math.min(1, progress.remaining / progress.planned))
         : 1;
     fill.style.width = (ratio * 100).toFixed(1) + '%';
+
+    // ---- 卡片下方自适应尖角（0.3.0 打磨定稿语义）----
+    //   顶点(尖端) = 进度位置：对齐进度条的"进度前沿"（绿色填充右边缘）；
+    //   两条边自适应：上端落在卡片底边上（apex ± ARM）；
+    //   活动范围统一夹在卡片底部【平直段】内 [CORNER_R−1, 卡宽−CORNER_R−1]（避开倒角）——
+    //     · 中部     → 对称 V 形（原有效果）
+    //     · 满进度   → 右边上端被夹到平直段右端点（= 倒角起点）→ 与框连住
+    //     · 零进度   → 镜像：左边上端落在倒角起点
+    const cardEl = _panel.querySelector('.maneuver-card');
+    const barEl = _panel.querySelector('.maneuver-bar-wrap');
+    if (cardEl && barEl && _tailSvg && _tailBody && _tailEdge) {
+        const cardRect = cardEl.getBoundingClientRect();
+        const barRect = barEl.getBoundingClientRect();
+        const localW = cardRect.width - 2;          // SVG 跨度 = 卡片内边距盒宽（左右各 1px 边框）
+        if (localW > 20) {
+            if (Math.abs(localW - _tailLocalW) > 0.5) {
+                _tailLocalW = localW;
+                _tailSvg.setAttribute('viewBox', '0 0 ' + localW + ' 10');
+            }
+            const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+            const loX = CORNER_R - 1;                        // 平直段左端（局部坐标）
+            const hiX = cardRect.width - CORNER_R - 1;       // 平直段右端（局部坐标）
+            // 进度前沿（相对卡片内边距盒左缘，条内含 1px 边框 → 内缩 2px 口径）
+            const raw = (barRect.left - cardRect.left - 1) + ratio * Math.max(0, barRect.width - 2);
+            const px = clamp(raw, loX, hiX);                 // 顶点 x = 进度位置
+            // 两条边：正常 = 顶点 ± ARM 斜边；一旦超出平直段 → **该边竖直**（上端与顶点同 x，
+            // 顶点本身已被夹在平直段内，故竖直边的上端仍落在卡片平直底边上、与框相连）
+            const xL = (px - ARM >= loX) ? px - ARM : px;
+            const xR = (px + ARM <= hiX) ? px + ARM : px;
+            // 黑底本体：上沿比斜边各外扩 0.5px（盖住卡体底边框的线头，消除接缝台阶）；
+            // 斜边从边框线中心 y=0.5 起笔 → 与横线笔画中心对齐，衔接连续
+            _tailBody.setAttribute('d',
+                'M ' + (xL - 0.5) + ' 0 L ' + px + ' ' + TIP_Y + ' L ' + (xR + 0.5) + ' 0 Z');
+            _tailEdge.setAttribute('points',
+                xL + ' 0.5 ' + px + ' ' + TIP_Y + ' ' + xR + ' 0.5');
+        }
+    }
 
     // ---- 三段倒计时状态灯 ----
     updateLeds(node, burnT, now);
