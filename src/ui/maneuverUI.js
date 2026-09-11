@@ -16,6 +16,7 @@ import { screenToWorld, cssToCanvas, canvasToCss, worldToScreen } from '../camer
 import { getCachedTime, bodyFuturePos } from '../physics/orbitalPrediction.js';
 import { walkToTime } from '../physics/maneuverPrediction.js';
 import { celestialBodies } from '../physics/physics.js';
+import { computeDeltaV } from '../resources/resourceSystem.js';
 import { textureManager } from '../graphics/textureManager.js';
 import { timeWarp } from '../timeWarp.js';
 import { formatTCountdown } from '../utils/format.js';
@@ -349,9 +350,11 @@ export function updateManeuverUI(canvas, ship) {
         _icon.style.left = iconCss.x + 'px';
         _icon.style.top = iconCss.y + 'px';
         // 十字手柄：编辑态开关控制（true=显示；false=完全隐藏——空白点击关闭后
-        // 需点击节点图标重新进入编辑；轴数据不可用/节点完成时同样隐藏）。
+        // 需点击节点图标重新进入编辑）。
+        // 0.3.0 打磨：已完成（executed）节点同样可编辑——目标轨迹参照常驻，
+        // 玩家可继续调 Δv/位置来规划修正燃烧（烧过头"拐回来"）。
         const axes = plan ? plan.axes : null;
-        const showHandles = _editing && !!axes && !node.executed;
+        const showHandles = _editing && !!axes;
         const iconHalf = cfg.handleIconSize / 2;
         for (const axis of HANDLE_AXES) {
             const h = _handles[axis];
@@ -427,6 +430,21 @@ export function updateManeuverUI(canvas, ship) {
     const stopVal = rows[2].querySelector('.maneuver-value');
     stopVal.textContent = 'T-' + formatTCountdown(Math.max(0, node.time + burnT - now));
 
+    // ---- 三行状态语义（0.3.0 打磨定稿）----
+    // 行1 需要ΔV：节点 Δv ≤ 飞船【当前可用】Δv → ✓白；超出 → ✗灰（0/0 视为够）
+    // 行2 加速开始于：节点时刻前 ✓白；到达后 ✓灰（对号常驻）
+    // 行3 加速停止于：节点时刻前 ✗灰；到达后 ✓白（此后保持 ✓白）
+    const shipDv = computeDeltaV(ship);
+    const states = computeManeuverRowStates({
+        planned: progress.planned,
+        shipDv,
+        now,
+        nodeTime: node.time
+    });
+    for (let i = 0; i < rows.length && i < states.length; i++) {
+        applyRowState(rows[i], states[i]);
+    }
+
     // ---- 进度条（0.3.0 打磨：项目绿满 → 消耗式向左缩小归零；宽度 = 剩余/计划） ----
     const fill = _panel.querySelector('.maneuver-bar-fill');
     const ratio = progress.planned > 0
@@ -440,6 +458,36 @@ export function updateManeuverUI(canvas, ship) {
     // ---- 按钮可用性 ----
     const greenBtn = _panel.querySelector('.maneuver-btn-green');
     greenBtn.disabled = node.executed || (node.time - cfg.warpLeadTime <= now);
+}
+
+// 三行读数状态计算（纯函数，可单测；0.3.0 打磨定稿语义）：
+//   行1 需要ΔV：节点 Δv ≤ 飞船当前可用 Δv → { check:'✓', active:true }（白）；
+//                超出 → { check:'✗', active:false }（灰）；planned=0 视为够（✓白）
+//   行2 加速开始于：节点时刻前 ✓白（对号常驻）；到达后 ✓灰
+//   行3 加速停止于：节点时刻前 ✗灰；到达后 ✓白并保持
+// @param {Object} p - { planned, shipDv, now, nodeTime }
+// @returns {Array<{check:string, active:boolean}>} 三行状态（顺序与面板行一致）
+export function computeManeuverRowStates(p) {
+    const planned = p && isFinite(p.planned) ? p.planned : 0;
+    const shipDv = p && isFinite(p.shipDv) ? p.shipDv : 0;
+    const beforeNode = !(p && isFinite(p.now) && isFinite(p.nodeTime)) ? true : (p.now < p.nodeTime);
+    const dvEnough = planned <= shipDv + 1e-6;
+    return [
+        { check: dvEnough ? '✓' : '✗', active: dvEnough },
+        { check: '✓', active: beforeNode },
+        { check: beforeNode ? '✗' : '✓', active: !beforeNode }
+    ];
+}
+
+// 应用状态到行（图标 + 白/灰状态类）
+function applyRowState(row, state) {
+    if (!row || !state) return;
+    const check = row.querySelector('.maneuver-check');
+    if (check && check.textContent !== state.check) {
+        check.textContent = state.check;
+    }
+    row.classList.toggle('state-active', !!state.active);
+    row.classList.toggle('state-inactive', !state.active);
 }
 
 function updateLeds(node, burnT, now) {

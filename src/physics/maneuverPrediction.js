@@ -162,6 +162,42 @@ export function planBurnArc(relPos, relVel, host, params, startTime) {
     return result;
 }
 
+// ===== 节点 Δv 的轨道参考系分量 ↔ 世界矢量互转（0.3.0 方案B：分量 = 唯一真值）=====
+// 分量定义：dvPro（+顺向 / −逆向）、dvRadial（+径向朝外 / −径向朝内）
+// 语义：Δv 以"节点时刻轨道参考系"的分量存储；节点被拖到新位置后分量不变、
+//       参考系随新位置旋转 → 世界矢量自动变为"新位置的顺向/径向"
+//       （修复：拖拽后燃烧方向仍停留在旧位置顺向）。
+// axes 结构：{ pro, retro, radIn, radOut }，每项为 host 局部系单位向量（plan.axes 同构）
+
+// 由轨道状态计算四方向单位向量（单一来源；computePlan 与拖拽重投影共用）
+export function computeNodeAxes(relPos, relVel) {
+    const dirs = getOrbitalDirectionAngles(relPos, relVel);
+    return {
+        pro: { x: Math.cos(dirs.prograde), y: Math.sin(dirs.prograde) },
+        retro: { x: Math.cos(dirs.retrograde), y: Math.sin(dirs.retrograde) },
+        radIn: { x: Math.cos(dirs.radialIn), y: Math.sin(dirs.radialIn) },
+        radOut: { x: Math.cos(dirs.radialOut), y: Math.sin(dirs.radialOut) }
+    };
+}
+
+// 世界矢量 → 分量（旧节点迁移：无 dvPro/dvRadial 时按给定参考系反投影一次）
+export function syncComponentsFromDeltaV(node, axes) {
+    if (!node || !axes || !axes.pro || !axes.radOut) return false;
+    if (isFinite(node.dvPro) && isFinite(node.dvRadial)) return true;
+    node.dvPro = node.deltaV.x * axes.pro.x + node.deltaV.y * axes.pro.y;
+    node.dvRadial = node.deltaV.x * axes.radOut.x + node.deltaV.y * axes.radOut.y;
+    return true;
+}
+
+// 分量 → 世界矢量（按当前参考系重建；分量缺失时返回 false，保持原矢量不动）
+export function rebuildDeltaVFromComponents(node, axes) {
+    if (!node || !axes || !axes.pro || !axes.radOut) return false;
+    if (!isFinite(node.dvPro) || !isFinite(node.dvRadial)) return false;
+    node.deltaV.x = node.dvPro * axes.pro.x + node.dvRadial * axes.radOut.x;
+    node.deltaV.y = node.dvPro * axes.pro.y + node.dvRadial * axes.radOut.y;
+    return true;
+}
+
 // 节点计划汇总：walk 状态 + 节点参考系轴 + 燃烧参数 + 燃烧积分 + 机动后段拼接
 // 返回 plan（含 axes / burnDuration / dvMag / dvMax / fuelLimited / fuelOutPoint /
 // burnResult / segments）；nodeState 不可达时仍返回基础信息（面板倒计时可用）。
@@ -225,25 +261,27 @@ export function computePlan(ship, node, baseSegments) {
     }
     plan.nodeState = nodeState;
     if (!nodeState) return plan;
-    const dirs = getOrbitalDirectionAngles(nodeState.relPos, nodeState.relVel);
-    plan.axes = {
-        pro: { x: Math.cos(dirs.prograde), y: Math.sin(dirs.prograde) },
-        retro: { x: Math.cos(dirs.retrograde), y: Math.sin(dirs.retrograde) },
-        radIn: { x: Math.cos(dirs.radialIn), y: Math.sin(dirs.radialIn) },
-        radOut: { x: Math.cos(dirs.radialOut), y: Math.sin(dirs.radialOut) }
-    };
+    plan.axes = computeNodeAxes(nodeState.relPos, nodeState.relVel);
 
-    if (dvMag <= 0) return plan;
+    // 方案B（0.3.0）：分量 = 唯一真值 —— 先迁移旧节点分量（世界矢量反投影一次），
+    // 再由分量 + 当前参考系轴重建世界矢量（节点被拖到新位置后方向随之旋转）
+    syncComponentsFromDeltaV(node, plan.axes);
+    rebuildDeltaVFromComponents(node, plan.axes);
+    const dvMagNow = Math.hypot(node.deltaV.x, node.deltaV.y) || 0;
+    plan.dvMag = dvMagNow;
+    plan.fuelLimited = dvMagNow > dvMax + 1e-6;
+
+    if (dvMagNow <= 0) return plan;
 
     // 燃烧弧（节点 Δv 方向沿 host 局部系恒定施加，与预测/手动执行同口径）
     const burnResult = planBurnArc(nodeState.relPos, nodeState.relVel, nodeState.host, {
-        dirX: node.deltaV.x / dvMag,
-        dirY: node.deltaV.y / dvMag,
+        dirX: node.deltaV.x / dvMagNow,
+        dirY: node.deltaV.y / dvMagNow,
         maxThrust,
         isp,
         mWet,
         mDry,
-        dvTarget: dvMag
+        dvTarget: dvMagNow
     }, node.time);
     plan.burnResult = burnResult;
     plan.burnDuration = burnResult.burnDuration;

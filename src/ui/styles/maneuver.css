@@ -60,7 +60,8 @@
     height: 34px;
     border-radius: 6px;
     border: 1px solid;
-    background: var(--theme-btn-bg);
+    /* 0.3.0 打磨：按钮背景改纯黑（原 --theme-btn-bg 近黑） */
+    background: #000000;
     font-size: 15px;
     line-height: 32px;
     text-align: center;
@@ -111,6 +112,18 @@
     gap: 6px;
     line-height: 20px;
 }
+/* 三行统一白/灰状态色（0.3.0 打磨：取消第二/三行的原金色标注，
+   改由状态类驱动——active 白 / inactive 灰，图标与文字同步） */
+.maneuver-row.state-active .maneuver-check,
+.maneuver-row.state-active .maneuver-label,
+.maneuver-row.state-active .maneuver-value {
+    color: var(--text-bright);
+}
+.maneuver-row.state-inactive .maneuver-check,
+.maneuver-row.state-inactive .maneuver-label,
+.maneuver-row.state-inactive .maneuver-value {
+    color: #6B737A;
+}
 .maneuver-check {
     color: var(--text-bright);
     font-size: 11px;
@@ -122,16 +135,10 @@
     color: var(--text-bright);
     flex: none;
 }
-.maneuver-row.maneuver-time-row .maneuver-label {
-    color: #FFD37A;
-}
 .maneuver-value {
     margin-left: auto;
     text-align: right;
     white-space: nowrap;
-}
-.maneuver-row.maneuver-time-row .maneuver-value {
-    color: #FFC966;
 }
 
 /* 右侧三枚倒计时状态灯（自上而下） */

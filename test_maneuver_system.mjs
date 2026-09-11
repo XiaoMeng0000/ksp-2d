@@ -56,5 +56,55 @@ check('S6 完成事件已广播', completed === true);
 const del = maneuverSystem.deleteNode(ship);
 check('S7 删除成功且数组清空', del === true && ship.maneuverNodes.length === 0);
 
+// S8: 方案B —— 节点拖到新位置后，"顺向 100 m/s"应变为【新位置的顺向】
+{
+    const { computeNodeAxes } = await import('./src/physics/maneuverPrediction.js');
+    const ship3 = { id: 's8', mode: 'on_rails', thrust: { ax: 0, ay: 0 }, maneuverNodes: [] };
+    maneuverSystem.createNode(ship3, {
+        time: 100, relX: 1e6, relY: 0, anchorBody: 'Kerbin', velRel: { x: 0, y: 2000 }
+    });
+    const n3 = ship3.maneuverNodes[0];
+    const axesA = computeNodeAxes({ x: 1e6, y: 0 }, { x: 0, y: 2000 });
+    maneuverSystem.updateNodeDeltaV(ship3, 'pro', 100, axesA);
+    check('S8 A 点顺向+100（世界矢量 = +Y）',
+        Math.abs(n3.deltaV.x) < 1e-6 && Math.abs(n3.deltaV.y - 100) < 1e-6);
+    check('S8 分量为真值 dvPro=100', Math.abs(n3.dvPro - 100) < 1e-9 && Math.abs(n3.dvRadial) < 1e-9);
+
+    // 拖到 B 点：位置 +Y、速度 −X（轨道系顺向相对 A 旋转 90°）
+    maneuverSystem.updateNodeTime(ship3, {
+        time: 200, relX: 0, relY: 1e6, anchorBody: 'Kerbin', velRel: { x: -2000, y: 0 }
+    });
+    const dotProB = n3.deltaV.x * (-1) + n3.deltaV.y * 0;   // B 点顺向单位向量 = (−1, 0)
+    check('S8 拖到 B 点后 Δv = B 点顺向 100', Math.abs(dotProB - 100) < 1e-6);
+    check('S8 拖拽后 |Δv| 保持 100', Math.abs(Math.hypot(n3.deltaV.x, n3.deltaV.y) - 100) < 1e-6);
+    check('S8 拖拽后分量不变（仍为输入的 100 顺向）', Math.abs(n3.dvPro - 100) < 1e-9);
+}
+
+// S9: 完成后节点仍可编辑（0.3.0 打磨：参照轨迹常驻，可规划"拐回来"）
+{
+    const { computeNodeAxes } = await import('./src/physics/maneuverPrediction.js');
+    // 节点 Δv = 顺向（速度 (0,2000) → 顺向单位向量 (0,1)）→ 推力须同向才能烧足
+    const ship4 = { id: 's9', mode: 'thrust', thrust: { ax: 0, ay: 1 }, maneuverNodes: [] };
+    maneuverSystem.createNode(ship4, {
+        time: -5, relX: 1e6, relY: 0, anchorBody: 'Kerbin', velRel: { x: 0, y: 2000 }
+    });
+    const n4 = ship4.maneuverNodes[0];
+    const axes4 = computeNodeAxes({ x: 1e6, y: 0 }, { x: 0, y: 2000 });
+    maneuverSystem.updateNodeDeltaV(ship4, 'pro', 5, axes4);
+    for (let i = 0; i < 400; i++) maneuverSystem.update(ship4, 0.05);   // 手动烧足
+    check('S9 烧足后 executed=true', n4.executed === true);
+    check('S9 完成后 getNode 仍返回该节点（轨迹/面板常驻）', maneuverSystem.getNode(ship4) === n4);
+
+    let arrivedAfterEdit = 0;
+    const h = () => { arrivedAfterEdit++; };
+    eventBus.on(Events.MANEUVER_ARRIVED, h);
+    maneuverSystem.updateNodeDeltaV(ship4, 'pro', 10, axes4);           // 完成后继续编辑
+    check('S9 编辑后 executed 复位（重新进入计划态）', n4.executed === false);
+    check('S9 编辑后分量继续累加（5 → 15）', Math.abs(n4.dvPro - 15) < 1e-9);
+    maneuverSystem.update(ship4, 0.05);
+    check('S9 编辑后不重复弹到达提醒', arrivedAfterEdit === 0);
+    eventBus.off(Events.MANEUVER_ARRIVED, h);
+}
+
 console.log(`\n结果: ${pass} 通过 / ${fail} 失败`);
 process.exit(fail > 0 ? 1 : 0);

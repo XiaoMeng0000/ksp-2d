@@ -140,5 +140,21 @@ check('T11 快照下 dvMax 不随燃料变化', Math.abs(r11b.plan.dvMax - r11a.
 check('T11 快照下燃烧时长不漂移', Math.abs(r11b.plan.burnDuration - r11a.plan.burnDuration) < 1e-9);
 ship.resources.fuel.amount = 3000;                                    // 还原
 
+// T12: 方案B —— 分量 = 唯一真值：世界矢量过期（0）时由分量 + 参考系轴重建
+const nodeComp = {
+    time: tNode, deltaV: { x: 0, y: 0 }, dvPro: 100, dvRadial: 0, executed: false,
+    relX: snap.relX, relY: snap.relY, relVelX: snap.relVelX, relVelY: snap.relVelY,
+    anchorBody: home.name, massWet: 8000, massFuel: 3000
+};
+const r12 = predictManeuverTrajectories(ship, nodeComp, segments);
+check('T12 分量重建世界 Δv（|Δv|=100）', Math.abs(r12.plan.dvMag - 100) < 1e-6);
+check('T12 世界矢量已按参考系回写（非零）',
+    Math.hypot(nodeComp.deltaV.x, nodeComp.deltaV.y) > 99.999);
+// 重建方向 = 节点时刻的顺向（与快照速度方向一致：世界矢量 · 顺向单位向量 ≈ 100）
+const proUnitDot = (nodeComp.deltaV.x * snap.relVelX + nodeComp.deltaV.y * snap.relVelY)
+    / Math.hypot(snap.relVelX, snap.relVelY);
+check('T12 重建方向为节点时刻顺向', Math.abs(proUnitDot - 100) < 1e-6);
+check('T12 燃烧弧存在（重建后可预测）', r12.segments.length > 0 && !!r12.burnArc);
+
 console.log(`\n结果: ${pass} 通过 / ${fail} 失败`);
 process.exit(fail > 0 ? 1 : 0);

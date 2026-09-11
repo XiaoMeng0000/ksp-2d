@@ -10,6 +10,7 @@
 import { eventBus, Events } from '../eventBus.js';
 import { MANEUVER_CONFIG } from '../config/maneuverConfig.js';
 import { getCachedTime } from '../physics/orbitalPrediction.js';
+import { computeNodeAxes, syncComponentsFromDeltaV, rebuildDeltaVFromComponents } from '../physics/maneuverPrediction.js';
 import { getTotalMass, getFuelAmount } from '../resources/resourceSystem.js';
 
 class ManeuverSystem {
@@ -59,7 +60,10 @@ class ManeuverSystem {
         }
         const node = {
             time: data.time,
+            // Δv：世界矢量（派生缓存，消费方接口不变）+ 轨道参考系分量（唯一真值，方案B）
             deltaV: { x: 0, y: 0 },
+            dvPro: 0,       // +顺向 / −逆向（节点时刻轨道参考系分量）
+            dvRadial: 0,    // +径向朝外 / −径向朝内
             executed: false,
             // 轨道坐标冻结锚（图标随轨道线移动、预测不可用时回退显示）
             relX: (data.relX !== null && data.relX !== undefined) ? data.relX : null,
@@ -94,22 +98,57 @@ class ManeuverSystem {
 
     // 沿节点参考系轴增减 Δv（方向手柄拖拽）：axisKey ∈ pro|retro|radIn|radOut，
     // axes = 预测 plan.axes（节点时刻轨道系单位向量）；编辑即重置进度
+    // 方案B（0.3.0）：写的是**分量**（dvPro/dvRadial），再按当前参考系轴重建世界矢量——
+    // 节点拖到新位置后分量不变、方向随新位置旋转。
     updateNodeDeltaV(ship, axisKey, deltaMs, axes) {
         const node = this.getNode(ship);
         if (!node || !axes || !axes[axisKey]) return false;
-        const u = axes[axisKey];
-        node.deltaV.x += u.x * deltaMs;
-        node.deltaV.y += u.y * deltaMs;
+        syncComponentsFromDeltaV(node, axes);
+        // 手柄语义：右=顺向(+) / 左=逆向(−)；上=径向朝外(+) / 下=径向朝内(−)
+        if (axisKey === 'pro') node.dvPro += deltaMs;
+        else if (axisKey === 'retro') node.dvPro -= deltaMs;
+        else if (axisKey === 'radOut') node.dvRadial += deltaMs;
+        else if (axisKey === 'radIn') node.dvRadial -= deltaMs;
+        rebuildDeltaVFromComponents(node, axes);
         // 拖拽高频调用：不逐帧发事件（UI 每帧读预测缓存自刷新），仅重置冲量基准
         this._resetTracking(this._nodeKey(node));
+        this._reopenAfterEdit(node);
         return true;
+    }
+
+    // 编辑即"重新进入计划态"（0.3.0 打磨）：
+    // 完成（executed）后节点与预测轨迹常驻，玩家可继续拖手柄/拖位置来规划修正燃烧
+    // （烧过头"拐回来"）；编辑后 executed 复位、进度冲量归零；
+    // 若节点时刻已过，则不重复弹到达提醒。
+    _reopenAfterEdit(node) {
+        if (!node) return;
+        if (node.executed) node.executed = false;
+        if (getCachedTime() >= node.time) this._arrivalNotified = true;
+    }
+
+    // 由节点快照（relX/relY/relVel）计算轨道参考系轴；快照不全时返回 null
+    _snapshotAxes(node) {
+        if (!node
+            || node.relX === null || node.relX === undefined
+            || node.relY === null || node.relY === undefined
+            || node.relVelX === null || node.relVelX === undefined
+            || node.relVelY === null || node.relVelY === undefined
+            || !isFinite(node.relVelX) || !isFinite(node.relVelY)) {
+            return null;
+        }
+        return computeNodeAxes({ x: node.relX, y: node.relY }, { x: node.relVelX, y: node.relVelY });
     }
 
     // 沿轨道拖动改节点时刻（data: { time, relX, relY, anchorBody, velRel? }；
     // velRel 可选——拖动命中链内时由调用方经 walkToTime 给出速度快照）
+    // 方案B（0.3.0）：拖拽前按**旧快照参考系**迁移分量，拖拽后按**新快照参考系**重建世界矢量
+    // → 节点从 A 拖到 B 时，"顺向 100 m/s"自动变为 B 点的顺向（而不是停留在 A 点方向）。
     updateNodeTime(ship, data) {
         const node = this.getNode(ship);
         if (!node || !data || !isFinite(data.time)) return false;
+        const oldAxes = this._snapshotAxes(node);
+        if (oldAxes) syncComponentsFromDeltaV(node, oldAxes);
+
         node.time = data.time;
         if (data.relX !== null && data.relX !== undefined) node.relX = data.relX;
         if (data.relY !== null && data.relY !== undefined) node.relY = data.relY;
@@ -118,10 +157,15 @@ class ManeuverSystem {
             node.relVelX = data.velRel.x;
             node.relVelY = data.velRel.y;
         }
+        // 新参考系下重建世界矢量（分量不变 → 方向随新位置旋转）
+        const newAxes = this._snapshotAxes(node);
+        if (newAxes) rebuildDeltaVFromComponents(node, newAxes);
+
         // 编辑即重新锚定计划：刷新质量快照（质量快照 = 最近一次授权的节点时刻质量）
         node.massWet = getTotalMass(ship) || 0;
         node.massFuel = getFuelAmount(ship) || 0;
         this._resetTracking(this._nodeKey(node));
+        this._reopenAfterEdit(node);
         return true;
     }
 

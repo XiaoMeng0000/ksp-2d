@@ -753,9 +753,11 @@ function renderOrbit(ship, ctx, canvas, isActive = true) {
 // 0.3.0 机动节点：扩展字段 relX/relY/anchorBody（节点在轨道上的冻结坐标，供图标锚定）
 
 // 机动节点预测准备：返回 { plan, segments, burnArc, maneuverMarkerDefs, nodeScreen, node }
-// 无可预测节点（无节点 / 已执行）→ null。
-// 注意：不按 ship.mode 过滤——推力模式下（玩家按机动计划手动燃烧中）预测线必须保持显示，
-// 否则一开节流阀机动规划即消失，玩家无法按计划执行（0.3.0 修复）。
+// 无节点 / 计算异常 → null。
+// 注意 1：不按 ship.mode 过滤——推力模式下（玩家按机动计划手动燃烧中）预测线必须保持显示，
+//         否则一开节流阀机动规划即消失，玩家无法按计划执行（0.3.0 修复）。
+// 注意 2：不按 node.executed 过滤——已完成节点继续显示预测轨迹（参照线常驻，
+//         玩家烧过头后可据此"拐回来"；编辑即重新进入计划态）。
 function prepareManeuverPrediction(ship, baseSegments, canvas) {
     if (!ship || !Array.isArray(ship.maneuverNodes) || ship.maneuverNodes.length === 0) {
         _mvCacheKey = null;
@@ -763,7 +765,8 @@ function prepareManeuverPrediction(ship, baseSegments, canvas) {
         return null;
     }
 
-    const node = ship.maneuverNodes.find(n => !n.executed) || null;
+    // 优先未执行节点；全部已执行时取第一个（保持"参照轨迹常驻"）
+    const node = ship.maneuverNodes.find(n => !n.executed) || ship.maneuverNodes[0] || null;
     if (!node) {
         _mvCacheKey = null;
         _mvCacheResult = null;
