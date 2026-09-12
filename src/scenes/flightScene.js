@@ -1,5 +1,5 @@
 import { shipSystem } from '../ship/shipSystem.js';
-import { camera, screenToWorld, cssToCanvas } from '../camera.js';
+import { camera, screenToWorld, cssToCanvas, worldToScreen } from '../camera.js';
 import { inputManager } from '../input.js';
 import { eventBus, Events } from '../eventBus.js';
 import { updateShipPhysics } from '../physics/physicsUpdate.js';
@@ -10,6 +10,7 @@ import { render, renderFlightHud, getLastOrbitSegments, getLastOrbitMarkers, set
 import { showOrbitContextMenu, updateOrbitContextMenu } from '../ui/orbitContextMenu.js';
 import { updateManeuverUI, hideManeuverUI, isManeuverDragging, collapseManeuverEditing } from '../ui/maneuverUI.js';
 import { maneuverSystem } from '../ship/maneuverSystem.js';
+import { flightView } from '../flightView.js';
 import { formatDuration } from '../utils/format.js';
 import { sceneManager } from '../sceneManager.js';
 import { gameState } from '../gameState.js';
@@ -433,6 +434,9 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             // 0.2.5：进入飞行场景时间加速归 1x（读档已在 saveManager 重置，此处兜底新建战役/追踪站切入路径）
             timeWarp.resetOnLoad();
 
+            // 视图档位复位：进场景回到默认"普通聚焦视图"并恢复其缩放范围（0.3.0）
+            flightView.reset();
+
             // 接收追踪站的设施聚焦请求
             if (window.__pendingFacilityId) {
                 const fac = facilitySystem.getFacility(window.__pendingFacilityId);
@@ -467,11 +471,14 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 const canvasY = canvasPt.y;
 
                 // 1. 检测是否点击了设施
+                // 0.3.0：统一走 camera.worldToScreen（此前手写变换漏了 Y 轴翻转，且绕开了旋转接口——
+                // 与渲染层的绘制口径不一致；收敛后未来"镜头旋转"一处生效）
                 const allFacilities = facilitySystem.getAllFacilities();
                 for (const f of allFacilities) {
                     const fAbsPos = getAbsolutePosition(f);
-                    const screenX = _canvas.width / 2 + (fAbsPos.x - camera.x) * camera.zoom;
-                    const screenY = _canvas.height / 2 + (fAbsPos.y - camera.y) * camera.zoom;
+                    const screenPt = worldToScreen(fAbsPos.x, fAbsPos.y, _canvas);
+                    const screenX = screenPt.x;
+                    const screenY = screenPt.y;
                     const hitRadius = Math.max(6, 10 * camera.zoom);
                     if (Math.abs(canvasX - screenX) <= hitRadius && Math.abs(canvasY - screenY) <= hitRadius) {
                         // 清除活动飞船 + 设置设施焦点，防止下一帧被 activeShip 覆盖
@@ -803,6 +810,21 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 }
             }
 
+            // 5b-2. V 键：切换视图（普通聚焦 ↔ 轨道机动）
+            // 机动视图不可用（无飞船绕恒星/深空）时给出提示、不切换（与工具栏按钮禁用口径一致）
+            if (inputManager.justPressed('KeyV')) {
+                const res = flightView.cycleView(activeShip, _canvas);
+                if (typeof window.showNotification === 'function') {
+                    if (res.changed) {
+                        window.showNotification(
+                            t(flightView.isManeuver() ? 'view.switchedManeuver' : 'view.switchedFocus'),
+                            'info');
+                    } else if (res.reason === 'unavailable') {
+                        window.showNotification(t('view.unavailable'), 'warning');
+                    }
+                }
+            }
+
             // 5c. 对接后无活动飞船：自动切到设施控制
             if (!activeShip && facilitySystem.lastDockedFacilityId) {
                 const dockedFacility = facilitySystem.getFacility(facilitySystem.lastDockedFacilityId);
@@ -1016,6 +1038,10 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                     camera.y = facAbsPos.y;
                 }
             }
+
+            // 视图档位（0.3.0）：机动视图下相机由 flightView 接管——聚焦所选中心天体（默认恒星）、
+            // 放大上限 = "刚好容纳该中心系统"的 fit；宿主变为不可用时自动回退普通视图（恢复缩放）
+            flightView.updateCamera(activeShip, _canvas);
 
             _lastDt = dt;
 

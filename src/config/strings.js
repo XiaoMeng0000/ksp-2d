@@ -320,6 +320,11 @@ const STRINGS = {
     // 燃料耗尽点轨道标签（0.3.0：收起态 ❌，展开显示全称）
     'orbitPoint.fuelOut': '燃料耗尽点',
 
+    // ---------- 飞行视图档位（0.3.0：V 键切换 普通聚焦 ↔ 轨道机动） ----------
+    'view.switchedManeuver': '已切换到轨道机动视图',
+    'view.switchedFocus': '已切换到普通聚焦视图',
+    'view.unavailable': '当前无法使用轨道机动视图（宿主无轨道中心）',
+
     // ---------- 飞船建造 ----------
     'build.title': '飞船建造',
     'build.selectHint': '选择飞船查看数据',

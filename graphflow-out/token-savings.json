@@ -1,12 +1,21 @@
 {
-  "totalRuns": 3,
-  "totalRawTokens": 11928,
-  "totalCompressedTokens": 939,
+  "totalRuns": 4,
+  "totalRawTokens": 12328,
+  "totalCompressedTokens": 1339,
   "totalSavedTokens": 10989,
-  "averageSavingsPercent": 92,
+  "averageSavingsPercent": 89,
   "firstRunAt": "2026-08-26T17:44:39.191Z",
-  "lastRunAt": "2026-09-05T15:53:14.996Z",
+  "lastRunAt": "2026-09-11T17:30:49.129Z",
   "recentRecords": [
+    {
+      "timestamp": "2026-09-11T17:30:49.129Z",
+      "query": "GameState 单例与 eventBus 模块通信约定",
+      "rawTokens": 400,
+      "compressedTokens": 400,
+      "savingsPercent": 0,
+      "source": "preview_context",
+      "kind": "tokens-not-fidelity"
+    },
     {
       "timestamp": "2026-09-05T15:53:14.996Z",
       "query": "机动节点 maneuver node 轨道预测 predictTrajectoryPatched 燃烧弧积分 当前实现状态",
