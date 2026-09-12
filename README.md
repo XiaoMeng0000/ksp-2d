@@ -1,3 +1,199 @@
-一个基于 Canvas 2D 的开普勒轨道力学模拟游戏，灵感来自 Kerbal Space Program。支持飞船建造与模块装配、SAS 姿态控制系统、多天体引力下的轨道预测与推力积分，以及追踪站全局监控。
+# KSP 2D：轨道工程师
 
-A Canvas 2D orbital mechanics sandbox inspired by Kerbal Space Program. Features ship building with module slots, SAS attitude control, multi-body gravity with Kepler orbits and RK4 thrust integration, and a tracking station for global surveillance.
+> 一款用 Canvas 2D 手写的二维轨道力学沙盒。造一艘船，把它送上去，然后别让它掉下来。
+
+KSP 2D：轨道工程师是一款非官方的粉丝自制游戏，灵感来自 Kerbal Space Program（坎巴拉太空计划）系列。
+你在一张二维星图上扮演轨道工程师：装配飞船、对接设施、规划机动节点、在多个天体的引力之间讨价还价，
+直到某条轨道终于如你所愿。
+
+- **当前版本**：v0.2.4（[查看更新记录](https://github.com/XiaoMeng0000/ksp-2d/releases)）
+- **技术栈**：原生 JavaScript（ES Module）+ HTML5 Canvas 2D + Web Audio，零依赖、无构建步骤
+- **平台**：任何现代桌面浏览器（Chrome / Edge / Firefox）
+
+<!-- TODO: 截图待补。建议放入 docs/images/ 后取消注释（推荐 3~4 张：主菜单、飞行场景、机动节点规划、飞船建造）
+![主菜单](docs/images/screenshot-menu.png)
+![飞行场景](docs/images/screenshot-flight.png)
+![机动节点](docs/images/screenshot-maneuver.png)
+-->
+
+---
+
+## 立即游玩
+
+游戏需要在服务器下运行（ES Module 不能从 `file://` 直接加载）。
+
+**方式一：在线游玩**
+
+访问 GitHub Pages 部署地址即可开玩：<https://xiaomeng0000.github.io/ksp-2d/>
+
+> 若该地址暂不可用，说明 Pages 尚未启用或部署失败，请改用方式二。
+
+**方式二：本地运行**
+
+```bash
+git clone https://github.com/XiaoMeng0000/ksp-2d.git
+cd ksp-2d
+node server.js
+```
+
+然后浏览器打开 <http://localhost:3000/>。首次启动需要加载图片、音频与字体，加载画面会显示三条进度条，
+全部完成后自动进入主菜单。
+
+> 仓库里另有两个 PowerShell 版静态服务器（`start_server.ps1` 端口 8888、`start-server.ps1` 端口 9090），
+> 功能与 `node server.js` 相同，但需要 PowerShell 环境，且三者端口不同——任选其一即可，别同时启动。
+
+---
+
+## 操作方式
+
+游戏内「百科 → 基础操作 / 轨道飞行」有完整图文说明，这里是最常用的键位：
+
+| 按键 | 作用 |
+|------|------|
+| `A` / `D` | 飞船左转 / 右转 |
+| `Shift` / `Ctrl` | 渐增 / 渐减油门 |
+| `Z` / `X` | 油门拉满 / 归零 |
+| `T` | SAS 姿态保持 开 / 关 |
+| `G` | 循环切换 SAS 方向（顺向 / 逆向 / 径向内 / 径向外） |
+| `,` / `.` | 降低 / 提高时间加速档位（降至 0x 即暂停） |
+| `\` | 时间复位到 1x |
+| `Alt` + `,` / `.` | 1x ~ 4x 之间精细微调时间 |
+| `V` | 切换轨道机动视图（聚焦当前飞船轨道） |
+| `B` | 靠近设施时打开设施交互面板 |
+| 鼠标滚轮 | 缩放画面 |
+| 鼠标点击天体 / 设施 | 让镜头聚焦过去 |
+| `Esc` | ESC 菜单（设置、存档、返回主菜单等） |
+
+**一句话玩法**：`,` / `.` 调时间，`Shift` 推油门，`X` 关机滑行，`Z` 全推力变轨，
+`G` 对准顺向后再点火——这是最经典的一条入轨路线。
+
+---
+
+## 玩法概览
+
+- **双游戏模式**：自由模式（资源无限、蓝图全解锁、星球资源直接可见）与生涯模式（严格经济、
+  蓝图需科技解锁、资源丰度需扫描模块探测）。
+- **多星系组合**：创建战役时选择星系组合——家园星系（Kerbol 系，含 Kerbol、Moho、Eve、Kerbin、
+  Mun、Minmus、Duna、Dres、Jool、Eeloo 等完整天体链）单选，其余星系（DebDeb、Tuun 等）可复选，
+  未开放星系作为占位展示。
+- **飞船建造**：在轨道船坞的装配车间里，从模板中挑选舰体、安装模块，按下建造后新舰在船坞旁就位并
+  立即接管为活动飞船。模块库目前提供测试压舱（配重）与建设集成模块（赋予部署设施的能力）。
+- **真实轨道物理**：轨道段使用开普勒解析解推进，推力段使用 RK4 数值积分逐帧演算，燃料按火箭方程
+  消耗；燃料耗尽引擎自动熄火并退回轨道模式。
+- **SAS 姿态控制**：导航球 + 控制圆盘，支持姿态保持与顺向 / 逆向 / 径向内 / 径向外四种指向，
+  依赖动量轮出力。
+- **机动节点规划**：在轨道机动视图中布置机动节点、设定 Δv 与方向、预览变轨后的轨道，支持多节点链式规划。
+- **设施与后勤**：轨道船坞（建造 / 改装 / 补给）、补给站（燃料补给）、科研站（实验室），
+  单座交互范围 5000 米；飞船可在合适的轨道上部署新设施。
+- **资源体系**：分级推进剂（液氢 / 液氧 / 甲烷 / 单组元 / 氙 / 氦-3 / 反物质等）、原料（水冰 / 金属矿石 /
+  稀土矿 / 裂变材料）、建造材料与科技点，配合货运、扫描与设施存储形成生产链。
+- **追踪站**：全局层级树监控所有飞船与设施，可切换控制目标、销毁飞船、查看轨道与资源状态。
+- **飞行状态 HUD**：右下角实时显示燃料剩余（进度条 + 吨数）、总 Δv 与推重比，支持展开查看燃烧时长。
+- **多面板 UI 系统**：KSP2 风格面板可同时打开、自由拖动，布局在鼠标与触控下均可用。
+- **时间加速**：1x 到 1000 万倍档位，加速时飞船操控输入被忽略。
+- **存档系统**：战役 → 检查点两级结构，支持世界导入 / 导出以便分享进度。
+
+---
+
+## 技术实现
+
+| 维度 | 约定 |
+|------|------|
+| 语言 | 原生 JavaScript，ES Module，零第三方依赖、无构建工具 |
+| 渲染 | HTML5 Canvas 2D（`src/renderer.js` 统一绘制） |
+| 状态 | `GameState` 单例，所有模块读写的统一入口 |
+| 通信 | `EventBus` 发布 / 订阅，模块之间不直接互相调用 |
+| 物理 | 轨道段开普勒解析解（`r = p / (1 + e·cosθ)` 焦点极坐标方程）+ 推力段 RK4 数值积分 |
+| 数据 | 所有配置集中在 `src/config/`；天体数据在 `src/config/systems/*.js` |
+| 文本 | 所有用户可见文本走 `src/config/strings.js` 的 `t()`，不硬编码在业务模块 |
+
+---
+
+## 项目结构
+
+```
+ksp-2d/
+├── index.html              # 页面入口（含启动加载画面）
+├── main.js                 # 启动流程：资源加载 → 公告 → 主菜单
+├── server.js               # 本地静态服务器（端口 3000）
+├── start_server.ps1        # PowerShell 版静态服务器（端口 8888）
+├── src/
+│   ├── renderer.js         # Canvas 2D 渲染器（绘制层，无业务逻辑）
+│   ├── gameState.js        # GameState 单例
+│   ├── eventBus.js         # 事件总线
+│   ├── sceneManager.js     # 场景管理
+│   ├── input.js            # 键盘输入管理
+│   ├── camera.js           # 镜头（缩放 / 跟随 / 聚焦）
+│   ├── timeWarp.js         # 时间加速
+│   ├── saveManager.js      # 存档：战役 / 检查点、导入导出
+│   ├── config/             # 所有数据配置（字符串、天体星系、模块、设施、设置……）
+│   ├── physics/            # 轨道力学、积分器、大气、SOI 判定、轨道与机动预测
+│   ├── ship/               # 飞船：模块、模板、SAS、机动节点、飞船系统
+│   ├── facility/           # 设施类型与设施系统（对接 / 补给 / 建造 / 部署）
+│   ├── resources/          # 资源类型、模式规则、货运、扫描
+│   ├── scenes/             # 场景：启动、主菜单、飞行、追踪站、星系图、百科、版权、制作人员
+│   ├── ui/                 # 全部 UI 面板与样式
+│   ├── graphics/           # 纹理、字体、渲染对象与程序化特效
+│   ├── audio/              # Web Audio 音频核心与调度
+│   └── utils/              # 通用工具（单位格式化等）
+├── assets/                 # 美术、音频、字体资源
+├── docs/                   # 开发规范与流程文档
+└── .github/                # Issue 模板与 Pages 部署工作流
+```
+
+---
+
+## 开发与贡献
+
+- 想提 Issue / PR：先看 [CONTRIBUTING.md](CONTRIBUTING.md)（Issue 规则、标签体系、提交信息风格）。
+- 已知但暂缓处理的问题：见 [KNOWN_ISSUES.md](KNOWN_ISSUES.md)。
+- 开发规范与流程文档（`docs/`）：
+  - [AI 工作规范](docs/AI工作规范.md)
+  - [UI 开发规范](docs/UI开发规范.md) · [UI 面板视觉风格规范](docs/UI面板视觉风格规范.md)
+  - [天体添加流程](docs/天体添加流程.md) · [纹理标准化流程](docs/纹理标准化流程.md) · [音频标准化流程](docs/音频标准化流程.md)
+  - [资源系统方案](docs/resource-system-plan.md) · [公告编写规范](docs/公告编写规范.md)
+
+**核心开发约定**（完整版见 CONTRIBUTING.md）：
+
+1. 零依赖、零构建——不引入任何第三方框架或打包工具。
+2. 状态只放 `GameState`，模块间通信只走 `EventBus`，渲染层不写业务逻辑。
+3. 所有可配置内容放 `src/config/`，业务模块不硬编码数值与文本。
+4. 首行 `"use strict"`，4 空格缩进，单引号，命名导出，中文注释。
+5. 大功能拆成可独立验证的小步；临时代码标 `// TEMP:`，未定点标 `// TODO:`。
+
+---
+
+## 版本与路线
+
+- 最新发布版：**v0.2.4**（[Releases](https://github.com/XiaoMeng0000/ksp-2d/releases)）
+- 开发中：0.3.0 机动节点系统与轨道机动视图的持续打磨
+- 游戏内「额外内容 → 游戏公告」记录每个版本的完整变更，源码位于 `src/config/announcementConfig.js`
+
+<!-- TODO: 路线图待补。建议列 3~5 条近期计划（如科研站实验室蓝图研究、更多星系、生涯经济平衡） -->
+
+---
+
+## 版权与致谢
+
+- 本项目是**非官方粉丝作品**，向 Kerbal Space Program 系列致敬，与 Squad / Intercept Games /
+  Private Division 等原作开发方**无任何从属关系**。
+- 游戏中的部分美术资源、音频资源、名称及玩法灵感来源于 Kerbal Space Program 系列，其知识产权归
+  各自版权方所有。
+- 本项目仅用于学习、交流与技术研究，**不以任何形式用于商业用途**。
+- 除上述第三方资源外，本项目的原创代码与原创美术由【逃逸速度】开发组保留权利。
+- 完整声明见游戏内「额外内容 → 版权声明」，对应源码 `src/config/licenseConfig.js`。
+
+**联系方式**
+
+- QQ 群：1098073419
+- E-mail：mc1234com@163.com
+- Issue：<https://github.com/XiaoMeng0000/ksp-2d/issues>
+
+---
+
+## 开发者备注（临时）
+
+根目录下的 `test_*.mjs` / `debug_*.mjs` / `bench_*.mjs` / `verify_fix.mjs` 是开发过程中用于
+物理精度、渲染性能、UI 面板状态与存档规则验证的独立 Node 脚本，不属于游戏运行时，可按需单独执行。
+
+<!-- TODO: 待整理。建议移入 tools/ 或 test/ 目录并在 README 中给出一句话用法，或加入 .gitignore -->
