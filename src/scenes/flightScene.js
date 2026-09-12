@@ -44,7 +44,7 @@ let _activeFacilityId = null;  // 当前控制的设施 ID（无活动飞船时�
 let _dockPromptFacId = null;   // 当前显示对接弹窗的设施 ID（防止重复 show）
 let _lastToolbarMode = null;         // 统一工具栏脏检测：上一次的 mode
 let _lastToolbarFingerprint = null; // 统一工具栏脏检测：上一次的数据指纹（含模块列表）
-let _maneuverAngle = null;          // 机动节点指向（0.3.0：SAS maneuver 模式与导航球机动标记共用）
+let _maneuverAngle = null;          // 机动节点指向（0.2.5：SAS maneuver 模式与导航球机动标记共用）
 let _hasManeuver = false;           // 是否存在可执行机动节点（SAS 节点副钮可用性）
 let _lastMouseX = -1;          // 最近鼠标画布 CSS 坐标（-1 = 未知/离开画布）
 let _lastMouseY = -1;
@@ -52,7 +52,7 @@ let _lastClientX = 0;          // 最近鼠标视口坐标（供工具提示定�
 let _lastClientY = 0;
 let _lastOrbitHit = null;      // 轨道线命中缓存（含世界坐标；悬停滞后/工具提示用）
 
-// 机动视图内隐藏/还原右下角飞船状态面板（0.3.0：避免与规划面板在同一角落遮挡）// 注意：shipStatusUI 每帧把内联 display 写回（display:flex），内联写在帧间会被反复覆盖造成闪烁，
+// 机动视图内隐藏/还原右下角飞船状态面板（0.2.5：避免与规划面板在同一角落遮挡）// 注意：shipStatusUI 每帧把内联 display 写回（display:flex），内联写在帧间会被反复覆盖造成闪烁，
 // 因此这里只切 body 类，由 maneuverPanel.css 的 !important 规则真正压制显示
 function setShipStatusPanelHidden(hidden) {
     if (typeof document === 'undefined' || !document.body) return;
@@ -316,7 +316,7 @@ export function computeNavballDirections(ship, host) {
 }
 
 /**
- * 轨道悬停检测（0.3.0 提交4，每帧渲染驱动版 + 悬停滞后防鬼畜）：
+ * 轨道悬停检测（0.2.4 提交4，每帧渲染驱动版 + 悬停滞后防鬼畜）：
  *   标记锚点命中（12px 半径）优先 → 轨道线点-线段命中；
  *   结果写入渲染层悬停通道（setOrbitHoverState，renderOrbitMarkers 消费：轨道点圆点）。
  * 时间加速稳定化：
@@ -389,7 +389,7 @@ function updateOrbitHover(cssX, cssY) {
 }
 
 /**
- * 轨道线 Tooltip（0.3.0 提交4）：仅由 mousemove 事件驱动，且鼠标移动距离防抖
+ * 轨道线 Tooltip（0.2.4 提交4）：仅由 mousemove 事件驱动，且鼠标移动距离防抖
  * （>20px 才触发，避免 warp 下每帧指纹变化导致 500ms 延迟定时器反复重置、提示不显示/闪烁）。
  * 内容取每帧更新缓存的 _lastOrbitHit。
  * @param {MouseEvent} e - 原始事件（clientX/clientY 供定位）
@@ -443,7 +443,7 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             // 0.2.5：进入飞行场景时间加速归 1x（读档已在 saveManager 重置，此处兜底新建战役/追踪站切入路径）
             timeWarp.resetOnLoad();
 
-            // 视图档位复位：进场景回到默认"普通聚焦视图"并恢复其缩放范围（0.3.0）
+            // 视图档位复位：进场景回到默认"普通聚焦视图"并恢复其缩放范围（0.2.5）
             flightView.reset();
 
             // 接收追踪站的设施聚焦请求
@@ -480,7 +480,7 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 const canvasY = canvasPt.y;
 
                 // 1. 检测是否点击了设施
-                // 0.3.0：统一走 camera.worldToScreen（此前手写变换漏了 Y 轴翻转，且绕开了旋转接口——
+                // 0.2.5：统一走 camera.worldToScreen（此前手写变换漏了 Y 轴翻转，且绕开了旋转接口——
                 // 与渲染层的绘制口径不一致；收敛后未来"镜头旋转"一处生效）
                 const allFacilities = facilitySystem.getAllFacilities();
                 for (const f of allFacilities) {
@@ -504,7 +504,7 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 if (!ship) return;
 
                 const result = sasUI.handleClick(cssX, cssY, ship.sasMode || 'off');
-                // 3. 0.3.0 提交5：SAS 未命中 → 左键点击轨道线打开锚定菜单（拦截；未命中则无操作）
+                // 3. 0.2.4 提交5：SAS 未命中 → 左键点击轨道线打开锚定菜单（拦截；未命中则无操作）
                 if (!result.hit) {
                     const canvasHit = cssToCanvas(cssX, cssY, _canvas);
                     const canvasHitX = canvasHit.x;
@@ -534,7 +534,7 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                             return;
                         }
                     }
-                    // 0.3.0 打磨：点击空白（未命中设施/SAS/轨道线）→ 收起机动节点编辑
+                    // 0.2.5 打磨：点击空白（未命中设施/SAS/轨道线）→ 收起机动节点编辑
                     collapseManeuverEditing();
                     return;
                 }
@@ -603,7 +603,7 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                         hideTooltip();
                     }
 
-                    // 0.3.0 提交4：轨道线 Tooltip（鼠标事件驱动 + 移动防抖；圆点由渲染循环驱动）
+                    // 0.2.4 提交4：轨道线 Tooltip（鼠标事件驱动 + 移动防抖；圆点由渲染循环驱动）
                     updateOrbitTooltip(e, x, y);
                 }
             };
@@ -617,7 +617,7 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             _canvas._sasDragHandlers = { onMouseDown, onMouseMove, onMouseUp };
 
             // SAS 集成 — Canvas 右键处理（右键中心 → 回到 STABILITY；
-            // 0.3.0 提交5：菜单已改为左键打开，右键不再拦截轨道线）
+            // 0.2.4 提交5：菜单已改为左键打开，右键不再拦截轨道线）
             const onContextMenu = (e) => {
                 e.preventDefault();
                 const rect = _canvas.getBoundingClientRect();
@@ -638,7 +638,7 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             const onMouseLeave = () => {
                 sasUI.clearHover();
                 sasUI._isDragging = false;
-                // 0.3.0 提交4：清空最近鼠标与轨道悬停（渲染层通道 + 命中缓存 + tooltip）
+                // 0.2.4 提交4：清空最近鼠标与轨道悬停（渲染层通道 + 命中缓存 + tooltip）
                 _lastMouseX = -1;
                 _lastMouseY = -1;
                 _lastOrbitHit = null;
@@ -666,7 +666,7 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             // 隐藏机动节点 UI（面板/图标/手柄），防遗留到其他场景
             hideManeuverUI();
 
-            // 隐藏轨道机动视图规划面板（0.3.0）
+            // 隐藏轨道机动视图规划面板（0.2.5）
             hideManeuverViewPanel();
 
             // 还原右下角飞船状态面板（移除机动视图隐藏类）
@@ -751,7 +751,7 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             }
             timeWarp.setMaxIndex(warpMaxIndex);
 
-            // 0.3.0 定点时间加速：以当前可用最大档位推进，到达直接切 1x + 通知。
+            // 0.2.4 定点时间加速：以当前可用最大档位推进，到达直接切 1x + 通知。
             // SOI 切换保护/点火物理档/病态限档已在上方 warpMaxIndex 计算中生效，
             // 此处只在该上限内拉满；剩余时间帧预算（倍率 ≤ 剩余/最大帧长）防一帧越过目标点。
             const warpTargetNow = timeWarp.getWarpTarget();
@@ -914,7 +914,7 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 // 构建 SAS 目标朝向计算所需的飞行上下文
                 const host = getSOIHost(getAbsolutePosition(activeShip));
 
-                // 机动节点方向（0.3.0）：存在可执行节点时计算两态方向——
+                // 机动节点方向（0.2.5）：存在可执行节点时计算两态方向——
                 //   过节点前 = 节点加速方向（恒定）；过节点后 = 达到目标轨道的当前燃烧方向（实时变）；
                 //   供 SAS 'maneuver' 模式指向、导航球机动标记、节点副钮可用性共同使用
                 const mvPred = getLastManeuverPrediction();
@@ -1032,14 +1032,14 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 activeShip.thrust = { ax: 0, ay: 0 };
             }
 
-            // 机动节点进度跟踪（0.3.0）：到达检测 / 手动燃烧冲量累计 / 完成判定。
+            // 机动节点进度跟踪（0.2.5）：到达检测 / 手动燃烧冲量累计 / 完成判定。
             // 只读 ship.thrust 与模式，绝不写 mode/throttle/thrust（无自动执行原则）
             if (activeShip) {
                 maneuverSystem.update(activeShip, simDt);
             }
 
             // 相机跟随活动飞船，无活动飞船且选中设施时跟随设施
-            // 0.3.0：过渡动画进行中由动画独占相机（跳过跟随与视图接管写值，保证平滑）
+            // 0.2.5：过渡动画进行中由动画独占相机（跳过跟随与视图接管写值，保证平滑）
             const cameraAnimating = updateCameraAnimation(
                 (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now());
             if (activeShip && !cameraAnimating) {
@@ -1057,7 +1057,7 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 }
             }
 
-            // 视图档位（0.3.0）：机动视图下相机由 flightView 接管——聚焦所选中心天体（默认恒星）、
+            // 视图档位（0.2.5）：机动视图下相机由 flightView 接管——聚焦所选中心天体（默认恒星）、
             // 放大上限 = "刚好容纳该中心系统"的 fit；宿主变为不可用时自动回退普通视图（恢复缩放）
             flightView.updateCamera(activeShip, _canvas);
 
@@ -1079,21 +1079,21 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 selectedFacilityId: _activeFacilityId
             });
 
-            // 0.3.0 提交4：每帧驱动轨道悬停检测（渲染循环兜底：圆点必跟手；
+            // 0.2.4 提交4：每帧驱动轨道悬停检测（渲染循环兜底：圆点必跟手；
             // 用最近鼠标位置，节流阀拖拽时跳过；机动节点手柄/图标拖拽时同样跳过）
             if (activeShip && _lastMouseX >= 0 && !sasUI._isDragging && !isManeuverDragging()) {
                 updateOrbitHover(_lastMouseX, _lastMouseY);
             }
 
-            // 0.3.0 提交5：右键菜单锚定轨道点（每帧同源重算，菜单跟点走不漂移）
+            // 0.2.4 提交5：右键菜单锚定轨道点（每帧同源重算，菜单跟点走不漂移）
             updateOrbitContextMenu(_canvas);
 
-            // 0.3.0 机动节点：加速计时器面板 / 节点图标 / 手柄（每帧驱动，仅活动飞船）
+            // 0.2.5 机动节点：加速计时器面板 / 节点图标 / 手柄（每帧驱动，仅活动飞船）
             if (activeShip) {
                 updateManeuverUI(_canvas, activeShip);
             }
 
-            // 0.3.0 轨道机动视图规划面板（机动视图内常驻显示；其他视图自动隐藏）
+            // 0.2.5 轨道机动视图规划面板（机动视图内常驻显示；其他视图自动隐藏）
             updateManeuverViewPanel(_canvas, activeShip);
 
             // 机动视图：隐藏右下角飞船状态面板（燃料储量 / 剩余 ΔV）——规划面板已提供
@@ -1123,7 +1123,7 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 if (typeof window.renderToolbarIcons === 'function') {
                     window.renderToolbarIcons(nextMode, nextData);
                 }
-                // 模式切换时关闭弹出页面面板（0.3.0:页面为多实例 .tkp-page）
+                // 模式切换时关闭弹出页面面板（0.2.4:页面为多实例 .tkp-page）
                 for (const el of document.querySelectorAll('.tkp-page')) {
                     el.style.display = 'none';
                 }
@@ -1142,7 +1142,7 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             const directions = activeShip
                 ? computeNavballDirections(activeShip, getSOIHost(getAbsolutePosition(activeShip)))
                 : null;
-            // 机动节点方向（0.3.0）：导航球第 5 枚方向标记数据源（与四方向同构，实时变化）
+            // 机动节点方向（0.2.5）：导航球第 5 枚方向标记数据源（与四方向同构，实时变化）
             if (directions) {
                 directions.maneuver = _maneuverAngle !== null ? { angle: _maneuverAngle } : null;
             }

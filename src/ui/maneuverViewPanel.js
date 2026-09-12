@@ -1,6 +1,6 @@
 'use strict';
 
-// 轨道机动视图规划面板（0.3.0）— 右侧悬浮纵板
+// 轨道机动视图规划面板（0.2.5）— 右侧悬浮纵板
 //   上块：局部放大图（1:1 正方形；纯线 / 轨道绿 / 信息化作战 HUD 风；动态缩放）
 //   下块：机动节点详细修改（聚焦天体下拉 / 四向 Δv 步进 / 节点时刻 / 按周期平移 / 计划读数）
 // 交互：
@@ -38,7 +38,7 @@ let _focusOpen = false;     // 聚焦下拉是否展开
 let _focusSig = '';         // 聚焦列表内容签名（层级+名称+当前聚焦）——未变化则不重建
 let _lastTickTs = 0;        // 速率制 Δv 累积用的上一帧时间戳
 
-// ===== 性能相关缓存（0.3.0：Kerbolar 系（天体多/轨道大）机动视图掉帧优化）=====
+// ===== 性能相关缓存（0.2.5：Kerbolar 系（天体多/轨道大）机动视图掉帧优化）=====
 // ① 放大图重绘与读数刷新节流（30fps 足够；速率制 Δv 累积仍逐帧执行，不受影响）
 // ② 布局矩形缓存（getBoundingClientRect 会强制重排，逐帧读取代价高）
 // ③ 读数文本去重（innerHTML 赋值较贵，值未变则不写）
@@ -311,14 +311,14 @@ function getShip() {
     return shipSystem.getActiveShip();
 }
 
-// ===== 放大图内轨道点菜单（HUD 风格；总监定稿：**仅**"创建机动节点"一项，0.3.0）=====
+// ===== 放大图内轨道点菜单（HUD 风格；总监定稿：**仅**"创建机动节点"一项，0.2.5）=====
 // 与主视图轨道菜单同语义（冻结节点时刻速度快照 → maneuverSystem.createNode），
 // 但样式走面板 HUD 风格（黑底 / 轨道绿细线 / 等宽小字），且只提供创建节点一个动作。
 let _nodeMenu = null;        // { el, data }
 let _dragMoved = false;      // 本次拖拽是否发生过位移（用于忽略拖拽末尾的那次 click）
 let _hover = null;           // 放大图悬停点 { x, y, absTime }（HUD 悬停标记 + 指针图标用）
 
-// 悬停反馈（0.3.0）：手柄/节点 = grab（可拖拽）；轨道线 = pointer（可点出轨道点菜单）；
+// 悬停反馈（0.2.5）：手柄/节点 = grab（可拖拽）；轨道线 = pointer（可点出轨道点菜单）；
 // 其余 = default。拖拽中切换为 grabbing。仅在变化时写 style.cursor（避免逐帧样式写入）。
 function onInsetHover(e) {
     if (!_insetCanvas) return;
@@ -801,7 +801,7 @@ function drawInset(canvas, ship, node, pred, now) {
         _hit.node = np;
         const axes = pred.plan.axes;
         if (axes) {
-            // 手柄几何（0.3.0 调整）：
+            // 手柄几何（0.2.5 调整）：
             //   · 静止偏移 / 拖拽延伸改为面板专用较短值（viewConfig.insetHandle*），按尺寸等比缩放
             //   · 可用范围 = **整个 HUD 面板块**边界（不再受 3/4 绘图区限制），仅留 HM 余量
             //   · 速率公式不受影响：仍用真实拖拽距离 × handleMaxRate
@@ -864,7 +864,7 @@ function drawInset(canvas, ship, node, pred, now) {
         ctx.beginPath(); ctx.arc(np.x, np.y, 8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     }
 
-    // —— 悬停反馈（HUD 风格，0.3.0）：轨道点十字准星 + T- 读数（指针在放大图内且未拖拽时）
+    // —— 悬停反馈（HUD 风格，0.2.5）：轨道点十字准星 + T- 读数（指针在放大图内且未拖拽时）
     if (_hover && !_drag) {
         const hx = _hover.x;
         const hy = _hover.y;
@@ -915,7 +915,7 @@ function plan_segments(pred) {
     return (pred && pred.plan && pred.plan.segments) ? pred.plan.segments : [];
 }
 
-// 段点 → **宿主参考系**（0.3.0 修复：多 SOI 链每段各有 anchorBody，
+// 段点 → **宿主参考系**（0.2.5 修复：多 SOI 链每段各有 anchorBody，
 // 其 relPoints 相对该段锚天体；此前一律按宿主系绘制 → 换系段（如 Mun 段）会画到错误位置）
 // anchorBody === host.name 时零开销直接返回原数组。
 function segmentPointsInHostFrame(seg, host) {
@@ -953,7 +953,7 @@ function referenceRadius(segs, host) {
     return R;
 }
 
-// 屏幕空间抽稀 + 可视区裁剪描边（0.3.0 性能）：
+// 屏幕空间抽稀 + 可视区裁剪描边（0.2.5 性能）：
 //   · 抽稀：相邻点间距 < minPx 时跳过（密集链在放大图里本就是亚像素，无视觉损失）
 //   · 裁剪：只描"与画布相交"的子段（逃逸/跨系链在放大图里可达数万像素，
 //     整条交给光栅器 + 虚线展开代价高）；每段两端各带一个界外点保证穿边不断

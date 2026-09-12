@@ -77,7 +77,7 @@ setZoomLimits(1e-12, 10);
 check('V6 退出后放大上限恢复', Math.abs(setZoom(5) - 5) < 1e-12);
 check('V6 取回上下限接口', getZoomLimits().max === 10);
 
-// V7: 相机平滑过渡动画（0.3.0）
+// V7: 相机平滑过渡动画（0.2.5）
 {
     const { camera, animateCameraTo, updateCameraAnimation, isCameraAnimating, cancelCameraAnimation, setZoomLimits } =
         await import('../../src/camera.js');
@@ -117,7 +117,7 @@ check('V6 取回上下限接口', getZoomLimits().max === 10);
     check('V7 动画结束后按新上限夹取', camera.zoom <= 1e-9 + 1e-15);
 }
 
-// V8: 平滑过渡不硬跳（0.3.0 修复"先突然缩小再动画"）
+// V8: 平滑过渡不硬跳（0.2.5 修复"先突然缩小再动画"）
 {
     const { camera, isCameraAnimating, updateCameraAnimation, setZoomLimits: szl } = await import('../../src/camera.js');
     const { flightView } = await import('../../src/flightView.js');

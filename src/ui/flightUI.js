@@ -38,7 +38,7 @@ leftToolbar.innerHTML = '';
 document.body.appendChild(leftToolbar);
 
 // 已打开面板对应的工具栏图标 id 集合(选中态 = 右侧亮绿条)
-// 0.3.0 多面板并存:图标与"打开的面板"一一挂接,允许多条亮条同时存在
+// 0.2.4 多面板并存:图标与"打开的面板"一一挂接,允许多条亮条同时存在
 let _activeToolbarIds = new Set();
 let _panelOpenerIcon = {};   // panelId → 打开该面板的图标 id
 
@@ -82,7 +82,7 @@ function isPageOpen(pageId) {
     return page ? page.el.style.display === 'block' : false;
 }
 
-// 关闭图标对应的面板(0.3.0 图标点击切换语义:页面面板与 uiManager 面板统一入口)
+// 关闭图标对应的面板(0.2.4 图标点击切换语义:页面面板与 uiManager 面板统一入口)
 function closePanel(panelId) {
     if (panelId === 'shipBuilder' || panelId === 'facilityDeploy') {
         uiManager.hidePanel(panelId);
@@ -91,7 +91,7 @@ function closePanel(panelId) {
     }
 }
 
-// 工具栏能力图标 → 面板 id 映射(0.3.0 图标点击切换语义:图标与其面板 1:1)
+// 工具栏能力图标 → 面板 id 映射(0.2.4 图标点击切换语义:图标与其面板 1:1)
 const CAPABILITY_PANEL = {
     deploy_facility: 'facilityDeploy',
     cargo_hold: 'cargo',
@@ -138,7 +138,7 @@ function renderToolbarIcons(mode, data) {
         }
 
         btn.addEventListener('click', () => {
-            // 0.3.0 切换语义:图标与其面板 1:1 映射,点已打开面板的图标 → 关闭该面板
+            // 0.2.4 切换语义:图标与其面板 1:1 映射,点已打开面板的图标 → 关闭该面板
             if (panelId && isPanelOpen(panelId) && _panelOpenerIcon[panelId] === iconId) {
                 closePanel(panelId);
                 return;
@@ -198,19 +198,19 @@ function renderToolbarIcons(mode, data) {
                     window.openShipBuilder();
                 }, 'comp_' + comp.id, comp.id, 'shipBuilder');
             } else {
-                // 0.3.0 多面板并存:不再先关闭建造面板,舱室面板与建造面板可同时存在
+                // 0.2.4 多面板并存:不再先关闭建造面板,舱室面板与建造面板可同时存在
                 createIcon(compIcon, compName, () => {
                     openCompartmentPanel(facility, comp.id);
                 }, 'comp_' + comp.id, comp.id, comp.id);
             }
         }
     }
-    // 0.3.0 多面板并存:重建图标列表后,按当前仍打开的面板同步亮条
+    // 0.2.4 多面板并存:重建图标列表后,按当前仍打开的面板同步亮条
     syncToolbarActive();
 }
 window.renderToolbarIcons = renderToolbarIcons;
 
-// ========== 工具栏页面面板（0.3.0 重构：每个内容页独立浮层,可并存/拖动/错位） ==========
+// ========== 工具栏页面面板（0.2.4 重构：每个内容页独立浮层,可并存/拖动/错位） ==========
 // 打开(或刷新)一个工具栏页面面板:页面对应独立 .tkp-page 浮层,互不覆盖 —
 // 货仓/扫描/指令舱/对接枢纽/补给站/实验室/仓储/模块管理/货仓调拨可同时打开
 function openPage(pageId, title, html) {
@@ -856,7 +856,7 @@ window.hideDockPrompt = function() {
     _dockCallback = null;
 };
 
-// ========== 工具栏页面面板注册表（0.3.0 重构：每个内容页独立 .tkp-page 浮层） ==========
+// ========== 工具栏页面面板注册表（0.2.4 重构：每个内容页独立 .tkp-page 浮层） ==========
 // 页面 id:货仓 cargo / 扫描 scan / 指令舱 bridge / 对接枢纽 dock_hub /
 // 补给站 supply_terminal / 实验室 laboratory / 仓储 storage /
 // 模块管理 moduleManage / 货仓调拨 cargoTransfer
@@ -903,7 +903,7 @@ function setPageVisible(pageId, visible) {
         if (!isBlock) {
             page.el.style.display = 'block';
             eventBus.emit(Events.UI_PANEL_OPENED, { panelId: pageId });
-            // 0.3.0 多面板并存:与其它浮层面板同开时错位,避免完全重叠
+            // 0.2.4 多面板并存:与其它浮层面板同开时错位,避免完全重叠
             cascadePanelOpen(page.el);
         }
     } else if (isBlock) {
@@ -985,7 +985,7 @@ function onPageContentClick(e) {
 
 // 0.2.7:任何可能经工具栏图标打开的面板关闭时,清除图标选中态(绿条)
 // 覆盖:✕ 关工具栏页面面板 / 建造面板 / 设施部署面板(uiManager 面板的关闭路径)
-// 0.3.0 多面板并存:只清除"打开该面板的图标"的亮条,其它仍打开的面板保持亮条
+// 0.2.4 多面板并存:只清除"打开该面板的图标"的亮条,其它仍打开的面板保持亮条
 eventBus.on(Events.UI_PANEL_CLOSED, (data) => {
     if (!data || !data.panelId) return;
     const openerId = _panelOpenerIcon[data.panelId];

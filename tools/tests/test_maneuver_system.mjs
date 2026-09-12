@@ -80,7 +80,7 @@ check('S7 删除成功且数组清空', del === true && ship.maneuverNodes.lengt
     check('S8 拖拽后分量不变（仍为输入的 100 顺向）', Math.abs(n3.dvPro - 100) < 1e-9);
 }
 
-// S9: 完成后节点仍可编辑（0.3.0 打磨：参照轨迹常驻，可规划"拐回来"）
+// S9: 完成后节点仍可编辑（0.2.5 打磨：参照轨迹常驻，可规划"拐回来"）
 {
     const { computeNodeAxes } = await import('../../src/physics/maneuverPrediction.js');
     // 节点 Δv = 顺向（速度 (0,2000) → 顺向单位向量 (0,1)）→ 推力须同向才能烧足

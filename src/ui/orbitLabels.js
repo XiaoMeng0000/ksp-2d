@@ -1,6 +1,6 @@
 'use strict';
 
-// 轨道标签 DOM 组件（0.3.0）— Canvas 锚点 + DOM 文字本体
+// 轨道标签 DOM 组件（0.2.4）— Canvas 锚点 + DOM 文字本体
 // 职责：把 renderer 算好的 markers（含屏幕坐标/文字）同步为 DOM 标签。
 // 纯渲染展现层：创建 / 更新 / 销毁 + transform 坐标同步 + 展开/收起切换。
 // 结构：
@@ -9,7 +9,7 @@
 //       .orbit-label-body  ← 文字面板（可点击展开/收起）
 // 锚点与折线由 renderer 在 Canvas 绘制（世界元素，与轨道线同层像素级对齐）；
 // 本体是 UI 文字 → DOM（UI 开发规范：一切 UI 文字都是 DOM）。
-// 展开/收起（0.3.0）：默认收起只显示类型名（Ap/Pe）；
+// 展开/收起（0.2.4）：默认收起只显示类型名（Ap/Pe）；
 //   鼠标悬停 → 临时展开（显示 高度 / 到达时刻 UT / 剩余时间 T+），移开收起；
 //   展开中右键点击面板 → 锁定展开（保持展开直至再次右键解锁；解锁后移开鼠标即收起）。
 //   展开状态按 type 记录在模块级（悬停/锁定两个集合），退出场景（clearOrbitLabels）时重置。
@@ -31,7 +31,7 @@ function labelKey(m) {
     return m.id || m.type;
 }
 
-// SOI 标签图标（0.3.0 图标替换，纹理标准化流程：textureConfig → textureManager → <img>；
+// SOI 标签图标（0.2.4 图标替换，纹理标准化流程：textureConfig → textureManager → <img>；
 // 白色箭头正式素材为横向长图（450x207），按自然比例定宽显示，未加载时回退箭头字符）
 function soiIconHtml(m, size) {
     if (m.type !== 'soi_exit' && m.type !== 'soi_entry') return '';
@@ -63,7 +63,7 @@ function isExpanded(key) {
 // 收起态 HTML：SOI 标签 = 纯图标（进入/离开箭头，天体名不再显示）；
 // Ap/Pe 标签 = 纯名称
 function buildCollapsedHTML(m) {
-    // 0.3.0：SOI 收起标签图标缩至 21.6px（原 24 的 -10%）；宽度按素材自然比例
+    // 0.2.4：SOI 收起标签图标缩至 21.6px（原 24 的 -10%）；宽度按素材自然比例
     const icon = soiIconHtml(m, 21.6);
     if (icon) {
         return icon;
@@ -202,6 +202,6 @@ export function syncOrbitLabels(markers, canvas) {
         // 0.2.5：markers 坐标为画布物理像素，经 canvasToCss 统一转 CSS 后定位（DPR≠1 时不再偏移）
         const cssPt = canvasToCss(m.bodyX, m.bodyY, canvas);
         el.style.transform = 'translate(' + Math.round(cssPt.x) + 'px,' + Math.round(cssPt.y) + 'px)';
-        // 0.3.0：标签本体悬停高亮已去除（isHover 数据流保留，供未来交互使用）
+        // 0.2.4：标签本体悬停高亮已去除（isHover 数据流保留，供未来交互使用）
     }
 }

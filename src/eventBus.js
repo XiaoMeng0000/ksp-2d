@@ -39,7 +39,7 @@ export const Events = {
     FACILITY_UNDOCKED: 'facility:undocked',
     // 环境危害事件
     SHIP_DESTROYED: 'ship:destroyed',    // 飞船被摧毁（大气引爆/表面撞击），payload: { shipId, reason: 'atmosphere' | 'surface' }
-    // 机动节点事件（0.3.0）
+    // 机动节点事件（0.2.5）
     MANEUVER_CREATED: 'maneuver:created',        // 节点创建，payload: { shipId, node }
     MANEUVER_DELETED: 'maneuver:deleted',        // 节点删除，payload: { shipId }
     MANEUVER_ARRIVED: 'maneuver:arrived',        // 到达节点时刻（倒计时归零），payload: { shipId, node }

@@ -45,7 +45,7 @@ const THROTTLE_TRACK_COLOR = '#000';
 // 节流阀 内容弧（未填充紫/填充绿）距边框距离（基准 px，两侧各缩进，露出黑色二级背景）
 const THROTTLE_FILL_GAP = 5;
 
-// ---- 图标状态色（0.3.0 图标替换规范：SVG 白色模板 + 运行时染色，色值与 root.css 变量对应） ----
+// ---- 图标状态色（0.2.4 图标替换规范：SVG 白色模板 + 运行时染色，色值与 root.css 变量对应） ----
 // 按钮配色方案 v2（参考 KSP2 圆盘按钮像素参考图）：正逆=绿 / 径向=青
 //   激活（SAS 开 + 选中）  = 语义色图标，黑底
 //   未激活（SAS 开 + 未选中）= 语义色实底圆 + 黑色符号
@@ -63,19 +63,19 @@ const SAS_INACTIVE_COLOR = '#555';          // SAS 主开关 未激活深灰（-
 
 // ---- 导航球（左下角，纯显示） ----
 const NAVBALL_RADIUS = 175;                // 大导航球半径
-// 内部装饰绿（0.3.0 由蓝改绿：--progress-green #3dff3d 暗 25% = RGB×0.75 → rgb(46,191,46)）
+// 内部装饰绿（0.2.4 由蓝改绿：--progress-green #3dff3d 暗 25% = RGB×0.75 → rgb(46,191,46)）
 const NAVBALL_DECOR_RGB = '46,191,46';
 // 二级背景（缩小的球）边界距外框 15px（基准）→ 内容缩放系数
 const NAVBALL_CONTENT_SCALE = (NAVBALL_RADIUS - 15) / NAVBALL_RADIUS;
 const NAVBALL_MARKER_SIZE = 26;            // 中心白色三角外接圆半径
 const NAVBALL_DIR_R = 140;                 // 圆上方向标记的半径位置（内缩避让描边）
-const MARKER_RADIUS = 18;                  // 圆上方向小圆半径（0.3.0 由 12 调大 1.5 倍：SVG 图标内部细节 24px 下不可辨）
+const MARKER_RADIUS = 18;                  // 圆上方向小圆半径（0.2.4 由 12 调大 1.5 倍：SVG 图标内部细节 24px 下不可辨）
 const NAV_MARKER_BG_COLOR = '#0e0e0e';     // 方向标记圆底（非常接近背景黑的深灰：遮蔽罗盘刻度、凸显图标）
 
 // ---- SAS 控制圆盘（导航球右侧，交互，按 KSP2 比例约为导航球 0.5 倍） ----
 const SAS_PANEL_RADIUS = 88;               // 圆盘半径（导航球 0.5 倍）
-const SAS_PANEL_CENTER_RADIUS = 6;         // 圆盘中心白色圆半径（0.3.0 由 10 改小：直径 12，与按钮(40)拉开层次）
-const DIR_BTN_RADIUS = 20;                 // 方向按钮半径（0.3.0 由 16 调大：参考 KSP2 圆盘按钮约占圆盘 20%，
+const SAS_PANEL_CENTER_RADIUS = 6;         // 圆盘中心白色圆半径（0.2.4 由 10 改小：直径 12，与按钮(40)拉开层次）
+const DIR_BTN_RADIUS = 20;                 // 方向按钮半径（0.2.4 由 16 调大：参考 KSP2 圆盘按钮约占圆盘 20%，
                                             //  取再大一点 → 直径 40 ≈ 圆盘 22.7%；相邻按钮仍留 ~44px 间隙）
 const DIR_OFFSET = 42;                     // 方向按钮偏移（X 斜角布局 dx/dy）
 const SAS_PANEL_GAP = 46;                  // 导航球与圆盘水平间距
@@ -90,34 +90,34 @@ const THROTTLE_ARC_END = 360;            // 结束角（度，顶部）
 const MARGIN = THROTTLE_ARC_OUTER + 16;  // 距左/下边缘（=210+16=226）
 
 // ---- 按钮框（DOM：SAS 圆盘正下方的方形框，主开关 + 副钮组） ----
-// 0.3.0 由 44px 缩至 3/4（33px），间距/内边距同步 ×0.75；框底仍与节流阀弧底对齐
+// 0.2.4 由 44px 缩至 3/4（33px），间距/内边距同步 ×0.75；框底仍与节流阀弧底对齐
 const BOTTOM_MAIN_SIZE = 33;             // 主开关（SAS）按钮边长（基准，与副钮统一大小）
 const BOTTOM_SUB_SIZE = 33;              // 副钮（节点/目标）边长（基准）
 const BOTTOM_BTN_GAP = 7.5;              // 同组按钮间距（基准）
 const BOTTOM_FRAME_PAD = 6;              // 方形框内边距（基准）
 // 圆盘底部到按钮框顶部间距（基准）— 0.2.7 起框底与节流阀弧底对齐：
 // 框底 = 圆心 y + Δ + 88 + GAP_BELOW + 框高(33+6×2=45) = 圆心 y + 210(节流阀外缘半径)
-// 0.3.0 为贴近工具栏将间距收紧为 11px，圆盘下移量 Δ 由公式自动反解（62→11 后 Δ=66）
+// 0.2.4 为贴近工具栏将间距收紧为 11px，圆盘下移量 Δ 由公式自动反解（62→11 后 Δ=66）
 const BOTTOM_BTN_GAP_BELOW = 11;
 // 圆盘下移量（基准）— 由对齐等式反解：Δ = 节流阀外缘(210) - 圆盘半径(88) - 间距(62) - 框高(45)
 const SAS_PANEL_DOWN_SHIFT = THROTTLE_ARC_OUTER - SAS_PANEL_RADIUS - BOTTOM_BTN_GAP_BELOW
     - (BOTTOM_MAIN_SIZE + BOTTOM_FRAME_PAD * 2);
 
 // ========== 导航球四方向定义（注册表，为机动节点预留扩展位） ==========
-// key 与 RENDER_DATA.directions 字段名对应；tex 为方向图标纹理 key（0.3.0 图标替换）
+// key 与 RENDER_DATA.directions 字段名对应；tex 为方向图标纹理 key（0.2.4 图标替换）
 const NAV_DIRECTIONS = [
     { key: 'prograde',   label: t('sas.prograde'),   color: NAV_DIR_PROGRADE_COLOR, tex: 'dir_prograde' },
     { key: 'retrograde', label: t('sas.retrograde'), color: NAV_DIR_PROGRADE_COLOR, tex: 'dir_retrograde' },
     { key: 'radialIn',   label: t('sas.radialIn'),   color: NAV_DIR_RADIAL_COLOR,  tex: 'dir_radial_in' },
     { key: 'radialOut',  label: t('sas.radialOut'),  color: NAV_DIR_RADIAL_COLOR,  tex: 'dir_radial_out' },
-    // 机动节点方向（0.3.0）：存在可执行机动节点时显示，与其他四方向一样实时变化
+    // 机动节点方向（0.2.5）：存在可执行机动节点时显示，与其他四方向一样实时变化
     //   （过节点前=节点加速方向；过节点后=达到目标轨道方向）；纹理未就绪用虚线圆环 fallback
     { key: 'maneuver',   label: t('sas.node'),       color: NAV_DIR_MANEUVER_COLOR, tex: null }
 ];
 
 // ========== SAS 圆盘方向按钮（X 斜角布局） ==========
 // tex 与 NAV_DIRECTIONS 共用同一套方向图标
-// iconScale：图标占按钮直径比例（默认 0.8）。0.3.0 径向图标内容扩展远小于正逆长十字
+// iconScale：图标占按钮直径比例（默认 0.8）。0.2.4 径向图标内容扩展远小于正逆长十字
 // （正逆内容跨距 92%、径向仅 44%~69% 的 viewBox），同等 0.8 下视觉偏小 → 径向单独放大
 const DIR_CIRCLES = [
     { mode: 'radial_in',  dx: -DIR_OFFSET, dy: -DIR_OFFSET, color: DIR_RADIAL_COLOR, label: t('sas.radialIn'),    tex: 'dir_radial_in',  iconScale: 0.95 },
@@ -190,7 +190,7 @@ class SASUI {
         };
         this._panelCenter = {
             x: margin + (NAVBALL_RADIUS + SAS_PANEL_GAP + SAS_PANEL_RADIUS) * this._scale,
-            // 0.3.0：圆盘整体下移 Δ，按钮框底（navY+Δ+88+62+45）恒等于节流阀弧底（navY+210）
+            // 0.2.4：圆盘整体下移 Δ，按钮框底（navY+Δ+88+62+45）恒等于节流阀弧底（navY+210）
             y: navY + SAS_PANEL_DOWN_SHIFT * this._scale
         };
         this._centerPos = this._navballCenter;
@@ -206,7 +206,7 @@ class SASUI {
      * @param {number} dt - 时间步长（秒）
      * @param {string} sasMode - 当前 SAS 模式（'off' / 'stability' / ...）
      * @param {number} throttle - 油门值 [0, 1]
-     * @param {boolean} [hasManeuver] - 是否存在可执行的机动节点（节点副钮可用性，0.3.0）
+     * @param {boolean} [hasManeuver] - 是否存在可执行的机动节点（节点副钮可用性，0.2.5）
      */
     update(dt, sasMode, throttle, hasManeuver) {
         // 方向标记常驻显示（不随 SAS 开关淡出；角度无效时由渲染层单独隐藏）
@@ -425,7 +425,7 @@ class SASUI {
         this._drawTriangle(ctx, cx, cy, s, heading, NAVBALL_MARKER_SIZE, MARKER_COLOR);
 
         // ---- 圆上四方向标记（常驻，角度有效时显示） ----
-        // 0.3.0 图标替换：纹理就绪用方向 SVG 模板染色（固定朝向不随角度旋转，仅沿圆环移动），
+        // 0.2.4 图标替换：纹理就绪用方向 SVG 模板染色（固定朝向不随角度旋转，仅沿圆环移动），
         // 纹理未就绪回退程序化小圆（铁律：永远带 fallback）
         if (appearance > 0.01) {
             const dirR = NAVBALL_DIR_R * s;
@@ -443,7 +443,7 @@ class SASUI {
                     // 方向图标：模板染色为语义色（正逆黄 / 径向青），正方形绘制（直径 = 小圆直径）
                     const size = Math.max(1, Math.round(markerR * 2));
                     // 圆底：接近背景黑的深灰，直径 = 图标 + 0.5px 刚好撑满（遮蔽罗盘刻度，图标更清晰）；
-                    // 0.3.0 不透明度 95%（图标保持 0.9）
+                    // 0.2.4 不透明度 95%（图标保持 0.9）
                     ctx.globalAlpha = 0.95 * appearance;
                     ctx.beginPath();
                     ctx.arc(mx, my, size / 2 + 0.5, 0, Math.PI * 2);
@@ -454,7 +454,7 @@ class SASUI {
                     ctx.drawImage(tinted, mx - size / 2, my - size / 2, size, size);
                     ctx.globalAlpha = 1.0;
                 } else if (dir.key === 'maneuver') {
-                    // 机动方向标记 fallback（0.3.0）：粉色虚线圆环 + 中心圆点，
+                    // 机动方向标记 fallback（0.2.5）：粉色虚线圆环 + 中心圆点，
                     // 与实心圆点方向标记区分；纹理素材后补即走上方 img 分支
                     ctx.globalAlpha = 0.95 * appearance;
                     ctx.beginPath();
@@ -515,7 +515,7 @@ class SASUI {
         ctx.fill();
 
         // ---- 四方向按钮 ----
-        // 0.3.0 配色方案 v2（参考 KSP2 圆盘按钮像素图）：
+        // 0.2.4 配色方案 v2（参考 KSP2 圆盘按钮像素图）：
         //   外框  SAS 开启 = 语义色（与图标一致，含未激活态；正逆绿/径向青）；SAS 关闭 = 深灰，描边 1px
         //   图标  SAS 开 + 选中   = 语义色实底（填满外框内，无黑隙）+ 黑色符号（醒目高亮）
         //         SAS 开 + 未选中 = 语义色图标·黑底（低调常显）
@@ -850,7 +850,7 @@ class SASUI {
     /**
      * 按钮定义（tex 为图标纹理 key，就绪时优先显示图片，否则 emoji 占位）
      * iconScale：mask 图标占按钮边长比例（默认 0.7）。
-     * 0.3.0 视觉对齐：icon_sas 正式素材圆环撑满 viewBox（≈95%），而 node/+/- 占位素材
+     * 0.2.4 视觉对齐：icon_sas 正式素材圆环撑满 viewBox（≈95%），而 node/+/- 占位素材
      * 内容仅约 75% —— 同为 0.7 时 SAS 显得大。icon_sas 单独缩至 0.55（视觉 ≈ 0.55×95% ≈ 52%，
      * 与占位图标的 0.7×75% ≈ 52.5% 对齐）；三张占位素材换成正式版（撑满圆环）后,
      * 建议把 iconScale 统一回 0.7。
@@ -921,7 +921,7 @@ class SASUI {
                         ship.sasMode = ship.sasMode === 'off' ? 'stability' : 'off';
                     }
                 } else if (def.id === 'node') {
-                    // 机动节点指向（0.3.0）：无节点时按钮 disabled（根本点不到，不弹通知）；
+                    // 机动节点指向（0.2.5）：无节点时按钮 disabled（根本点不到，不弹通知）；
                     // 有节点：点击 = 开启/切换回姿态保持（与圆盘方向按钮同交互
                     if (btn.disabled || !ship) return;
                     ship.sasMode = (ship.sasMode === 'maneuver') ? 'stability' : 'maneuver';
@@ -1025,8 +1025,8 @@ class SASUI {
 
     /**
      * 同步 SAS 按钮激活态（sasMode 变化才写 DOM）
-     * 0.3.0 状态色规范：激活=通用绿(--progress-green) / 未激活=通用深灰(--border)
-     * 0.3.0 机动节点副钮：hasManeuver=false → disabled（无法点击、不弹通知）；
+     * 0.2.4 状态色规范：激活=通用绿(--progress-green) / 未激活=通用深灰(--border)
+     * 0.2.5 机动节点副钮：hasManeuver=false → disabled（无法点击、不弹通知）；
      *   sasMode==='maneuver' → 激活绿
      * @param {string} sasMode
      * @param {boolean} [hasManeuver] - 是否存在可执行的机动节点
@@ -1146,12 +1146,12 @@ class SASUI {
         const orbitsLabel = this._makeCheckbox('bodyOrbits', t('sas.bodyOrbits'));
         content.appendChild(orbitsLabel);
 
-        // SOI 切换标签 toggle（0.3.0）
+        // SOI 切换标签 toggle（0.2.4）
         const soiLabel = this._makeCheckbox('soiLabels', t('sas.soiLabels'));
         content.appendChild(soiLabel);
 
         panel.appendChild(content);
-        // 0.3.0：挂入左上玩家 HUD 黑条尾端（黑条不存在时兜底 body，正常时序黑条必已创建）
+        // 0.2.4：挂入左上玩家 HUD 黑条尾端（黑条不存在时兜底 body，正常时序黑条必已创建）
         const hudHost = document.getElementById('playerResourceHud');
         (hudHost || document.body).appendChild(panel);
 

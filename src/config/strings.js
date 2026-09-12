@@ -273,12 +273,12 @@ const STRINGS = {
     'orbit.type.escape': '逃逸',
     'orbit.type.deepSpace': '深空',
 
-    // ---------- 轨道点标签（0.3.0：Ap/Pe 标记） ----------
+    // ---------- 轨道点标签（0.2.4：Ap/Pe 标记） ----------
     'orbitPoint.ap': 'Ap',
     'orbitPoint.pe': 'Pe',
     'orbitPoint.apFull': '远点',
     'orbitPoint.peFull': '近点',
-    // SOI 穿越标签（0.3.0：段尾=离开 / 段头=进入）
+    // SOI 穿越标签（0.2.4：段尾=离开 / 段头=进入）
     'orbitPoint.soiLeave': (p) => `离开 ${p.name}`,
     'orbitPoint.soiEnter': (p) => `进入 ${p.name}`,
     // SOI 标签展开面板状态行（替代高度行）
@@ -286,7 +286,7 @@ const STRINGS = {
     'orbitPoint.soiEncounter': (p) => `正在遭遇 ${p.name}`,
     // 可见性筛选：SOI 切换标签开关
     'sas.soiLabels': 'SOI 切换标签',
-    // ---------- 轨道线右键菜单（0.3.0 提交5 占位版） ----------
+    // ---------- 轨道线右键菜单（0.2.4 提交5 占位版） ----------
     'orbitMenu.createNode': '创建机动计划',
     'orbitMenu.warpToPoint': '时间加速至目标点',
     'orbitMenu.toApo': '快进至远点',
@@ -294,7 +294,7 @@ const STRINGS = {
     'orbitMenu.toSoi': '快进至引力范围变化',
     'orbitMenu.targetSuffix': '到目标点',
     'orbitMenu.todo': (p) => `「${p.name}」功能开发中，敬请期待`,
-    // 定点时间加速（0.3.0 提交5 落地）
+    // 定点时间加速（0.2.4 提交5 落地）
     'orbitMenu.warpStarted': '定点加速启动：将以最大可用档位前往目标点',
     'orbitMenu.arrived': '已到达目标点',
     'orbitMenu.noTime': '该点无到达时间数据，无法定点加速',
@@ -302,7 +302,7 @@ const STRINGS = {
     'orbitMenu.noSoi': '当前轨道无近期 SOI 切换',
     'orbitMenu.apeClose': '目标拱点已不足 15 秒，无需加速',
 
-    // ---------- 机动节点（0.3.0：加速计时器面板 / 节点交互） ----------
+    // ---------- 机动节点（0.2.5：加速计时器面板 / 节点交互） ----------
     'maneuver.panelTitle': '加速计时器',
     'maneuver.dvNeeded': '需要ΔV',
     'maneuver.burnStartAt': '加速开始于',
@@ -317,15 +317,15 @@ const STRINGS = {
     'maneuver.deleted': '机动计划已删除',
     'maneuver.warpStarted': '定点加速启动：前往机动节点时刻前 10 秒',
     'maneuver.warpTooClose': '距节点时刻已不足 10 秒，无需加速',
-    // 燃料耗尽点轨道标签（0.3.0：收起态 ❌，展开显示全称）
+    // 燃料耗尽点轨道标签（0.2.5：收起态 ❌，展开显示全称）
     'orbitPoint.fuelOut': '燃料耗尽点',
 
-    // ---------- 飞行视图档位（0.3.0：V 键切换 普通聚焦 ↔ 轨道机动） ----------
+    // ---------- 飞行视图档位（0.2.5：V 键切换 普通聚焦 ↔ 轨道机动） ----------
     'view.switchedManeuver': '视图：机动',
     'view.switchedFocus': '视图：常规',
     'view.unavailable': '当前无法使用轨道机动视图（宿主无轨道中心）',
 
-    // ---------- 轨道机动视图规划面板（0.3.0） ----------
+    // ---------- 轨道机动视图规划面板（0.2.5） ----------
     'mvp.title': '轨道机动视图',
     'mvp.focusLabel': '聚焦天体',
     'mvp.dvLabel': '机动 ΔV（节点参考系分量）',
@@ -467,7 +467,7 @@ const STRINGS = {
     'dock.success': '对接成功',
     'dock.failFull': '对接失败（对接口已满或其他原因）',
 
-    // ---------- 飞行状态 HUD（0.3.0 右下燃料/ΔV 卡） ----------
+    // ---------- 飞行状态 HUD（0.2.4 右下燃料/ΔV 卡） ----------
     'hud.dvLabel': '剩余 ΔV',
     'hud.twr': '推重比',
     'hud.burnTime': '燃烧时间',

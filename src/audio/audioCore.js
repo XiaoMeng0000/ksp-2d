@@ -20,7 +20,7 @@ class AudioCore {
         this._total = 0;
         this._completed = 0;
         this._ready = false;
-        this._pendingPlays = [];     // 按需补载中的待播请求（0.3.0：资产后置/加载失败自愈）
+        this._pendingPlays = [];     // 按需补载中的待播请求（0.2.5：资产后置/加载失败自愈）
 
         // 音量总线：master → { music, sfx → { ui, comms } }
         // 分类音量（设置面板可调）：总 / 音乐 / UI 音效 / 坎巴拉人通讯音
@@ -267,7 +267,7 @@ class AudioCore {
         }
         const buffer = this._buffers.get(id);
         if (!buffer) {
-            // 0.3.0 加固（"warp 后到达音不响"排查）：物理文件是页面启动后才放入 /
+            // 0.2.5 加固（"warp 后到达音不响"排查）：物理文件是页面启动后才放入 /
             // 启动时拉取失败 → 按需补载，成功后立即补播（事件为一次性，错过即失）；
             // 未配置的 id 直接警告
             const manifest = buildAudioManifest();

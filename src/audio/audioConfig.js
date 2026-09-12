@@ -66,7 +66,7 @@ export const sfxMap = {
     // 0x 暂停专属音效:进入暂停(激活)与取消暂停(恢复)各一,原调不变调
     warp_pause: { path: 'assets/audio/sfx/warp_pause.ogg' },
     warp_resume: { path: 'assets/audio/sfx/warp_resume.ogg' },
-    // 机动节点到达提示音（0.3.0）：倒计时归零到达节点时刻
+    // 机动节点到达提示音（0.2.5）：倒计时归零到达节点时刻
     // （音频资产按《音频标准化流程》补充；文件缺失时 playSfx 静默跳过）
     maneuver_arrive: { path: 'assets/audio/sfx/maneuver_arrive.ogg' }
 };

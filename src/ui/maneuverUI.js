@@ -1,11 +1,11 @@
 'use strict';
 
-// 机动节点 UI（0.3.0）— 加速计时器面板 + 节点图标 + 十字型四向手柄（DOM 层）
+// 机动节点 UI（0.2.5）— 加速计时器面板 + 节点图标 + 十字型四向手柄（DOM 层）
 // 架构：UI 只订阅事件 + 每帧读渲染层预测缓存（getLastManeuverPrediction），
 //       不直连物理引擎；数据写操作统一走 maneuverSystem
 // 命中分层：图标/手柄/面板为 DOM 元素置于画布之上，天然拦截 canvas 事件
 //   → 图标覆盖区优先于轨道线悬停/右键菜单（KSP 样式）
-// 交互（0.3.0 定稿）：节点存在期间 图标/十字手柄/面板 全部常驻可操作；
+// 交互（0.2.5 定稿）：节点存在期间 图标/十字手柄/面板 全部常驻可操作；
 //   空白点击仅终止进行中的拖拽（不隐藏任何元素，拖动能力永不失能）
 
 import { t } from '../config/strings.js';
@@ -35,7 +35,7 @@ let _drag = null;           // { mode:'time' } | { mode:'dv', axis, dist, lastTi
 let _lastShip = null;       // 本帧活动飞船（按钮点击/拖拽事件用）
 
 // 十字型手柄布局（屏幕空间固定，不随轨道方向旋转）：
-//   上=径向朝外 下=径向朝内 右=顺向 左=逆向（dy 向下为正，0.3.0 打磨定稿）
+//   上=径向朝外 下=径向朝内 右=顺向 左=逆向（dy 向下为正，0.2.5 打磨定稿）
 const HANDLE_AXES = ['pro', 'retro', 'radIn', 'radOut'];
 const HANDLE_LAYOUT = {
     pro: { dx: 1, dy: 0 },
@@ -358,7 +358,7 @@ export function updateManeuverUI(canvas, ship) {
     const burnT = (plan && plan.burnDuration !== null && plan.burnDuration !== undefined)
         ? plan.burnDuration : 0;
 
-    // ---- 机动视图内隐藏节点图标与手柄（0.3.0：远景下图标仅是行星上一点，
+    // ---- 机动视图内隐藏节点图标与手柄（0.2.5：远景下图标仅是行星上一点，
     //      细节交由规划面板的放大图；加速计时器面板保留显示） ----
     const hideGizmo = flightView.isManeuver();
 
@@ -379,7 +379,7 @@ export function updateManeuverUI(canvas, ship) {
         _icon.style.top = iconCss.y + 'px';
         // 十字手柄：编辑态开关控制（true=显示；false=完全隐藏——空白点击关闭后
         // 需点击节点图标重新进入编辑）。
-        // 0.3.0 打磨：已完成（executed）节点同样可编辑——目标轨迹参照常驻，
+        // 0.2.5 打磨：已完成（executed）节点同样可编辑——目标轨迹参照常驻，
         // 玩家可继续调 Δv/位置来规划修正燃烧（烧过头"拐回来"）。
         const axes = plan ? plan.axes : null;
         const showHandles = _editing && !!axes;
@@ -446,7 +446,7 @@ export function updateManeuverUI(canvas, ship) {
 
     // ---- 面板（常驻：节点存在即显示；空白点击仅收起手柄编辑） ----
     // 锚定：时间加速面板（#timeWarpWrap bottom 12px 居中）正上方居中
-    // 0.3.0 性能：offsetHeight 是布局读取，逐帧读会强制重排 —— 缓存 300ms
+    // 0.2.5 性能：offsetHeight 是布局读取，逐帧读会强制重排 —— 缓存 300ms
     const warpWrap = document.getElementById('timeWarpWrap');
     const nowMs2 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
     if (!_warpHCache || (nowMs2 - _warpHCache.t) > 300) {
@@ -463,7 +463,7 @@ export function updateManeuverUI(canvas, ship) {
     const stopVal = rows[2].querySelector('.maneuver-value');
     stopVal.textContent = 'T-' + formatTCountdown(Math.max(0, node.time + burnT - now));
 
-    // ---- 三行状态语义（0.3.0 打磨定稿）----
+    // ---- 三行状态语义（0.2.5 打磨定稿）----
     // 行1 需要ΔV：节点 Δv ≤ 飞船【当前可用】Δv → ✓白；超出 → ✗灰（0/0 视为够）
     // 行2 加速开始于：节点时刻前 ✓白；到达后 ✓灰（对号常驻）
     // 行3 加速停止于：节点时刻前 ✗灰；到达后 ✓白（此后保持 ✓白）
@@ -478,14 +478,14 @@ export function updateManeuverUI(canvas, ship) {
         applyRowState(rows[i], states[i]);
     }
 
-    // ---- 进度条（0.3.0 打磨：项目绿满 → 消耗式向左缩小归零；宽度 = 剩余/计划） ----
+    // ---- 进度条（0.2.5 打磨：项目绿满 → 消耗式向左缩小归零；宽度 = 剩余/计划） ----
     const fill = _panel.querySelector('.maneuver-bar-fill');
     const ratio = progress.planned > 0
         ? Math.max(0, Math.min(1, progress.remaining / progress.planned))
         : 1;
     fill.style.width = (ratio * 100).toFixed(1) + '%';
 
-    // ---- 卡片下方自适应尖角（0.3.0 打磨定稿语义）----
+    // ---- 卡片下方自适应尖角（0.2.5 打磨定稿语义）----
     //   顶点(尖端) = 进度位置：对齐进度条的"进度前沿"（绿色填充右边缘）；
     //   两条边自适应：上端落在卡片底边上（apex ± ARM）；
     //   活动范围统一夹在卡片底部【平直段】内 [CORNER_R−1, 卡宽−CORNER_R−1]（避开倒角）——
@@ -495,7 +495,7 @@ export function updateManeuverUI(canvas, ship) {
     const cardEl = _panel.querySelector('.maneuver-card');
     const barEl = _panel.querySelector('.maneuver-bar-wrap');
     if (cardEl && barEl && _tailSvg && _tailBody && _tailEdge) {
-        // 布局矩形缓存（0.3.0 性能）：面板只在"有节点"时存在，逐帧 getBoundingClientRect
+        // 布局矩形缓存（0.2.5 性能）：面板只在"有节点"时存在，逐帧 getBoundingClientRect
         // 会在每帧 DOM 写入之后强制重排 —— 改为缓存，仅在过期/尺寸变化时重测
         const nowMs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
         if (!_tailRect || (nowMs - _tailRect.t) > 300) {
@@ -536,7 +536,7 @@ export function updateManeuverUI(canvas, ship) {
     greenBtn.disabled = node.executed || (node.time - cfg.warpLeadTime <= now);
 }
 
-// 三行读数状态计算（纯函数，可单测；0.3.0 打磨定稿语义）：
+// 三行读数状态计算（纯函数，可单测；0.2.5 打磨定稿语义）：
 //   行1 需要ΔV：节点 Δv ≤ 飞船当前可用 Δv → { check:'✓', active:true }（白）；
 //                超出 → { check:'✗', active:false }（灰）；planned=0 视为够（✓白）
 //   行2 加速开始于：节点时刻前 ✓白（对号常驻）；到达后 ✓灰

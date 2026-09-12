@@ -260,7 +260,7 @@ function solveEccentricAnomaly(M, e) {
     return (lo + hi) / 2;
 }
 
-// 段对象构造（0.3.0 机动节点）：统一附带 startState（段起始状态快照：
+// 段对象构造（0.2.5 机动节点）：统一附带 startState（段起始状态快照：
 // 相对宿主位置/速度 + 绝对时刻 + 宿主名），供机动节点预测沿链时间寻址（walkToTime）。
 // 渲染层不消费该字段（additive 字段，向后兼容）。
 function makeSegment(relPoints, host, stepStartTime, depth, startState) {
@@ -275,7 +275,7 @@ function makeSegment(relPoints, host, stepStartTime, depth, startState) {
 }
 
 // 递归内部：分段拼接一步，采样从 theta0 到交点或完整轨道
-// 段点结构（0.3.0 骨架新增 t 字段）：{ x, y, t } — x/y 为相对锚点坐标，
+// 段点结构（0.2.4 骨架新增 t 字段）：{ x, y, t } — x/y 为相对锚点坐标，
 // t 为自该段起点（anchorTime）起的游戏秒偏移；锚点绝对时刻 = anchorTime + t。
 // 供轨道悬停 Tooltip 的 T+ 显示与右键菜单"时间加速至此"计算（飞行Scene 交互层读取）。
 export function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segments) {
@@ -283,7 +283,7 @@ export function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, 
 
     const hostPos = bodyFuturePos(host, stepStartTime);
     const relPos = { x: posAbs.x - hostPos.x, y: posAbs.y - hostPos.y };
-    // 段起始状态快照（0.3.0 机动节点）：供 walkToTime 沿预测链时间寻址
+    // 段起始状态快照（0.2.5 机动节点）：供 walkToTime 沿预测链时间寻址
     const segStartState = {
         relPos: { x: relPos.x, y: relPos.y },
         relVel: { x: velRel.x, y: velRel.y },

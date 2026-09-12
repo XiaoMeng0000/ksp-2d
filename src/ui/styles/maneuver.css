@@ -1,5 +1,5 @@
 /* ============================================================
-   maneuver.css — 机动节点系统（0.3.0）
+   maneuver.css — 机动节点系统（0.2.5）
    · 加速计时器面板（#maneuverPanel，KSP2 式覆盖面板）
    · 节点图标（.maneuver-node-icon）+ 四向分离手柄（.maneuver-handle）
    共用 theme.css 的 --theme-* 变量；面板读数用 --font-mono
@@ -12,7 +12,7 @@
     transform: translateX(-50%);
     bottom: 20px;   /* 每帧由 updateManeuverUI 按时间加速面板高度重算 */
     width: 350px;
-    /* 0.3.0 打磨：纯黑背景（对照样式稿） */
+    /* 0.2.5 打磨：纯黑背景（对照样式稿） */
     background: #000000;
     border: 1px solid var(--theme-menu-border);
     border-radius: 10px;
@@ -25,7 +25,7 @@
     user-select: none;
 }
 
-/* 标题行：标题 + 右侧虚线延伸（0.3.0 打磨：已移除"动"徽章） */
+/* 标题行：标题 + 右侧虚线延伸（0.2.5 打磨：已移除"动"徽章） */
 .maneuver-title {
     display: flex;
     align-items: center;
@@ -60,7 +60,7 @@
     height: 34px;
     border-radius: 6px;
     border: 1px solid;
-    /* 0.3.0 打磨：按钮背景改纯黑（原 --theme-btn-bg 近黑） */
+    /* 0.2.5 打磨：按钮背景改纯黑（原 --theme-btn-bg 近黑） */
     background: #000000;
     font-size: 15px;
     line-height: 32px;
@@ -83,7 +83,7 @@
     font-size: 16px;
 }
 
-/* 信息卡（三行读卡 + 右侧三枚倒计时灯，0.3.0 打磨：灯移入卡内、卡片右扩；
+/* 信息卡（三行读卡 + 右侧三枚倒计时灯，0.2.5 打磨：灯移入卡内、卡片右扩；
    黑底 + 外框同款紫边框） */
 .maneuver-card {
     flex: 1;
@@ -100,7 +100,7 @@
     flex: 1;
     min-width: 0;
 }
-/* 卡片下方自适应尖角（0.3.0 打磨）：SVG 每帧按"进度前沿"重算顶点——
+/* 卡片下方自适应尖角（0.2.5 打磨）：SVG 每帧按"进度前沿"重算顶点——
    两侧落点始终落在卡片底边上（自适应夹取），尖端指向进度位置；
    不触发夹取时即为原始对称 V 形。替代原先"整体平移的硬编码菱形" */
 .maneuver-card-tail {
@@ -126,7 +126,7 @@
     gap: 6px;
     line-height: 20px;
 }
-/* 三行统一白/灰状态色（0.3.0 打磨：取消第二/三行的原金色标注，
+/* 三行统一白/灰状态色（0.2.5 打磨：取消第二/三行的原金色标注，
    改由状态类驱动——active 白 / inactive 灰，图标与文字同步） */
 .maneuver-row.state-active .maneuver-check,
 .maneuver-row.state-active .maneuver-label,
@@ -155,7 +155,7 @@
     white-space: nowrap;
 }
 
-/* 右侧三枚倒计时状态灯（卡内右侧；0.3.0 打磨：紧凑居中 + 固定间距） */
+/* 右侧三枚倒计时状态灯（卡内右侧；0.2.5 打磨：紧凑居中 + 固定间距） */
 .maneuver-leds {
     display: flex;
     flex-direction: column;
@@ -184,7 +184,7 @@
     border-color: #EF5350;
 }
 
-/* 底部进度条（0.3.0 打磨：项目绿满 → 消耗式向左缩小归零，底色近黑；
+/* 底部进度条（0.2.5 打磨：项目绿满 → 消耗式向左缩小归零，底色近黑；
    左右边界与信息卡对齐后**两侧再内缩 6px**（= 卡片倒角半径）——
    使尖角在进度极值处正好落在卡片底部"平直段"端点（倒角起点），与框连住。
    margin-left = 按钮列宽(40) + 体区间距(10) + 内缩(6) = 56px） */
@@ -224,12 +224,12 @@
 }
 .maneuver-handle {
     position: fixed;
-    /* 0.3.0 打磨：图标定稿 25px（33px 的 3/4） */
+    /* 0.2.5 打磨：图标定稿 25px（33px 的 3/4） */
     width: 25px;
     height: 25px;
     margin-left: -12.5px;
     margin-top: -12.5px;
-    /* 0.3.0 打磨：现行方向图标（dir_* 纹理 + 导航球色染色）作手柄底图，取消临时方框 */
+    /* 0.2.5 打磨：现行方向图标（dir_* 纹理 + 导航球色染色）作手柄底图，取消临时方框 */
     background-size: contain;
     background-repeat: no-repeat;
     background-position: center;

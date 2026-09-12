@@ -343,9 +343,9 @@ window.openShipBuilder = function() {
     document.getElementById('shipBuilderStats').innerHTML = 
         '<div>' + t('build.selectHint') + '</div>';
     document.getElementById('shipBuilderSlots').innerHTML = '';
-    // 0.3.0 多面板并存:不再关闭工具栏面板,建造/舱室/部署可同时打开
+    // 0.2.4 多面板并存:不再关闭工具栏面板,建造/舱室/部署可同时打开
     uiManager.showPanel('shipBuilder');
-    // 0.3.0 多面板并存:与其它浮层面板同开时错位,避免完全重叠
+    // 0.2.4 多面板并存:与其它浮层面板同开时错位,避免完全重叠
     cascadePanelOpen(shipBuilderPanel);
 };
 

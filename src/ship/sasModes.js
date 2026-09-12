@@ -154,7 +154,7 @@ export function computeTargetHeading(mode, context, state) {
             return wrapAngle(radialIn + Math.PI);
         }
 
-        // ---- 机动节点指向（0.3.0）：
+        // ---- 机动节点指向（0.2.5）：
         //   方向由飞行场景每帧经 state.maneuverHeading 注入（过节点前=节点加速方向；
         //   过节点后=达到目标轨道的当前燃烧方向）；无有效方向时回退当前朝向 ----
         case SASMode.MANEUVER: {

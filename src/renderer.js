@@ -49,7 +49,7 @@ function isRingOnScreen(cx, cy, r, canvas) {
     return Math.abs(r - dc) <= farCorner;
 }
 
-// ===== 轨道交互骨架（0.3.0）：渲染层持有"本帧已绘制的轨道几何"，供交互层读取 =====
+// ===== 轨道交互骨架（0.2.4）：渲染层持有"本帧已绘制的轨道几何"，供交互层读取 =====
 // 交互层（flightScene）通过访问器读取，不与预测引擎直接耦合；
 // hover 状态由交互层写入，渲染层在绘制标记时消费。功能体待后续提交填充。
 let _lastOrbitSegments = null;   // 本帧活动飞船轨道预测 segments（renderOrbit 写入，null = 无活动飞船）
@@ -57,7 +57,7 @@ let _lastOrbitMarkers = [];      // 本帧 Ap/Pe 标记屏幕位置（renderOrbi
 let _orbitHoverState = null;     // 悬停状态（setOrbitHoverState 写入，标记绘制消费）
 let _lastVisibility = {};        // 本帧可见性选项（render 写入，SOI 标签开关等消费）
 let _lastManeuverPrediction = null;  // 本帧机动节点预测缓存（prepareManeuverPrediction 写入，机动 UI 读取）
-let _mvCacheKey = null;              // 机动预测缓存键（0.3.0"有节点就卡"修复：滑行期零重算）
+let _mvCacheKey = null;              // 机动预测缓存键（0.2.5"有节点就卡"修复：滑行期零重算）
 let _mvCacheResult = null;           // 机动预测缓存结果（pinned 快照下仅依赖节点+质量/引擎参数）
 
 // rgba 字符串缓存（0.2.5 A8：hexToRgba 每帧对每个天体/设施重复 parse+拼接，按 (hex,alpha) 缓存）
@@ -84,7 +84,7 @@ const ORBIT_BRIGHT_COLORS = [
     'rgba(136, 68, 255, 0.8)'
 ];
 
-// 机动预测线（燃烧后段）颜色池（0.3.0 打磨）：品红/粉/紫系，
+// 机动预测线（燃烧后段）颜色池（0.2.5 打磨）：品红/粉/紫系，
 // 与普通轨道线 ORBIT_BRIGHT_COLORS 完全错开（无同值项）；
 // 当前 SOI 段 = 已定稿粉色（MANEUVER_CONFIG.postBurnColor），其余按 SOI 名哈希取池
 const MANEUVER_BRIGHT_COLORS = [
@@ -586,7 +586,7 @@ export {
     createStars,
     render,
     renderFlightHud,
-    // 轨道交互骨架（0.3.0）：数据访问器 + 悬停状态通道 + 待填功能函数
+    // 轨道交互骨架（0.2.4）：数据访问器 + 悬停状态通道 + 待填功能函数
     computeApPePositions,
     renderOrbitMarkers,
     findNearestOrbitPoint,
@@ -623,7 +623,7 @@ function getSOIDirection(fromName, toName) {
     return null;
 }
 
-// 机动预测线分段配色（0.3.0 打磨）：与 getOrbitColor 同机制——
+// 机动预测线分段配色（0.2.5 打磨）：与 getOrbitColor 同机制——
 // 当前 SOI 段固定粉色主色（对照样式稿），其余段按 SOI 名哈希取机动专属色池
 // （池与普通轨道线色池无同值项，机动线与绿线可并列分辨）
 function getManeuverColor(soiName, isCurrentSoi) {
@@ -645,7 +645,7 @@ function getSegmentAnchor(seg) {
 // 轨道线渲染主入口
 // 绘制点 = 锚点绝对位置 + 相对坐标（worldToScreen 期望绝对世界坐标）
 /**
- * 折线屏幕裁剪描边（0.3.0 卡顿修复）：
+ * 折线屏幕裁剪描边（0.2.5 卡顿修复）：
  * 预测链点数上万，高倍缩放下屏幕坐标可达数十万像素——整条交给光栅器会明显掉帧
  * （浏览器对巨大路径的裁剪代价高）。这里按"点是否落在扩展视口内"把折线切成可见子段，
  * 每段两端各带一个界外点，保证线条穿出屏幕边缘而非断在边界上。
@@ -730,7 +730,7 @@ function renderOrbit(ship, ctx, canvas, isActive = true) {
         ctx.strokeStyle = color;
         ctx.lineWidth = isActive ? 2 : 1;
         ctx.setLineDash([]);
-        // 0.3.0：屏幕裁剪描边（屏外巨量点不再交给光栅器；见 strokeChainClipped 注释）
+        // 0.2.5：屏幕裁剪描边（屏外巨量点不再交给光栅器；见 strokeChainClipped 注释）
         strokeChainClipped(ctx, seg.relPoints, anchor, canvas);
         ctx.setLineDash([]);
     }
@@ -773,7 +773,7 @@ function renderOrbit(ship, ctx, canvas, isActive = true) {
 
     // 骨架：Ap/Pe 标记绘制调用点（renderOrbitMarkers 功能体待填，当前返回 []）
     // 输出缓存到 _lastOrbitMarkers，供交互层命中检测（此处已过 isActive 提前返回，恒为活动飞船）
-    // 0.3.0 机动视图：主视图**仅显示 SOI 切换标签**（Ap/Pe、燃料耗尽点等轨道点标签隐藏），
+    // 0.2.5 机动视图：主视图**仅显示 SOI 切换标签**（Ap/Pe、燃料耗尽点等轨道点标签隐藏），
     // 细节交由规划面板放大图呈现；节点图标/手柄由 maneuverUI 另行隐藏
     const mvPred = _lastManeuverPrediction;
     const mvFilter = flightView.isManeuver()
@@ -789,12 +789,12 @@ function renderOrbit(ship, ctx, canvas, isActive = true) {
 
 // ship.maneuverNodes 由 shipSystem.createShip 初始化为空数组，数据结构：
 // { time: Number, deltaV: {x, y}, executed: Boolean }
-// 0.3.0 机动节点：扩展字段 relX/relY/anchorBody（节点在轨道上的冻结坐标，供图标锚定）
+// 0.2.5 机动节点：扩展字段 relX/relY/anchorBody（节点在轨道上的冻结坐标，供图标锚定）
 
 // 机动节点预测准备：返回 { plan, segments, burnArc, maneuverMarkerDefs, nodeScreen, node }
 // 无节点 / 计算异常 → null。
 // 注意 1：不按 ship.mode 过滤——推力模式下（玩家按机动计划手动燃烧中）预测线必须保持显示，
-//         否则一开节流阀机动规划即消失，玩家无法按计划执行（0.3.0 修复）。
+//         否则一开节流阀机动规划即消失，玩家无法按计划执行（0.2.5 修复）。
 // 注意 2：不按 node.executed 过滤——已完成节点继续显示预测轨迹（参照线常驻，
 //         玩家烧过头后可据此"拐回来"；编辑即重新进入计划态）。
 function prepareManeuverPrediction(ship, baseSegments, canvas) {
@@ -812,7 +812,7 @@ function prepareManeuverPrediction(ship, baseSegments, canvas) {
         return null;
     }
 
-    // 旧节点快照自动回填（0.3.0 "飞船燃烧算进节点"漂移根治）：
+    // 旧节点快照自动回填（0.2.5 "飞船燃烧算进节点"漂移根治）：
     // 无完整快照的节点（功能上线前的存档/会话遗留）首次在滑行态可见时，
     // 一次性从当前预测链冻结 位置/速度/质量 快照；回填后 computePlan 走冻结路径，
     // 计划永久脱离活飞船状态（推力模式基链含燃烧轨迹，故只在 on_rails 回填）。
@@ -834,7 +834,7 @@ function prepareManeuverPrediction(ship, baseSegments, canvas) {
         }
     }
 
-    // 每帧重算防护（0.3.0 修复"有节点就卡"）：冻结快照优先下，预测计划只依赖
+    // 每帧重算防护（0.2.5 修复"有节点就卡"）：冻结快照优先下，预测计划只依赖
     // 节点时间/Δv 与节点时刻质量/引擎参数——点火燃烧（当前质量下降）不影响键，
     // 燃烧期全帧命中缓存 → 预测线零漂移。
     // 注：无快照的旧节点在此缓存键中用常量占位（-1），绝不回退到当前燃料——
@@ -870,7 +870,7 @@ function prepareManeuverPrediction(ship, baseSegments, canvas) {
         nodeScreen = worldToScreen(node.relX + hp.x, node.relY + hp.y, canvas);
     }
 
-    // ===== 机动线专用标记 def（0.3.0 打磨：与主线共用轨道点标签管线） =====
+    // ===== 机动线专用标记 def（0.2.5 打磨：与主线共用轨道点标签管线） =====
     // ① 燃料耗尽点（仅当节点 Δv 超出飞船能力时存在）
     // ② 机动后轨道的 Ap/Pe（与主线同口径可达性：出界/已过近点不显示）
     const markerDefs = [];
@@ -932,8 +932,8 @@ function prepareManeuverPrediction(ship, baseSegments, canvas) {
     return { plan, segments: result.segments, burnArc: result.burnArc, maneuverMarkerDefs: markerDefs, nodeScreen, node };
 }
 
-// 机动节点预测线绘制（0.3.0）：燃烧弧（真实段亮红 / 虚拟续烧段暗红）+
-// 机动后轨道（0.3.0 打磨：实线粉色，对照样式稿）+ 跨 SOI 衔接线（粉色实线）
+// 机动节点预测线绘制（0.2.5）：燃烧弧（真实段亮红 / 虚拟续烧段暗红）+
+// 机动后轨道（0.2.5 打磨：实线粉色，对照样式稿）+ 跨 SOI 衔接线（粉色实线）
 function renderManeuverOrbits(ship, ctx, canvas, pred) {
     if (!pred || !pred.segments || pred.segments.length === 0) return;
 
@@ -952,18 +952,18 @@ function renderManeuverOrbits(ship, ctx, canvas, pred) {
                 ctx.lineWidth = 2.5;
                 ctx.setLineDash([]);
             } else {
-                // 0.3.0 打磨：机动后段按 SOI 分段配色（当前 SOI = 定稿粉色，其余取机动色池）
+                // 0.2.5 打磨：机动后段按 SOI 分段配色（当前 SOI = 定稿粉色，其余取机动色池）
                 ctx.strokeStyle = getManeuverColor(seg.soiName, seg.isCurrentSoi);
                 ctx.lineWidth = 2;
                 ctx.setLineDash([]);
             }
-            // 0.3.0：屏幕裁剪描边（高倍缩放下机动后链坐标极大，裁剪后光栅化代价大幅下降）
+            // 0.2.5：屏幕裁剪描边（高倍缩放下机动后链坐标极大，裁剪后光栅化代价大幅下降）
             strokeChainClipped(ctx, pts, anchor, canvas);
             ctx.setLineDash([]);
         }
     }
 
-    // 跨 SOI 衔接线（机动后段链，与主线同口径：仅"子→父"方向；0.3.0 打磨：
+    // 跨 SOI 衔接线（机动后段链，与主线同口径：仅"子→父"方向；0.2.5 打磨：
     // 粉色虚线——衔接线保持虚线语义，与主线衔接线 [4,6] 同款，超长降级实线防 dash 段数爆炸）
     for (let si = 0; si < pred.segments.length - 1; si++) {
         const seg = pred.segments[si];
@@ -1012,7 +1012,7 @@ function splitBurnSubPaths(points) {
     return paths;
 }
 
-// ===== 轨道交互（0.3.0：骨架 + 提交2 标记 + 提交3 悬停检测计算层） =====
+// ===== 轨道交互（0.2.4：骨架 + 提交2 标记 + 提交3 悬停检测计算层） =====
 // 目标：活动飞船轨道线的 Ap/Pe 标记显示、轨道线悬停检测、右键菜单数据通道。
 // 已完成：数据通道（缓存/访问器/悬停状态）+ computeApPePositions/renderOrbitMarkers
 //   （提交 2：Canvas 锚点 + DOM 文字本体，类型注册表数据驱动）+ findNearestOrbitPoint
@@ -1020,7 +1020,7 @@ function splitBurnSubPaths(points) {
 // 待填：flightScene 交互接入（提交 4）、右键菜单（提交 5）。
 
 /**
- * 把 orbitPoint 命中参数解析为当前帧的世界/屏幕坐标与到达时间（0.3.0 提交4 修复）：
+ * 把 orbitPoint 命中参数解析为当前帧的世界/屏幕坐标与到达时间（0.2.4 提交4 修复）：
  * 轨道线每帧随 cachedTime 重锚（锚点 = 宿主"当前时刻"位置），命中缓存的世界坐标
  * 跨帧会与重锚后的轨道线错位（warp 下偏移、zoom 越大越明显）。
  * 本函数与轨道线同帧同源重算：用本帧 segments（_lastOrbitSegments）+ 段锚点，
@@ -1113,9 +1113,9 @@ const ORBIT_LABEL_DY = -16;
  * @param {HTMLCanvasElement} canvas
  * @param {Object} ship - 活动飞船
  * @param {Object|null} hoveredMarker - 悬停状态 { type: 'ap'|'pe'|'orbitPoint', ... }（提交 4 接入）
- * @param {Array|null} extraDefs - 外部标记 def（0.3.0 机动节点：燃料耗尽点/机动后 Ap/Pe 等），
+ * @param {Array|null} extraDefs - 外部标记 def（0.2.5 机动节点：燃料耗尽点/机动后 Ap/Pe 等），
  *                                形态同 defs（可选 worldAbs 绝对坐标直通 / altM 海拔 / id 覆盖）
- * @param {Array|null} extraSegments - 附加预测段（0.3.0 打磨：机动后段链），
+ * @param {Array|null} extraSegments - 附加预测段（0.2.5 打磨：机动后段链），
  *                                    与主线同口径生成 SOI 穿越标签（id 前缀 mv_ 防与主线冲突）
  * @returns {Array} markers - [{ type, worldX, worldY, screenX, screenY, bodyX, bodyY,
  *                              icon, label, value, tToNext, contextMenu, isHover }]
@@ -1142,13 +1142,13 @@ function renderOrbitMarkers(ctx, canvas, ship, hoveredMarker, extraDefs = null, 
     const anchor = bodyFuturePos(host, getCachedTime());
     const info = liveKepler ? getOrbitalInfo(liveKepler, ship.currentGM, host, ship.pos) : null;
 
-    // 拱点可达性（0.3.0 修复）：标记只显示"预测轨道线上真实存在"的拱点。
+    // 拱点可达性（0.2.4 修复）：标记只显示"预测轨道线上真实存在"的拱点。
     // tExit = 到宿主 SOI 出界的剩余时间（findSOIExitTime 与预测线 patchedStep 同口径）：
     //   闭合椭圆（tExit null ⇔ rApo ≤ SOI，预测线画整圈）→ Pe + Ap 恒显示；
     //   出界/伪椭圆（段 0 只画到出界交点）→ Pe 仅未过近点时显示（tToPe < tExit）
     //     （驶过近点后 Pe 在飞船身后 → 隐藏；近逃逸抖动帧 tToPe 巨大 > tExit → 一并过滤）；
     //   Ap 仅闭合椭圆显示（出界轨迹到达前已切换参考系，无 Ap 点）。
-    //   双曲线（a<0，捕获/飞掠，0.3.0 修复3）：无 Ap 概念；
+    //   双曲线（a<0，捕获/飞掠，0.2.4 修复3）：无 Ap 概念；
     //     Pe = 最近接近点（KSP 入近点语义），未过最近点时显示
     //     （数学保证近点半径 ≤ 当前 r < SOI → 到达近点恒先于出界，无需 tExit 比较）。
     const defs = [];
@@ -1169,7 +1169,7 @@ function renderOrbitMarkers(ctx, canvas, ship, hoveredMarker, extraDefs = null, 
             }
         }
     }
-    // 外部标记 def（0.3.0 机动节点：燃料耗尽点等）
+    // 外部标记 def（0.2.5 机动节点：燃料耗尽点等）
     for (const d of exDefs) defs.push(d);
 
     for (const d of defs) {
@@ -1204,7 +1204,7 @@ function renderOrbitMarkers(ctx, canvas, ship, hoveredMarker, extraDefs = null, 
         });
     }
 
-    // ===== SOI 穿越标签（0.3.0）：存在 SOI 穿越时，段尾=离开该段 SOI、段头=进入该段 SOI =====
+    // ===== SOI 穿越标签（0.2.4）：存在 SOI 穿越时，段尾=离开该段 SOI、段头=进入该段 SOI =====
     // 可由可见性面板"SOI 切换标签"开关控制（soiLabels === false 时不生成）
     // 数据源：本帧预测 segments（与轨道线同源）；段点 t = 段起点（anchorTime）起的秒偏移
     // → 到边界时刻 tToNext = anchorTime + relPt.t − 当前游戏时间；段 0 头（飞船位置）不标"进入"。
@@ -1232,7 +1232,7 @@ function renderOrbitMarkers(ctx, canvas, ship, hoveredMarker, extraDefs = null, 
         }
     }
 
-    // ===== 机动后预测段的 SOI 标签（0.3.0 打磨）：与主线同口径，id 前缀 mv_ 防冲突 =====
+    // ===== 机动后预测段的 SOI 标签（0.2.5 打磨）：与主线同口径，id 前缀 mv_ 防冲突 =====
     const mvSegs = extraSegments;
     if (mvSegs && mvSegs.length > 1 && _lastVisibility.soiLabels !== false) {
         const now = getCachedTime();
@@ -1252,20 +1252,20 @@ function renderOrbitMarkers(ctx, canvas, ship, hoveredMarker, extraDefs = null, 
         }
     }
 
-    // ===== 标签过滤（0.3.0）：机动视图下只保留 SOI 切换标签（其余轨道点标签在远景下无参考价值）=====
+    // ===== 标签过滤（0.2.5）：机动视图下只保留 SOI 切换标签（其余轨道点标签在远景下无参考价值）=====
     if (typeof markerFilter === 'function') {
         for (let i = markers.length - 1; i >= 0; i--) {
             if (!markerFilter(markers[i])) markers.splice(i, 1);
         }
     }
 
-    // ===== 标签避让（KSP2 风格，0.3.0）：同一 SOI 边界两端的离开/进入标签若挤在一起，
+    // ===== 标签避让（KSP2 风格，0.2.4）：同一 SOI 边界两端的离开/进入标签若挤在一起，
     // 则后段"进入"标签沿两标签连线方向推开（leader 线相应延长），迭代收敛 =====
     applyLabelAvoidance(markers);
 
     // Canvas：折线（锚点 → 本体位置，单段直线）+ 锚点（旋转 45° 正方形 = 菱形）
     // 统一使用飞行界面紫（ORBIT_MARKER_COLOR），类型区分只在 DOM 标签文字颜色；
-    // 锚点悬停高亮效果已去除（0.3.0：悬停只作用于 DOM 标签本体），恒普通样式
+    // 锚点悬停高亮效果已去除（0.2.4：悬停只作用于 DOM 标签本体），恒普通样式
     for (const m of markers) {
         const r = 3.5;
 
@@ -1291,7 +1291,7 @@ function renderOrbitMarkers(ctx, canvas, ship, hoveredMarker, extraDefs = null, 
         ctx.restore();
     }
 
-    // 轨道线任意点悬停高亮（0.3.0 提交4）：hoveredMarker 为 orbitPoint 命中参数时，
+    // 轨道线任意点悬停高亮（0.2.4 提交4）：hoveredMarker 为 orbitPoint 命中参数时，
     // 用本帧 segments 同帧重算（resolveOrbitHit）—— 与轨道线同源，warp 重锚下零错位
     if (hoveredMarker && hoveredMarker.type === 'orbitPoint') {
         const cur = resolveOrbitHit(hoveredMarker, canvas);
@@ -1309,7 +1309,7 @@ function renderOrbitMarkers(ctx, canvas, ship, hoveredMarker, extraDefs = null, 
     return markers;
 }
 
-// SOI 穿越标签构建（0.3.0）：push 单个边界点标签（段尾=离开 / 段头=进入）
+// SOI 穿越标签构建（0.2.4）：push 单个边界点标签（段尾=离开 / 段头=进入）
 // relPt 为段内相对锚点坐标；id 用"类型+段索引+头尾"保证实例唯一
 // （同一 type 可出现多次——多次穿越有多个离开/进入标签，DOM 元素必须按 id 区分）；
 // name 防御：soiName 缺失时回退 anchorBody，再回退深空文案（防"离开 undefined"）
@@ -1353,7 +1353,7 @@ function pushSoiTag(markers, typeId, segIndex, relPt, seg, segAnchor, hostBody, 
     });
 }
 
-// KSP2 风格标签避让（0.3.0 修复4）：所有标签（SOI 穿越 + Ap/Pe）两两 body 挤压时
+// KSP2 风格标签避让（0.2.4 修复4）：所有标签（SOI 穿越 + Ap/Pe）两两 body 挤压时
 // 沿两者连线方向互相推开（各推一半；锚点不动、leader 线相应延长），迭代收敛。
 // 全标不丢弃，只错位——多次穿越时同类型标签同堆（进入×2 等）也必须互相避让。
 const LABEL_MIN_DIST = 70;   // 标签 body 最小间隔（px）
@@ -1489,7 +1489,7 @@ function getLastOrbitSegments() {
     return _lastOrbitSegments;
 }
 
-// 本帧机动节点预测缓存（0.3.0）：机动 UI 面板/图标读取（plan/segments/nodeScreen/maneuverMarkerDefs）
+// 本帧机动节点预测缓存（0.2.5）：机动 UI 面板/图标读取（plan/segments/nodeScreen/maneuverMarkerDefs）
 function getLastManeuverPrediction() {
     return _lastManeuverPrediction;
 }
@@ -1530,7 +1530,7 @@ function formatSpeed(mps) {
     return mps.toFixed(1) + ' m/s';
 }
 
-// 时长格式化（0.3.0 迁移至 utils/format.js 共享，此处不再定义）
+// 时长格式化（0.2.4 迁移至 utils/format.js 共享，此处不再定义）
 
 // 顶部轨道数据 HUD：2 行 × 4 列纯文字，绿色系，以画布中轴中心对称
 function renderOrbitHud(ctx, canvas, ship) {

@@ -1,6 +1,6 @@
 'use strict';
 
-// 轨道线右键菜单（0.3.0 提交5 占位版 + 锚点化）
+// 轨道线右键菜单（0.2.4 提交5 占位版 + 锚点化）
 // 入口：flightScene 命中轨道线时调用；菜单锚定"点击那一刻的轨道时空点"（KSP2 式）：
 //   - 面板通过"菱形选择点 + 竖线（连面板底边中点）"连接轨道点，与标签的折线（连右上）不同；
 //   - **定点冻结**：锚点 = 点击瞬间解析的世界坐标（不随轨道重锚/宿主移动漂移），
@@ -108,7 +108,7 @@ export function showOrbitContextMenu(clientX, clientY, data, canvas) {
         row.addEventListener('click', (e) => {
             e.stopPropagation();
 
-            // 0.3.0 机动节点：创建机动计划（菜单冻结快照 → maneuverSystem）
+            // 0.2.5 机动节点：创建机动计划（菜单冻结快照 → maneuverSystem）
             if (item.action === 'createNode') {
                 const ship = shipSystem.getActiveShip();
                 if (!ship) {
@@ -116,7 +116,7 @@ export function showOrbitContextMenu(clientX, clientY, data, canvas) {
                     return;
                 }
                 if (_menuData && _menuData.absTime !== null && _menuData.absTime !== undefined) {
-                    // 冻结节点时刻速度快照（0.3.0 打磨：节点时刻已过时重建预测状态，永不失效）
+                    // 冻结节点时刻速度快照（0.2.5 打磨：节点时刻已过时重建预测状态，永不失效）
                     let velRel = null;
                     try {
                         const st = walkToTime(getLastOrbitSegments(), _menuData.absTime);
@@ -149,7 +149,7 @@ export function showOrbitContextMenu(clientX, clientY, data, canvas) {
                 return;
             }
 
-            // 0.3.0 提交5：定点加速三项（目标点/远点/近点）——统一走 timeWarp.warpToTime
+            // 0.2.4 提交5：定点加速三项（目标点/远点/近点）——统一走 timeWarp.warpToTime
             let targetTime = null;
             let targetLabel = null;
             if (item.action === 'warpToPoint') {

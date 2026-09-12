@@ -1,6 +1,6 @@
 'use strict';
 
-// 轨道点类型注册表（0.3.0）— 数据驱动：轨道标签/菜单的类型定义统一入库
+// 轨道点类型注册表（0.2.4）— 数据驱动：轨道标签/菜单的类型定义统一入库
 // 约定：
 //   id           类型 id（与 markers[].type / hoveredMarker.type 对应）
 //   icon         锚点/标签图标字符（可空，空则只画圆点）
@@ -34,7 +34,7 @@ export const ORBIT_POINT_TYPES = {
         contextMenu: false,
         labelStyle: { side: 'outside' }
     },
-    // SOI 穿越标签（0.3.0）：段尾=离开、段头=进入；青蓝系呼应 SOI 边界圆
+    // SOI 穿越标签（0.2.4）：段尾=离开、段头=进入；青蓝系呼应 SOI 边界圆
     soi_exit: {
         id: 'soi_exit',
         icon: null,
@@ -53,7 +53,7 @@ export const ORBIT_POINT_TYPES = {
         contextMenu: false,
         labelStyle: { side: 'outside' }
     },
-    // 机动节点燃料耗尽点（0.3.0）：节点 Δv 超出飞船能力时真实燃烧段的终点；
+    // 机动节点燃料耗尽点（0.2.5）：节点 Δv 超出飞船能力时真实燃烧段的终点；
     // 收起态图标 ❌，展开显示"燃料耗尽点"全称
     fuelOut: {
         id: 'fuelOut',

@@ -37,7 +37,7 @@ import './src/ui/flightUI.js';
 import './src/ui/shipDestroyedUI.js';
 // 玩家资源 HUD（0.2.0 阶段4）— 右上角常驻模式 + 材料套装/科技点显示
 import './src/ui/resourceHUD.js';
-// 飞行状态 HUD（0.3.0）— 右下角燃料卡 + 总 ΔV 卡
+// 飞行状态 HUD（0.2.4）— 右下角燃料卡 + 总 ΔV 卡
 import './src/ui/shipStatusUI.js';
 // 图形系统 - 纹理管理器
 import { textureManager } from './src/graphics/textureManager.js';

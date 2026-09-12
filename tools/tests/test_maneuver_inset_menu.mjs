@@ -53,7 +53,7 @@ check('M13 文案 mvp.createNode = 创建机动节点',
     /'mvp\.createNode': '创建机动节点'/.test(strings));
 check('M14 文案 mvp.menuTitleSuffix 存在', /'mvp\.menuTitleSuffix':/.test(strings));
 
-// —— ⑤ 悬停反馈（0.3.0）：指针图标 + HUD 悬停标记
+// —— ⑤ 悬停反馈（0.2.5）：指针图标 + HUD 悬停标记
 check('M15 悬停指针：手柄/节点 = grab，轨道 = pointer，其余 default',
     /cursor = 'grab'/.test(src) && /cursor = 'pointer'/.test(src) && /let cursor = 'default'/.test(src));
 check('M16 拖拽中指针变 grabbing，离开画布复位 default',

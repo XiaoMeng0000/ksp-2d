@@ -25,7 +25,7 @@ function clamp(value, min, max) {
     return value;
 }
 
-// 多面板并存(0.3.0):参与错位判断的浮层选择器 — 两大主面板 + 所有工具栏页面面板(.tkp-page)。
+// 多面板并存(0.2.4):参与错位判断的浮层选择器 — 两大主面板 + 所有工具栏页面面板(.tkp-page)。
 // 各浮层默认位相同,同开时需按遮挡情况错位,保证新面板不被其它面板完全盖住(永远露出可抓边缘)
 const DEFAULT_CASCADE_SELECTORS = ['#shipBuilderPanel', '#facilityDeployPanel', '.tkp-page'];
 const CASCADE_STEP = 40;   // 每次尝试错位增量(px,向右下)
@@ -109,7 +109,7 @@ export function makePanelDraggable(panelEl, handleEl) {
     handleEl.addEventListener('pointerdown', onPointerDown);
 }
 
-// 面板打开时的错位放置(0.3.0 多面板并存):
+// 面板打开时的错位放置(0.2.4 多面板并存):
 // 若该面板从未被拖动过(无内联 left/top)且已有其它浮层面板可见,则把
 // 当前位置(即 CSS 默认位)向右下逐步错位,直到新面板不被任何一个已可见
 // 面板完全盖住(留出可抓/可辨的边缘),避免相同默认位导致完全重叠。

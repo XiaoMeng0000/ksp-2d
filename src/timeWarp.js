@@ -33,7 +33,7 @@ class TimeWarp {
         this._index = WARP_RATES.indexOf(1);      // 默认 1x
         this._savedIndex = this._index;           // 大圆按钮暂停前档位
         this._maxIndex = WARP_RATES.length - 1;   // 档位上限（由场景每帧设置）
-        this._warpTarget = null;                  // 定点加速目标 { time, onArrive }（0.3.0）
+        this._warpTarget = null;                  // 定点加速目标 { time, onArrive }（0.2.4）
         this._initKeyListener();
     }
 
@@ -204,7 +204,7 @@ class TimeWarp {
         }
     }
 
-    // === 目标时刻加速（0.3.0 决策 1B 实现：定点时间加速） ===
+    // === 目标时刻加速（0.2.4 决策 1B 实现：定点时间加速） ===
 
     /**
      * 设定定点时间加速目标（轨道菜单"时间加速至目标点"入口）

@@ -1,6 +1,6 @@
 'use strict';
 
-// 机动节点系统（0.3.0）— 节点生命周期 + 手动燃烧进度跟踪（单例）
+// 机动节点系统（0.2.5）— 节点生命周期 + 手动燃烧进度跟踪（单例）
 // 职责边界：
 //   - 节点数据操作（创建/删除/编辑 Δv/时间）——写入 ship.maneuverNodes
 //   - 每帧 update：到达检测（MANEUVER_ARRIVED）、手动燃烧冲量累计、完成判定（MANEUVER_COMPLETED）
@@ -69,10 +69,10 @@ class ManeuverSystem {
             relX: (data.relX !== null && data.relX !== undefined) ? data.relX : null,
             relY: (data.relY !== null && data.relY !== undefined) ? data.relY : null,
             anchorBody: data.anchorBody || null,
-            // 节点时刻速度快照（host 局部系，0.3.0 打磨）：节点时刻已过/链外时重建预测状态
+            // 节点时刻速度快照（host 局部系，0.2.5 打磨）：节点时刻已过/链外时重建预测状态
             relVelX: (data.velRel && isFinite(data.velRel.x)) ? data.velRel.x : null,
             relVelY: (data.velRel && isFinite(data.velRel.y)) ? data.velRel.y : null,
-            // 节点时刻质量快照（0.3.0 "燃烧期预测漂移"修复）：
+            // 节点时刻质量快照（0.2.5 "燃烧期预测漂移"修复）：
             // 计划锚定节点时刻的飞船质量——点火燃烧后当前质量逐帧下降，
             // 若计划读取当前质量会每帧漂移（dvMax/燃烧时长/虚拟段逐帧变化）。
             // 旧存档无快照时 computePlan 回退当前质量（向后兼容）。
@@ -98,7 +98,7 @@ class ManeuverSystem {
 
     // 沿节点参考系轴增减 Δv（方向手柄拖拽）：axisKey ∈ pro|retro|radIn|radOut，
     // axes = 预测 plan.axes（节点时刻轨道系单位向量）；编辑即重置进度
-    // 方案B（0.3.0）：写的是**分量**（dvPro/dvRadial），再按当前参考系轴重建世界矢量——
+    // 方案B（0.2.5）：写的是**分量**（dvPro/dvRadial），再按当前参考系轴重建世界矢量——
     // 节点拖到新位置后分量不变、方向随新位置旋转。
     updateNodeDeltaV(ship, axisKey, deltaMs, axes) {
         const node = this.getNode(ship);
@@ -116,7 +116,7 @@ class ManeuverSystem {
         return true;
     }
 
-    // 编辑即"重新进入计划态"（0.3.0 打磨）：
+    // 编辑即"重新进入计划态"（0.2.5 打磨）：
     // 完成（executed）后节点与预测轨迹常驻，玩家可继续拖手柄/拖位置来规划修正燃烧
     // （烧过头"拐回来"）；编辑后 executed 复位、进度冲量归零；
     // 若节点时刻已过，则不重复弹到达提醒。
@@ -141,7 +141,7 @@ class ManeuverSystem {
 
     // 沿轨道拖动改节点时刻（data: { time, relX, relY, anchorBody, velRel? }；
     // velRel 可选——拖动命中链内时由调用方经 walkToTime 给出速度快照）
-    // 方案B（0.3.0）：拖拽前按**旧快照参考系**迁移分量，拖拽后按**新快照参考系**重建世界矢量
+    // 方案B（0.2.5）：拖拽前按**旧快照参考系**迁移分量，拖拽后按**新快照参考系**重建世界矢量
     // → 节点从 A 拖到 B 时，"顺向 100 m/s"自动变为 B 点的顺向（而不是停留在 A 点方向）。
     updateNodeTime(ship, data) {
         const node = this.getNode(ship);
@@ -170,7 +170,7 @@ class ManeuverSystem {
     }
 
     /**
-     * 纯时间编辑（0.3.0 规划面板：改节点时间 / 按周期平移）：
+     * 纯时间编辑（0.2.5 规划面板：改节点时间 / 按周期平移）：
      * 用节点冻结快照的 Kepler 轨道**解析传播**到 newTime（可跨任意多圈，不依赖预测链），
      * 刷新位置/速度快照并按新参考系重建 Δv 世界矢量（分量不变）。
      * @param {Object} ship

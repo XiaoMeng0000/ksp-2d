@@ -20,7 +20,7 @@ const POLL_INTERVAL = 1000;
 
 const hudEl = document.createElement('div');
 hudEl.id = 'playerResourceHud';
-// 0.3.0：内容放入子容器，hudEl 自身可被其他模块追加元素（可见性筛选按钮挂尾端），
+// 0.2.4：内容放入子容器，hudEl 自身可被其他模块追加元素（可见性筛选按钮挂尾端），
 // renderHud 只重写内容容器，避免 innerHTML 整体重写清掉追加元素
 const contentEl = document.createElement('div');
 contentEl.id = 'prhContent';

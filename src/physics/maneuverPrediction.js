@@ -1,6 +1,6 @@
 'use strict';
 
-// 机动节点预测引擎（0.3.0）— 纯函数模块，无内部状态
+// 机动节点预测引擎（0.2.5）— 纯函数模块，无内部状态
 // 链路：沿当前预测链时间寻址 t_node 状态 → 两段式燃烧弧积分（动态质量真实段
 // + 燃料耗尽后恒定加速度虚拟续烧段）→ patchedStep 拼接机动后轨道
 // 与渲染层/交互层解耦：renderer 每帧调用并缓存结果，UI 只读缓存
@@ -162,7 +162,7 @@ export function planBurnArc(relPos, relVel, host, params, startTime) {
     return result;
 }
 
-// ===== 节点 Δv 的轨道参考系分量 ↔ 世界矢量互转（0.3.0 方案B：分量 = 唯一真值）=====
+// ===== 节点 Δv 的轨道参考系分量 ↔ 世界矢量互转（0.2.5 方案B：分量 = 唯一真值）=====
 // 分量定义：dvPro（+顺向 / −逆向）、dvRadial（+径向朝外 / −径向朝内）
 // 语义：Δv 以"节点时刻轨道参考系"的分量存储；节点被拖到新位置后分量不变、
 //       参考系随新位置旋转 → 世界矢量自动变为"新位置的顺向/径向"
@@ -205,7 +205,7 @@ export function computePlan(ship, node, baseSegments) {
     const dvMag = Math.hypot(node.deltaV.x, node.deltaV.y) || 0;
     const maxThrust = ship.maxThrust || 0;
     const isp = ship.isp || 0;
-    // 质量参数（0.3.0 "燃烧期预测漂移"修复）：优先用节点时刻质量快照——
+    // 质量参数（0.2.5 "燃烧期预测漂移"修复）：优先用节点时刻质量快照——
     // 点火燃烧后当前质量逐帧下降，若读当前值，dvMax/燃烧时长/虚拟段会每帧漂移；
     // 旧存档无快照时回退当前质量（向后兼容）。
     const mWet = (isFinite(node.massWet) && node.massWet > 0)
@@ -235,7 +235,7 @@ export function computePlan(ship, node, baseSegments) {
         segments: []
     };
 
-    // 节点状态获取（0.3.0 修复"燃烧后节点整体跳变"）：
+    // 节点状态获取（0.2.5 修复"燃烧后节点整体跳变"）：
     //   · 冻结快照（创建/拖动时保存的 relX/relY/relVelX/relVelY + anchorBody）**优先**——
     //     节点位置锁定在规划点（相对宿主固定），燃烧开始后轨道改变也不漂移；
     //   · 无快照（旧存档/控制台裸建节点）→ 沿当前预测链 walk（节点时刻已过则重建）。
@@ -263,7 +263,7 @@ export function computePlan(ship, node, baseSegments) {
     if (!nodeState) return plan;
     plan.axes = computeNodeAxes(nodeState.relPos, nodeState.relVel);
 
-    // 方案B（0.3.0）：分量 = 唯一真值 —— 先迁移旧节点分量（世界矢量反投影一次），
+    // 方案B（0.2.5）：分量 = 唯一真值 —— 先迁移旧节点分量（世界矢量反投影一次），
     // 再由分量 + 当前参考系轴重建世界矢量（节点被拖到新位置后方向随之旋转）
     syncComponentsFromDeltaV(node, plan.axes);
     rebuildDeltaVFromComponents(node, plan.axes);
@@ -324,7 +324,7 @@ export function predictManeuverTrajectories(ship, node, baseSegments) {
     };
 }
 
-// 机动节点两态方向（0.3.0 SAS 节点指向 / 导航球机动标记）：
+// 机动节点两态方向（0.2.5 SAS 节点指向 / 导航球机动标记）：
 //   过节点前（now < node.time）：恒为节点加速方向（节点 Δv 方向，host 局部系 = 世界向）
 //   过节点后（now >= node.time）：若想达到目标（机动后）轨道的当前燃烧方向——
 //     在"当前位置空间角"处取目标轨道的速度矢量，与当前速度差 = 所需速度增量方向，
@@ -377,7 +377,7 @@ export function computeManeuverDirection(ship, pred, now) {
     return Math.atan2(dvx, dvy);
 }
 
-// ===== 节点"纯时间编辑"支撑（0.3.0 规划面板：改时间 / 按周期平移）=====
+// ===== 节点"纯时间编辑"支撑（0.2.5 规划面板：改时间 / 按周期平移）=====
 
 /**
  * 节点所在轨道周期（秒）：由节点冻结快照的 Kepler 根数解析求解 2π√(a³/gm)；
