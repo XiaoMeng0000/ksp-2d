@@ -38,6 +38,17 @@ let _focusOpen = false;     // 聚焦下拉是否展开
 let _focusSig = '';         // 聚焦列表内容签名（层级+名称+当前聚焦）——未变化则不重建
 let _lastTickTs = 0;        // 速率制 Δv 累积用的上一帧时间戳
 
+// ===== 性能相关缓存（0.3.0：Kerbolar 系（天体多/轨道大）机动视图掉帧优化）=====
+// ① 放大图重绘与读数刷新节流（30fps 足够；速率制 Δv 累积仍逐帧执行，不受影响）
+// ② 布局矩形缓存（getBoundingClientRect 会强制重排，逐帧读取代价高）
+// ③ 读数文本去重（innerHTML 赋值较贵，值未变则不写）
+let _lastHeavyTs = 0;       // 上次重绘放大图/刷新读数的时间戳
+let _rectCache = { t: 0, canvas: null, bar: null, card: null, scaleK: 1 };
+let _readoutCache = { tl: '', tr: '', bl: '', br: '' };
+let _refCache = { segs: null, hostName: null, R: 0 };
+const HEAVY_INTERVAL_MS = 33;    // 放大图/读数刷新间隔（≈30fps）
+const RECT_TTL_MS = 300;         // 布局矩形缓存有效期
+
 // 步进档位（可后续挪配置；当前为面板专用）
 const DV_STEP = 0.1;        // 四向 Δv 步进（m/s）
 const TIME_STEP_BIG = 10;   // 节点时刻大步进（秒）
@@ -48,6 +59,27 @@ function el(tag, cls, text) {
     if (cls) e.className = cls;
     if (text !== undefined) e.textContent = text;
     return e;
+}
+
+// 布局矩形缓存（避免逐帧 getBoundingClientRect 强制重排）；窗口尺寸变化时失效
+function getRects(force) {
+    const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    if (!force && _rectCache.canvas && (now - _rectCache.t) < RECT_TTL_MS) return _rectCache;
+    const cardEl = _panel ? _panel.querySelector('.maneuver-card') : null;
+    const barEl = _panel ? _panel.querySelector('.maneuver-bar-wrap') : null;
+    const cvRect = _insetCanvas ? _insetCanvas.getBoundingClientRect() : null;
+    _rectCache = {
+        t: now,
+        canvas: cvRect,
+        bar: barEl ? barEl.getBoundingClientRect() : null,
+        card: cardEl ? cardEl.getBoundingClientRect() : null,
+        scaleK: cvRect ? Math.max(0.5, Math.min(1, Math.min(cvRect.width, cvRect.height) / 400)) : 1
+    };
+    return _rectCache;
+}
+
+if (typeof window !== 'undefined') {
+    window.addEventListener('resize', () => { _rectCache.canvas = null; });
 }
 
 // ===== DOM 构建（懒初始化） =====
@@ -336,13 +368,11 @@ function onInsetPointerUp() {
     _drag = null;
 }
 
-// 放大图内的手柄视觉比例：主视图手柄参数（偏移 51 / 拖拽范围 153px）是按整屏尺度定的，
-// 在数百像素的放大图里按同比例缩放（k），使"拖到最大位置 = 最大注入速率"的手感一致
+// 放大图内的手柄视觉比例（k）：按放大图尺寸等比缩放，使"拖到最大位置 = 最大注入速率"的手感一致
+// 用布局矩形缓存（拖拽期间逐帧调用，避免 getBoundingClientRect 强制重排）
 function insetHandleScale() {
     if (!_insetCanvas) return 1;
-    const r = _insetCanvas.getBoundingClientRect();
-    const side = Math.min(r.width, r.height);
-    return Math.max(0.5, Math.min(1, side / 400));
+    return getRects().scaleK;
 }
 
 // 速率制 Δv 累积（每帧调用）：与主视图手柄同一公式，范围取放大图专用短范围
@@ -425,11 +455,18 @@ export function updateManeuverViewPanel(canvas, ship) {
     }
     _panel.style.display = 'flex';
 
-    // 速率制手柄 Δv 累积（帧 dt；与主视图同源语义）
+    // 速率制手柄 Δv 累积（必须逐帧：与时间相关的注入，节流会影响手感）
     const nowTs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
     const dtReal = _lastTickTs ? Math.min(0.1, (nowTs - _lastTickTs) / 1000) : 0;
     _lastTickTs = nowTs;
     if (ship) accumulateHandleDv(ship, dtReal);
+
+    // 放大图重绘 / 读数刷新节流到 ~30fps（Kerbolar 系天体多时显著省帧；视觉无差别）
+    const heavyDue = (nowTs - _lastHeavyTs) >= HEAVY_INTERVAL_MS;
+    if (heavyDue) _lastHeavyTs = nowTs;
+    // 聚焦下拉展开时必须每帧刷新（需要响应当前选择），其余情况跟随节流
+    refreshFocusList(heavyDue || _focusOpen);
+    if (!heavyDue) return;
 
     const now = getCachedTime();
     const node = maneuverSystem.getNode(ship);
@@ -437,8 +474,9 @@ export function updateManeuverViewPanel(canvas, ship) {
     const plan = pred && pred.plan ? pred.plan : null;
 
     // —— 聚焦天体下拉（数据驱动：当前星系全部天体，层级缩进）
-    _els.focusName.textContent = flightView.getFocusName() || '--';
-    refreshFocusList();
+    const focusNameText = flightView.getFocusName() || '--';
+    if (_els.focusName.textContent !== focusNameText) _els.focusName.textContent = focusNameText;
+    refreshFocusList(true);
 
     // —— 四向 Δv 读数（两个有符号分量 → 四行显示）
     const dvPro = node && isFinite(node.dvPro) ? node.dvPro : 0;
@@ -476,14 +514,18 @@ export function updateManeuverViewPanel(canvas, ship) {
 }
 
 // 聚焦列表（展开时刷新；**内容签名未变则不重建**，避免每帧换元素导致真实点击丢失）
-function refreshFocusList() {
+// shouldRefresh=false 时仅同步显隐（节流帧不重建）
+function refreshFocusList(shouldRefresh) {
     const list = _els.focusList;
     if (!list) return;
-    list.style.display = _focusOpen ? 'block' : 'none';
-    if (!_focusOpen) {
+    const visible = _focusOpen;
+    const want = visible ? 'block' : 'none';
+    if (list.style.display !== want) list.style.display = want;
+    if (!visible) {
         _focusSig = '';          // 关闭时清签名 → 下次展开必定重建（保证内容最新）
         return;
     }
+    if (!shouldRefresh) return;
 
     const targets = flightView.getTargets();
     if (!targets || targets.length === 0) {
@@ -519,12 +561,12 @@ function formatFit(m) {
 }
 
 // ===== 放大图绘制 =====
-// 动态缩放：R = 当前轨道在 SOI 内的最大半径；逃逸/超 SOI → R = SOI 半径；
-// 轨道直径映射到绘图区边长（板块面积 3/4 → 边长 86.6%）；内容按 SOI 截断
+// 动态缩放：R = 当前轨道在 SOI 内的最大半径（缓存，链对象不变则复用）；逃逸/超 SOI → R = SOI 半径；
+// 轨道直径映射到绘图区边长（板块面积 2/3 → 边长 81.6%）；内容按 SOI 截断
 function drawInset(canvas, ship, node, pred, now) {
     const cv = _insetCanvas;
     if (!cv) return;
-    const rect = cv.getBoundingClientRect();
+    const rect = getRects().canvas || cv.getBoundingClientRect();
     const cssW = Math.max(60, Math.round(rect.width));
     const cssH = Math.max(60, Math.round(rect.height));
     const dpr = window.devicePixelRatio || 1;
@@ -583,12 +625,12 @@ function drawInset(canvas, ship, node, pred, now) {
     // 当前轨道（实线）
     drawSegments(ctx, segs, geom, {
         stroke: 'rgba(61,255,61,0.85)', lineWidth: 1.4, dash: null
-    }, host);
-    // 燃烧弧（亮绿加粗）+ 机动后轨道（虚线）
+    }, host, cssW, cssH);
+    // 燃烧弧（亮绿加粗）+ 机动后轨道（虚线，超长自动降级实线）
     if (pred && pred.burnArc) {
-        drawSegments(ctx, [pred.burnArc], geom, { stroke: '#3dff3d', lineWidth: 2.6, dash: null }, host);
+        drawSegments(ctx, [pred.burnArc], geom, { stroke: '#3dff3d', lineWidth: 2.6, dash: null }, host, cssW, cssH);
     }
-    drawSegments(ctx, postSegs, geom, { stroke: 'rgba(61,255,61,0.75)', lineWidth: 1.2, dash: [7, 5] }, host);
+    drawSegments(ctx, postSegs, geom, { stroke: 'rgba(61,255,61,0.75)', lineWidth: 1.2, dash: [7, 5] }, host, cssW, cssH);
     ctx.restore();
 
     // —— 宿主天体：中心空心圆（双环）
@@ -676,14 +718,22 @@ function drawInset(canvas, ship, node, pred, now) {
         ctx.beginPath(); ctx.arc(np.x, np.y, 8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     }
 
-    // —— 装饰读数
+    // —— 装饰读数（文本去重：值未变不写 DOM）
     const progress = ship ? maneuverSystem.getProgress(ship) : null;
     const alt = Math.hypot(ship ? ship.pos.x : 0, ship ? ship.pos.y : 0) - (host.radius || 0);
-    _els.readoutTL.innerHTML = 'SOI <b>' + host.name.toUpperCase() + '</b><br>R <b>' + formatFit(host.soiRadius) + '</b>';
-    _els.readoutTR.innerHTML = 'ALT <b>' + formatFit(alt) + '</b><br>VEL <b>' + Math.round(Math.hypot(ship ? ship.vel.x : 0, ship ? ship.vel.y : 0)) + ' m/s</b>';
-    _els.readoutBL.innerHTML = 'REF R <b>' + formatFit(R) + '</b><br>SCALE <b>' + (scale * 1000).toFixed(3) + '</b>';
-    _els.readoutBR.innerHTML = 'ΔV <b>' + (progress ? progress.planned.toFixed(1) : '0.0') + ' m/s</b><br>T− <b>'
-        + (node ? formatTCountdown(Math.max(0, node.time - now)) : '--') + '</b>';
+    setReadout('tl', 'SOI <b>' + host.name.toUpperCase() + '</b><br>R <b>' + formatFit(host.soiRadius) + '</b>');
+    setReadout('tr', 'ALT <b>' + formatFit(alt) + '</b><br>VEL <b>' + Math.round(Math.hypot(ship ? ship.vel.x : 0, ship ? ship.vel.y : 0)) + ' m/s</b>');
+    setReadout('bl', 'REF R <b>' + formatFit(R) + '</b><br>SCALE <b>' + (scale * 1000).toFixed(3) + '</b>');
+    setReadout('br', 'ΔV <b>' + (progress ? progress.planned.toFixed(1) : '0.0') + ' m/s</b><br>T− <b>'
+        + (node ? formatTCountdown(Math.max(0, node.time - now)) : '--') + '</b>');
+}
+
+// 读数写入（值未变则跳过 DOM 写入）
+function setReadout(key, html) {
+    if (_readoutCache[key] === html) return;
+    _readoutCache[key] = html;
+    const e = _els['readout' + key.toUpperCase()];
+    if (e) e.innerHTML = html;
 }
 
 function plan_segments(pred) {
@@ -711,7 +761,9 @@ function segmentPointsInHostFrame(seg, host) {
 }
 
 // 参照半径：当前轨道（基础预测链，换算到宿主系）在 SOI 内的最大半径；逃逸/超 SOI/无数据 → SOI 半径
+// 结果按"链对象引用 + 宿主名"缓存（链未变则不重算，Kerbolar 系点数多时显著省帧）
 function referenceRadius(segs, host) {
+    if (_refCache.segs === segs && _refCache.hostName === host.name) return _refCache.R;
     let maxR = 0;
     for (const seg of segs) {
         const pts = segmentPointsInHostFrame(seg, host);
@@ -721,27 +773,80 @@ function referenceRadius(segs, host) {
             if (r > maxR) maxR = r;
         }
     }
-    if (!(maxR > 0)) return host.soiRadius;
-    if (maxR > host.soiRadius) return host.soiRadius;   // 逃逸/超 SOI → 极限缩到 SOI 程度
-    return maxR;
+    const R = (!(maxR > 0) || maxR > host.soiRadius) ? host.soiRadius : maxR;
+    _refCache = { segs, hostName: host.name, R };
+    return R;
 }
 
-function drawSegments(ctx, segs, geom, style, host) {
+// 屏幕空间抽稀 + 可视区裁剪描边（0.3.0 性能）：
+//   · 抽稀：相邻点间距 < minPx 时跳过（密集链在放大图里本就是亚像素，无视觉损失）
+//   · 裁剪：只描"与画布相交"的子段（逃逸/跨系链在放大图里可达数万像素，
+//     整条交给光栅器 + 虚线展开代价高）；每段两端各带一个界外点保证穿边不断
+//   · 超长路径降级实线：路径长 > DASH_MAX_PATH_PX 时忽略虚线（段数有界）
+const DASH_MAX_PATH_PX = 4000;
+
+function drawPolyline(ctx, pts, geom, minPx, cssW, cssH, dashed) {
+    const margin = 24;
+    const inside = (p) => p.x >= -margin && p.x <= cssW + margin && p.y >= -margin && p.y <= cssH + margin;
+
+    // 抽稀后转屏幕坐标
+    const sp = [];
+    let lastX = NaN;
+    let lastY = NaN;
+    const min2 = minPx * minPx;
+    for (let i = 0; i < pts.length; i++) {
+        const p = insetPoint(pts[i], geom);
+        const first = sp.length === 0;
+        const last = i === pts.length - 1;
+        if (!first && !last) {
+            const dx = p.x - lastX;
+            const dy = p.y - lastY;
+            if (dx * dx + dy * dy < min2) continue;
+        }
+        sp.push(p);
+        lastX = p.x;
+        lastY = p.y;
+    }
+    if (sp.length < 2) return;
+
+    // 按可视区切成子段
+    let run = [];
+    const flush = (arr) => {
+        if (arr.length < 2) return;
+        // 路径长度（用于虚线降级判断）
+        let len = 0;
+        for (let i = 1; i < arr.length; i++) len += Math.hypot(arr[i].x - arr[i - 1].x, arr[i].y - arr[i - 1].y);
+        const useDash = dashed && len <= DASH_MAX_PATH_PX;
+        ctx.setLineDash(useDash ? [7, 5] : []);
+        ctx.beginPath();
+        ctx.moveTo(arr[0].x, arr[0].y);
+        for (let i = 1; i < arr.length; i++) ctx.lineTo(arr[i].x, arr[i].y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+    };
+
+    for (let i = 0; i < sp.length; i++) {
+        const ins = inside(sp[i]);
+        if (ins && run.length === 0 && i > 0) run.push(sp[i - 1]);   // 带上界外前一点
+        if (ins) run.push(sp[i]);
+        if (!ins && run.length > 0) {
+            run.push(sp[i]);                                          // 带上界外后一点
+            flush(run);
+            run = [];
+        }
+    }
+    if (run.length > 0) flush(run);
+}
+
+function drawSegments(ctx, segs, geom, style, host, cssW, cssH) {
     if (!segs || segs.length === 0) return;
     ctx.strokeStyle = style.stroke;
     ctx.lineWidth = style.lineWidth;
-    ctx.setLineDash(style.dash || []);
+    const dashed = !!(style.dash && style.dash.length);
     for (const seg of segs) {
         const pts = segmentPointsInHostFrame(seg, host);
         if (!pts || pts.length < 2) continue;
-        ctx.beginPath();
-        const p0 = insetPoint(pts[0], geom);
-        ctx.moveTo(p0.x, p0.y);
-        for (let i = 1; i < pts.length; i++) {
-            const p = insetPoint(pts[i], geom);
-            ctx.lineTo(p.x, p.y);
-        }
-        ctx.stroke();
+        drawPolyline(ctx, pts, geom, 0.9, cssW, cssH, dashed);
     }
     ctx.setLineDash([]);
 }

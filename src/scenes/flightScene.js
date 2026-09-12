@@ -1,5 +1,5 @@
 import { shipSystem } from '../ship/shipSystem.js';
-import { camera, screenToWorld, cssToCanvas, worldToScreen } from '../camera.js';
+import { camera, screenToWorld, cssToCanvas, worldToScreen, updateCameraAnimation } from '../camera.js';
 import { inputManager } from '../input.js';
 import { eventBus, Events } from '../eventBus.js';
 import { updateShipPhysics } from '../physics/physicsUpdate.js';
@@ -1039,13 +1039,16 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             }
 
             // 相机跟随活动飞船，无活动飞船且选中设施时跟随设施
-            if (activeShip) {
+            // 0.3.0：过渡动画进行中由动画独占相机（跳过跟随与视图接管写值，保证平滑）
+            const cameraAnimating = updateCameraAnimation(
+                (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now());
+            if (activeShip && !cameraAnimating) {
                 const shipAbs = getAbsolutePosition(activeShip);
                 camera.x = shipAbs.x;
                 camera.y = shipAbs.y;
                 _activeFacilityId = null;
                 gameState.setState({ activeFacilityId: null });
-            } else if (_activeFacilityId) {
+            } else if (_activeFacilityId && !cameraAnimating) {
                 const focusedFacility = facilitySystem.getFacility(_activeFacilityId);
                 if (focusedFacility) {
                     const facAbsPos = getAbsolutePosition(focusedFacility);

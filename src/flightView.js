@@ -12,7 +12,7 @@
 //   · 可用性：只要有活动飞船即可用（无活动飞船时不可用）
 //   · 机动视图内时间加速不受限；滚轮始终作用于相机缩放（含面板区域）
 
-import { camera, setZoomLimits, setZoom } from './camera.js';
+import { camera, setZoomLimits, setZoom, animateCameraTo, isCameraAnimating, cancelCameraAnimation } from './camera.js';
 import { VIEW_IDS, VIEW_CONFIG } from './config/viewConfig.js';
 import { celestialBodies, getSOIHost, getAbsolutePosition } from './physics/physics.js';
 
@@ -119,6 +119,14 @@ function resolveHost(ship) {
     return getSOIHost(getAbsolutePosition(ship));
 }
 
+// 普通聚焦视图的相机目标 = 活动飞船绝对位置（无飞船 → null：退化为"只恢复缩放"不位移）
+function resolveFocusViewTarget(ship) {
+    if (!ship) return null;
+    const abs = getAbsolutePosition(ship);
+    if (!abs || !isFinite(abs.x) || !isFinite(abs.y)) return null;
+    return { x: abs.x, y: abs.y };
+}
+
 // 星系解析：宿主所属恒星；宿主缺失（深空）时取距飞船最近的恒星
 export function resolveCurrentStar(ship) {
     const host = resolveHost(ship);
@@ -175,13 +183,14 @@ class FlightView {
         return t ? t.fitRadius : 0;
     }
 
-    /** 场景重置：回默认视图 + 恢复普通视图缩放范围（不改缩放值本身） */
+    /** 场景重置：回默认视图 + 恢复普通视图缩放范围（不改缩放值本身；中止进行中的过渡动画） */
     reset() {
         this._view = VIEW_CONFIG.defaultView;
         this._targets = [];
         this._focusName = null;
         this._starName = null;
         this._prevZoom = null;
+        cancelCameraAnimation();
         setZoomLimits(VIEW_CONFIG.zoomMin, VIEW_CONFIG.zoomMaxFocus);
     }
 
@@ -191,7 +200,7 @@ class FlightView {
      */
     cycleView(ship, canvas) {
         if (this.isManeuver()) {
-            this.exitManeuver();
+            this.exitManeuver(ship, canvas);
             return { view: this._view, changed: true, reason: 'ok' };
         }
         if (!isManeuverAvailable(ship)) {
@@ -201,7 +210,7 @@ class FlightView {
         return { view: this._view, changed: true, reason: 'ok' };
     }
 
-    /** 进入机动视图：缓存当前缩放 → 默认聚焦恒星 → 缩放初值 = 上限 */
+    /** 进入机动视图：缓存当前缩放 → 默认聚焦恒星 → **平滑过渡**到该天体（位置 + 缩放） */
     enterManeuver(ship, canvas) {
         const star = resolveCurrentStar(ship);
         if (!star) return false;
@@ -216,21 +225,34 @@ class FlightView {
         return true;
     }
 
-    /** 切回普通聚焦视图：恢复进入前的缩放 + 普通视图缩放范围 */
-    exitManeuver() {
+    /**
+     * 切回普通聚焦视图：**平滑移动回飞船**并恢复进入前的缩放（0.3.0 平滑过渡）
+     * @param {Object} [ship] - 活动飞船；缺省/不存在时仅恢复缩放，不做位移动画
+     * @param {Object} [canvas]
+     */
+    exitManeuver(ship, canvas) {
         this._view = VIEW_IDS.FOCUS;
         this._targets = [];
         this._focusName = null;
         this._starName = null;
-        setZoomLimits(VIEW_CONFIG.zoomMin, VIEW_CONFIG.zoomMaxFocus);
-        if (this._prevZoom !== null) {
-            setZoom(this._prevZoom);
-        }
+        const restoreZoom = (this._prevZoom !== null) ? this._prevZoom : camera.zoom;
         this._prevZoom = null;
+
+        const target = resolveFocusViewTarget(ship);
+        if (target) {
+            // 先启动动画（目标动态提供：飞船持续运动也能准确落点），再恢复普通视图缩放范围——
+            // 顺序同 _applyFocus：先动画后设限，避免设限瞬间把当前缩放硬夹一次
+            animateCameraTo(() => ({ x: target.x, y: target.y, zoom: restoreZoom }), VIEW_CONFIG.transitionMs);
+            setZoomLimits(VIEW_CONFIG.zoomMin, VIEW_CONFIG.zoomMaxFocus);
+        } else {
+            cancelCameraAnimation();
+            setZoomLimits(VIEW_CONFIG.zoomMin, VIEW_CONFIG.zoomMaxFocus);
+            setZoom(restoreZoom);
+        }
     }
 
     /**
-     * 切换聚焦天体（下拉菜单调用）：缩放重置为新上限（总监定稿）
+     * 切换聚焦天体（下拉菜单调用）：**平滑移动**到目标天体 + **平滑缩放**到其上限（0.3.0）
      * @param {string} name - 天体名
      */
     setFocusByName(name, canvas) {
@@ -247,15 +269,27 @@ class FlightView {
         return t ? this.setFocusByName(t.body.name, canvas) : false;
     }
 
-    /** 相机落到当前聚焦天体；resetZoom=true 时把缩放设为该天体的上限 */
+    /**
+     * 相机过渡到当前聚焦天体（0.3.0：改为**平滑动画**，不再瞬移）
+     * · 位置：目标天体位置每帧动态读取（天体公转中也能精确落点）
+     * · 缩放：重置为该天体上限（resetZoom=true）或保持当前值；log 空间插值
+     * · 顺序很重要（0.3.0 修复"先突然缩小再动画"）：**必须先启动动画、再设缩放上限**——
+     *   setZoomLimits 在无动画进行时会立刻把当前缩放夹进新范围，若先设限就会硬跳一次
+     */
     _applyFocus(canvas, resetZoom) {
         const t = this._targets.find(x => x.body.name === this._focusName);
         if (!t) return;
         const cap = computeFitZoom(t.fitRadius, canvas);
-        camera.x = t.body.position.x;
-        camera.y = t.body.position.y;
+        const body = t.body;
+        const zoomTarget = resetZoom ? cap : camera.zoom;
+        // ① 先启动动画（进入动画态后，setZoomLimits 只记录不夹取）
+        animateCameraTo(() => ({
+            x: body.position.x,
+            y: body.position.y,
+            zoom: zoomTarget
+        }), VIEW_CONFIG.transitionMs);
+        // ② 再设置缩放上限（此时动画已接管相机，不会硬跳）
         setZoomLimits(VIEW_CONFIG.zoomMin, cap);
-        if (resetZoom) setZoom(cap);
     }
 
     /**
@@ -272,7 +306,7 @@ class FlightView {
         }
         const star = resolveCurrentStar(ship);
         if (!star) {
-            this.exitManeuver();
+            this.exitManeuver(ship, canvas);
             return false;
         }
         // 星系变化（跨星系/换船）→ 重算目标列表；原选中天体若不存在则回到恒星
@@ -292,10 +326,12 @@ class FlightView {
             return true;
         }
         // 相机聚焦所选天体；上限随屏尺寸刷新（放大不越界，缩小不限）
-        camera.x = t.body.position.x;
-        camera.y = t.body.position.y;
         const cap = computeFitZoom(t.fitRadius, canvas);
         setZoomLimits(VIEW_CONFIG.zoomMin, cap);
+        // 过渡动画进行中：相机由动画独占驱动（不在此处写值，否则会打断平滑移动）
+        if (isCameraAnimating()) return true;
+        camera.x = t.body.position.x;
+        camera.y = t.body.position.y;
         if (camera.zoom > cap) setZoom(cap);
         return true;
     }

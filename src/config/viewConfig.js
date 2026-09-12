@@ -32,5 +32,8 @@ export const VIEW_CONFIG = {
     //   · 偏移/拖拽延伸按放大图尺寸等比缩放（k = clamp(边长/400, 0.5, 1)）
     //   · 手柄/拖拽一律夹在整个 HUD 面板边界内（不越出面板）
     insetHandleOffset: 26,       // 静止偏移（CSS px @k=1）
-    insetHandleDragRange: 64     // 最大拖拽延伸（CSS px @k=1）
+    insetHandleDragRange: 64,    // 最大拖拽延伸（CSS px @k=1）
+    // 相机平滑过渡时长（毫秒）：视图切换（普通聚焦 ↔ 轨道机动）与聚焦天体切换共用
+    // 0.3.0 打磨：700 → 1200（节奏偏快，加长并保留 easeInOutCubic 缓入缓出）
+    transitionMs: 1200
 };

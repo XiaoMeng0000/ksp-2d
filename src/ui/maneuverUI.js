@@ -57,6 +57,8 @@ let _tailSvg = null;        // 卡片下方自适应尖角（SVG 容器）
 let _tailBody = null;       // 尖角黑底本体（path）
 let _tailEdge = null;       // 尖角紫色斜边（polyline）
 let _tailLocalW = -1;       // 尖角 viewBox 宽度缓存（布局宽度变化才重设）
+let _tailRect = null;       // 尖角布局矩形缓存（避免逐帧 getBoundingClientRect 强制重排）
+let _warpHCache = null;     // 时间加速面板高度缓存（避免逐帧 offsetHeight 强制重排）
 const ARM = 7;              // 尖角两条边的水平跨度（自适应夹取基准）
 const TIP_Y = 9;            // 尖角尖端深度（相对卡片底边框）
 const CORNER_R = 6;         // 卡片倒角半径（与 .maneuver-card border-radius 一致）
@@ -444,8 +446,13 @@ export function updateManeuverUI(canvas, ship) {
 
     // ---- 面板（常驻：节点存在即显示；空白点击仅收起手柄编辑） ----
     // 锚定：时间加速面板（#timeWarpWrap bottom 12px 居中）正上方居中
+    // 0.3.0 性能：offsetHeight 是布局读取，逐帧读会强制重排 —— 缓存 300ms
     const warpWrap = document.getElementById('timeWarpWrap');
-    const warpH = warpWrap ? warpWrap.offsetHeight : 0;
+    const nowMs2 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    if (!_warpHCache || (nowMs2 - _warpHCache.t) > 300) {
+        _warpHCache = { t: nowMs2, h: warpWrap ? warpWrap.offsetHeight : 0 };
+    }
+    const warpH = _warpHCache.h;
     _panel.style.bottom = (12 + warpH + cfg.panelGap) + 'px';
     _panel.style.display = 'block';
     const rows = _panel.querySelectorAll('.maneuver-row');
@@ -488,8 +495,14 @@ export function updateManeuverUI(canvas, ship) {
     const cardEl = _panel.querySelector('.maneuver-card');
     const barEl = _panel.querySelector('.maneuver-bar-wrap');
     if (cardEl && barEl && _tailSvg && _tailBody && _tailEdge) {
-        const cardRect = cardEl.getBoundingClientRect();
-        const barRect = barEl.getBoundingClientRect();
+        // 布局矩形缓存（0.3.0 性能）：面板只在"有节点"时存在，逐帧 getBoundingClientRect
+        // 会在每帧 DOM 写入之后强制重排 —— 改为缓存，仅在过期/尺寸变化时重测
+        const nowMs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        if (!_tailRect || (nowMs - _tailRect.t) > 300) {
+            _tailRect = { t: nowMs, card: cardEl.getBoundingClientRect(), bar: barEl.getBoundingClientRect() };
+        }
+        const cardRect = _tailRect.card;
+        const barRect = _tailRect.bar;
         const localW = cardRect.width - 2;          // SVG 跨度 = 卡片内边距盒宽（左右各 1px 边框）
         if (localW > 20) {
             if (Math.abs(localW - _tailLocalW) > 0.5) {

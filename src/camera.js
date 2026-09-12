@@ -6,11 +6,12 @@ const camera = { x: 0, y: 0, zoom: 1e-4, rotation: 0 };
 let _zoomMin = 1e-12;
 let _zoomMax = 10;
 
-// 设置缩放上下限（视图切换时调用；会立即把当前缩放夹进新范围）
+// 设置缩放上下限（视图切换时调用；动画期间只记录不夹取当前值，
+// 否则切换瞬间会把当前缩放硬拉到新范围 → 破坏平滑过渡）
 function setZoomLimits(min, max) {
     _zoomMin = isFinite(min) ? min : 1e-12;
     _zoomMax = (isFinite(max) && max > _zoomMin) ? max : _zoomMin;
-    camera.zoom = Math.max(_zoomMin, Math.min(_zoomMax, camera.zoom));
+    if (!_anim) camera.zoom = Math.max(_zoomMin, Math.min(_zoomMax, camera.zoom));
 }
 
 function getZoomLimits() {
@@ -32,8 +33,64 @@ function setCameraRotation(angle) {
 
 function handleWheel(e) {
     e.preventDefault();
+    if (_anim) _anim = null;      // 玩家滚轮接管 → 立即中止进行中的过渡动画
     const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
     camera.zoom = Math.max(_zoomMin, Math.min(_zoomMax, camera.zoom * zoomFactor));
+}
+
+// ===== 相机平滑过渡动画（0.3.0）：视图切换 / 聚焦天体切换时平滑移动 + 平滑缩放 =====
+// · 目标由函数动态提供（可跟随正在公转的天体，落点始终准确）
+// · 缩放按 log 空间插值（跨数量级时观感均匀，而非前半段几乎不动、后半段猛冲）
+// · 与滚轮/场景跟随的协作：动画期间由动画独占写值；滚轮按下即中止动画交还玩家
+let _anim = null;
+
+function easeInOutCubic(t) {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+function animateCameraTo(getTarget, durationMs) {
+    if (typeof getTarget !== 'function') return;
+    const dur = (isFinite(durationMs) && durationMs > 0) ? durationMs : 1;
+    _anim = {
+        t0: (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now(),
+        dur,
+        fromX: camera.x,
+        fromY: camera.y,
+        fromZoom: camera.zoom,
+        getTarget
+    };
+}
+
+// 每帧推进动画；返回 true 表示本帧相机由动画驱动（调用方应跳过跟随/视图写值）
+function updateCameraAnimation(nowMs) {
+    if (!_anim) return false;
+    const now = isFinite(nowMs)
+        ? nowMs
+        : ((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now());
+    const p = Math.max(0, Math.min(1, (now - _anim.t0) / _anim.dur));
+    const e = easeInOutCubic(p);
+    const tgt = _anim.getTarget() || {};
+    if (isFinite(tgt.x)) camera.x = _anim.fromX + (tgt.x - _anim.fromX) * e;
+    if (isFinite(tgt.y)) camera.y = _anim.fromY + (tgt.y - _anim.fromY) * e;
+    if (isFinite(tgt.zoom) && tgt.zoom > 0) {
+        const z0 = Math.log(_anim.fromZoom);
+        const z1 = Math.log(tgt.zoom);
+        camera.zoom = Math.exp(z0 + (z1 - z0) * e);
+    }
+    if (p >= 1) {
+        _anim = null;
+        // 动画结束：把最终值夹回当前档位的缩放范围（保证不越界）
+        camera.zoom = Math.max(_zoomMin, Math.min(_zoomMax, camera.zoom));
+    }
+    return true;
+}
+
+function isCameraAnimating() {
+    return !!_anim;
+}
+
+function cancelCameraAnimation() {
+    _anim = null;
 }
 
 function initCamera() {
@@ -90,4 +147,4 @@ function canvasToCss(x, y, canvas) {
     return { x: x * sx, y: y * sy };
 }
 
-export { camera, initCamera, worldToScreen, screenToWorld, cssToCanvas, canvasToCss, setZoomLimits, getZoomLimits, setZoom, setCameraRotation };
+export { camera, initCamera, worldToScreen, screenToWorld, cssToCanvas, canvasToCss, setZoomLimits, getZoomLimits, setZoom, setCameraRotation, animateCameraTo, updateCameraAnimation, isCameraAnimating, cancelCameraAnimation };

@@ -77,5 +77,77 @@ setZoomLimits(1e-12, 10);
 check('V6 退出后放大上限恢复', Math.abs(setZoom(5) - 5) < 1e-12);
 check('V6 取回上下限接口', getZoomLimits().max === 10);
 
+// V7: 相机平滑过渡动画（0.3.0）
+{
+    const { camera, animateCameraTo, updateCameraAnimation, isCameraAnimating, cancelCameraAnimation, setZoomLimits } =
+        await import('./src/camera.js');
+    setZoomLimits(1e-12, 10);
+
+    // 动态目标（模拟公转天体：位置随时间移动）
+    camera.x = 0; camera.y = 0; camera.zoom = 1e-4;
+    let targetX = 1000;
+    animateCameraTo(() => ({ x: targetX, y: 2000, zoom: 1e-8 }), 700);
+    check('V7 动画已启动', isCameraAnimating() === true);
+
+    const t0 = performance.now();
+    // 推进到 50%：位置应在起终点之间（缓动中点 = 几何中点）
+    updateCameraAnimation(t0 + 350);
+    check('V7 50% 位置居中（缓动对称）', Math.abs(camera.x - 500) < 60 && Math.abs(camera.y - 1000) < 60);
+    // 缩放按 log 空间插值：50% 时应为几何平均 √(1e-4×1e-8) = 1e-6
+    check('V7 50% 缩放 = 几何平均 1e-6', Math.abs(camera.zoom - 1e-6) / 1e-6 < 0.05);
+
+    // 目标移动后再推进到 100%：应落到**最新**目标位置（跟随运动天体）
+    targetX = 1500;
+    updateCameraAnimation(t0 + 700);
+    check('V7 结束落在最新目标位置', Math.abs(camera.x - 1500) < 1e-6 && Math.abs(camera.y - 2000) < 1e-6);
+    check('V7 结束后缩放到位', Math.abs(camera.zoom - 1e-8) / 1e-8 < 1e-6);
+    check('V7 动画自动结束', isCameraAnimating() === false);
+
+    // 取消动画
+    animateCameraTo(() => ({ x: 9, y: 9, zoom: 1e-6 }), 500);
+    cancelCameraAnimation();
+    check('V7 可取消（滚轮接管）', isCameraAnimating() === false);
+
+    // 动画期间 setZoomLimits 不夹取当前值（避免切换瞬间硬跳）
+    camera.zoom = 1e-4;
+    animateCameraTo(() => ({ x: 0, y: 0, zoom: 1e-8 }), 700);
+    setZoomLimits(1e-12, 1e-9);
+    check('V7 动画期间不夹取当前缩放（防硬跳）', camera.zoom === 1e-4);
+    updateCameraAnimation(performance.now() + 900);
+    check('V7 动画结束后按新上限夹取', camera.zoom <= 1e-9 + 1e-15);
+}
+
+// V8: 平滑过渡不硬跳（0.3.0 修复"先突然缩小再动画"）
+{
+    const { camera, isCameraAnimating, updateCameraAnimation, setZoomLimits: szl } = await import('./src/camera.js');
+    const { flightView } = await import('./src/flightView.js');
+    const { VIEW_CONFIG } = await import('./src/config/viewConfig.js');
+    szl(1e-12, 10);
+    camera.zoom = 2e-4;                       // 近景档
+    camera.x = 12345; camera.y = -6789;
+    const before = { zoom: camera.zoom, x: camera.x, y: camera.y };
+    const ok = flightView.enterManeuver(ship, canvas);
+    check('V8 进入机动视图成功', ok === true);
+    check('V8 动画已启动', isCameraAnimating() === true);
+    // 关键：进入瞬间缩放/位置**不得**被硬跳到目标档（修复前 setZoomLimits 会立刻夹取）
+    check('V8 进入瞬间缩放未硬跳', Math.abs(camera.zoom - before.zoom) < 1e-12);
+    check('V8 进入瞬间位置未硬跳', Math.abs(camera.x - before.x) < 1e-6);
+    // 推进到结束：应落到当前聚焦天体（恒星）位置与其上限
+    updateCameraAnimation(performance.now() + VIEW_CONFIG.transitionMs + 50);
+    const star = celestialBodies.find(b => b.type === 'star');
+    check('V8 结束落到聚焦天体位置',
+        Math.abs(camera.x - star.position.x) < 1 && Math.abs(camera.y - star.position.y) < 1);
+    const capStar = computeFitZoom(targets[0].fitRadius, canvas);
+    check('V8 结束缩放 = 该天体上限', Math.abs(camera.zoom - capStar) / capStar < 1e-6);
+    // 退出：同样不得硬跳
+    camera.zoom = 1e-7;
+    const zBeforeExit = camera.zoom;
+    flightView.exitManeuver(ship, canvas);
+    check('V8 退出瞬间缩放未硬跳', Math.abs(camera.zoom - zBeforeExit) < 1e-18);
+    check('V8 退出动画已启动', isCameraAnimating() === true);
+    updateCameraAnimation(performance.now() + VIEW_CONFIG.transitionMs + 50);
+    check('V8 过渡时长已加长（≥1000ms）', VIEW_CONFIG.transitionMs >= 1000);
+}
+
 console.log(`\n结果: ${pass} 通过 / ${fail} 失败`);
 process.exit(fail > 0 ? 1 : 0);

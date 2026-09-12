@@ -644,6 +644,46 @@ function getSegmentAnchor(seg) {
 
 // 轨道线渲染主入口
 // 绘制点 = 锚点绝对位置 + 相对坐标（worldToScreen 期望绝对世界坐标）
+/**
+ * 折线屏幕裁剪描边（0.3.0 卡顿修复）：
+ * 预测链点数上万，高倍缩放下屏幕坐标可达数十万像素——整条交给光栅器会明显掉帧
+ * （浏览器对巨大路径的裁剪代价高）。这里按"点是否落在扩展视口内"把折线切成可见子段，
+ * 每段两端各带一个界外点，保证线条穿出屏幕边缘而非断在边界上。
+ * 说明：按点判可见（链点足够密，长弦跨界的情形可忽略）；返回实际描出的线段数（诊断用）。
+ */
+function strokeChainClipped(ctx, pts, anchor, canvas, margin = 64) {
+    if (!pts || pts.length < 2) return 0;
+    const x0 = -margin;
+    const y0 = -margin;
+    const x1 = canvas.width + margin;
+    const y1 = canvas.height + margin;
+    const screen = new Array(pts.length);
+    for (let i = 0; i < pts.length; i++) {
+        screen[i] = worldToScreen(pts[i].x + anchor.x, pts[i].y + anchor.y, canvas);
+    }
+    const inside = (p) => p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1;
+
+    let stroked = 0;
+    let i = 0;
+    while (i < screen.length) {
+        while (i < screen.length && !inside(screen[i])) i++;
+        if (i >= screen.length) break;
+        const start = i > 0 ? i - 1 : i;
+        let end = i;
+        while (end + 1 < screen.length && inside(screen[end + 1])) end++;
+        const stop = (end + 1 < screen.length) ? end + 1 : end;
+        ctx.beginPath();
+        ctx.moveTo(screen[start].x, screen[start].y);
+        for (let k = start + 1; k <= stop; k++) {
+            ctx.lineTo(screen[k].x, screen[k].y);
+            stroked++;
+        }
+        ctx.stroke();
+        i = stop + 1;
+    }
+    return stroked;
+}
+
 function renderOrbit(ship, ctx, canvas, isActive = true) {
     if (!ship) {
         // 无活动飞船：清空轨道几何缓存与标签，防止交互层读到过期数据/标签残留
@@ -687,19 +727,11 @@ function renderOrbit(ship, ctx, canvas, isActive = true) {
         const anchor = getSegmentAnchor(seg);
         const color = isActive ? getOrbitColor(seg.soiName, false, seg.isCurrentSoi) : '#888888';
 
-        ctx.beginPath();
-        const p0 = worldToScreen(seg.relPoints[0].x + anchor.x, seg.relPoints[0].y + anchor.y, canvas);
-        ctx.moveTo(p0.x, p0.y);
-
-        for (let i = 1; i < seg.relPoints.length; i++) {
-            const p = worldToScreen(seg.relPoints[i].x + anchor.x, seg.relPoints[i].y + anchor.y, canvas);
-            ctx.lineTo(p.x, p.y);
-        }
-
         ctx.strokeStyle = color;
         ctx.lineWidth = isActive ? 2 : 1;
         ctx.setLineDash([]);
-        ctx.stroke();
+        // 0.3.0：屏幕裁剪描边（屏外巨量点不再交给光栅器；见 strokeChainClipped 注释）
+        strokeChainClipped(ctx, seg.relPoints, anchor, canvas);
         ctx.setLineDash([]);
     }
 
@@ -915,13 +947,6 @@ function renderManeuverOrbits(ship, ctx, canvas, pred) {
         const subPaths = isBurn ? splitBurnSubPaths(seg.relPoints) : [seg.relPoints];
         for (const pts of subPaths) {
             if (!pts || pts.length < 2) continue;
-            ctx.beginPath();
-            const p0 = worldToScreen(pts[0].x + anchor.x, pts[0].y + anchor.y, canvas);
-            ctx.moveTo(p0.x, p0.y);
-            for (let i = 1; i < pts.length; i++) {
-                const p = worldToScreen(pts[i].x + anchor.x, pts[i].y + anchor.y, canvas);
-                ctx.lineTo(p.x, p.y);
-            }
             if (isBurn) {
                 ctx.strokeStyle = pts[0].ghost ? MANEUVER_CONFIG.burnArcGhostColor : MANEUVER_CONFIG.burnArcColor;
                 ctx.lineWidth = 2.5;
@@ -932,7 +957,8 @@ function renderManeuverOrbits(ship, ctx, canvas, pred) {
                 ctx.lineWidth = 2;
                 ctx.setLineDash([]);
             }
-            ctx.stroke();
+            // 0.3.0：屏幕裁剪描边（高倍缩放下机动后链坐标极大，裁剪后光栅化代价大幅下降）
+            strokeChainClipped(ctx, pts, anchor, canvas);
             ctx.setLineDash([]);
         }
     }
