@@ -146,6 +146,45 @@ body.mvp-maneuver #shipStatusPanel {
     font-weight: normal;
 }
 
+/* ---------- 放大图内轨道点菜单（HUD 风格；仅"创建机动节点"一项） ----------
+   fixed 定位挂在 body 上（面板 overflow 会裁切，故不能放面板内）；
+   视觉沿用放大图语言：黑底 + 轨道绿细线 + 等宽小字 */
+.mvp-menu {
+    position: fixed;
+    z-index: 960;
+    min-width: 132px;
+    background: #000000;
+    border: 1px solid var(--progress-green);
+    border-radius: 4px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    user-select: none;
+    overflow: hidden;
+}
+.mvp-menu-title {
+    padding: 3px 8px;
+    color: rgba(61, 255, 61, 0.75);
+    border-bottom: 1px solid rgba(61, 255, 61, 0.35);
+    white-space: nowrap;
+}
+.mvp-menu-item {
+    padding: 5px 8px;
+    color: var(--progress-green);
+    cursor: pointer;
+    white-space: nowrap;
+}
+.mvp-menu-item:hover {
+    background: rgba(61, 255, 61, 0.12);
+}
+.mvp-menu-item.disabled {
+    color: #6B737A;
+    cursor: not-allowed;
+}
+.mvp-menu-item.disabled:hover {
+    background: none;
+}
+
 /* ---------- 下板块：机动节点详细修改 ---------- */
 .mvp-editor {
     border-top: 1px solid rgba(90, 95, 207, 0.5);

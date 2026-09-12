@@ -343,6 +343,9 @@ const STRINGS = {
     'mvp.kind.star': '恒星',
     'mvp.kind.planet': '行星',
     'mvp.kind.moon': '卫星',
+    // 放大图内轨道点菜单（HUD 风格；总监定稿：仅保留"创建机动节点"一项）
+    'mvp.createNode': '创建机动节点',
+    'mvp.menuTitleSuffix': '到该点',
 
     // ---------- 飞船建造 ----------
     'build.title': '飞船建造',

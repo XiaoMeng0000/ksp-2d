@@ -146,8 +146,10 @@ function ensureDom() {
     focusSec.appendChild(_els.focusList);
     editor.appendChild(focusSec);
 
-    // 点击面板外任意处 → 收起下拉
+    // 点击面板外任意处 → 收起下拉 / 关闭轨道点菜单
     window.addEventListener('pointerdown', (e) => {
+        const inMenu = _nodeMenu && _nodeMenu.el && e.target && _nodeMenu.el.contains(e.target);
+        if (_nodeMenu && !inMenu) closeNodeMenu();
         if (!_focusOpen) return;
         const sec = _els.focusList ? _els.focusList.parentElement : null;
         if (sec && e.target && sec.contains(e.target)) return;
@@ -239,8 +241,17 @@ function ensureDom() {
 
     // 图内交互：节点 / 四向手柄
     _insetCanvas.addEventListener('pointerdown', onInsetPointerDown);
+    _insetCanvas.addEventListener('click', onInsetClick);
+    _insetCanvas.addEventListener('pointermove', onInsetHover);
+    _insetCanvas.addEventListener('pointerleave', onInsetLeave);
     window.addEventListener('pointermove', onInsetPointerMove);
     window.addEventListener('pointerup', onInsetPointerUp);
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            closeNodeMenu();
+            _focusOpen = false;
+        }
+    });
 
     _initialized = true;
 }
@@ -300,9 +311,143 @@ function getShip() {
     return shipSystem.getActiveShip();
 }
 
-// ===== 图内拖拽 =====
+// ===== 放大图内轨道点菜单（HUD 风格；总监定稿：**仅**"创建机动节点"一项，0.3.0）=====
+// 与主视图轨道菜单同语义（冻结节点时刻速度快照 → maneuverSystem.createNode），
+// 但样式走面板 HUD 风格（黑底 / 轨道绿细线 / 等宽小字），且只提供创建节点一个动作。
+let _nodeMenu = null;        // { el, data }
+let _dragMoved = false;      // 本次拖拽是否发生过位移（用于忽略拖拽末尾的那次 click）
+let _hover = null;           // 放大图悬停点 { x, y, absTime }（HUD 悬停标记 + 指针图标用）
 
+// 悬停反馈（0.3.0）：手柄/节点 = grab（可拖拽）；轨道线 = pointer（可点出轨道点菜单）；
+// 其余 = default。拖拽中切换为 grabbing。仅在变化时写 style.cursor（避免逐帧样式写入）。
+function onInsetHover(e) {
+    if (!_insetCanvas) return;
+    if (_drag) {
+        if (_insetCanvas.style.cursor !== 'grabbing') _insetCanvas.style.cursor = 'grabbing';
+        return;
+    }
+    const p = toInsetLocal(e);
+    let cursor = 'default';
+    let hover = null;
+
+    if (_hit) {
+        for (const axis of ['pro', 'retro', 'radIn', 'radOut']) {
+            const h = _hit.handles[axis];
+            if (h && Math.hypot(p.x - h.x, p.y - h.y) <= MANEUVER_CONFIG.handleHitRadius) {
+                cursor = 'grab';
+                break;
+            }
+        }
+        if (cursor === 'default' && _hit.node
+            && Math.hypot(p.x - _hit.node.x, p.y - _hit.node.y) <= MANEUVER_CONFIG.nodeHitRadius) {
+            cursor = 'grab';
+        }
+    }
+
+    if (cursor === 'default') {
+        const ship = getShip();
+        const host = ship && ship.currentSOI ? celestialBodies.find(b => b.name === ship.currentSOI) : null;
+        const segs = getLastOrbitSegments();
+        if (host && segs && segs.length) {
+            const near = nearestOrbitPointInInset(segs, p, host, 24);
+            if (near) {
+                cursor = 'pointer';
+                hover = { x: p.x, y: p.y, absTime: near.absTime };
+            }
+        }
+    }
+
+    _hover = hover;
+    if (_insetCanvas.style.cursor !== cursor) _insetCanvas.style.cursor = cursor;
+}
+
+function onInsetLeave() {
+    _hover = null;
+    if (_insetCanvas && _insetCanvas.style.cursor !== 'default') _insetCanvas.style.cursor = 'default';
+}
+
+function closeNodeMenu() {
+    if (!_nodeMenu) return;
+    if (_nodeMenu.el && _nodeMenu.el.parentNode) _nodeMenu.el.parentNode.removeChild(_nodeMenu.el);
+    _nodeMenu = null;
+}
+
+function openNodeMenu(clientX, clientY, data, ship) {
+    closeNodeMenu();
+    const menu = el('div', 'mvp-menu');
+    const remain = Math.max(0, data.absTime - getCachedTime());
+    menu.appendChild(el('div', 'mvp-menu-title',
+        'T-' + formatTCountdown(remain) + t('mvp.menuTitleSuffix')));
+
+    const exists = !!(ship && Array.isArray(ship.maneuverNodes) && ship.maneuverNodes.length > 0);
+    const item = el('div', 'mvp-menu-item' + (exists ? ' disabled' : ''),
+        '+ ' + t('mvp.createNode'));
+    item.addEventListener('click', () => {
+        if (exists) {
+            if (typeof window.showNotification === 'function') {
+                window.showNotification(t('maneuver.alreadyExists'), 'warning');
+            }
+            closeNodeMenu();
+            return;
+        }
+        const result = maneuverSystem.createNode(ship, {
+            time: data.absTime,
+            relX: data.relX,
+            relY: data.relY,
+            anchorBody: data.anchorBody,
+            velRel: data.relVel
+        });
+        if (typeof window.showNotification === 'function') {
+            if (result && result.ok) window.showNotification(t('maneuver.created'), 'success');
+            else if (result && result.reason === 'exists') window.showNotification(t('maneuver.alreadyExists'), 'warning');
+            else window.showNotification(t('maneuver.createFailed'), 'warning');
+        }
+        closeNodeMenu();
+    });
+    menu.appendChild(item);
+
+    document.body.appendChild(menu);
+    // 定位：点击处；越界回收进视口（菜单为 fixed，坐标即 client 坐标）
+    const r = menu.getBoundingClientRect();
+    const left = Math.max(8, Math.min(clientX, window.innerWidth - r.width - 8));
+    const top = Math.max(8, Math.min(clientY, window.innerHeight - r.height - 8));
+    menu.style.left = left + 'px';
+    menu.style.top = top + 'px';
+    _nodeMenu = { el: menu, data };
+}
+
+// 放大图内点击：命中轨道（未拖拽）→ 打开轨道点菜单
+function onInsetClick(e) {
+    if (_drag || _dragMoved) {
+        _dragMoved = false;
+        return;
+    }
+    const ship = getShip();
+    if (!ship) return;
+    const host = ship.currentSOI ? celestialBodies.find(b => b.name === ship.currentSOI) : null;
+    if (!host) return;
+    const segs = getLastOrbitSegments();
+    if (!segs || segs.length === 0) return;
+    const p = toInsetLocal(e);
+    const near = nearestOrbitPointInInset(segs, p, host, 24);
+    if (!near) {
+        closeNodeMenu();
+        return;
+    }
+    const st = walkToTime(segs, near.absTime);
+    if (!st) return;
+    openNodeMenu(e.clientX, e.clientY, {
+        absTime: near.absTime,
+        relX: st.relPos.x,
+        relY: st.relPos.y,
+        relVel: st.relVel,
+        anchorBody: st.host.name
+    }, ship);
+}
+
+// ===== 图内拖拽（节点 / 四向手柄）=====
 function onInsetPointerDown(e) {
+    _dragMoved = false;
     if (!_hit || !_insetCanvas) return;
     const p = toInsetLocal(e);
     const pred = getLastManeuverPrediction();
@@ -330,6 +475,7 @@ function onInsetPointerDown(e) {
 
 function onInsetPointerMove(e) {
     if (!_drag) return;
+    _dragMoved = true;                  // 拖拽开始 → 随后的 click 不作为"点轨道"处理
     const ship = getShip();
     if (!ship) { _drag = null; return; }
 
@@ -393,11 +539,11 @@ function toInsetLocal(e) {
 
 // 放大图内最近轨道点（含到达时刻）：只沿**宿主系**段搜索（换系段的坐标不属于本地轨道，
 // 参与搜索会把节点吸附到错误时刻）
-function nearestOrbitPointInInset(segs, p, host) {
+function nearestOrbitPointInInset(segs, p, host, thresholdPx) {
     if (!_hit || !_hit.geom || !isFinite(_hit.geom.scale)) return null;
     const g = _hit.geom;
     let best = null;
-    let bestD2 = 30 * 30;   // 命中阈值（CSS px，与主视图一致）
+    let bestD2 = (thresholdPx || 30) * (thresholdPx || 30);   // 命中阈值（CSS px，默认与主视图一致）
     for (const seg of segs) {
         const anchorName = seg.anchorBody || seg.segSoiName;
         if (anchorName && host && anchorName !== host.name) continue;
@@ -716,6 +862,35 @@ function drawInset(canvas, ship, node, pred, now) {
         ctx.strokeStyle = '#3dff3d';
         ctx.lineWidth = 1.6;
         ctx.beginPath(); ctx.arc(np.x, np.y, 8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    }
+
+    // —— 悬停反馈（HUD 风格，0.3.0）：轨道点十字准星 + T- 读数（指针在放大图内且未拖拽时）
+    if (_hover && !_drag) {
+        const hx = _hover.x;
+        const hy = _hover.y;
+        ctx.strokeStyle = 'rgba(61,255,61,0.9)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(hx - 8, hy); ctx.lineTo(hx - 4, hy);
+        ctx.moveTo(hx + 4, hy); ctx.lineTo(hx + 8, hy);
+        ctx.moveTo(hx, hy - 8); ctx.lineTo(hx, hy - 4);
+        ctx.moveTo(hx, hy + 4); ctx.lineTo(hx, hy + 8);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(hx, hy - 3);
+        ctx.lineTo(hx + 3, hy);
+        ctx.lineTo(hx, hy + 3);
+        ctx.lineTo(hx - 3, hy);
+        ctx.closePath();
+        ctx.stroke();
+        const remain = Math.max(0, _hover.absTime - now);
+        ctx.fillStyle = 'rgba(61,255,61,0.9)';
+        ctx.font = '10px monospace';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('T-' + formatTCountdown(remain), hx + 10, hy - 10);
+        ctx.textAlign = 'start';
+        ctx.textBaseline = 'alphabetic';
     }
 
     // —— 装饰读数（文本去重：值未变不写 DOM）
