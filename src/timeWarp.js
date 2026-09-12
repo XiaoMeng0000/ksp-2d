@@ -33,7 +33,7 @@ class TimeWarp {
         this._index = WARP_RATES.indexOf(1);      // 默认 1x
         this._savedIndex = this._index;           // 大圆按钮暂停前档位
         this._maxIndex = WARP_RATES.length - 1;   // 档位上限（由场景每帧设置）
-        this._warpTarget = null;                  // 定点加速目标 { time, onArrive }（0.3.0）
+        this._warpTarget = null;                  // 定点加速目标 { time, onArrive }（0.2.4）
         this._initKeyListener();
     }
 
@@ -181,6 +181,16 @@ class TimeWarp {
     }
 
     /**
+     * 读档 / 进入飞行场景重置（0.2.5）：取消进行中的定点加速目标并回到 1x。
+     * 与 resetTo1x 的区别：不弹"已取消"通知（系统流程而非玩家操作），
+     * 且 0x 暂停也恢复到 1x（读档后时间线必须从 1x 起步，防止旧目标/高倍率继续推进）。
+     */
+    resetOnLoad() {
+        this._warpTarget = null;
+        this.warpToIndex(WARP_RATES.indexOf(1));
+    }
+
+    /**
      * 大圆按钮：暂停 ↔ 恢复
      * 非暂停 → 保存当前档位并跳 0x；暂停 → 跳回暂停前档位（如 10x 暂停恢复回 10x）
      */
@@ -194,7 +204,7 @@ class TimeWarp {
         }
     }
 
-    // === 目标时刻加速（0.3.0 决策 1B 实现：定点时间加速） ===
+    // === 目标时刻加速（0.2.4 决策 1B 实现：定点时间加速） ===
 
     /**
      * 设定定点时间加速目标（轨道菜单"时间加速至目标点"入口）

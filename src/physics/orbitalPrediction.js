@@ -155,13 +155,13 @@ function patchedRadialLine(relPos, relVel, host, depth, maxSeg, segments, stepSt
         pts.push({ x: relPos.x + ux * s, y: relPos.y + uy * s, t: (i / M) * tTotal });
     }
 
-    const pushSeg = () => segments.push({
-        relPoints: pts,
-        anchorBody: host.name,
-        anchorTime: stepStartTime,
-        soiName: host.name,
-        isCurrentSoi: depth === 0
-    });
+    const startState = {
+        relPos: { x: relPos.x, y: relPos.y },
+        relVel: { x: velRel.x, y: velRel.y },
+        time: stepStartTime,
+        body: host.name
+    };
+    const pushSeg = () => segments.push(makeSegment(pts, host, stepStartTime, depth, startState));
 
     // 逃逸出 SOI（端点在边界）→ 切换递归
     if (host.gm > 0 && rT >= host.soiRadius - 1) {
@@ -260,15 +260,36 @@ function solveEccentricAnomaly(M, e) {
     return (lo + hi) / 2;
 }
 
+// 段对象构造（0.2.5 机动节点）：统一附带 startState（段起始状态快照：
+// 相对宿主位置/速度 + 绝对时刻 + 宿主名），供机动节点预测沿链时间寻址（walkToTime）。
+// 渲染层不消费该字段（additive 字段，向后兼容）。
+function makeSegment(relPoints, host, stepStartTime, depth, startState) {
+    return {
+        relPoints,
+        anchorBody: host.name,
+        anchorTime: stepStartTime,
+        soiName: host.name,
+        isCurrentSoi: depth === 0,
+        startState: startState || null
+    };
+}
+
 // 递归内部：分段拼接一步，采样从 theta0 到交点或完整轨道
-// 段点结构（0.3.0 骨架新增 t 字段）：{ x, y, t } — x/y 为相对锚点坐标，
+// 段点结构（0.2.4 骨架新增 t 字段）：{ x, y, t } — x/y 为相对锚点坐标，
 // t 为自该段起点（anchorTime）起的游戏秒偏移；锚点绝对时刻 = anchorTime + t。
 // 供轨道悬停 Tooltip 的 T+ 显示与右键菜单"时间加速至此"计算（飞行Scene 交互层读取）。
-function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segments) {
+export function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segments) {
     if (depth >= maxSeg) return;
 
     const hostPos = bodyFuturePos(host, stepStartTime);
     const relPos = { x: posAbs.x - hostPos.x, y: posAbs.y - hostPos.y };
+    // 段起始状态快照（0.2.5 机动节点）：供 walkToTime 沿预测链时间寻址
+    const segStartState = {
+        relPos: { x: relPos.x, y: relPos.y },
+        relVel: { x: velRel.x, y: velRel.y },
+        time: stepStartTime,
+        body: host.name
+    };
     const kepler = stateToKepler(relPos, velRel, host.gm);
 
     // 双曲线轨道（a<0）：解析推进到 SOI 边界交点（与椭圆"穿越 SOI"分支同构）
@@ -291,13 +312,7 @@ function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segment
                 if (i % 2 === 0) pts.push({ x: rP.x, y: rP.y, t });
                 if (Math.sqrt(rP.x * rP.x + rP.y * rP.y) > host.soiRadius) break;
             }
-            segments.push({
-                relPoints: pts,
-                anchorBody: host.name,
-                anchorTime: stepStartTime,
-                soiName: host.name,
-                isCurrentSoi: depth === 0
-            });
+            segments.push(makeSegment(pts, host, stepStartTime, depth, segStartState));
             if (soiDiagEnabled()) {
                 console.log(`[DIAG-轨道] patchedStep depth=${depth} host=${host.name} 双曲线无交点采样出界 pts=${pts.length}`);
             }
@@ -332,13 +347,7 @@ function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segment
             const rP = keplerPositionAtTheta({ a: kepler.a, e: kepler.e, omega: kepler.omega }, host.gm, th);
             points.push({ x: rP.x, y: rP.y, t: frac * deltaT });
         }
-        segments.push({
-            relPoints: points,
-            anchorBody: host.name,
-            anchorTime: stepStartTime,
-            soiName: host.name,
-            isCurrentSoi: depth === 0
-        });
+        segments.push(makeSegment(points, host, stepStartTime, depth, segStartState));
 
         // 交点处切换参考系 → 递归（与椭圆穿越分支同构）
         const intersectionTime = stepStartTime + deltaT;
@@ -424,13 +433,7 @@ function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segment
             // 每步检测 SOI 切换
             const soiHost = getSOIHostAtTime(absP, stepStartTime + t);
             if (soiHost && soiHost.name !== host.name) {
-                segments.push({
-                    relPoints: pts,
-                    anchorBody: host.name,
-                    anchorTime: stepStartTime,
-                    soiName: host.name,
-                    isCurrentSoi: depth === 0
-                });
+                segments.push(makeSegment(pts, host, stepStartTime, depth, segStartState));
                 if (soiDiagEnabled()) {
                     console.log(`[DIAG-轨道] patchedStep depth=${depth} 双曲线→切换 nextSoi=${soiHost.name} pts=${pts.length}`);
                 }
@@ -449,13 +452,7 @@ function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segment
                 break;
             }
         }
-        segments.push({
-            relPoints: pts,
-            anchorBody: host.name,
-            anchorTime: stepStartTime,
-            soiName: host.name,
-            isCurrentSoi: depth === 0
-        });
+        segments.push(makeSegment(pts, host, stepStartTime, depth, segStartState));
         if (soiDiagEnabled()) {
             console.log(`[DIAG-轨道] patchedStep depth=${depth} host=${host.name} 双曲线出界 pts=${pts.length}`);
         }
@@ -520,13 +517,7 @@ function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segment
 
         if (switchIdx === -1) {
             // 全程未切换 → 用固定锚点绘制完整轨道
-            segments.push({
-                relPoints: drawPoints,
-                anchorBody: host.name,
-                anchorTime: stepStartTime,
-                soiName: host.name,
-                isCurrentSoi: depth === 0
-            });
+            segments.push(makeSegment(drawPoints, host, stepStartTime, depth, segStartState));
             if (soiDiagEnabled()) {
                 console.log(`[DIAG-轨道] patchedStep depth=${depth} host=${host.name} 椭圆无切换 pts=${drawPoints.length}`);
             }
@@ -569,13 +560,7 @@ function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segment
         const probePos = { x: switchAbsPos.x + absVel.x, y: switchAbsPos.y + absVel.y };
         const verifiedHost = getSOIHostAtTime(probePos, switchTime + 1);
         if (!verifiedHost || verifiedHost.name === host.name) {
-            segments.push({
-                relPoints: drawPoints,
-                anchorBody: host.name,
-                anchorTime: stepStartTime,
-                soiName: host.name,
-                isCurrentSoi: depth === 0
-            });
+            segments.push(makeSegment(drawPoints, host, stepStartTime, depth, segStartState));
             return;
         }
         nextSoiHost = verifiedHost;
@@ -587,13 +572,7 @@ function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segment
         const M = Math.max(MIN_POINTS, Math.min(200, Math.ceil(tHi / (T / N))));
         const E1 = solveEccentricAnomaly(M0 + n * tHi, kepler.e);
         const truncatedPoints = ellipseSampleByE(kepler, E0, E1, M, M0, n);
-        segments.push({
-            relPoints: truncatedPoints,
-            anchorBody: host.name,
-            anchorTime: stepStartTime,
-            soiName: host.name,
-            isCurrentSoi: depth === 0
-        });
+        segments.push(makeSegment(truncatedPoints, host, stepStartTime, depth, segStartState));
 
         const newHostVel = bodyFutureVel(nextSoiHost, switchTime);
         const newRelVel = { x: absVel.x - newHostVel.x, y: absVel.y - newHostVel.y };
@@ -626,13 +605,7 @@ function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segment
         const rP = keplerPositionAtTheta({ a: kepler.a, e: kepler.e, omega: kepler.omega }, host.gm, th);
         points.push({ x: rP.x, y: rP.y, t: frac * deltaT });
     }
-    segments.push({
-        relPoints: points,
-        anchorBody: host.name,
-        anchorTime: stepStartTime,
-        soiName: host.name,
-        isCurrentSoi: depth === 0
-    });
+    segments.push(makeSegment(points, host, stepStartTime, depth, segStartState));
 
     // 在交点处切换参考系 → 递归
     const intersectionTime = stepStartTime + deltaT;
@@ -834,6 +807,39 @@ export function timeToNextSOISwitch(ship, host) {
     }
 
     return switchT;
+}
+
+// ===== 0.2.5 B10：SOI 切换剩余时间的缓存包装（供飞行/追踪场景每帧档位保护调用）=====
+// timeToNextSOISwitch 每帧全量重算：stateToKepler + 开普勒交点求解 + 嵌套 SOI 全周期扫描
+// （稳定轨道 ≈1.4ms/船，多船会挤爆帧预算，模块内注释自述）。
+// 缓存原理：无边界事件时，解析轨道上"到下一次边界交点的时间"随沿轨推进严格线性递减
+// （减少量 = 推进的游戏时间），因此缓存窗口内用一阶外推即可得到精确值，O(1) 每帧。
+// 窗口策略（按游戏时间，与倍率解耦）：
+//   - 缓存为 null（本轮扫描判定无切换/无嵌套）：20 游戏秒后重扫一次（探测轨道相位变化）；
+//   - 缓存值 > 20s：线性外推直至剩余 ≤20s 或窗口用满 20 游戏秒；
+//   - 剩余 ≤20s：进入保护区间，每帧精算（档位必须逐帧精确）。
+// 边界事件（实际发生切换）由 host 键变化使缓存失效兜底；换船同理。
+const SOI_SWITCH_CACHE_WINDOW = 20;   // 游戏秒
+let _soiSwitchCache = { shipId: null, hostName: null, gameTimeAt: 0, remaining0: null };
+
+export function getTimeToNextSOISwitch(ship, host) {
+    if (!ship || !host) return null;
+    const nowGame = getCachedTime();
+    const c = _soiSwitchCache;
+    const hostName = host.name || '';
+    if (c.shipId === ship.id && c.hostName === hostName) {
+        const elapsed = nowGame - c.gameTimeAt;
+        if (c.remaining0 === null) {
+            if (elapsed >= 0 && elapsed < SOI_SWITCH_CACHE_WINDOW) return null;
+        } else if (c.remaining0 > SOI_SWITCH_CACHE_WINDOW
+            && elapsed >= 0 && elapsed < Math.min(SOI_SWITCH_CACHE_WINDOW, c.remaining0 - SOI_SWITCH_CACHE_WINDOW)) {
+            const est = c.remaining0 - elapsed;
+            return est > 0 ? est : null;
+        }
+    }
+    const remaining = timeToNextSOISwitch(ship, host);
+    _soiSwitchCache = { shipId: ship.id, hostName: hostName, gameTimeAt: nowGame, remaining0: remaining };
+    return remaining;
 }
 
 // 解析解分段预测 — 多段拼接完整轨道（含 SOI 穿越）

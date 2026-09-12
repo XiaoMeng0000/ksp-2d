@@ -165,9 +165,9 @@ window.openFacilityDeployPanel = function() {
     selectedFacilityTypeId = null;
     document.getElementById('facilityDeployDetail').innerHTML =
         '<div>' + t('facility.deployHint') + '</div>';
-    // 0.3.0 多面板并存:不再关闭工具栏面板,部署/舱室/建造可同时打开
+    // 0.2.4 多面板并存:不再关闭工具栏面板,部署/舱室/建造可同时打开
     uiManager.showPanel('facilityDeploy');
-    // 0.3.0 多面板并存:与其它浮层面板同开时错位,避免完全重叠
+    // 0.2.4 多面板并存:与其它浮层面板同开时错位,避免完全重叠
     cascadePanelOpen(facilityDeployPanel);
 };
 

@@ -30,7 +30,6 @@ eventBus.on(Events.RENDER_DATA, (data) => {
 });
 let _currentFacility = null;
 let _facilityMenuOpen = false;
-let _controlledDockedShipId = null;
 
 // 飞船建造UI - 左侧工具栏
 const leftToolbar = document.createElement('div');
@@ -39,7 +38,7 @@ leftToolbar.innerHTML = '';
 document.body.appendChild(leftToolbar);
 
 // 已打开面板对应的工具栏图标 id 集合(选中态 = 右侧亮绿条)
-// 0.3.0 多面板并存:图标与"打开的面板"一一挂接,允许多条亮条同时存在
+// 0.2.4 多面板并存:图标与"打开的面板"一一挂接,允许多条亮条同时存在
 let _activeToolbarIds = new Set();
 let _panelOpenerIcon = {};   // panelId → 打开该面板的图标 id
 
@@ -83,7 +82,7 @@ function isPageOpen(pageId) {
     return page ? page.el.style.display === 'block' : false;
 }
 
-// 关闭图标对应的面板(0.3.0 图标点击切换语义:页面面板与 uiManager 面板统一入口)
+// 关闭图标对应的面板(0.2.4 图标点击切换语义:页面面板与 uiManager 面板统一入口)
 function closePanel(panelId) {
     if (panelId === 'shipBuilder' || panelId === 'facilityDeploy') {
         uiManager.hidePanel(panelId);
@@ -92,7 +91,7 @@ function closePanel(panelId) {
     }
 }
 
-// 工具栏能力图标 → 面板 id 映射(0.3.0 图标点击切换语义:图标与其面板 1:1)
+// 工具栏能力图标 → 面板 id 映射(0.2.4 图标点击切换语义:图标与其面板 1:1)
 const CAPABILITY_PANEL = {
     deploy_facility: 'facilityDeploy',
     cargo_hold: 'cargo',
@@ -139,7 +138,7 @@ function renderToolbarIcons(mode, data) {
         }
 
         btn.addEventListener('click', () => {
-            // 0.3.0 切换语义:图标与其面板 1:1 映射,点已打开面板的图标 → 关闭该面板
+            // 0.2.4 切换语义:图标与其面板 1:1 映射,点已打开面板的图标 → 关闭该面板
             if (panelId && isPanelOpen(panelId) && _panelOpenerIcon[panelId] === iconId) {
                 closePanel(panelId);
                 return;
@@ -188,7 +187,6 @@ function renderToolbarIcons(mode, data) {
         const facility = facilitySystem.getFacility(data.facilityId);
         if (!facility) return;
         _currentFacility = facility;
-        _controlledDockedShipId = null;
 
         const compartments = getFacilityCompartments(facility.typeId);
         for (const comp of compartments) {
@@ -200,19 +198,19 @@ function renderToolbarIcons(mode, data) {
                     window.openShipBuilder();
                 }, 'comp_' + comp.id, comp.id, 'shipBuilder');
             } else {
-                // 0.3.0 多面板并存:不再先关闭建造面板,舱室面板与建造面板可同时存在
+                // 0.2.4 多面板并存:不再先关闭建造面板,舱室面板与建造面板可同时存在
                 createIcon(compIcon, compName, () => {
                     openCompartmentPanel(facility, comp.id);
                 }, 'comp_' + comp.id, comp.id, comp.id);
             }
         }
     }
-    // 0.3.0 多面板并存:重建图标列表后,按当前仍打开的面板同步亮条
+    // 0.2.4 多面板并存:重建图标列表后,按当前仍打开的面板同步亮条
     syncToolbarActive();
 }
 window.renderToolbarIcons = renderToolbarIcons;
 
-// ========== 工具栏页面面板（0.3.0 重构：每个内容页独立浮层,可并存/拖动/错位） ==========
+// ========== 工具栏页面面板（0.2.4 重构：每个内容页独立浮层,可并存/拖动/错位） ==========
 // 打开(或刷新)一个工具栏页面面板:页面对应独立 .tkp-page 浮层,互不覆盖 —
 // 货仓/扫描/指令舱/对接枢纽/补给站/实验室/仓储/模块管理/货仓调拨可同时打开
 function openPage(pageId, title, html) {
@@ -664,27 +662,8 @@ function buildBridgeContent(facility) {
     // 0.2.0 阶段5：指令舱货物表入口（所属天体/交互范围卡片已按需求移除）
     html += '<div class="tkp-actions"><button data-action="open-storage" class="tkp-btn">' + t('facility.storage') + '</button></div>';
 
-    // 分区二：当前受控飞船卡（仅当存在）
-    if (_controlledDockedShipId) {
-        const ship = facility.dockedShips?.find(s => s.id === _controlledDockedShipId);
-        if (ship) {
-            html += '<div class="tkp-section">' + t('facility.controlSection') + '</div>'
-                + '<div class="tkp-card">'
-                + '<div style="font-size:13px;color:var(--text-bright);font-weight:bold;margin-bottom:8px;">'
-                + renderIconHtml('ship_default_active', '🚀', 12) + ' ' + (ship.displayName || ship.id) + '</div>'
-                + '<div class="tkp-grid" style="margin-bottom:10px;">';
-            html += info(t('facility.dryMassLabel'), (ship.dryMass ?? '-') + ' t');
-            html += info(t('facility.modulesLabel'), (ship.modules?.length || 0) + t('common.unitCount'));
-            html += '</div>'
-                // 0.2.0 阶段4：燃料分槽进度条（每种推进剂独立一条，占满整行）
-                + '<div style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px;">'
-                + '<span class="tkp-info-label">' + t('facility.fuelLabel') + '</span>'
-                + renderFuelBarsHtml(ship)
-                + '</div>'
-                + '<button data-action="release-control" class="tkp-btn">' + t('facility.backToOverview') + '</button>'
-                + '</div>';
-        }
-    }
+    // 0.2.5：原"当前受控飞船卡 + release-control 按钮"已移除（_controlledDockedShipId 恒为 null 的死代码，
+    // 0.2.0 阶段5 起控制切换改走模块管理/起飞；未来"远程接管停靠飞船"可从 git 历史恢复）
     return html;
 }
 
@@ -811,14 +790,6 @@ window.__getControlledFacility = function() {
     return _currentFacility;
 };
 
-// 全局辅助函数：释放停靠飞船控制权
-function releaseShipControl() {
-    _controlledDockedShipId = null;
-    if (_currentFacility) {
-        openCompartmentPanel(_currentFacility, 'bridge');
-    }
-};
-
 // 全局辅助函数：起飞
 function facilityUndockShip(shipId) {
     if (_currentFacility) {
@@ -885,7 +856,7 @@ window.hideDockPrompt = function() {
     _dockCallback = null;
 };
 
-// ========== 工具栏页面面板注册表（0.3.0 重构：每个内容页独立 .tkp-page 浮层） ==========
+// ========== 工具栏页面面板注册表（0.2.4 重构：每个内容页独立 .tkp-page 浮层） ==========
 // 页面 id:货仓 cargo / 扫描 scan / 指令舱 bridge / 对接枢纽 dock_hub /
 // 补给站 supply_terminal / 实验室 laboratory / 仓储 storage /
 // 模块管理 moduleManage / 货仓调拨 cargoTransfer
@@ -932,7 +903,7 @@ function setPageVisible(pageId, visible) {
         if (!isBlock) {
             page.el.style.display = 'block';
             eventBus.emit(Events.UI_PANEL_OPENED, { panelId: pageId });
-            // 0.3.0 多面板并存:与其它浮层面板同开时错位,避免完全重叠
+            // 0.2.4 多面板并存:与其它浮层面板同开时错位,避免完全重叠
             cascadePanelOpen(page.el);
         }
     } else if (isBlock) {
@@ -958,9 +929,7 @@ function onPageContentClick(e) {
     const action = btn.dataset.action;
     const shipId = btn.dataset.shipId;
     const resId = btn.dataset.resId;
-    if (action === 'release-control') {
-        releaseShipControl();
-    } else if (action === 'undock-ship') {
+    if (action === 'undock-ship') {
         facilityUndockShip(shipId);
     } else if (action === 'refuel-ship') {
         facilityRefuelShip(shipId);
@@ -1016,7 +985,7 @@ function onPageContentClick(e) {
 
 // 0.2.7:任何可能经工具栏图标打开的面板关闭时,清除图标选中态(绿条)
 // 覆盖:✕ 关工具栏页面面板 / 建造面板 / 设施部署面板(uiManager 面板的关闭路径)
-// 0.3.0 多面板并存:只清除"打开该面板的图标"的亮条,其它仍打开的面板保持亮条
+// 0.2.4 多面板并存:只清除"打开该面板的图标"的亮条,其它仍打开的面板保持亮条
 eventBus.on(Events.UI_PANEL_CLOSED, (data) => {
     if (!data || !data.panelId) return;
     const openerId = _panelOpenerIcon[data.panelId];

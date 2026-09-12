@@ -1,9 +1,9 @@
 // TEMP: 跨 SOI 轨道线预测排查诊断脚本 — 构造多类场景 dump 段产出
-// 运行：node debug_soi_predict.mjs
+// 运行：node tools/debug_soi_predict.mjs
 globalThis.window = { _soiDiag: true };
-import { stateToKepler, findSOIIntersection } from './src/physics/orbitalMechanics.js';
-import { updateCelestialBodies, celestialBodies } from './src/physics/physics.js';
-import { predictTrajectoryPatched, getSOIHostAtTime, bodyFuturePos } from './src/physics/orbitalPrediction.js';
+import { stateToKepler, findSOIIntersection } from '../src/physics/orbitalMechanics.js';
+import { updateCelestialBodies, celestialBodies } from '../src/physics/physics.js';
+import { predictTrajectoryPatched, getSOIHostAtTime, bodyFuturePos } from '../src/physics/orbitalPrediction.js';
 
 updateCelestialBodies(0);
 

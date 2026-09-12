@@ -138,6 +138,7 @@ ksp-2d/
 │   └── utils/              # 通用工具（单位格式化等）
 ├── assets/                 # 美术、音频、字体资源
 ├── docs/                   # 开发规范与流程文档
+├── tools/                  # 开发辅助脚本（基准 / 测试 / 诊断，非游戏运行时）
 └── .github/                # Issue 模板与 Pages 部署工作流
 ```
 
@@ -166,7 +167,7 @@ ksp-2d/
 ## 版本与路线
 
 - 最新发布版：**v0.2.4**（[Releases](https://github.com/XiaoMeng0000/ksp-2d/releases)）
-- 开发中：0.3.0 机动节点系统与轨道机动视图的持续打磨
+- 开发中：0.2.5 机动节点系统与轨道机动视图的持续打磨
 - 游戏内「额外内容 → 游戏公告」记录每个版本的完整变更，源码位于 `src/config/announcementConfig.js`
 
 <!-- TODO: 路线图待补。建议列 3~5 条近期计划（如科研站实验室蓝图研究、更多星系、生涯经济平衡） -->
@@ -193,7 +194,15 @@ ksp-2d/
 
 ## 开发者备注（临时）
 
-根目录下的 `test_*.mjs` / `debug_*.mjs` / `bench_*.mjs` / `verify_fix.mjs` 是开发过程中用于
-物理精度、渲染性能、UI 面板状态与存档规则验证的独立 Node 脚本，不属于游戏运行时，可按需单独执行。
+`tools/` 下是开发过程中用于物理精度、渲染性能、UI 面板状态与存档规则验证的独立 Node 脚本，
+不属于游戏运行时，可按需单独执行（脚本内部按自身位置解析路径，从任意工作目录运行均可）。
 
-<!-- TODO: 待整理。建议移入 tools/ 或 test/ 目录并在 README 中给出一句话用法，或加入 .gitignore -->
+| 目录 | 内容 | 运行示例 |
+|------|------|----------|
+| `tools/bench/` | 渲染 / 虚线 / 机动节点的逐帧开销基准 | `node tools/bench/bench_render_cost.mjs` |
+| `tools/tests/` | 单测与回归：全模块图导入冒烟、机动系统 / 预测 / 视图 / 面板状态、0.2.5 回归 | `node tools/tests/test_module_graph.mjs` |
+| `tools/` | 一次性诊断脚本（跨 SOI 预测、存档复现、资源规则冒烟、机动精度调研） | `node tools/verify_fix.mjs` |
+
+各脚本头部注释均写有自身用途与用法。注意 `tools/debug_checkpoint18.mjs` 与
+`tools/debug_maneuver_precision.mjs` 是针对特定历史存档 / 场景的一次性复现脚本，
+后者含一条已失效的断言（E4），当前会以非 0 退出，属预期状态而非项目回归。

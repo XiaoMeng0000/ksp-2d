@@ -1,0 +1,249 @@
+/* ============================================================
+   maneuver.css — 机动节点系统（0.2.5）
+   · 加速计时器面板（#maneuverPanel，KSP2 式覆盖面板）
+   · 节点图标（.maneuver-node-icon）+ 四向分离手柄（.maneuver-handle）
+   共用 theme.css 的 --theme-* 变量；面板读数用 --font-mono
+   ============================================================ */
+
+/* ===== 加速计时器面板 ===== */
+#maneuverPanel {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 20px;   /* 每帧由 updateManeuverUI 按时间加速面板高度重算 */
+    width: 350px;
+    /* 0.2.5 打磨：纯黑背景（对照样式稿） */
+    background: #000000;
+    border: 1px solid var(--theme-menu-border);
+    border-radius: 10px;
+    padding: 10px 12px 12px 12px;
+    z-index: 940;   /* 锚点层(945)/面板(950)之下，轨道标签(500)之上 */
+    color: var(--text-bright);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+    user-select: none;
+}
+
+/* 标题行：标题 + 右侧虚线延伸（0.2.5 打磨：已移除"动"徽章） */
+.maneuver-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+.maneuver-title-text {
+    color: #7FD4FF;
+    font-size: 13px;
+    white-space: nowrap;
+}
+.maneuver-title-line {
+    flex: 1;
+    border-top: 1px dashed var(--theme-border);
+    margin-left: 2px;
+}
+
+/* 主体：左按钮列 + 中信息卡 + 右状态灯列 */
+.maneuver-body {
+    display: flex;
+    align-items: stretch;
+    gap: 10px;
+}
+.maneuver-btns {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    justify-content: center;
+}
+.maneuver-btn {
+    width: 40px;
+    height: 34px;
+    border-radius: 6px;
+    border: 1px solid;
+    /* 0.2.5 打磨：按钮背景改纯黑（原 --theme-btn-bg 近黑） */
+    background: #000000;
+    font-size: 15px;
+    line-height: 32px;
+    text-align: center;
+    cursor: pointer;
+}
+.maneuver-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+.maneuver-btn-green {
+    color: var(--progress-green);
+    border-color: #3FAF5F;
+    font-size: 16px;
+    font-weight: bold;
+}
+.maneuver-btn-red {
+    color: #EF5350;
+    border-color: #B84D45;
+    font-size: 16px;
+}
+
+/* 信息卡（三行读卡 + 右侧三枚倒计时灯，0.2.5 打磨：灯移入卡内、卡片右扩；
+   黑底 + 外框同款紫边框） */
+.maneuver-card {
+    flex: 1;
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+    background: #000000;
+    border: 1px solid var(--theme-menu-border);
+    border-radius: 6px;
+    padding: 6px 8px;
+    position: relative;
+}
+.maneuver-rows {
+    flex: 1;
+    min-width: 0;
+}
+/* 卡片下方自适应尖角（0.2.5 打磨）：SVG 每帧按"进度前沿"重算顶点——
+   两侧落点始终落在卡片底边上（自适应夹取），尖端指向进度位置；
+   不触发夹取时即为原始对称 V 形。替代原先"整体平移的硬编码菱形" */
+.maneuver-card-tail {
+    position: absolute;
+    left: 0;
+    bottom: -10px;
+    width: 100%;
+    height: 10px;
+    overflow: visible;
+    pointer-events: none;
+}
+.maneuver-card-tail-body {
+    fill: #000000;
+}
+.maneuver-card-tail-edge {
+    fill: none;
+    stroke: var(--theme-menu-border);
+    stroke-width: 1;
+}
+.maneuver-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    line-height: 20px;
+}
+/* 三行统一白/灰状态色（0.2.5 打磨：取消第二/三行的原金色标注，
+   改由状态类驱动——active 白 / inactive 灰，图标与文字同步） */
+.maneuver-row.state-active .maneuver-check,
+.maneuver-row.state-active .maneuver-label,
+.maneuver-row.state-active .maneuver-value {
+    color: var(--text-bright);
+}
+.maneuver-row.state-inactive .maneuver-check,
+.maneuver-row.state-inactive .maneuver-label,
+.maneuver-row.state-inactive .maneuver-value {
+    color: #6B737A;
+}
+.maneuver-check {
+    color: var(--text-bright);
+    font-size: 11px;
+    width: 12px;
+    text-align: center;
+    flex: none;
+}
+.maneuver-label {
+    color: var(--text-bright);
+    flex: none;
+}
+.maneuver-value {
+    margin-left: auto;
+    text-align: right;
+    white-space: nowrap;
+}
+
+/* 右侧三枚倒计时状态灯（卡内右侧；0.2.5 打磨：紧凑居中 + 固定间距） */
+.maneuver-leds {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 8px;
+    flex: none;
+    padding: 2px 0;
+}
+.maneuver-led {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    background: #3A4148;
+    border: 1px solid #565E66;
+}
+.maneuver-led.lit {
+    background: #E8EAF0;
+    border-color: #FFFFFF;
+}
+.maneuver-led.green {
+    background: var(--progress-green);
+    border-color: #7CE38B;
+}
+.maneuver-led.red {
+    background: #D84343;
+    border-color: #EF5350;
+}
+
+/* 底部进度条（0.2.5 打磨：项目绿满 → 消耗式向左缩小归零，底色近黑；
+   左右边界与信息卡对齐后**两侧再内缩 6px**（= 卡片倒角半径）——
+   使尖角在进度极值处正好落在卡片底部"平直段"端点（倒角起点），与框连住。
+   margin-left = 按钮列宽(40) + 体区间距(10) + 内缩(6) = 56px） */
+.maneuver-bar-wrap {
+    margin-top: 8px;
+    margin-left: 56px;
+    margin-right: 6px;
+    height: 10px;
+    border: 1px solid #2A2A2A;
+    border-radius: 5px;
+    background: #050505;
+    overflow: hidden;
+}
+.maneuver-bar-fill {
+    height: 100%;
+    width: 100%;
+    background: var(--progress-green);
+}
+
+/* ===== 节点图标与手柄（DOM 覆盖层，画布之上） ===== */
+.maneuver-node-icon {
+    position: fixed;
+    width: 22px;
+    height: 22px;
+    /* box-sizing:border-box —— 边框计入尺寸：margin -11px 精确对中 iconCss。
+       旧版默认 content-box（22+2×2=26px 边框盒 + 同 margin）→ 可见圆心偏移 2px，
+       表现为十字手柄相对节点圆的静止偏移（已修复） */
+    box-sizing: border-box;
+    margin-left: -11px;
+    margin-top: -11px;
+    border-radius: 50%;
+    border: 2px solid var(--node-icon-border, #E3F2FD);
+    background: rgba(12, 18, 28, 0.55);
+    box-shadow: 0 0 8px rgba(79, 195, 247, 0.75);
+    cursor: move;
+    z-index: 935;
+}
+.maneuver-handle {
+    position: fixed;
+    /* 0.2.5 打磨：图标定稿 25px（33px 的 3/4） */
+    width: 25px;
+    height: 25px;
+    margin-left: -12.5px;
+    margin-top: -12.5px;
+    /* 0.2.5 打磨：现行方向图标（dir_* 纹理 + 导航球色染色）作手柄底图，取消临时方框 */
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.85));
+    cursor: grab;
+    z-index: 936;
+}
+.maneuver-handle:active {
+    cursor: grabbing;
+}
+
+/* 中心圆 → 方向图标的实线衔接线（轴对齐，颜色 = 对应图标色；拖拽时随手柄延伸） */
+.maneuver-handle-line {
+    position: fixed;
+    pointer-events: none;
+    z-index: 935;
+}

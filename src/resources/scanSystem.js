@@ -77,6 +77,8 @@ export function startScan(ship, bodyId) {
 
     // 全局仅允许一个进行中的扫描任务（扫描仪单通道）
     const player = gameState.getState().player;
+    // 0.2.5 防御：scannedBodies 缺失（异常旧档/手改存档）时初始化，防止下方直接索引抛 TypeError
+    if (!player.scannedBodies) player.scannedBodies = {};
     for (const [id, entry] of Object.entries(player.scannedBodies || {})) {
         if (entry && entry.scanning) return { ok: false, reason: 'busy', body: id };
     }

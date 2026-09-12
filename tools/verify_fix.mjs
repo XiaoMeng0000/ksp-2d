@@ -1,11 +1,11 @@
 // t7 全面验证脚本 — 修复后状态（dir 字段 / 病态回退 / 先推进后检测 / 预测线 dir 适配）
-// 运行：node verify_fix.mjs
+// 运行：node tools/verify_fix.mjs
 globalThis.window = { _soiDiag: false };
-import { stateToKepler, keplerPositionAtTime, keplerPositionAtTheta, keplerToState, findSOIIntersection, getOrbitalInfo } from './src/physics/orbitalMechanics.js';
-import { rk4Integrate } from './src/physics/integrator.js';
-import { updateShipPhysics } from './src/physics/physicsUpdate.js';
-import { updateCelestialBodies, getAbsolutePosition, celestialBodies } from './src/physics/physics.js';
-import { predictTrajectoryPatched, bodyFuturePos } from './src/physics/orbitalPrediction.js';
+import { stateToKepler, keplerPositionAtTime, keplerPositionAtTheta, keplerToState, findSOIIntersection, getOrbitalInfo } from '../src/physics/orbitalMechanics.js';
+import { rk4Integrate } from '../src/physics/integrator.js';
+import { updateShipPhysics } from '../src/physics/physicsUpdate.js';
+import { updateCelestialBodies, getAbsolutePosition, celestialBodies } from '../src/physics/physics.js';
+import { predictTrajectoryPatched, bodyFuturePos } from '../src/physics/orbitalPrediction.js';
 
 let pass = 0, fail = 0;
 function ok(cond, label, detail) {

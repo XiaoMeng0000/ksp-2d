@@ -133,7 +133,7 @@ export const bodies = [
         orbitParent: 'Kerbin',
         orbitA: 47000000,
         orbitE: 0,
-        orbitOmega: 38,    // 保留官方近点幅角数据（e=0 时无实际影响）
+        orbitOmega: Math.PI * 38 / 180,  // 保留官方近点幅角数据 38°（0.2.5：单位统一为弧度，原裸度数 38 会在设 e>0 时被当作 38rad）
         orbitTheta0: 0.9,  // 官方初始平近点角
         textureKey: 'minmus'
     }),

@@ -488,7 +488,7 @@ function getOrbitalInfo(kepler, gm, body, relPos) {
         orbitType = 'suborbital';
     } else if (a * (1 + e) > body.soiRadius) {
         // 伪椭圆（Ap 超出宿主 SOI）：轨道在到达 Ap 前即切换参考系，语义上按逃逸显示。
-        // 0.3.0 修复：近逃逸 a 巨大/抖动时 HUD 不再误标"椭圆轨"（Ap/Pe 标记层同步隐藏 Ap）
+        // 0.2.4 修复：近逃逸 a 巨大/抖动时 HUD 不再误标"椭圆轨"（Ap/Pe 标记层同步隐藏 Ap）
         orbitType = 'escape';
     } else if (e < 0.01) {
         orbitType = 'circular';

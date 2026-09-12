@@ -1,13 +1,17 @@
 import { shipSystem } from '../ship/shipSystem.js';
-import { camera, screenToWorld } from '../camera.js';
+import { camera, screenToWorld, cssToCanvas, worldToScreen, updateCameraAnimation } from '../camera.js';
 import { inputManager } from '../input.js';
 import { eventBus, Events } from '../eventBus.js';
 import { updateShipPhysics } from '../physics/physicsUpdate.js';
 import { updateCelestialBodies, getSOIHost, getAbsolutePosition, getRelativePosition, convertVelocityFrame, celestialBodies } from '../physics/physics.js';
 import { stateToKepler } from '../physics/orbitalMechanics.js';
-import { timeToNextSOISwitch } from '../physics/orbitalPrediction.js';
-import { render, renderFlightHud, getLastOrbitSegments, getLastOrbitMarkers, setOrbitHoverState, findNearestOrbitPoint, resolveOrbitHit } from '../renderer.js';
+import { getTimeToNextSOISwitch } from '../physics/orbitalPrediction.js';
+import { render, renderFlightHud, getLastOrbitSegments, getLastOrbitMarkers, setOrbitHoverState, findNearestOrbitPoint, resolveOrbitHit, getLastManeuverPrediction } from '../renderer.js';
 import { showOrbitContextMenu, updateOrbitContextMenu } from '../ui/orbitContextMenu.js';
+import { updateManeuverUI, hideManeuverUI, isManeuverDragging, collapseManeuverEditing } from '../ui/maneuverUI.js';
+import { updateManeuverViewPanel, hideManeuverViewPanel } from '../ui/maneuverViewPanel.js';
+import { maneuverSystem } from '../ship/maneuverSystem.js';
+import { flightView } from '../flightView.js';
 import { formatDuration } from '../utils/format.js';
 import { sceneManager } from '../sceneManager.js';
 import { gameState } from '../gameState.js';
@@ -21,6 +25,7 @@ import { getModuleDef } from '../ship/moduleTypes.js';
 import { getFacilityType } from '../facility/facilityTypes.js';
 import { getTotalMass, getResource, getFuelAmount, getFuelCapacity } from '../resources/resourceSystem.js';
 import { updateScanProgress } from '../resources/scanSystem.js';
+import { computeManeuverDirection } from '../physics/maneuverPrediction.js';
 import { getEngineType } from '../resources/engineConfig.js';
 import { consumeCargo, hasCargoHold, getCargoAmount } from '../resources/cargoSystem.js';
 import { isBalanceEnforced } from '../resources/modeRules.js';
@@ -39,11 +44,21 @@ let _activeFacilityId = null;  // 当前控制的设施 ID（无活动飞船时�
 let _dockPromptFacId = null;   // 当前显示对接弹窗的设施 ID（防止重复 show）
 let _lastToolbarMode = null;         // 统一工具栏脏检测：上一次的 mode
 let _lastToolbarFingerprint = null; // 统一工具栏脏检测：上一次的数据指纹（含模块列表）
+let _maneuverAngle = null;          // 机动节点指向（0.2.5：SAS maneuver 模式与导航球机动标记共用）
+let _hasManeuver = false;           // 是否存在可执行机动节点（SAS 节点副钮可用性）
 let _lastMouseX = -1;          // 最近鼠标画布 CSS 坐标（-1 = 未知/离开画布）
 let _lastMouseY = -1;
 let _lastClientX = 0;          // 最近鼠标视口坐标（供工具提示定位）
 let _lastClientY = 0;
 let _lastOrbitHit = null;      // 轨道线命中缓存（含世界坐标；悬停滞后/工具提示用）
+
+// 机动视图内隐藏/还原右下角飞船状态面板（0.2.5：避免与规划面板在同一角落遮挡）// 注意：shipStatusUI 每帧把内联 display 写回（display:flex），内联写在帧间会被反复覆盖造成闪烁，
+// 因此这里只切 body 类，由 maneuverPanel.css 的 !important 规则真正压制显示
+function setShipStatusPanelHidden(hidden) {
+    if (typeof document === 'undefined' || !document.body) return;
+    if (hidden) document.body.classList.add('mvp-maneuver');
+    else document.body.classList.remove('mvp-maneuver');
+}
 let _lastOrbitTipX = -9999;    // 最近一次工具提示触发时鼠标位置（移动防抖）
 let _lastOrbitTipY = -9999;
 
@@ -301,7 +316,7 @@ export function computeNavballDirections(ship, host) {
 }
 
 /**
- * 轨道悬停检测（0.3.0 提交4，每帧渲染驱动版 + 悬停滞后防鬼畜）：
+ * 轨道悬停检测（0.2.4 提交4，每帧渲染驱动版 + 悬停滞后防鬼畜）：
  *   标记锚点命中（12px 半径）优先 → 轨道线点-线段命中；
  *   结果写入渲染层悬停通道（setOrbitHoverState，renderOrbitMarkers 消费：轨道点圆点）。
  * 时间加速稳定化：
@@ -322,10 +337,10 @@ function updateOrbitHover(cssX, cssY) {
         return;
     }
 
-    const rect = _canvas.getBoundingClientRect();
-    // canvas 坐标空间换算（画布物理像素 = CSS 像素 × canvas.width/rect.width，兼容 DPR/缩放）
-    const canvasX = cssX * (_canvas.width / rect.width);
-    const canvasY = cssY * (_canvas.height / rect.height);
+    // canvas 坐标空间统一换算（0.2.5：CSS 像素 → 画布物理像素，与设施命中/轨道点击同口径）
+    const canvasPt = cssToCanvas(cssX, cssY, _canvas);
+    const canvasX = canvasPt.x;
+    const canvasY = canvasPt.y;
 
     // 1. 标记锚点命中（菱形锚点）
     let hoveredMarker = null;
@@ -374,7 +389,7 @@ function updateOrbitHover(cssX, cssY) {
 }
 
 /**
- * 轨道线 Tooltip（0.3.0 提交4）：仅由 mousemove 事件驱动，且鼠标移动距离防抖
+ * 轨道线 Tooltip（0.2.4 提交4）：仅由 mousemove 事件驱动，且鼠标移动距离防抖
  * （>20px 才触发，避免 warp 下每帧指纹变化导致 500ms 延迟定时器反复重置、提示不显示/闪烁）。
  * 内容取每帧更新缓存的 _lastOrbitHit。
  * @param {MouseEvent} e - 原始事件（clientX/clientY 供定位）
@@ -425,6 +440,12 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
         enter: () => {
             inputManager.enable();
 
+            // 0.2.5：进入飞行场景时间加速归 1x（读档已在 saveManager 重置，此处兜底新建战役/追踪站切入路径）
+            timeWarp.resetOnLoad();
+
+            // 视图档位复位：进场景回到默认"普通聚焦视图"并恢复其缩放范围（0.2.5）
+            flightView.reset();
+
             // 接收追踪站的设施聚焦请求
             if (window.__pendingFacilityId) {
                 const fac = facilitySystem.getFacility(window.__pendingFacilityId);
@@ -451,18 +472,22 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             // SAS 集成 — Canvas 点击处理
             const onClick = (e) => {
                 const rect = _canvas.getBoundingClientRect();
-                const dpr = window.devicePixelRatio || 1;
                 const cssX = e.clientX - rect.left;
                 const cssY = e.clientY - rect.top;
-                const canvasX = cssX * dpr;
-                const canvasY = cssY * dpr;
+                // 0.2.5：统一换算（与轨道命中/悬停同口径；旧实现直接乘 dpr，高清屏点击偏移）
+                const canvasPt = cssToCanvas(cssX, cssY, _canvas);
+                const canvasX = canvasPt.x;
+                const canvasY = canvasPt.y;
 
                 // 1. 检测是否点击了设施
+                // 0.2.5：统一走 camera.worldToScreen（此前手写变换漏了 Y 轴翻转，且绕开了旋转接口——
+                // 与渲染层的绘制口径不一致；收敛后未来"镜头旋转"一处生效）
                 const allFacilities = facilitySystem.getAllFacilities();
                 for (const f of allFacilities) {
                     const fAbsPos = getAbsolutePosition(f);
-                    const screenX = _canvas.width / 2 + (fAbsPos.x - camera.x) * camera.zoom;
-                    const screenY = _canvas.height / 2 + (fAbsPos.y - camera.y) * camera.zoom;
+                    const screenPt = worldToScreen(fAbsPos.x, fAbsPos.y, _canvas);
+                    const screenX = screenPt.x;
+                    const screenY = screenPt.y;
                     const hitRadius = Math.max(6, 10 * camera.zoom);
                     if (Math.abs(canvasX - screenX) <= hitRadius && Math.abs(canvasY - screenY) <= hitRadius) {
                         // 清除活动飞船 + 设置设施焦点，防止下一帧被 activeShip 覆盖
@@ -479,10 +504,11 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 if (!ship) return;
 
                 const result = sasUI.handleClick(cssX, cssY, ship.sasMode || 'off');
-                // 3. 0.3.0 提交5：SAS 未命中 → 左键点击轨道线打开锚定菜单（拦截；未命中则无操作）
+                // 3. 0.2.4 提交5：SAS 未命中 → 左键点击轨道线打开锚定菜单（拦截；未命中则无操作）
                 if (!result.hit) {
-                    const canvasHitX = cssX * (_canvas.width / rect.width);
-                    const canvasHitY = cssY * (_canvas.height / rect.height);
+                    const canvasHit = cssToCanvas(cssX, cssY, _canvas);
+                    const canvasHitX = canvasHit.x;
+                    const canvasHitY = canvasHit.y;
                     const segments = getLastOrbitSegments();
                     if (segments && segments.length > 0) {
                         const mouseWorld = screenToWorld(canvasHitX, canvasHitY, _canvas);
@@ -508,6 +534,8 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                             return;
                         }
                     }
+                    // 0.2.5 打磨：点击空白（未命中设施/SAS/轨道线）→ 收起机动节点编辑
+                    collapseManeuverEditing();
                     return;
                 }
 
@@ -575,7 +603,7 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                         hideTooltip();
                     }
 
-                    // 0.3.0 提交4：轨道线 Tooltip（鼠标事件驱动 + 移动防抖；圆点由渲染循环驱动）
+                    // 0.2.4 提交4：轨道线 Tooltip（鼠标事件驱动 + 移动防抖；圆点由渲染循环驱动）
                     updateOrbitTooltip(e, x, y);
                 }
             };
@@ -589,7 +617,7 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             _canvas._sasDragHandlers = { onMouseDown, onMouseMove, onMouseUp };
 
             // SAS 集成 — Canvas 右键处理（右键中心 → 回到 STABILITY；
-            // 0.3.0 提交5：菜单已改为左键打开，右键不再拦截轨道线）
+            // 0.2.4 提交5：菜单已改为左键打开，右键不再拦截轨道线）
             const onContextMenu = (e) => {
                 e.preventDefault();
                 const rect = _canvas.getBoundingClientRect();
@@ -610,7 +638,7 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             const onMouseLeave = () => {
                 sasUI.clearHover();
                 sasUI._isDragging = false;
-                // 0.3.0 提交4：清空最近鼠标与轨道悬停（渲染层通道 + 命中缓存 + tooltip）
+                // 0.2.4 提交4：清空最近鼠标与轨道悬停（渲染层通道 + 命中缓存 + tooltip）
                 _lastMouseX = -1;
                 _lastMouseY = -1;
                 _lastOrbitHit = null;
@@ -634,6 +662,15 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
 
             // 隐藏悬停提示（防切场景后 tooltip 残留）
             hideTooltip();
+
+            // 隐藏机动节点 UI（面板/图标/手柄），防遗留到其他场景
+            hideManeuverUI();
+
+            // 隐藏轨道机动视图规划面板（0.2.5）
+            hideManeuverViewPanel();
+
+            // 还原右下角飞船状态面板（移除机动视图隐藏类）
+            setShipStatusPanelHidden(false);
 
             // 清空轨道标签（标签由渲染循环每帧驱动，退出场景后无人同步 → 必须显式清理）
             clearOrbitLabels();
@@ -680,7 +717,8 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 const warpHost = activeShip.currentSOI
                     ? celestialBodies.find(b => b.name === activeShip.currentSOI)
                     : null;
-                const tSwitch = timeToNextSOISwitch(activeShip, warpHost);
+                // 0.2.5 B10：走缓存版（解析轨道剩余时间随推进线性递减，窗口外推 O(1)；剩余 ≤20s 精算）
+        const tSwitch = getTimeToNextSOISwitch(activeShip, warpHost);
                 if (tSwitch !== null) {
                     warpMaxIndex = Math.min(warpMaxIndex, timeWarp.getSOIProtectMaxIndex(tSwitch));
                 }
@@ -713,7 +751,7 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             }
             timeWarp.setMaxIndex(warpMaxIndex);
 
-            // 0.3.0 定点时间加速：以当前可用最大档位推进，到达直接切 1x + 通知。
+            // 0.2.4 定点时间加速：以当前可用最大档位推进，到达直接切 1x + 通知。
             // SOI 切换保护/点火物理档/病态限档已在上方 warpMaxIndex 计算中生效，
             // 此处只在该上限内拉满；剩余时间帧预算（倍率 ≤ 剩余/最大帧长）防一帧越过目标点。
             const warpTargetNow = timeWarp.getWarpTarget();
@@ -784,6 +822,21 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                     window.showNotification(t('dock.success'), 'success');
                 } else {
                     window.showNotification(t('dock.failFull'), 'warning');
+                }
+            }
+
+            // 5b-2. V 键：切换视图（普通聚焦 ↔ 轨道机动）
+            // 机动视图不可用（无飞船绕恒星/深空）时给出提示、不切换（与工具栏按钮禁用口径一致）
+            if (inputManager.justPressed('KeyV')) {
+                const res = flightView.cycleView(activeShip, _canvas);
+                if (typeof window.showNotification === 'function') {
+                    if (res.changed) {
+                        window.showNotification(
+                            t(flightView.isManeuver() ? 'view.switchedManeuver' : 'view.switchedFocus'),
+                            'info');
+                    } else if (res.reason === 'unavailable') {
+                        window.showNotification(t('view.unavailable'), 'warning');
+                    }
                 }
             }
 
@@ -860,6 +913,23 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
 
                 // 构建 SAS 目标朝向计算所需的飞行上下文
                 const host = getSOIHost(getAbsolutePosition(activeShip));
+
+                // 机动节点方向（0.2.5）：存在可执行节点时计算两态方向——
+                //   过节点前 = 节点加速方向（恒定）；过节点后 = 达到目标轨道的当前燃烧方向（实时变）；
+                //   供 SAS 'maneuver' 模式指向、导航球机动标记、节点副钮可用性共同使用
+                const mvPred = getLastManeuverPrediction();
+                _hasManeuver = !!(mvPred && mvPred.plan && mvPred.plan.node && !mvPred.plan.node.executed
+                    && mvPred.plan.dvMag > 1e-3);
+                // NaN/Infinity 方向防御：非有限角度会污染导航球 marker 坐标 → ctx.arc NaN
+                // 抛 IndexSizeError → 每帧渲染中断 → 画布全黑 + 控制台刷错
+                const mvRaw = _hasManeuver ? computeManeuverDirection(activeShip, mvPred) : null;
+                _maneuverAngle = (mvRaw !== null && isFinite(mvRaw)) ? mvRaw : null;
+                // 节点消失（删除/完成）时自动退出 maneuver 模式，静默回到姿态保持
+                if (activeShip.sasMode === 'maneuver' && !_hasManeuver) {
+                    activeShip.sasMode = 'stability';
+                }
+                activeShip._sasController.setManeuverHeading(_maneuverAngle);
+
                 const sasContext = {
                     shipVx: activeShip.vel.x,
                     shipVy: activeShip.vel.y,
@@ -962,14 +1032,23 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 activeShip.thrust = { ax: 0, ay: 0 };
             }
 
-            // 相机跟随活动飞船，无活动飞船且选中设施时跟随设施
+            // 机动节点进度跟踪（0.2.5）：到达检测 / 手动燃烧冲量累计 / 完成判定。
+            // 只读 ship.thrust 与模式，绝不写 mode/throttle/thrust（无自动执行原则）
             if (activeShip) {
+                maneuverSystem.update(activeShip, simDt);
+            }
+
+            // 相机跟随活动飞船，无活动飞船且选中设施时跟随设施
+            // 0.2.5：过渡动画进行中由动画独占相机（跳过跟随与视图接管写值，保证平滑）
+            const cameraAnimating = updateCameraAnimation(
+                (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now());
+            if (activeShip && !cameraAnimating) {
                 const shipAbs = getAbsolutePosition(activeShip);
                 camera.x = shipAbs.x;
                 camera.y = shipAbs.y;
                 _activeFacilityId = null;
                 gameState.setState({ activeFacilityId: null });
-            } else if (_activeFacilityId) {
+            } else if (_activeFacilityId && !cameraAnimating) {
                 const focusedFacility = facilitySystem.getFacility(_activeFacilityId);
                 if (focusedFacility) {
                     const facAbsPos = getAbsolutePosition(focusedFacility);
@@ -977,6 +1056,10 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                     camera.y = facAbsPos.y;
                 }
             }
+
+            // 视图档位（0.2.5）：机动视图下相机由 flightView 接管——聚焦所选中心天体（默认恒星）、
+            // 放大上限 = "刚好容纳该中心系统"的 fit；宿主变为不可用时自动回退普通视图（恢复缩放）
+            flightView.updateCamera(activeShip, _canvas);
 
             _lastDt = dt;
 
@@ -991,17 +1074,31 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             render(ctx, _canvas, activeShip, {
                 visibility: _visibilityState,
                 facilities: renderFacilities,
+                // 0.2.5（H4）：渲染层不直连业务模块，飞船列表由场景层注入
+                ships: shipSystem.getAllShips(),
                 selectedFacilityId: _activeFacilityId
             });
 
-            // 0.3.0 提交4：每帧驱动轨道悬停检测（渲染循环兜底：圆点必跟手；
-            // 用最近鼠标位置，节流阀拖拽时跳过）
-            if (activeShip && _lastMouseX >= 0 && !sasUI._isDragging) {
+            // 0.2.4 提交4：每帧驱动轨道悬停检测（渲染循环兜底：圆点必跟手；
+            // 用最近鼠标位置，节流阀拖拽时跳过；机动节点手柄/图标拖拽时同样跳过）
+            if (activeShip && _lastMouseX >= 0 && !sasUI._isDragging && !isManeuverDragging()) {
                 updateOrbitHover(_lastMouseX, _lastMouseY);
             }
 
-            // 0.3.0 提交5：右键菜单锚定轨道点（每帧同源重算，菜单跟点走不漂移）
+            // 0.2.4 提交5：右键菜单锚定轨道点（每帧同源重算，菜单跟点走不漂移）
             updateOrbitContextMenu(_canvas);
+
+            // 0.2.5 机动节点：加速计时器面板 / 节点图标 / 手柄（每帧驱动，仅活动飞船）
+            if (activeShip) {
+                updateManeuverUI(_canvas, activeShip);
+            }
+
+            // 0.2.5 轨道机动视图规划面板（机动视图内常驻显示；其他视图自动隐藏）
+            updateManeuverViewPanel(_canvas, activeShip);
+
+            // 机动视图：隐藏右下角飞船状态面板（燃料储量 / 剩余 ΔV）——规划面板已提供
+            // "燃料余量 / 计划 ΔV" 读数，避免两块面板在同一角落相互遮挡
+            setShipStatusPanelHidden(flightView.isManeuver());
 
             // 状态驱动：统一工具栏图标切换
             let nextMode = 'off';
@@ -1026,7 +1123,7 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 if (typeof window.renderToolbarIcons === 'function') {
                     window.renderToolbarIcons(nextMode, nextData);
                 }
-                // 模式切换时关闭弹出页面面板（0.3.0:页面为多实例 .tkp-page）
+                // 模式切换时关闭弹出页面面板（0.2.4:页面为多实例 .tkp-page）
                 for (const el of document.querySelectorAll('.tkp-page')) {
                     el.style.display = 'none';
                 }
@@ -1035,7 +1132,7 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             // SAS UI 渲染（仅在有活动飞船时显示）
             if (activeShip) {
                 sasUI.updateLayout(_canvas);
-                sasUI.update(_lastDt, activeShip.sasMode || 'off', activeShip.throttle || 0);
+                sasUI.update(_lastDt, activeShip.sasMode || 'off', activeShip.throttle || 0, _hasManeuver);
                 sasUI.render(ctx, activeShip.sasMode || 'off', activeShip.throttle || 0);
             }
 
@@ -1045,6 +1142,10 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             const directions = activeShip
                 ? computeNavballDirections(activeShip, getSOIHost(getAbsolutePosition(activeShip)))
                 : null;
+            // 机动节点方向（0.2.5）：导航球第 5 枚方向标记数据源（与四方向同构，实时变化）
+            if (directions) {
+                directions.maneuver = _maneuverAngle !== null ? { angle: _maneuverAngle } : null;
+            }
             eventBus.emit(Events.RENDER_DATA, {
                 exists: !!activeShip,
                 // 世界游戏时间（秒）— 时间加速面板 UT 显示数据源（tracking 场景用 CELESTIAL_TIME_UPDATED）

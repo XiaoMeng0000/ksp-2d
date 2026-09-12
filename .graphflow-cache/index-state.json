@@ -7,8 +7,8 @@
       "numNodes": 6
     },
     "main.js": {
-      "mtimeMs": 1787761696324.5586,
-      "hash": "e4e3c2faa0b2f72c07eeb6275cf3e65b",
+      "mtimeMs": 1788599949951.3247,
+      "hash": "bbb2a97581134f5935f181ccfb1345a6",
       "numNodes": 32
     },
     "README.md": {
@@ -22,18 +22,18 @@
       "numNodes": 5
     },
     "src/camera.js": {
-      "mtimeMs": 1787761244353.61,
-      "hash": "b1a545402c05bc446ea2de1a4d754b6b",
-      "numNodes": 7
+      "mtimeMs": 1788599046149.5623,
+      "hash": "789df9be64d76724f89b8133fb5f32d1",
+      "numNodes": 9
     },
     "src/eventBus.js": {
-      "mtimeMs": 1787761244364.2915,
-      "hash": "7b7e146efb5664fc8eece10447fffb99",
+      "mtimeMs": 1788626657193.7354,
+      "hash": "e395e9a9034d42f6e761f8093e0aae14",
       "numNodes": 4
     },
     "src/gameState.js": {
-      "mtimeMs": 1786743168594.8984,
-      "hash": "37cfa2c4e8a5dd1b3d718fedddfafdb0",
+      "mtimeMs": 1788599633006.8848,
+      "hash": "5fb9c62942cbb0c36c7861deeea013ef",
       "numNodes": 4
     },
     "src/input.js": {
@@ -42,14 +42,14 @@
       "numNodes": 3
     },
     "src/renderer.js": {
-      "mtimeMs": 1787925650876.56,
-      "hash": "6dacaeac2683c657b6bf5f9b8f77bd7f",
-      "numNodes": 44
+      "mtimeMs": 1789126324729.7827,
+      "hash": "1afc5452379c951dc4e3c33925f0d418",
+      "numNodes": 52
     },
     "src/saveManager.js": {
-      "mtimeMs": 1787765589984.5706,
-      "hash": "f0d263c03500286ea2d53e8d832d583b",
-      "numNodes": 14
+      "mtimeMs": 1788605367840.038,
+      "hash": "97be4cc22e7d60c5186ea73d983986a0",
+      "numNodes": 16
     },
     "src/sceneManager.js": {
       "mtimeMs": 1785573506793.1255,
@@ -57,14 +57,14 @@
       "numNodes": 4
     },
     "src/timeWarp.js": {
-      "mtimeMs": 1787925650899.038,
-      "hash": "ef61e30775f21c02e6219cb38403c2f8",
+      "mtimeMs": 1788599301699.721,
+      "hash": "c8f7fd20b10e75ab1b6b3f61b5cbdb77",
       "numNodes": 7
     },
     "src/utils/format.js": {
-      "mtimeMs": 1787761244427.55,
-      "hash": "79059b738e00a4bbbbd31d9c81d5b62a",
-      "numNodes": 9
+      "mtimeMs": 1788626652367.927,
+      "hash": "c881999f28c68eee8a3a3799c9d29c1b",
+      "numNodes": 10
     },
     "src/ui/announcementUI.js": {
       "mtimeMs": 1787761244387.079,
@@ -87,14 +87,14 @@
       "numNodes": 31
     },
     "src/ui/facilityDeployUI.js": {
-      "mtimeMs": 1787761244391.773,
-      "hash": "f24ef1528062f2a3803ef61cd4ea56eb",
-      "numNodes": 13
+      "mtimeMs": 1788538715856.238,
+      "hash": "25bccf6c85d4d34e3c4335845534c59e",
+      "numNodes": 14
     },
     "src/ui/flightUI.js": {
-      "mtimeMs": 1787761244393.7866,
-      "hash": "d2ccdb87370462a9b8794419ff24876a",
-      "numNodes": 39
+      "mtimeMs": 1788599901963.0344,
+      "hash": "5ea383e44df59e614ee201655d3f351a",
+      "numNodes": 46
     },
     "src/ui/menuUI.js": {
       "mtimeMs": 1786743168622.7812,
@@ -107,23 +107,23 @@
       "numNodes": 16
     },
     "src/ui/orbitContextMenu.js": {
-      "mtimeMs": 1788530548615.4148,
-      "hash": "9841c5baef2ed7b04cf85ae0c5c5d018",
-      "numNodes": 17
+      "mtimeMs": 1788630389142.9045,
+      "hash": "652a7d7707c700c43eb701d160b190cc",
+      "numNodes": 19
     },
     "src/ui/orbitLabels.js": {
-      "mtimeMs": 1787761244397.546,
-      "hash": "d7b1a7197f96ce1dd89234e6897a2bcc",
-      "numNodes": 17
+      "mtimeMs": 1788599165271.7014,
+      "hash": "d7878e02f9dec75b24ebba63a243f368",
+      "numNodes": 18
     },
     "src/ui/resourceHUD.js": {
-      "mtimeMs": 1787761244399.061,
-      "hash": "1c5c052e7b9d7492f325bb00262135f4",
+      "mtimeMs": 1788623790345.3657,
+      "hash": "4ba85b638a016f2e7d1ede46497c29bf",
       "numNodes": 8
     },
     "src/ui/sasUI.js": {
-      "mtimeMs": 1787761244401.589,
-      "hash": "8a32b35a9b8ad15be9eb61257f9d78df",
+      "mtimeMs": 1788634413531.3457,
+      "hash": "5d71a1ee864ac50363ce1fcd4790fcfd",
       "numNodes": 7
     },
     "src/ui/settingsUI.js": {
@@ -132,9 +132,9 @@
       "numNodes": 20
     },
     "src/ui/shipBuilderUI.js": {
-      "mtimeMs": 1787761244403.596,
-      "hash": "c18bfc8949799a104329c25f28aa402f",
-      "numNodes": 22
+      "mtimeMs": 1788599855926.4666,
+      "hash": "4723b21c4ce75a75faa914afaaf5c6ee",
+      "numNodes": 20
     },
     "src/ui/shipDestroyedUI.js": {
       "mtimeMs": 1787761244405.1038,
@@ -142,9 +142,9 @@
       "numNodes": 10
     },
     "src/ui/startGamePanel.js": {
-      "mtimeMs": 1787761667973.1306,
-      "hash": "2c4df4a78ae2291fe592fde2ca6c9e01",
-      "numNodes": 22
+      "mtimeMs": 1788599483506.014,
+      "hash": "f3d67c2124902da09dee3fe98ef45b1a",
+      "numNodes": 26
     },
     "src/ui/systemSelectPanel.js": {
       "mtimeMs": 1787925650928.362,
@@ -152,8 +152,8 @@
       "numNodes": 15
     },
     "src/ui/timeWarpUI.js": {
-      "mtimeMs": 1788530497613.6353,
-      "hash": "9c1a1d6f49a64d32c6003e08ef5a7507",
+      "mtimeMs": 1788623770859.188,
+      "hash": "24c17645013a29b43f097120ceca9727",
       "numNodes": 11
     },
     "src/ui/trackingUI.js": {
@@ -167,8 +167,8 @@
       "numNodes": 3
     },
     "src/ui/uiComponents.js": {
-      "mtimeMs": 1788530497614.6772,
-      "hash": "5b2073c0e968c54ac71682c1f8116077",
+      "mtimeMs": 1788538715872.7698,
+      "hash": "1b86dfc70efe64f2d05f6ebb6bbdf8e9",
       "numNodes": 16
     },
     "src/ui/uiManager.js": {
@@ -187,13 +187,13 @@
       "numNodes": 7
     },
     "src/ship/sasController.js": {
-      "mtimeMs": 1786696837590.6514,
-      "hash": "9021b08e20fb0b406328b0dea9de786b",
+      "mtimeMs": 1788633907938.6562,
+      "hash": "c176288cd5d0b5dc88ef022d05d94c76",
       "numNodes": 5
     },
     "src/ship/sasModes.js": {
-      "mtimeMs": 1786178170523.3604,
-      "hash": "9e11ad0651eb11e9be83faeae6d82280",
+      "mtimeMs": 1788633898605.064,
+      "hash": "55cf13bfc573d083daf98b07e1c96414",
       "numNodes": 9
     },
     "src/ship/shipCategories.js": {
@@ -202,8 +202,8 @@
       "numNodes": 3
     },
     "src/ship/shipSystem.js": {
-      "mtimeMs": 1786743168616.7527,
-      "hash": "4725f62e5a95f8814b36ffeb3a97124f",
+      "mtimeMs": 1788599669464.2932,
+      "hash": "3acea63e734c295d450dd584def6e7d5",
       "numNodes": 6
     },
     "src/ship/shipTemplates.js": {
@@ -222,9 +222,9 @@
       "numNodes": 2
     },
     "src/scenes/flightScene.js": {
-      "mtimeMs": 1787925650887.5525,
-      "hash": "979f0cfdb67ee1f55e72e7b12631242a",
-      "numNodes": 35
+      "mtimeMs": 1788634409521.6772,
+      "hash": "a5955de68e48ae4f818553632ce029b7",
+      "numNodes": 38
     },
     "src/scenes/galaxiesScene.js": {
       "mtimeMs": 1787763835867.4407,
@@ -252,8 +252,8 @@
       "numNodes": 15
     },
     "src/scenes/trackingScene.js": {
-      "mtimeMs": 1787761244385.208,
-      "hash": "d8aaaad69f8e8bad6a2c9f5d14c440f7",
+      "mtimeMs": 1788623693258.8137,
+      "hash": "fd2cecaa04c19da905381537cb836801",
       "numNodes": 32
     },
     "src/resources/cargoSystem.js": {
@@ -267,13 +267,13 @@
       "numNodes": 4
     },
     "src/resources/modeRules.js": {
-      "mtimeMs": 1787761244373.3455,
-      "hash": "bccdaaf1a7e47eacc7fd88504b7a2295",
+      "mtimeMs": 1788599715849.1284,
+      "hash": "ba6383ab47799dbe491cd5adebf18ebd",
       "numNodes": 8
     },
     "src/resources/resourceSystem.js": {
-      "mtimeMs": 1787761244374.8499,
-      "hash": "24af4fb6a45a67d9c97d3d6ba79b6955",
+      "mtimeMs": 1788605338584.8064,
+      "hash": "7bf88452814f34aee29c801762b123aa",
       "numNodes": 17
     },
     "src/resources/resourceTypes.js": {
@@ -282,8 +282,8 @@
       "numNodes": 6
     },
     "src/resources/scanSystem.js": {
-      "mtimeMs": 1786743168607.9917,
-      "hash": "24cacd77730cf10d1108bf11c70770df",
+      "mtimeMs": 1788599720986.653,
+      "hash": "13bb6735eba82a02b2a72b9435817998",
       "numNodes": 19
     },
     "src/physics/atmosphere.js": {
@@ -307,9 +307,9 @@
       "numNodes": 13
     },
     "src/physics/orbitalPrediction.js": {
-      "mtimeMs": 1787761244369.317,
-      "hash": "4f1678edcbd5839b272ace0449dbb27b",
-      "numNodes": 22
+      "mtimeMs": 1788626772403.3442,
+      "hash": "e88b4e7ad5e79089efad743e31181d36",
+      "numNodes": 24
     },
     "src/physics/physics.js": {
       "mtimeMs": 1787925650873.6123,
@@ -347,8 +347,8 @@
       "numNodes": 3
     },
     "src/graphics/textureConfig.js": {
-      "mtimeMs": 1787761244366.306,
-      "hash": "73612e40c2fc150418252b23549cad2c",
+      "mtimeMs": 1788538715851.5513,
+      "hash": "833912afb524131dda32a82029b6005c",
       "numNodes": 3
     },
     "src/graphics/textureManager.js": {
@@ -357,8 +357,8 @@
       "numNodes": 5
     },
     "src/facility/facilitySystem.js": {
-      "mtimeMs": 1786743168591.7754,
-      "hash": "454aa189892239452ac33343ddf39207",
+      "mtimeMs": 1788599834741.9,
+      "hash": "38cb9ea759561e0c1a18600533b41354",
       "numNodes": 11
     },
     "src/facility/facilityTypes.js": {
@@ -367,8 +367,8 @@
       "numNodes": 9
     },
     "src/config/announcementConfig.js": {
-      "mtimeMs": 1787764789585.0193,
-      "hash": "0230482ee823292af9c6142fd7e59bcc",
+      "mtimeMs": 1788538715846.2595,
+      "hash": "365a0db51d260cd5d1d7f2e6ca68d37c",
       "numNodes": 7
     },
     "src/config/bodyResources.js": {
@@ -402,8 +402,8 @@
       "numNodes": 3
     },
     "src/config/orbitPointTypes.js": {
-      "mtimeMs": 1787761244360.684,
-      "hash": "95c72b83c0375c999239b8f255e80561",
+      "mtimeMs": 1788626671206.615,
+      "hash": "2fe1301ca065067b5c261142ab510321",
       "numNodes": 4
     },
     "src/config/sasConfig.js": {
@@ -432,13 +432,13 @@
       "numNodes": 19
     },
     "src/config/strings.js": {
-      "mtimeMs": 1788530548614.3953,
-      "hash": "9193b8bbc838e0d3510154864c382d49",
+      "mtimeMs": 1788631159338.4104,
+      "hash": "caa8901ae6ec14eb541c35a931d2dcce",
       "numNodes": 4
     },
     "src/config/version.js": {
-      "mtimeMs": 1786743168588.265,
-      "hash": "9a07d45a6b1b1741ebf651e9b091f156",
+      "mtimeMs": 1788596772297.7383,
+      "hash": "faa7b4caf3bcef85516aa3c9b98d278b",
       "numNodes": 3
     },
     "src/config/systems/debdebSystem.js": {
@@ -452,8 +452,8 @@
       "numNodes": 5
     },
     "src/config/systems/kerbolarSystem.js": {
-      "mtimeMs": 1787925650858.9028,
-      "hash": "625dbf1d1e150e1a1ddc6319ae19dfbf",
+      "mtimeMs": 1788605333637.696,
+      "hash": "9a4e34ba72aa7b6e9ab24681760926c4",
       "numNodes": 5
     },
     "src/config/systems/testSystem.js": {
@@ -467,18 +467,18 @@
       "numNodes": 4
     },
     "src/audio/audioConfig.js": {
-      "mtimeMs": 1787761244351.115,
-      "hash": "8aea9d9bdbbc3acc09c79077353b6ce0",
+      "mtimeMs": 1788676986421.0413,
+      "hash": "bc2413ae80970014c2b2446a53dbad57",
       "numNodes": 28
     },
     "src/audio/audioCore.js": {
-      "mtimeMs": 1787761244352.6028,
-      "hash": "c82efbdd83f0558833d14938c9fe2e4b",
+      "mtimeMs": 1788677497273.3047,
+      "hash": "062003022c549edfb1ea104b05016c3c",
       "numNodes": 5
     },
     "src/audio/audioDirector.js": {
-      "mtimeMs": 1787761244353.61,
-      "hash": "16d6f14d411aa02b2d2154a20bdb07dc",
+      "mtimeMs": 1788676993537.9043,
+      "hash": "e896f4d0b18eff574ff7b4a4d74bc667",
       "numNodes": 9
     },
     "docs/AI工作规范.md": {
@@ -492,8 +492,8 @@
       "numNodes": 67
     },
     "docs/UI开发规范.md": {
-      "mtimeMs": 1787761244343.0537,
-      "hash": "48ff615d338289cae949cc10810dead1",
+      "mtimeMs": 1788538715832.4678,
+      "hash": "fc6f7ce2b5901784a7938b3320dec151",
       "numNodes": 31
     },
     "docs/UI面板视觉风格规范.md": {
@@ -525,6 +525,36 @@
       "mtimeMs": 1788530323887.2495,
       "hash": "8fa66ebfcf6b16d1efeb389eed3b7650",
       "numNodes": 20
+    },
+    "src/ui/panelDrag.js": {
+      "mtimeMs": 1788538715858.3904,
+      "hash": "ed6f5f4cf7617d482d8a42a2d10f5dce",
+      "numNodes": 5
+    },
+    "src/ui/shipStatusUI.js": {
+      "mtimeMs": 1788538715863.7576,
+      "hash": "956a9a373be1939dc60f4bded12b4caa",
+      "numNodes": 14
+    },
+    "src/ui/maneuverUI.js": {
+      "mtimeMs": 1789133720331.243,
+      "hash": "733a1c80e12e6ed61ce2feef858ee445",
+      "numNodes": 32
+    },
+    "src/ship/maneuverSystem.js": {
+      "mtimeMs": 1789126337237.4812,
+      "hash": "96681dd094b9cdee92e39a6bce3ad915",
+      "numNodes": 8
+    },
+    "src/physics/maneuverPrediction.js": {
+      "mtimeMs": 1789125846257.3706,
+      "hash": "fb92ce8f92b0fe6233336398d8ff4e41",
+      "numNodes": 15
+    },
+    "src/config/maneuverConfig.js": {
+      "mtimeMs": 1788632696129.3418,
+      "hash": "22912ec85a695f3e479c3f1bf63a0096",
+      "numNodes": 3
     }
   }
 }

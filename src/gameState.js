@@ -44,29 +44,78 @@ class GameState {
         }));
     }
 
+    // 广播状态变化事件
+    _notify(changedKeys) {
+        eventBus.emit(Events.GAME_STATE_CHANGED, { changedKeys });
+    }
+
     // 获取当前状态（只读副本）
     getState() {
         return this._deepClone(this._state);
     }
 
     // 深拷贝合并，确保替换数组时旧引用不会污染新数据
+    // 0.2.5（方案 A）：值未变时跳过拷贝与广播 —— 消除"每帧 setState({activeFacilityId: null})"
+    // 一类的 GAME_STATE_CHANGED 事件风暴（浅比较即可覆盖标量重复写入场景）
     setState(data) {
+        const changedKeys = [];
         for (const key in data) {
-            if (data.hasOwnProperty(key)) {
-                this._state[key] = this._deepClone(data[key]);
+            if (!Object.prototype.hasOwnProperty.call(data, key)) {
+                continue;
             }
+            if (data[key] === this._state[key]) {
+                continue;
+            }
+            this._state[key] = this._deepClone(data[key]);
+            changedKeys.push(key);
         }
-        eventBus.emit(Events.GAME_STATE_CHANGED, {
-            changedKeys: Object.keys(data)
-        });
+        if (changedKeys.length > 0) {
+            this._notify(changedKeys);
+        }
+    }
+
+    // ===== 0.2.5（方案 A）集合增量接口 =====
+    // 旧实现所有"改一条"操作都走 getState() 深拷贝 → 改副本 → setState 整组替换，
+    // 导致：① 已持有引用的模块（SAS 控制器等运行时挂载）随整组替换被 JSON 清洗剥离；
+    // ② 其他实体引用全部悬空；③ 每次 O(全部实体) 深拷贝。
+    // 增量接口保持数组引用不变、仅动单个元素，已持有引用持续有效。
+    // 全量替换语义仍由 setState 承担（读档通道使用）。
+
+    // 追加实体到集合（数组引用不变，返回入列对象本身）
+    addToCollection(key, entity) {
+        this._state[key].push(entity);
+        this._notify([key]);
+        return entity;
+    }
+
+    // 按 id 从集合移除实体
+    removeFromCollection(key, id) {
+        const arr = this._state[key];
+        const index = arr.findIndex(e => e && e.id === id);
+        if (index === -1) {
+            return false;
+        }
+        arr.splice(index, 1);
+        this._notify([key]);
+        return true;
+    }
+
+    // 按 id 替换集合内单个实体（元素引用更新为该对象，数组与其余元素引用不变）
+    replaceInCollection(key, entity) {
+        const arr = this._state[key];
+        const index = arr.findIndex(e => e && e.id === entity.id);
+        if (index === -1) {
+            return false;
+        }
+        arr[index] = entity;
+        this._notify([key]);
+        return true;
     }
 
     // 重置为初始状态
     reset() {
         this._state = this._deepClone(initialState);
-        eventBus.emit(Events.GAME_STATE_CHANGED, {
-            changedKeys: ['ships', 'activeShipId', 'activeFacilityId', 'missions', 'facilities', 'gameTime', 'currentScene']
-        });
+        this._notify(['ships', 'activeShipId', 'activeFacilityId', 'missions', 'facilities', 'gameTime', 'currentScene']);
     }
 
     // 返回当前活动飞船
@@ -109,4 +158,3 @@ export const gameState = new GameState();
 if (typeof window !== 'undefined') {
     window.__gameState = gameState;
 }
-

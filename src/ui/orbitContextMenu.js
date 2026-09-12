@@ -1,6 +1,6 @@
 'use strict';
 
-// 轨道线右键菜单（0.3.0 提交5 占位版 + 锚点化）
+// 轨道线右键菜单（0.2.4 提交5 占位版 + 锚点化）
 // 入口：flightScene 命中轨道线时调用；菜单锚定"点击那一刻的轨道时空点"（KSP2 式）：
 //   - 面板通过"菱形选择点 + 竖线（连面板底边中点）"连接轨道点，与标签的折线（连右上）不同；
 //   - **定点冻结**：锚点 = 点击瞬间解析的世界坐标（不随轨道重锚/宿主移动漂移），
@@ -14,11 +14,13 @@ import { eventBus, Events } from '../eventBus.js';
 import { getCachedTime, bodyFuturePos } from '../physics/orbitalPrediction.js';
 import { celestialBodies } from '../physics/physics.js';
 import { formatGameDurationLong } from '../utils/format.js';
-import { worldToScreen } from '../camera.js';
+import { worldToScreen, canvasToCss } from '../camera.js';
 import { timeWarp } from '../timeWarp.js';
 import { shipSystem } from '../ship/shipSystem.js';
+import { maneuverSystem } from '../ship/maneuverSystem.js';
 import { timeToNextSOISwitch } from '../physics/orbitalPrediction.js';
-import { getLastOrbitMarkers } from '../renderer.js';
+import { getLastOrbitMarkers, getLastOrbitSegments } from '../renderer.js';
+import { walkToTime } from '../physics/maneuverPrediction.js';
 
 // 菜单项定义（数据驱动：action 行为标识 + 图标字符 + strings key）
 const MENU_ITEMS = [
@@ -105,7 +107,49 @@ export function showOrbitContextMenu(clientX, clientY, data, canvas) {
         row.textContent = item.icon + ' ' + t(item.nameKey);
         row.addEventListener('click', (e) => {
             e.stopPropagation();
-            // 0.3.0 提交5：定点加速三项（目标点/远点/近点）——统一走 timeWarp.warpToTime
+
+            // 0.2.5 机动节点：创建机动计划（菜单冻结快照 → maneuverSystem）
+            if (item.action === 'createNode') {
+                const ship = shipSystem.getActiveShip();
+                if (!ship) {
+                    closeMenu(false);
+                    return;
+                }
+                if (_menuData && _menuData.absTime !== null && _menuData.absTime !== undefined) {
+                    // 冻结节点时刻速度快照（0.2.5 打磨：节点时刻已过时重建预测状态，永不失效）
+                    let velRel = null;
+                    try {
+                        const st = walkToTime(getLastOrbitSegments(), _menuData.absTime);
+                        if (st && st.relVel) velRel = st.relVel;
+                    } catch (err) {
+                        // 预测链瞬时缺失（如模式切换过渡帧）→ 跳过速度快照，走退化显示
+                    }
+                    const result = maneuverSystem.createNode(ship, {
+                        time: _menuData.absTime,
+                        relX: _menuData.relX,
+                        relY: _menuData.relY,
+                        anchorBody: _menuData.anchorBody || _menuData.soiName || null,
+                        velRel
+                    });
+                    if (result.ok) {
+                        if (typeof window.showNotification === 'function') {
+                            window.showNotification(t('maneuver.created'), 'success');
+                        }
+                    } else if (result.reason === 'exists') {
+                        if (typeof window.showNotification === 'function') {
+                            window.showNotification(t('maneuver.alreadyExists'), 'warning');
+                        }
+                    } else if (typeof window.showNotification === 'function') {
+                        window.showNotification(t('maneuver.createFailed'), 'warning');
+                    }
+                } else if (typeof window.showNotification === 'function') {
+                    window.showNotification(t('maneuver.createFailed'), 'warning');
+                }
+                closeMenu(false);
+                return;
+            }
+
+            // 0.2.4 提交5：定点加速三项（目标点/远点/近点）——统一走 timeWarp.warpToTime
             let targetTime = null;
             let targetLabel = null;
             if (item.action === 'warpToPoint') {
@@ -255,8 +299,11 @@ export function updateOrbitContextMenu(canvas) {
         wy = anchor.y + _menuData.relY;
     }
     const s = worldToScreen(wx, wy, canvas);
-    const ax = s.x;
-    const ay = s.y;
+    // 0.2.5（高清屏）：锚点/竖线是 DOM 元素（CSS 像素定位），画布物理坐标统一转 CSS；
+    // 出屏判断与钳制一律用视口 CSS 尺寸（window.inner*），不再使用画布物理尺寸
+    const cssPt = canvasToCss(s.x, s.y, canvas);
+    const ax = cssPt.x;
+    const ay = cssPt.y;
     const w = _menuEl.offsetWidth || 200;
     const h = _menuEl.offsetHeight || 230;
 
@@ -267,8 +314,8 @@ export function updateOrbitContextMenu(canvas) {
     if (flip) {
         top = ay + ANCHOR_GAP;
     }
-    const viewW = (canvas && canvas.width) || window.innerWidth;
-    const viewH = (canvas && canvas.height) || window.innerHeight;
+    const viewW = window.innerWidth;
+    const viewH = window.innerHeight;
     left = Math.max(4, Math.min(left, viewW - w - 4));
     top = Math.max(4, Math.min(top, viewH - h - 4));
     _menuEl.style.left = left + 'px';

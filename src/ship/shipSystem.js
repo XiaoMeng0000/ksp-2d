@@ -19,7 +19,6 @@ class ShipSystem {
             return null;
         }
 
-        const state = gameState.getState();
         const shipId = `ship_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
         // 0.2.0：按模板燃料储罐生成推进剂资源槽（旧 fuel/fuelCapacity 字段废弃）
@@ -95,11 +94,12 @@ class ShipSystem {
             shipInstance.momentOfInertia += def.momentOfInertiaBonus;
         }
 
-        state.ships.push(shipInstance);
-        gameState.setState({ ships: state.ships });
+        // 0.2.5（方案 A）：增量入列 —— 返回对象即 GameState 内的规范引用（与 createFacility 口径一致）。
+        // 旧实现经 getState 深拷贝 + setState 整组替换，返回值与内部对象不是同一引用（潜伏陷阱）
+        gameState.addToCollection('ships', shipInstance);
 
         // 如果没有活动飞船，自动设为活动
-        if (!state.activeShipId) {
+        if (!gameState.getActiveShip()) {
             gameState.setState({ activeShipId: shipId });
         }
 
@@ -137,33 +137,35 @@ class ShipSystem {
     }
 
     // 持久化飞船修改到 GameState
+    // 0.2.5（方案 A）：按 id 增量替换单个元素 —— 数组与其余飞船引用保持不变，
+    // 挂载的运行时字段（_sasController 等）不再随整组深拷贝被 JSON 清洗剥离
     persistShip(shipData) {
-        const state = gameState.getState();
-        const index = state.ships.findIndex(s => s.id === shipData.id);
-        if (index === -1) {
-            console.warn(`[ShipSystem] 飞船 ${shipData.id} 不存在，无法持久化`);
+        if (!shipData || !shipData.id) {
+            console.warn('[ShipSystem] persistShip 需要有效的飞船对象');
             return false;
         }
-        state.ships[index] = shipData;
-        gameState.setState({ ships: state.ships });
-        return true;
+        const ok = gameState.replaceInCollection('ships', shipData);
+        if (!ok) {
+            console.warn(`[ShipSystem] 飞船 ${shipData.id} 不存在，无法持久化`);
+        }
+        return ok;
     }
 
-    // 删除飞船实例
+    // 删除飞船实例（0.2.5：按 id 增量移除，不整组替换）
     deleteShip(shipId) {
-        const state = gameState.getState();
-        const index = state.ships.findIndex(s => s.id === shipId);
-        if (index === -1) {
+        const existing = gameState.getShipRef(shipId);
+        if (!existing) {
             console.warn(`[ShipSystem] 飞船 ${shipId} 不存在，无法删除`);
             return false;
         }
+        const wasActive = (gameState.getActiveShip() || {}).id === shipId;
 
-        state.ships.splice(index, 1);
-        gameState.setState({ ships: state.ships });
+        gameState.removeFromCollection('ships', shipId);
 
         // 如果删除的是活动飞船，清除 activeShipId
-        if (state.activeShipId === shipId) {
-            const newActiveId = state.ships.length > 0 ? state.ships[0].id : null;
+        if (wasActive) {
+            const remaining = gameState.getAllShipsRef();
+            const newActiveId = remaining.length > 0 ? remaining[0].id : null;
             gameState.setState({ activeShipId: newActiveId });
             console.log(`[ShipSystem] 活动飞船已删除，切换到: ${newActiveId || '无'}`);
         }

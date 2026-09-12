@@ -381,6 +381,28 @@
     cursor: pointer;
 }
 
+/* 导出/导入世界并排按钮行（位于"创建新战役"下方，两钮等宽，样式与创建按钮一致） */
+#startGamePanel .sgp-transfer-row {
+    display: flex;
+    gap: 6px;
+    margin: 0 0 10px 0;
+}
+
+#startGamePanel .sgp-transfer-row .sgp-new-campaign {
+    flex: 1;
+    margin-bottom: 0;
+}
+
+#startGamePanel .sgp-transfer-row .sgp-new-campaign:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+#startGamePanel .sgp-transfer-row .sgp-new-campaign:disabled:hover {
+    background: var(--theme-btn-bg);
+    border-color: var(--border-light);
+}
+
 /* 列表区 */
 #startGamePanel .sgp-list {
     flex: 1;
@@ -1847,7 +1869,7 @@
     }
 }
 
-/* ---- 轨道线右键菜单（0.3.0 提交5 占位版；参考图式样后续美化） ---- */
+/* ---- 轨道线右键菜单（0.2.4 提交5 占位版；参考图式样后续美化） ---- */
 .orbit-context-menu {
     position: fixed;
     z-index: 950;
@@ -1884,7 +1906,7 @@
     border-color: var(--toolbar-border);
 }
 
-/* ---- 轨道右键菜单锚点层（0.3.0 提交5：菱形选择点 + 竖线连面板，KSP2 式） ---- */
+/* ---- 轨道右键菜单锚点层（0.2.4 提交5：菱形选择点 + 竖线连面板，KSP2 式） ---- */
 /* 显示优先级：锚点层 945 > 标签 500 < 面板 950（菜单显示在标签之上） */
 #orbitContextMenuAnchor {
     position: fixed;

@@ -7,7 +7,10 @@
 import { gameState } from '../gameState.js';
 
 function getMode() {
-    return gameState.getState().player.gameMode || 'sandbox';
+    // 0.2.5（方案 A）：直接引用读取（O(1)）—— 旧实现走 getState() 全量深拷贝，
+    // 该函数被 cargoSystem 消耗路径等热路径反复调用，深拷贝整个游戏状态浪费明显
+    const player = gameState.getPlayerRef();
+    return (player && player.gameMode) || 'sandbox';
 }
 
 // 是否严格校验余额（不足即拒绝操作）

@@ -323,7 +323,7 @@
     background: var(--accent-bg);
 }
 
-/* ---- 可见性筛选面板（0.3.0 迁入左上玩家 HUD 黑条尾端） ---- */
+/* ---- 可见性筛选面板（0.2.4 迁入左上玩家 HUD 黑条尾端） ---- */
 #visibilityPanel {
     position: relative;
     display: none;               /* 显隐由 sasUI show/hide（'flex'/'none'）控制 */
@@ -379,7 +379,7 @@
     padding: 2px 0;
 }
 
-/* ---- 轨道标签（0.3.0 提交 2：Canvas 锚点 + DOM 文字本体） ---- */
+/* ---- 轨道标签（0.2.4 提交 2：Canvas 锚点 + DOM 文字本体） ---- */
 /* 容器：fixed 于视口 0,0，不拦截鼠标；每个标签 absolute 0,0 + transform 平移 */
 #orbitLabels {
     position: fixed;
@@ -400,7 +400,7 @@
 
 /* 文字本体：小面板样式；边框统一飞行界面紫（--toolbar-border，与 Canvas 锚点/折线一致），
    文字颜色由注册表内联注入（类型区分色，Ap/Pe 各一）；
-   可悬停/右键锁定展开（0.3.0）：宽度同样收缩到内容，保证展开面板各行为完整单行 */
+   可悬停/右键锁定展开（0.2.4）：宽度同样收缩到内容，保证展开面板各行为完整单行 */
 .orbit-label-body {
     background: rgba(0, 0, 0, 0.75);
     border: 1px solid var(--toolbar-border);
@@ -421,7 +421,7 @@
     font-size: 12px;
 }
 
-/* 展开面板行结构（0.3.0）：标题=类型色（内联注入），T- 行=HUD 绿，高度行=主文本色 */
+/* 展开面板行结构（0.2.4）：标题=类型色（内联注入），T- 行=HUD 绿，高度行=主文本色 */
 .orbit-label-body .olb-title {
     display: block;
     color: var(--text-main);
@@ -437,9 +437,9 @@
     color: var(--text-main);
 }
 
-/* 悬停高亮（0.3.0：已去除——锚点与标签本体均无悬停视觉变化，悬停仅用于数据/交互） */
+/* 悬停高亮（0.2.4：已去除——锚点与标签本体均无悬停视觉变化，悬停仅用于数据/交互） */
 
-/* ---- 飞行状态 HUD：右下燃料卡 + 总 ΔV 卡（0.3.0 打磨 v2：并入飞行组件体系）----
+/* ---- 飞行状态 HUD：右下燃料卡 + 总 ΔV 卡（0.2.4 打磨 v2：并入飞行组件体系）----
    统一：黑底 + 紫描边 + 2px 黑外框 + 5px 圆角；
    燃料行文字收敛进进度条内（满油黑字=样板，低油切白保可读）；
    展开态只显示推重比/燃烧时间（金色数值），燃料行隐藏；右侧引擎图标（emoji 占位） */
@@ -459,7 +459,7 @@
 
 #shipStatusPanel .ss-card {
     box-sizing: border-box;
-    /* 0.3.0 打磨：并入飞行界面组件体系 —— 紫描边 + 紫框外 2px 黑外框 + 5px 圆角 */
+    /* 0.2.4 打磨：并入飞行界面组件体系 —— 紫描边 + 紫框外 2px 黑外框 + 5px 圆角 */
     border: 1px solid var(--toolbar-border);
     box-shadow: 0 0 0 2px #000;
     border-radius: 5px;
@@ -597,7 +597,7 @@
     flex-direction: column;
     gap: 5px;
     min-width: 0;
-    /* 0.3.0 打磨 v4：条高缩至 3/4 后容器高度不变 —— 面板大小与条组中轴线均不位移 */
+    /* 0.2.4 打磨 v4：条高缩至 3/4 后容器高度不变 —— 面板大小与条组中轴线均不位移 */
     min-height: 33px;
     justify-content: center;
 }
@@ -635,7 +635,7 @@
     position: absolute;
     top: 0;
     line-height: 10.5px;
-    /* 0.3.0 打磨 v5：燃料类型与数据用项目像素字体（像素对齐标准 11px 整倍） */
+    /* 0.2.4 打磨 v5：燃料类型与数据用项目像素字体（像素对齐标准 11px 整倍） */
     font-family: var(--font-pixel);
     font-size: 11px;
     color: #000;                /* 满油黑字（样板：文字在条内） */

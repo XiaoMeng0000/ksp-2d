@@ -5,7 +5,7 @@ import { getFacilityType } from '../facility/facilityTypes.js';
 import { camera } from '../camera.js';
 import { updateShipPhysics } from '../physics/physicsUpdate.js';
 import { updateCelestialBodies, getAbsolutePosition, celestialBodies } from '../physics/physics.js';
-import { timeToNextSOISwitch } from '../physics/orbitalPrediction.js';
+import { getTimeToNextSOISwitch } from '../physics/orbitalPrediction.js';
 import { render } from '../renderer.js';
 import { eventBus, Events } from '../eventBus.js';
 import { gameState } from '../gameState.js';
@@ -389,7 +389,8 @@ export function registerTrackingScene({ getTime, setTime, canvas }) {
                 const warpHost = activeShip.currentSOI
                     ? celestialBodies.find(b => b.name === activeShip.currentSOI)
                     : null;
-                const tSwitch = timeToNextSOISwitch(activeShip, warpHost);
+                // 0.2.5 B10：缓存版（见 getTimeToNextSOISwitch 注释）
+                const tSwitch = getTimeToNextSOISwitch(activeShip, warpHost);
                 if (tSwitch !== null) {
                     warpMaxIndex = Math.min(warpMaxIndex, timeWarp.getSOIProtectMaxIndex(tSwitch));
                 }
@@ -485,6 +486,8 @@ export function registerTrackingScene({ getTime, setTime, canvas }) {
             render(ctx, _canvas, activeShip, {
                 visibility: { ships: true, facilities: true, bodyOrbits: true },
                 facilities: renderFacilities,
+                // 0.2.5（H4）：渲染层不直连业务模块，飞船列表由场景层注入
+                ships: shipSystem.getAllShips(),
                 selectedFacilityId: selectedFacId
             });
         }

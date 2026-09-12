@@ -1,6 +1,6 @@
 'use strict';
 
-// 飞行状态 HUD（0.3.0）— 屏幕右下角两卡
+// 飞行状态 HUD（0.2.4）— 屏幕右下角两卡
 //   燃料卡（上）：活动飞船全部推进剂槽余量（绿条 + 吨数），可展开显示
 //                推重比（宿主天体表面重力口径）/ 燃烧时间（满推力）/ 初始质量
 //   总 ΔV 卡（下，贴底）：绿底黑字大数字；燃料耗尽/engineOut 时整体切红
@@ -30,7 +30,7 @@ fuelCard.innerHTML =
     '<div class="ss-fuel-card-body">' +
     '<div class="ss-details"></div>' +
     '<div class="ss-fuel-rows"></div>' +
-    // 0.3.0 打磨：样板右端引擎图标（白色单色 SVG，纹理未就绪回退 emoji）
+    // 0.2.4 打磨：样板右端引擎图标（白色单色 SVG，纹理未就绪回退 emoji）
     '<div class="ss-engine-icon">' + renderIconHtml('icon_engine', '🚀', 20) + '</div>' +
     '</div>';
 
@@ -95,7 +95,7 @@ function renderFuelRows(ship) {
     fuelCard.querySelector('.ss-fuel-rows').innerHTML = html;
 }
 
-// 渲染展开附加列（推重比 / 燃烧时间；0.3.0 打磨：初始质量已删，燃料余量展开态隐藏）
+// 渲染展开附加列（推重比 / 燃烧时间；0.2.4 打磨：初始质量已删，燃料余量展开态隐藏）
 function renderDetails(ship) {
     let html = '';
     if (ship) {
@@ -148,7 +148,7 @@ function render(ship) {
     renderFuelRows(ship);
     renderDetails(ship);
     renderDeltaVCard(ship);
-    // 0.3.0 修复：引擎图标纹理异步加载，模块构建时 get() 尚不可用会回退 emoji；
+    // 0.2.4 修复：引擎图标纹理异步加载，模块构建时 get() 尚不可用会回退 emoji；
     // 放入刷新循环，内容变化（emoji → SVG img）时才写 DOM，避免静态骨架永驻 emoji
     const iconHtml = renderIconHtml('icon_engine', '🚀', 20);
     if (iconHtml !== _lastIconHtml) {

@@ -20,7 +20,7 @@ const POLL_INTERVAL = 1000;
 
 const hudEl = document.createElement('div');
 hudEl.id = 'playerResourceHud';
-// 0.3.0：内容放入子容器，hudEl 自身可被其他模块追加元素（可见性筛选按钮挂尾端），
+// 0.2.4：内容放入子容器，hudEl 自身可被其他模块追加元素（可见性筛选按钮挂尾端），
 // renderHud 只重写内容容器，避免 innerHTML 整体重写清掉追加元素
 const contentEl = document.createElement('div');
 contentEl.id = 'prhContent';
@@ -33,19 +33,22 @@ function _getActiveShipName() {
     return ship ? (ship.displayName || ship.id) : '';
 }
 
-let _lastShipName = null;
+// 0.2.5（M10）：缓存键 = 模式 + 船名 —— 旧实现只比较船名，
+// 游戏模式变化而船名不变时（同场景内改模式）左上角模式文字不刷新
+let _lastHudKey = null;
 
 function renderHud() {
-    const player = gameState.getState().player;
-    const mode = player.gameMode || 'sandbox';
+    // 0.2.5（方案 A）：直接引用读取 —— 旧实现每秒 getState() 全量深拷贝整个游戏状态
+    const player = gameState.getPlayerRef();
+    const mode = (player && player.gameMode) || 'sandbox';
     const modeText = MODE_TEXT[mode] || mode;
     const shipName = _getActiveShipName();
 
-    // 载具名变化才重写 DOM（避免每帧/每次轮询无谓刷新）
-    if (shipName === _lastShipName) {
+    const key = mode + '|' + shipName;
+    if (key === _lastHudKey) {
         return;
     }
-    _lastShipName = shipName;
+    _lastHudKey = key;
 
     let html = `<button class="prh-mode prh-mode-${mode}" title="${t('common.settings')}">${modeText}</button>`;
     if (shipName) {
@@ -76,13 +79,17 @@ eventBus.on(Events.GAME_STATE_CHANGED, (data) => {
 eventBus.on(Events.SCENE_CHANGED, (data) => {
     const gameScenes = ['flight', 'tracking', 'galaxies'];
     hudEl.style.display = gameScenes.includes(data.to) ? 'flex' : 'none';
-    _lastShipName = null;
+    _lastHudKey = null;
     renderHud();
 });
 hudEl.style.display = 'none';
 
-// 兜底轮询（低频）
-setInterval(renderHud, POLL_INTERVAL);
+// 兜底轮询（低频；0.2.5 B12：HUD 隐藏（主菜单/设置等非游戏场景）时跳过，避免常驻空转 ——
+// 事件驱动已覆盖绝大部分刷新，轮询仅补偿不发事件的调试写入）
+setInterval(() => {
+    if (hudEl.style.display === 'none') return;
+    renderHud();
+}, POLL_INTERVAL);
 
 // 挂载到 window 供调试
 if (typeof window !== 'undefined') {

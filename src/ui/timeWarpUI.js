@@ -77,6 +77,7 @@ class TimeWarpUI {
         this._lastHeaderKey = undefined;
         this._lastFooterKey = undefined;
         this._lastUtText = '';
+        this._lastOnFrameMs = 0;   // 0.2.5 B12：同帧双事件去重
         this._cellActive = [];
         this._cellLocked = [];
 
@@ -295,7 +296,14 @@ class TimeWarpUI {
         if (visible) this.refresh();
     }
 
+    // 0.2.5 B12：同一真实帧内可能先后收到 RENDER_DATA 与 CELESTIAL_TIME_UPDATED
+    //（飞行场景两个事件每帧各发一次）→ 帧级去重，refresh 每帧最多执行一次
     onFrame(time) {
+        const now = performance.now();
+        if (now - (this._lastOnFrameMs || 0) < 6) {
+            return;
+        }
+        this._lastOnFrameMs = now;
         const text = formatUT(time);
         if (text !== this._lastUtText) {
             this._lastUtText = text;
@@ -322,22 +330,18 @@ class TimeWarpUI {
             stateKey = 'n';
         }
 
-        // ---- 控制状态容器的显隐（opacity） ----
-        for (const [key, container] of Object.entries(this._headerContainers)) {
-            const isActive = (key === stateKey);
-            container.classList.toggle('active', isActive);
-        }
-
-        // ---- 控制顶栏整体显隐（用 hidden 类） ----
-        const isNormal = (stateKey === 'n');
-        this._header.classList.toggle('hidden', isNormal);
-
-        // ---- 边框颜色（只在状态改变时更新） ----
+        // ---- 边框颜色 / 控制状态容器显隐 / 顶栏显隐：只在状态 key 变化时更新 ----
+        // 0.2.5 B12：状态容器 classList 与顶栏 hidden 原为每帧无条件 toggle，移入缓存分支
         const headerKey = stateKey;
         if (this._lastHeaderKey !== headerKey) {
             this._lastHeaderKey = headerKey;
             this._right.style.borderColor = paused ? COLOR_PAUSE : COLOR_RUN;
             this._header.style.borderColor = paused ? COLOR_PAUSE : COLOR_SPEED;
+            for (const [key, container] of Object.entries(this._headerContainers)) {
+                const isActive = (key === stateKey);
+                container.classList.toggle('active', isActive);
+            }
+            this._header.classList.toggle('hidden', stateKey === 'n');
         }
 
         // ---- 档位格 ----

@@ -54,6 +54,22 @@ const STRINGS = {
     'startgame.metaGameTime': '游戏时间',
     'startgame.metaGameMode': '游戏模式',
 
+    // ---------- 世界导入导出（0.2.5 存档交流） ----------
+    'startgame.exportWorld': '导出世界',
+    'startgame.importWorld': '导入世界',
+    'startgame.exportSuccess': '✅ 世界已导出',
+    'startgame.exportFailed': '❌ 导出失败：未找到该世界',
+    'startgame.importSuccess': (p) => `✅ 世界「${p.name}」已导入`,
+    'startgame.importFailedFormat': '❌ 导入失败：文件格式不匹配',
+    'startgame.importFailedInvalid': '❌ 导入失败：存档文件内容无效',
+    // 0.2.5 导入落地写入本地存储失败(配额满等)专用提示
+    'startgame.importFailedStorage': '❌ 导入失败：本地存储写入失败，请删除部分战役后重试。',
+    'startgame.importFailedSystem': '❌ 导入失败：该世界的星系配置与当前版本不兼容',
+    'startgame.importFailedRead': '❌ 导入失败：文件读取出错',
+    'startgame.renameTitle': '世界名称已存在',
+    'startgame.renamePrompt': (p) => `已存在同名世界「${p.name}」。请为导入的世界输入新名称：`,
+    'startgame.renameDefault': (p) => `${p.name} (导入)`,
+
     // ---------- 创建新战役对话框 ----------
     'newcampaign.title': '创建新战役',
     'newcampaign.gameMode': '游戏模式',
@@ -210,7 +226,6 @@ const STRINGS = {
     'facility.unknownCompartment': '未知舱室',
     'facility.infoSection': '设施信息',
     'facility.storageSection': '存储',
-    'facility.controlSection': '当前控制',
     'facility.nameLabel': '设施名称',
     'facility.typeLabel': '设施类型',
     'facility.dockLabel': '对接口',
@@ -223,7 +238,6 @@ const STRINGS = {
     'facility.fuelLabel': '燃料',
     'facility.dryMassLabel': '干质量',
     'facility.modulesLabel': '模块',
-    'facility.backToOverview': '返回设施总览',
     'facility.shipBuilt': '飞船已建造在设施附近',
     'facility.newShipName': '新建飞船',
     'facility.deployTitle': '部署设施',
@@ -259,12 +273,12 @@ const STRINGS = {
     'orbit.type.escape': '逃逸',
     'orbit.type.deepSpace': '深空',
 
-    // ---------- 轨道点标签（0.3.0：Ap/Pe 标记） ----------
+    // ---------- 轨道点标签（0.2.4：Ap/Pe 标记） ----------
     'orbitPoint.ap': 'Ap',
     'orbitPoint.pe': 'Pe',
     'orbitPoint.apFull': '远点',
     'orbitPoint.peFull': '近点',
-    // SOI 穿越标签（0.3.0：段尾=离开 / 段头=进入）
+    // SOI 穿越标签（0.2.4：段尾=离开 / 段头=进入）
     'orbitPoint.soiLeave': (p) => `离开 ${p.name}`,
     'orbitPoint.soiEnter': (p) => `进入 ${p.name}`,
     // SOI 标签展开面板状态行（替代高度行）
@@ -272,7 +286,7 @@ const STRINGS = {
     'orbitPoint.soiEncounter': (p) => `正在遭遇 ${p.name}`,
     // 可见性筛选：SOI 切换标签开关
     'sas.soiLabels': 'SOI 切换标签',
-    // ---------- 轨道线右键菜单（0.3.0 提交5 占位版） ----------
+    // ---------- 轨道线右键菜单（0.2.4 提交5 占位版） ----------
     'orbitMenu.createNode': '创建机动计划',
     'orbitMenu.warpToPoint': '时间加速至目标点',
     'orbitMenu.toApo': '快进至远点',
@@ -280,13 +294,58 @@ const STRINGS = {
     'orbitMenu.toSoi': '快进至引力范围变化',
     'orbitMenu.targetSuffix': '到目标点',
     'orbitMenu.todo': (p) => `「${p.name}」功能开发中，敬请期待`,
-    // 定点时间加速（0.3.0 提交5 落地）
+    // 定点时间加速（0.2.4 提交5 落地）
     'orbitMenu.warpStarted': '定点加速启动：将以最大可用档位前往目标点',
     'orbitMenu.arrived': '已到达目标点',
     'orbitMenu.noTime': '该点无到达时间数据，无法定点加速',
     'orbitMenu.apeUnavailable': '到达该拱点前将发生 SOI 切换，暂时不可用',
     'orbitMenu.noSoi': '当前轨道无近期 SOI 切换',
     'orbitMenu.apeClose': '目标拱点已不足 15 秒，无需加速',
+
+    // ---------- 机动节点（0.2.5：加速计时器面板 / 节点交互） ----------
+    'maneuver.panelTitle': '加速计时器',
+    'maneuver.dvNeeded': '需要ΔV',
+    'maneuver.burnStartAt': '加速开始于',
+    'maneuver.burnStopAt': '加速停止于',
+    'maneuver.warpToBurnTip': '时间加速至节点前10秒',
+    'maneuver.deleteTip': '删除机动计划',
+    'maneuver.created': '机动计划已创建',
+    'maneuver.alreadyExists': '已存在机动计划，请先删除旧计划',
+    'maneuver.createFailed': '机动计划创建失败：该点不在可预测范围内',
+    'maneuver.arrived': '已到达机动节点时刻，请按计划点火',
+    'maneuver.completed': '机动计划 ΔV 已达成',
+    'maneuver.deleted': '机动计划已删除',
+    'maneuver.warpStarted': '定点加速启动：前往机动节点时刻前 10 秒',
+    'maneuver.warpTooClose': '距节点时刻已不足 10 秒，无需加速',
+    // 燃料耗尽点轨道标签（0.2.5：收起态 ❌，展开显示全称）
+    'orbitPoint.fuelOut': '燃料耗尽点',
+
+    // ---------- 飞行视图档位（0.2.5：V 键切换 普通聚焦 ↔ 轨道机动） ----------
+    'view.switchedManeuver': '视图：机动',
+    'view.switchedFocus': '视图：常规',
+    'view.unavailable': '当前无法使用轨道机动视图（宿主无轨道中心）',
+
+    // ---------- 轨道机动视图规划面板（0.2.5） ----------
+    'mvp.title': '轨道机动视图',
+    'mvp.focusLabel': '聚焦天体',
+    'mvp.dvLabel': '机动 ΔV（节点参考系分量）',
+    'mvp.dvPro': '顺向',
+    'mvp.dvRetro': '逆向',
+    'mvp.dvRadIn': '径向内',
+    'mvp.dvRadOut': '径向朝外',
+    'mvp.timeLabel': '节点时刻',
+    'mvp.periodLabel': '按周期平移',
+    'mvp.periodUnit': '圈',
+    'mvp.planDv': '计划 ΔV',
+    'mvp.fuelMargin': '燃料余量',
+    'mvp.fuelOk': '充足',
+    'mvp.fuelLow': '不足',
+    'mvp.kind.star': '恒星',
+    'mvp.kind.planet': '行星',
+    'mvp.kind.moon': '卫星',
+    // 放大图内轨道点菜单（HUD 风格；总监定稿：仅保留"创建机动节点"一项）
+    'mvp.createNode': '创建机动节点',
+    'mvp.menuTitleSuffix': '到该点',
 
     // ---------- 飞船建造 ----------
     'build.title': '飞船建造',
@@ -312,14 +371,11 @@ const STRINGS = {
     'build.slotIndex': (p) => `槽${p.i}`,
     'build.slotEmpty': '空',
     'build.selectShipFirst': '请先选择一艘飞船',
-    'build.noHomeBody': '找不到起始天体数据',
-    'build.chooseAltitude': '选择轨道高度',
-    'build.altitudePrompt': (p) => `请输入绕 ${p.name} 的轨道半径（米）`,
     'build.invalidNumber': '请输入有效数字',
     'build.shipNameSuffix': (p) => `${p.name}号`,
     'build.createFailed': '飞船创建失败',
-    'build.launched': '飞船建造完成，已发射！',
-    'build.cancelled': '建造已取消',
+    // 0.2.5：飞船出生在船坞旁并立即切控制（旧"输入轨道半径"流程文案已清理）
+    'build.launched': '飞船建造完成，已出坞！',
 
     // ---------- SAS / 导航球 ----------
     'sas.prograde': '顺向',
@@ -411,7 +467,7 @@ const STRINGS = {
     'dock.success': '对接成功',
     'dock.failFull': '对接失败（对接口已满或其他原因）',
 
-    // ---------- 飞行状态 HUD（0.3.0 右下燃料/ΔV 卡） ----------
+    // ---------- 飞行状态 HUD（0.2.4 右下燃料/ΔV 卡） ----------
     'hud.dvLabel': '剩余 ΔV',
     'hud.twr': '推重比',
     'hud.burnTime': '燃烧时间',
@@ -463,6 +519,8 @@ const STRINGS = {
     // 0.2.5 星系组合兼容性(读档校验)
     'save.systemIncompatibleTitle': '无法加载存档',
     'save.systemIncompatible': '该存档的星系配置与当前版本不兼容，无法加载。',
+    // 0.2.5 存储写入失败可感知(存档/删除/导入共用)
+    'save.storageFull': '⚠ 存档写入失败：本地存储空间不足或被浏览器限制，请清理后重试。',
     'timewarp.pausedNotice': '游戏已暂停',
     'timewarp.resumedNotice': '游戏已恢复',
     'timewarp.warpCanceled': '已取消定点加速',

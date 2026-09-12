@@ -10,9 +10,11 @@ import { stateToKepler } from './physics/orbitalMechanics.js';
 import { celestialBodies, setActiveSystems, getActiveSystemIds } from './physics/physics.js';
 import { eventBus, Events } from './eventBus.js';
 import { t } from './config/strings.js';
+import { VERSION_TEXT } from './config/version.js';
 import { validateSystemSelection } from './config/starSystemIndex.js';
 import { createInfoDialog } from './ui/uiComponents.js';
 import { initFacilityStorage, addStorage } from './resources/cargoSystem.js';
+import { timeWarp } from './timeWarp.js';
 
 class SaveManager {
     constructor() {
@@ -66,11 +68,15 @@ class SaveManager {
         };
     }
 
+    // 0.2.5：返回是否写入成功 —— localStorage 满/被禁用时调用方必须可感知失败，
+    // 避免"存档假成功"（尤其导入世界是一次性写入量最大的路径）
     _savePlayerProfile() {
         try {
             localStorage.setItem('ksp2d_profile', JSON.stringify(this._playerProfile));
+            return true;
         } catch (e) {
             console.error('[SaveManager] 保存玩家档案失败:', e);
+            return false;
         }
     }
 
@@ -78,8 +84,13 @@ class SaveManager {
         return this._playerProfile;
     }
 
+    // 0.2.5（H2d）：先拷贝再合并 —— _playerProfile 可能与最近存档世界的 world.player 共享引用
+    //（saveCheckpoint 末尾赋值），旧实现直接 Object.assign 会顺带改写该世界的 player 数据
+    //（脏写不进磁盘，刷新后该世界档案与本地档案不一致）
     updatePlayerProfile(updates) {
-        Object.assign(this._playerProfile, updates);
+        const merged = JSON.parse(JSON.stringify(this._playerProfile));
+        Object.assign(merged, updates);
+        this._playerProfile = merged;
         this._savePlayerProfile();
     }
 
@@ -98,14 +109,25 @@ class SaveManager {
         }
     }
 
+    // 0.2.5：返回是否写入成功 —— 调用方（创建/存档/删除/导入）据此回滚或提示，
+    // 杜绝存储失败时 UI 仍报"成功"
     _saveToStorage() {
         try {
             localStorage.setItem('ksp2d_worlds', JSON.stringify({
                 _worlds: this._worlds,
                 _worldList: this._worldList
             }));
+            return true;
         } catch (e) {
             console.error('[SaveManager] 保存到 localStorage 失败:', e);
+            return false;
+        }
+    }
+
+    // 存储失败统一提示（0.2.5）：文案走 strings.js
+    _notifyStorageFull() {
+        if (typeof window !== 'undefined' && typeof window.showNotification === 'function') {
+            window.showNotification(t('save.storageFull'), 'error');
         }
     }
 
@@ -140,11 +162,15 @@ class SaveManager {
 
     // 创建新世界
     // starSystems: 星系组合 id 数组(创建时绑定,不可更改;缺省时按当前激活组合)
+    // 0.2.5：失败原因在本函数内区分并各自通知（名称冲突/存储写入失败），调用方只负责回滚
     createWorld(name, starSystems) {
         // 名称冲突检测
         const nameExists = this._worldList.some(id => this._worlds[id].metadata.name === name);
         if (nameExists) {
             console.warn(`[SaveManager] 世界名称 "${name}" 已存在`);
+            if (typeof window !== 'undefined' && typeof window.showNotification === 'function') {
+                window.showNotification(t('newgame.nameExists'), 'error');
+            }
             return null;
         }
 
@@ -202,7 +228,14 @@ class SaveManager {
         };
 
         this._worldList.unshift(worldId);
-        this._saveToStorage();
+        // 0.2.5：写入失败 → 回滚内存态并提示，不返回"假成功"的世界 ID
+        if (!this._saveToStorage()) {
+            this._worldList.shift();
+            delete this._worlds[worldId];
+            this._notifyStorageFull();
+            console.warn('[SaveManager] 世界创建失败：存储写入失败，已回滚');
+            return null;
+        }
 
         console.log(`[SaveManager] 世界创建成功: ${worldId}`);
         return worldId;
@@ -285,12 +318,26 @@ class SaveManager {
         };
 
         world.checkpoints.unshift(checkpoint);
+        const prevActiveCheckpointId = world.activeCheckpointId;
+        const prevPlayer = world.player;
         world.activeCheckpointId = checkpointId;
         // 0.2.0 阶段4：同步玩家状态到世界档案与本地档案（读档按 world.player 恢复，不同步会回滚到初始 500 套）
-        world.player = gameState.getState().player;
-        this._playerProfile = world.player;
+        // 0.2.5 修复 H2a：写入前必须过 _sanitizePlayerForSave（与 createWorld/loadCheckpoint 口径一致），
+        // 否则进行中的扫描任务（scanning:true）会经 world.player 泄漏进存档/导出文件，卡死扫描单通道
+        world.player = this._sanitizePlayerForSave(gameState.getState().player);
+        // 0.2.5（H2d）：_playerProfile 存独立副本，避免与 world.player 共享引用（见 updatePlayerProfile）
+        this._playerProfile = JSON.parse(JSON.stringify(world.player));
         this._savePlayerProfile();
-        this._saveToStorage();
+        // 0.2.5 修复 H2b：存储写入失败 → 回滚本检查点与玩家状态，明确失败而非"假成功"
+        if (!this._saveToStorage()) {
+            world.checkpoints.shift();
+            world.activeCheckpointId = prevActiveCheckpointId;
+            world.player = prevPlayer;
+            this._playerProfile = prevPlayer;
+            this._notifyStorageFull();
+            console.warn('[SaveManager] 检查点创建失败：存储写入失败，已回滚');
+            return null;
+        }
 
         console.log(`[SaveManager] 检查点创建成功: ${checkpointId}`);
         return checkpointId;
@@ -405,6 +452,9 @@ class SaveManager {
             sceneManager.switchTo(checkpoint.currentScene);
         }
 
+        // 0.2.5：读档后时间加速归 1x（取消进行中的定点加速目标，防止旧目标/高倍率在新时间线继续推进）
+        timeWarp.resetOnLoad();
+
         // 加载后通过 shipSystem 切换活动飞船
         if (checkpoint.activeShipId) {
             shipSystem.switchShip(checkpoint.activeShipId);
@@ -509,22 +559,31 @@ class SaveManager {
         }));
     }
 
-    // 删除世界
+    // 删除世界（0.2.5：存储写入失败时回滚内存，保证内存/磁盘一致并明确提示）
     deleteWorld(worldId) {
-        if (!this._worlds[worldId]) {
+        const world = this._worlds[worldId];
+        if (!world) {
             console.warn(`[SaveManager] 世界 ${worldId} 不存在`);
             return false;
         }
+        const worldIndex = this._worldList.indexOf(worldId);
 
         delete this._worlds[worldId];
         this._worldList = this._worldList.filter(id => id !== worldId);
-        this._saveToStorage();
+        if (!this._saveToStorage()) {
+            // 回滚：恢复世界与列表原序
+            this._worlds[worldId] = world;
+            this._worldList.splice(Math.max(0, worldIndex), 0, worldId);
+            this._notifyStorageFull();
+            console.warn('[SaveManager] 世界删除失败：存储写入失败，已回滚');
+            return false;
+        }
 
         console.log(`[SaveManager] 世界删除成功: ${worldId}`);
         return true;
     }
 
-    // 删除检查点
+    // 删除检查点（0.2.5：存储写入失败时回滚内存，保证内存/磁盘一致并明确提示）
     deleteCheckpoint(worldId, checkpointId) {
         const world = this._worlds[worldId];
         if (!world) {
@@ -538,11 +597,20 @@ class SaveManager {
             return false;
         }
 
+        const removed = world.checkpoints[index];
+        const prevActiveCheckpointId = world.activeCheckpointId;
         world.checkpoints.splice(index, 1);
         if (world.activeCheckpointId === checkpointId) {
             world.activeCheckpointId = world.checkpoints.length > 0 ? world.checkpoints[0].id : null;
         }
-        this._saveToStorage();
+        if (!this._saveToStorage()) {
+            // 回滚：恢复检查点与激活检查点
+            world.checkpoints.splice(index, 0, removed);
+            world.activeCheckpointId = prevActiveCheckpointId;
+            this._notifyStorageFull();
+            console.warn('[SaveManager] 检查点删除失败：存储写入失败，已回滚');
+            return false;
+        }
 
         console.log(`[SaveManager] 检查点删除成功: ${checkpointId}`);
         return true;
@@ -611,11 +679,204 @@ class SaveManager {
         return null;
     }
 
+    // ============================================================
+    // 世界导入导出（0.2.5 存档交流：本地 JSON 文件跨设备迁移）
+    // 导出：世界（含全部检查点）→ 单文件下载；导入分两步：
+    //   readWorldExportFile 读取+校验（不落地）→ commitImportedWorld 落地
+    // 导出不改变任何存储逻辑；导入走 _saveToStorage()，与本地存档同路径
+    // ============================================================
+
+    // 导出世界为本地 JSON 文件（浏览器下载）
+    exportWorldToFile(worldId) {
+        const world = this.getWorld(worldId);
+        if (!world) {
+            console.warn(`[SaveManager] 导出失败:世界 ${worldId} 不存在`);
+            return false;
+        }
+
+        const exportData = {
+            format: 'ksp2d_world_export',
+            version: '1.0',
+            exportedAt: Date.now(),
+            appVersion: VERSION_TEXT,
+            world: world
+        };
+
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${this._sanitizeFileName(world.metadata.name)}_${this._formatFileTimestamp(Date.now())}.json`;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        // 延迟回收：部分浏览器在 click 后立即 revoke 会中断下载
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 1000);
+
+        console.log(`[SaveManager] 世界导出成功: ${worldId} (${world.metadata.name})`);
+        return true;
+    }
+
+    // 清洗导出文件名：Windows 非法字符 → 下划线，去首尾点/空格
+    _sanitizeFileName(name) {
+        const cleaned = String(name || 'world')
+            .replace(/[\\/:*?"<>|]/g, '_')
+            .replace(/^[\s.]+|[\s.]+$/g, '')
+            .trim();
+        return cleaned || 'world';
+    }
+
+    // 导出时间戳格式：YYYYMMDD-HHMMSS
+    _formatFileTimestamp(ts) {
+        const d = new Date(ts);
+        const pad = (n) => String(n).padStart(2, '0');
+        return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+    }
+
+    // 读取并校验世界导出文件（不落地）
+    // resolve(world) | reject(Error，err.code: 'format' | 'invalid' | 'system' | 'read')
+    readWorldExportFile(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (!data || data.format !== 'ksp2d_world_export') {
+                        reject(this._makeExportError('format', '文件格式不匹配'));
+                        return;
+                    }
+                    const world = data.world;
+                    if (!world || !world.metadata
+                        || typeof world.metadata.name !== 'string' || !world.metadata.name.trim()) {
+                        reject(this._makeExportError('invalid', '世界数据无效'));
+                        return;
+                    }
+                    if (!Array.isArray(world.checkpoints) || world.checkpoints.length === 0) {
+                        reject(this._makeExportError('invalid', '存档点数据无效'));
+                        return;
+                    }
+                    // 0.2.5 结构校验：损坏/手工修改的文件若 ships/facilities 非数组（或含非对象元素），
+                    // 读档时 for..of 遍历会直接抛异常崩溃，读取阶段必须拦截
+                    for (const cp of world.checkpoints) {
+                        if (!cp || typeof cp !== 'object') {
+                            reject(this._makeExportError('invalid', '存档点数据无效'));
+                            return;
+                        }
+                        if (!Array.isArray(cp.ships) || !Array.isArray(cp.facilities)) {
+                            reject(this._makeExportError('invalid', '存档点数据无效'));
+                            return;
+                        }
+                        if (cp.ships.some(s => !s || typeof s !== 'object')
+                            || cp.facilities.some(f => !f || typeof f !== 'object')) {
+                            reject(this._makeExportError('invalid', '存档点数据无效'));
+                            return;
+                        }
+                    }
+                    // player 若存在必须为对象（读档路径直接按对象访问字段）
+                    if (world.player !== undefined && world.player !== null
+                        && typeof world.player !== 'object') {
+                        reject(this._makeExportError('invalid', '世界数据无效'));
+                        return;
+                    }
+                    // activeCheckpointId 指向不存在时重置为第一个检查点
+                    if (!world.checkpoints.some(c => c.id === world.activeCheckpointId)) {
+                        world.activeCheckpointId = world.checkpoints[0].id;
+                    }
+                    // 星系组合校验（与 loadCheckpoint 同一校验函数）
+                    const savedSystems = world.metadata.starSystems || ['kerbolar'];
+                    if (!validateSystemSelection(savedSystems).ok) {
+                        reject(this._makeExportError('system', '星系配置不兼容'));
+                        return;
+                    }
+                    resolve(world);
+                } catch (err) {
+                    if (err && err.code) {
+                        reject(err);
+                    } else {
+                        reject(this._makeExportError('invalid', err && err.message ? err.message : '文件解析失败'));
+                    }
+                }
+            };
+            reader.onerror = () => reject(this._makeExportError('read', '文件读取失败'));
+            reader.readAsText(file);
+        });
+    }
+
+    // 构造带错误码的导入错误（供 UI 层分类提示）
+    _makeExportError(code, message) {
+        const err = new Error(message);
+        err.code = code;
+        return err;
+    }
+
+    // 导入世界落地：新 id、列表置顶、写入存储
+    // nameOverride：导入命名（重名时由 UI 弹窗提供；缺省用世界原名称）
+    // 0.2.5：返回值改为 { ok, worldId?, reason? } —— reason: 'invalid' | 'system' | 'storage'，
+    // 存储写入失败必须可感知（导入是一次性写入量最大的路径，最易触发配额上限），绝不"假成功"
+    commitImportedWorld(world, nameOverride) {
+        if (!world || !world.metadata) {
+            console.warn('[SaveManager] 导入失败:世界数据无效');
+            return { ok: false, reason: 'invalid' };
+        }
+        const override = (typeof nameOverride === 'string' && nameOverride.trim()) ? nameOverride.trim() : '';
+        const baseName = override || String(world.metadata.name || '').trim();
+        if (!baseName) {
+            console.warn('[SaveManager] 导入失败:世界名称为空');
+            return { ok: false, reason: 'invalid' };
+        }
+        // 星系校验兜底（防调用方篡改；正常流程 readWorldExportFile 已校验）
+        const savedSystems = world.metadata.starSystems || ['kerbolar'];
+        if (!validateSystemSelection(savedSystems).ok) {
+            console.warn('[SaveManager] 导入失败:星系配置不兼容');
+            return { ok: false, reason: 'system' };
+        }
+
+        // 名称唯一兜底：冲突时追加 (2) (3)…（玩家自命名若重名同样生效）
+        const name = this._ensureUniqueWorldName(baseName);
+        const worldId = `world_${this._generateId()}`;
+        // 深拷贝落地，切断与导入对象的外部引用
+        const stored = JSON.parse(JSON.stringify(world));
+        stored.metadata.name = name;
+        // 0.2.5：落地前清洗玩家状态（与 saveCheckpoint/loadCheckpoint 同口径），
+        // 防止导入文件携带的 scanning:true 泄漏进本地存档
+        stored.player = this._sanitizePlayerForSave(stored.player);
+        this._worlds[worldId] = stored;
+        this._worldList.unshift(worldId);
+        if (!this._saveToStorage()) {
+            // 写入失败：回滚内存并返回失败原因，UI 明确报错而非"假成功"
+            this._worldList.shift();
+            delete this._worlds[worldId];
+            this._notifyStorageFull();
+            console.warn('[SaveManager] 世界导入失败：存储写入失败，已回滚');
+            return { ok: false, reason: 'storage' };
+        }
+
+        console.log(`[SaveManager] 世界导入成功: ${worldId} (${name})`);
+        return { ok: true, worldId };
+    }
+
+    // 保证世界名唯一：冲突时追加 (2) (3)… 后缀
+    _ensureUniqueWorldName(name) {
+        const exists = (n) => this._worldList.some(id =>
+            this._worlds[id] && this._worlds[id].metadata.name === n);
+        if (!exists(name)) return name;
+        let i = 2;
+        while (exists(`${name} (${i})`)) i++;
+        return `${name} (${i})`;
+    }
+
     clearAll() {
         this._worlds = {};
         this._worldList = [];
-        this._saveToStorage();
-        console.log('[SaveManager] 所有世界已清空');
+        if (!this._saveToStorage()) {
+            this._notifyStorageFull();
+            console.warn('[SaveManager] 清空世界失败：存储写入失败');
+        } else {
+            console.log('[SaveManager] 所有世界已清空');
+        }
     }
 }
 
