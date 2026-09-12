@@ -376,3 +376,51 @@ export function computeManeuverDirection(ship, pred, now) {
     if (Math.hypot(dvx, dvy) < 0.1) return null;   // 已在目标轨道（误差内）→ 无指向意义
     return Math.atan2(dvx, dvy);
 }
+
+// ===== 节点"纯时间编辑"支撑（0.3.0 规划面板：改时间 / 按周期平移）=====
+
+/**
+ * 节点所在轨道周期（秒）：由节点冻结快照的 Kepler 根数解析求解 2π√(a³/gm)；
+ * 逃逸/双曲线（a<0）/快照缺失 → null（无周期，按周期平移不可用）
+ * @returns {number|null}
+ */
+export function getNodeOrbitPeriod(node) {
+    if (!node || node.relX === null || node.relX === undefined
+        || node.relVelX === null || node.relVelX === undefined
+        || !node.anchorBody) {
+        return null;
+    }
+    const body = celestialBodies.find(b => b.name === node.anchorBody);
+    if (!body || !(body.gm > 0)) return null;
+    const k = stateToKepler({ x: node.relX, y: node.relY }, { x: node.relVelX, y: node.relVelY }, body.gm);
+    if (!k || !isFinite(k.a) || !(k.a > 0)) return null;
+    return 2 * Math.PI * Math.sqrt(k.a * k.a * k.a / body.gm);
+}
+
+/**
+ * 沿节点冻结快照的轨道解析传播到 newTime（可跨任意多圈）：
+ * 返回 { relPos, relVel, period } 或 null（快照缺失/无有效根数/宿主不存在）。
+ * 说明：不依赖预测链，故"节点时刻远超可见预测链"也能精确外推（同一 SOI 内）。
+ * @param {Object} node - 机动节点（relX/relY/relVelX/relVelY/time/anchorBody）
+ * @param {number} newTime - 目标绝对时刻（游戏秒）
+ */
+export function propagateNodeSnapshot(node, newTime) {
+    if (!node || !isFinite(newTime)) return null;
+    if (node.relX === null || node.relX === undefined
+        || node.relY === null || node.relY === undefined
+        || node.relVelX === null || node.relVelX === undefined
+        || node.relVelY === null || node.relVelY === undefined
+        || !node.anchorBody) {
+        return null;
+    }
+    const body = celestialBodies.find(b => b.name === node.anchorBody);
+    if (!body || !(body.gm > 0)) return null;
+    const k = stateToKepler({ x: node.relX, y: node.relY }, { x: node.relVelX, y: node.relVelY }, body.gm);
+    if (!k) return null;
+    const dt = newTime - node.time;
+    const st = keplerToState(k, body.gm, dt);
+    const period = (isFinite(k.a) && k.a > 0)
+        ? 2 * Math.PI * Math.sqrt(k.a * k.a * k.a / body.gm)
+        : null;
+    return { relPos: st.pos, relVel: st.vel, period };
+}

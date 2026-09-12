@@ -16,6 +16,7 @@ import { screenToWorld, cssToCanvas, canvasToCss, worldToScreen } from '../camer
 import { getCachedTime, bodyFuturePos } from '../physics/orbitalPrediction.js';
 import { walkToTime } from '../physics/maneuverPrediction.js';
 import { celestialBodies } from '../physics/physics.js';
+import { flightView } from '../flightView.js';
 import { computeDeltaV } from '../resources/resourceSystem.js';
 import { textureManager } from '../graphics/textureManager.js';
 import { timeWarp } from '../timeWarp.js';
@@ -355,6 +356,10 @@ export function updateManeuverUI(canvas, ship) {
     const burnT = (plan && plan.burnDuration !== null && plan.burnDuration !== undefined)
         ? plan.burnDuration : 0;
 
+    // ---- 机动视图内隐藏节点图标与手柄（0.3.0：远景下图标仅是行星上一点，
+    //      细节交由规划面板的放大图；加速计时器面板保留显示） ----
+    const hideGizmo = flightView.isManeuver();
+
     // ---- 图标屏幕位置：预测链内优先；退化用冻结轨道坐标 ----
     let iconCss = null;
     if (pred && pred.nodeScreen) {
@@ -366,7 +371,7 @@ export function updateManeuverUI(canvas, ship) {
         const wy = node.relY + hp.y;
         iconCss = worldToCanvasCss(wx, wy, canvas);
     }
-    if (iconCss) {
+    if (iconCss && !hideGizmo) {
         _icon.style.display = 'block';
         _icon.style.left = iconCss.x + 'px';
         _icon.style.top = iconCss.y + 'px';

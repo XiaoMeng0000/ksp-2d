@@ -10,6 +10,7 @@ import { renderableManager } from './graphics/renderable.js';
 import { textureManager } from './graphics/textureManager.js';
 import { drawStarGlow, drawStarBall, drawPlanetRing } from './graphics/programEffects.js';
 import { STARFIELD_CONFIG } from './config/starfieldConfig.js';
+import { flightView } from './flightView.js';
 import { t } from './config/strings.js';
 import { ORBIT_POINT_TYPES, ORBIT_MARKER_COLOR } from './config/orbitPointTypes.js';
 import { syncOrbitLabels } from './ui/orbitLabels.js';
@@ -740,12 +741,18 @@ function renderOrbit(ship, ctx, canvas, isActive = true) {
 
     // 骨架：Ap/Pe 标记绘制调用点（renderOrbitMarkers 功能体待填，当前返回 []）
     // 输出缓存到 _lastOrbitMarkers，供交互层命中检测（此处已过 isActive 提前返回，恒为活动飞船）
+    // 0.3.0 机动视图：主视图**仅显示 SOI 切换标签**（Ap/Pe、燃料耗尽点等轨道点标签隐藏），
+    // 细节交由规划面板放大图呈现；节点图标/手柄由 maneuverUI 另行隐藏
     const mvPred = _lastManeuverPrediction;
+    const mvFilter = flightView.isManeuver()
+        ? (m) => m && (m.type === 'soi_exit' || m.type === 'soi_entry')
+        : null;
     _lastOrbitMarkers = renderOrbitMarkers(ctx, canvas, ship, _orbitHoverState,
         (mvPred && mvPred.maneuverMarkerDefs && mvPred.maneuverMarkerDefs.length
             ? mvPred.maneuverMarkerDefs : null),
         (mvPred && mvPred.plan && mvPred.plan.segments && mvPred.plan.segments.length > 1
-            ? mvPred.plan.segments : null)) || [];
+            ? mvPred.plan.segments : null),
+        mvFilter) || [];
 }
 
 // ship.maneuverNodes 由 shipSystem.createShip 初始化为空数组，数据结构：
@@ -1087,7 +1094,7 @@ const ORBIT_LABEL_DY = -16;
  * @returns {Array} markers - [{ type, worldX, worldY, screenX, screenY, bodyX, bodyY,
  *                              icon, label, value, tToNext, contextMenu, isHover }]
  */
-function renderOrbitMarkers(ctx, canvas, ship, hoveredMarker, extraDefs = null, extraSegments = null) {
+function renderOrbitMarkers(ctx, canvas, ship, hoveredMarker, extraDefs = null, extraSegments = null, markerFilter = null) {
     const markers = [];
 
     // 无活动飞船 / 深空 / 逃逸：清空标签
@@ -1216,6 +1223,13 @@ function renderOrbitMarkers(ctx, canvas, ship, hoveredMarker, extraDefs = null, 
                 pushSoiTag(markers, 'soi_entry', si, seg.relPoints[0],
                     seg, segAnchor, hostBody, now, canvas, hoveredMarker, 'mv_');
             }
+        }
+    }
+
+    // ===== 标签过滤（0.3.0）：机动视图下只保留 SOI 切换标签（其余轨道点标签在远景下无参考价值）=====
+    if (typeof markerFilter === 'function') {
+        for (let i = markers.length - 1; i >= 0; i--) {
+            if (!markerFilter(markers[i])) markers.splice(i, 1);
         }
     }
 

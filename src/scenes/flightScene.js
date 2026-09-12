@@ -9,6 +9,7 @@ import { getTimeToNextSOISwitch } from '../physics/orbitalPrediction.js';
 import { render, renderFlightHud, getLastOrbitSegments, getLastOrbitMarkers, setOrbitHoverState, findNearestOrbitPoint, resolveOrbitHit, getLastManeuverPrediction } from '../renderer.js';
 import { showOrbitContextMenu, updateOrbitContextMenu } from '../ui/orbitContextMenu.js';
 import { updateManeuverUI, hideManeuverUI, isManeuverDragging, collapseManeuverEditing } from '../ui/maneuverUI.js';
+import { updateManeuverViewPanel, hideManeuverViewPanel } from '../ui/maneuverViewPanel.js';
 import { maneuverSystem } from '../ship/maneuverSystem.js';
 import { flightView } from '../flightView.js';
 import { formatDuration } from '../utils/format.js';
@@ -50,6 +51,14 @@ let _lastMouseY = -1;
 let _lastClientX = 0;          // 最近鼠标视口坐标（供工具提示定位）
 let _lastClientY = 0;
 let _lastOrbitHit = null;      // 轨道线命中缓存（含世界坐标；悬停滞后/工具提示用）
+
+// 机动视图内隐藏/还原右下角飞船状态面板（0.3.0：避免与规划面板在同一角落遮挡）// 注意：shipStatusUI 每帧把内联 display 写回（display:flex），内联写在帧间会被反复覆盖造成闪烁，
+// 因此这里只切 body 类，由 maneuverPanel.css 的 !important 规则真正压制显示
+function setShipStatusPanelHidden(hidden) {
+    if (typeof document === 'undefined' || !document.body) return;
+    if (hidden) document.body.classList.add('mvp-maneuver');
+    else document.body.classList.remove('mvp-maneuver');
+}
 let _lastOrbitTipX = -9999;    // 最近一次工具提示触发时鼠标位置（移动防抖）
 let _lastOrbitTipY = -9999;
 
@@ -657,6 +666,12 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             // 隐藏机动节点 UI（面板/图标/手柄），防遗留到其他场景
             hideManeuverUI();
 
+            // 隐藏轨道机动视图规划面板（0.3.0）
+            hideManeuverViewPanel();
+
+            // 还原右下角飞船状态面板（移除机动视图隐藏类）
+            setShipStatusPanelHidden(false);
+
             // 清空轨道标签（标签由渲染循环每帧驱动，退出场景后无人同步 → 必须显式清理）
             clearOrbitLabels();
 
@@ -1074,6 +1089,13 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             if (activeShip) {
                 updateManeuverUI(_canvas, activeShip);
             }
+
+            // 0.3.0 轨道机动视图规划面板（机动视图内常驻显示；其他视图自动隐藏）
+            updateManeuverViewPanel(_canvas, activeShip);
+
+            // 机动视图：隐藏右下角飞船状态面板（燃料储量 / 剩余 ΔV）——规划面板已提供
+            // "燃料余量 / 计划 ΔV" 读数，避免两块面板在同一角落相互遮挡
+            setShipStatusPanelHidden(flightView.isManeuver());
 
             // 状态驱动：统一工具栏图标切换
             let nextMode = 'off';

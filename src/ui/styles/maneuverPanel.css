@@ -1,0 +1,333 @@
+/* ============================================================
+   maneuverPanel.css — 轨道机动视图规划面板（0.3.0）
+   · 右侧悬浮纵板：上=局部放大视图（纯线 / 轨道绿 / 信息化作战 HUD 风）
+                   下=机动节点详细修改面板（四向 Δv / 时间 / 周期 / 聚焦中心）
+   · 与主题变量共用（theme.css）；面板在机动视图内不可关闭
+   · 类名统一 mvp- 前缀（maneuver view panel），与加速计时器面板（.maneuver-*）互不干扰
+   ============================================================ */
+
+/* 机动视图内隐藏右下角飞船状态面板（燃料储量 / 剩余 ΔV）：
+   该面板由 shipStatusUI 每帧写内联 display:flex，故必须用 !important 的类规则压制，
+   否则会与内联写入互相覆盖造成闪烁 */
+body.mvp-maneuver #shipStatusPanel {
+    display: none !important;
+}
+
+#maneuverViewPanel {
+    position: fixed;
+    right: 16px;
+    /* 顶部锚定；机动视图内右下角飞船状态面板已隐藏，故可用高度放宽到整个视口 */
+    top: 8px;
+    width: 420px;
+    max-height: calc(100vh - 16px);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    background: #000000;
+    border: 1px solid var(--theme-menu-border);
+    border-radius: 10px;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5);
+    color: var(--text-bright);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    user-select: none;
+    z-index: 945;
+}
+
+/* ---------- 面板头（无关闭按钮：机动视图内不可关闭） ---------- */
+.mvp-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px 6px 12px;
+}
+.mvp-title {
+    color: #7FD4FF;
+    font-size: 13px;
+    white-space: nowrap;
+}
+.mvp-header-line {
+    flex: 1;
+    border-top: 1px dashed var(--theme-border);
+}
+.mvp-header-mode {
+    color: var(--progress-green);
+    font-size: 11px;
+    letter-spacing: 1px;
+}
+
+/* ---------- 上板块：局部放大视图（1:1 正方形，任何视口下不变形） ---------- */
+/* 绘图区内的缩放为"按当前轨道动态计算"（见 viewConfig.insetAreaRatio 注释）：
+   · 轨道占**板块面积 2/3**（边长 √(2/3) ≈ 81.6%），四周约 9% 余量供节点手柄使用
+   · 闭合轨道→轨道撑满该区域；逃逸/超 SOI→退化为 SOI 撑满 */
+.mvp-inset {
+    position: relative;
+    /* 1:1 正方形；矮视口下按高度自适应收缩（保证整块面板可见，不压扁比例） */
+    width: min(100%, max(240px, calc(100vh - 360px)));
+    align-self: center;
+    aspect-ratio: 1 / 1;
+    height: auto;
+    flex: none;
+    margin: 0 10px 8px 10px;
+    border: 1px solid rgba(61, 255, 61, 0.35);
+    background:
+        linear-gradient(90deg, rgba(61, 255, 61, 0.06) 1px, transparent 1px) 0 0 / 25% 100%,
+        linear-gradient(0deg, rgba(61, 255, 61, 0.06) 1px, transparent 1px) 0 0 / 100% 25%,
+        #000000;
+}
+/* 绘图区：画布铺满整个面板块（0.3.0 调整）——轨道仍按"板块面积 3/4"的比例绘制
+   （缩放在 drawInset 内按 √0.75 计算），而手柄/节点可用**整块面板**的边界，
+   不再被 3/4 绘图区那圈限制住 */
+.mvp-inset-plot {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+}
+.mvp-inset-plot svg,
+.mvp-inset-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    overflow: visible;
+}
+
+/* HUD 装饰：四角角标 */
+.mvp-corner {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border: 1px solid var(--progress-green);
+    opacity: 0.75;
+}
+.mvp-corner.tl { left: 4px; top: 4px; border-right: 0; border-bottom: 0; }
+.mvp-corner.tr { right: 4px; top: 4px; border-left: 0; border-bottom: 0; }
+.mvp-corner.bl { left: 4px; bottom: 4px; border-right: 0; border-top: 0; }
+.mvp-corner.br { right: 4px; bottom: 4px; border-left: 0; border-top: 0; }
+
+/* HUD 装饰：边框刻度尺（上/左，贴绘图区边缘） */
+.mvp-ruler-x {
+    position: absolute;
+    left: 6.7%;
+    right: 6.7%;
+    top: 2px;
+    height: 4px;
+    background: repeating-linear-gradient(90deg,
+        var(--progress-green) 0 1px, transparent 1px 12px);
+    opacity: 0.5;
+}
+.mvp-ruler-y {
+    position: absolute;
+    top: 6.7%;
+    bottom: 6.7%;
+    left: 2px;
+    width: 4px;
+    background: repeating-linear-gradient(0deg,
+        var(--progress-green) 0 1px, transparent 1px 12px);
+    opacity: 0.5;
+}
+
+/* HUD 数据块（装饰带四角读数；装饰带仅 6.7%，故用小字号单行块） */
+.mvp-readout {
+    position: absolute;
+    font-size: 9px;
+    line-height: 11px;
+    color: rgba(61, 255, 61, 0.75);
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+.mvp-readout.tl { left: 6px; top: 5px; }
+.mvp-readout.tr { right: 6px; top: 5px; text-align: right; }
+.mvp-readout.bl { left: 6px; bottom: 5px; }
+.mvp-readout.br { right: 6px; bottom: 5px; text-align: right; }
+.mvp-readout b {
+    color: var(--progress-green);
+    font-weight: normal;
+}
+
+/* ---------- 下板块：机动节点详细修改 ---------- */
+.mvp-editor {
+    border-top: 1px solid rgba(90, 95, 207, 0.5);
+    padding: 6px 12px 8px 12px;
+    flex: none;
+}
+.mvp-section {
+    margin-bottom: 6px;
+}
+.mvp-section-label {
+    color: var(--text-bright);
+    opacity: 0.75;
+    font-size: 11px;
+    margin-bottom: 4px;
+}
+
+/* 聚焦天体选择（0.3.0 改版）：收起态 = 圆点 + 当前天体名（点击展开）；展开态 = 层级列表 */
+.mvp-focus-trigger {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    border: 1px solid var(--progress-green);
+    border-radius: 4px;
+    background: #000000;
+    cursor: pointer;
+}
+.mvp-focus-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    border: 1px solid var(--progress-green);
+    flex: none;
+}
+.mvp-focus-name {
+    flex: 1;
+    color: var(--progress-green);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.mvp-focus-caret {
+    flex: none;
+    opacity: 0.7;
+    font-size: 10px;
+}
+.mvp-focus-list {
+    margin-top: 4px;
+    border: 1px solid var(--theme-menu-border);
+    border-radius: 4px;
+    background: #000000;
+    max-height: 150px;
+    overflow-y: auto;
+}
+.mvp-focus-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.mvp-focus-item:hover {
+    background: rgba(61, 255, 61, 0.08);
+}
+.mvp-focus-item.active {
+    color: var(--progress-green);
+}
+.mvp-focus-item.active .mvp-focus-branch {
+    color: var(--progress-green);
+    opacity: 1;
+}
+.mvp-focus-branch {
+    opacity: 0.45;
+    flex: none;
+}
+.mvp-focus-item-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.mvp-focus-meta {
+    margin-left: auto;
+    opacity: 0.55;
+    font-size: 10px;
+    flex: none;
+}
+
+/* 四向 Δv 行：标签在左，[− 数值 单位 +] 紧凑成组右对齐 */
+.mvp-dv-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    line-height: 22px;
+}
+.mvp-dv-label {
+    flex: 1;
+    color: var(--text-bright);
+}
+.mvp-dv-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: none;
+}
+.mvp-step {
+    width: 22px;
+    height: 20px;
+    line-height: 18px;
+    text-align: center;
+    border: 1px solid var(--theme-border);
+    border-radius: 4px;
+    background: #000000;
+    color: var(--text-bright);
+    cursor: pointer;
+    flex: none;
+}
+.mvp-step:hover {
+    border-color: var(--progress-green);
+    color: var(--progress-green);
+}
+.mvp-dv-value {
+    width: 54px;
+    text-align: right;
+    color: var(--progress-green);
+}
+.mvp-dv-unit {
+    flex: none;
+    opacity: 0.6;
+    font-size: 10px;
+    width: 22px;
+}
+
+/* 时间 / 周期行 */
+.mvp-time-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    line-height: 22px;
+}
+.mvp-time-label {
+    width: 62px;
+    flex: none;
+    color: var(--text-bright);
+}
+.mvp-time-value {
+    flex: 1;
+    text-align: right;
+    color: var(--progress-green);
+}
+.mvp-input {
+    flex: none;
+    width: 104px;
+    background: #000000;
+    border: 1px solid var(--theme-border);
+    border-radius: 4px;
+    color: var(--text-bright);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 2px 6px;
+}
+.mvp-input:focus {
+    outline: none;
+    border-color: var(--progress-green);
+}
+.mvp-btn-wide {
+    flex: 1;
+    text-align: center;
+    padding: 3px 0;
+    border: 1px solid var(--theme-border);
+    border-radius: 4px;
+    background: #000000;
+    color: var(--text-bright);
+    cursor: pointer;
+}
+.mvp-btn-wide:hover {
+    border-color: var(--progress-green);
+    color: var(--progress-green);
+}
+.mvp-hint {
+    font-size: 10px;
+    opacity: 0.55;
+    line-height: 14px;
+    margin-top: 2px;
+}

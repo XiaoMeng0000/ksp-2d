@@ -321,9 +321,28 @@ const STRINGS = {
     'orbitPoint.fuelOut': '燃料耗尽点',
 
     // ---------- 飞行视图档位（0.3.0：V 键切换 普通聚焦 ↔ 轨道机动） ----------
-    'view.switchedManeuver': '已切换到轨道机动视图',
-    'view.switchedFocus': '已切换到普通聚焦视图',
+    'view.switchedManeuver': '视图：机动',
+    'view.switchedFocus': '视图：常规',
     'view.unavailable': '当前无法使用轨道机动视图（宿主无轨道中心）',
+
+    // ---------- 轨道机动视图规划面板（0.3.0） ----------
+    'mvp.title': '轨道机动视图',
+    'mvp.focusLabel': '聚焦天体',
+    'mvp.dvLabel': '机动 ΔV（节点参考系分量）',
+    'mvp.dvPro': '顺向',
+    'mvp.dvRetro': '逆向',
+    'mvp.dvRadIn': '径向内',
+    'mvp.dvRadOut': '径向朝外',
+    'mvp.timeLabel': '节点时刻',
+    'mvp.periodLabel': '按周期平移',
+    'mvp.periodUnit': '圈',
+    'mvp.planDv': '计划 ΔV',
+    'mvp.fuelMargin': '燃料余量',
+    'mvp.fuelOk': '充足',
+    'mvp.fuelLow': '不足',
+    'mvp.kind.star': '恒星',
+    'mvp.kind.planet': '行星',
+    'mvp.kind.moon': '卫星',
 
     // ---------- 飞船建造 ----------
     'build.title': '飞船建造',

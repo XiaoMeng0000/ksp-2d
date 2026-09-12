@@ -10,7 +10,7 @@
 import { eventBus, Events } from '../eventBus.js';
 import { MANEUVER_CONFIG } from '../config/maneuverConfig.js';
 import { getCachedTime } from '../physics/orbitalPrediction.js';
-import { computeNodeAxes, syncComponentsFromDeltaV, rebuildDeltaVFromComponents } from '../physics/maneuverPrediction.js';
+import { computeNodeAxes, syncComponentsFromDeltaV, rebuildDeltaVFromComponents, propagateNodeSnapshot } from '../physics/maneuverPrediction.js';
 import { getTotalMass, getFuelAmount } from '../resources/resourceSystem.js';
 
 class ManeuverSystem {
@@ -167,6 +167,38 @@ class ManeuverSystem {
         this._resetTracking(this._nodeKey(node));
         this._reopenAfterEdit(node);
         return true;
+    }
+
+    /**
+     * 纯时间编辑（0.3.0 规划面板：改节点时间 / 按周期平移）：
+     * 用节点冻结快照的 Kepler 轨道**解析传播**到 newTime（可跨任意多圈，不依赖预测链），
+     * 刷新位置/速度快照并按新参考系重建 Δv 世界矢量（分量不变）。
+     * @param {Object} ship
+     * @param {number} newTime - 目标绝对时刻（游戏秒）
+     * @returns {{ok:boolean, period:number|null}} period 供调用方（按周期平移）复用
+     */
+    updateNodeTimeByTime(ship, newTime) {
+        const node = this.getNode(ship);
+        if (!node || !isFinite(newTime)) return { ok: false, period: null };
+        const prop = propagateNodeSnapshot(node, newTime);
+        if (!prop) return { ok: false, period: null };
+
+        // 先按旧参考系迁移分量（旧存档节点），再写新快照、按新参考系重建世界矢量
+        const oldAxes = this._snapshotAxes(node);
+        if (oldAxes) syncComponentsFromDeltaV(node, oldAxes);
+
+        node.time = newTime;
+        node.relX = prop.relPos.x;
+        node.relY = prop.relPos.y;
+        node.relVelX = prop.relVel.x;
+        node.relVelY = prop.relVel.y;
+
+        const newAxes = this._snapshotAxes(node);
+        if (newAxes) rebuildDeltaVFromComponents(node, newAxes);
+
+        this._resetTracking(this._nodeKey(node));
+        this._reopenAfterEdit(node);
+        return { ok: true, period: prop.period };
     }
 
     // 每帧更新（flightScene 在推力向量计算后调用，仅活动飞船）：

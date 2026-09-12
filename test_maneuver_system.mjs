@@ -106,5 +106,45 @@ check('S7 删除成功且数组清空', del === true && ship.maneuverNodes.lengt
     eventBus.off(Events.MANEUVER_ARRIVED, h);
 }
 
+// S10: 纯时间编辑（规划面板改时间 / 按周期平移）
+{
+    const { getNodeOrbitPeriod, propagateNodeSnapshot } = await import('./src/physics/maneuverPrediction.js');
+    const ship5 = { id: 's10', mode: 'on_rails', thrust: { ax: 0, ay: 0 }, maneuverNodes: [] };
+    maneuverSystem.createNode(ship5, {
+        time: 1000, relX: 1e6, relY: 0, anchorBody: 'Kerbin', velRel: { x: 0, y: 2246 }
+    });
+    const n5 = ship5.maneuverNodes[0];
+    const axes5 = {
+        pro: { x: 0, y: 1 }, retro: { x: 0, y: -1 },
+        radOut: { x: 1, y: 0 }, radIn: { x: -1, y: 0 }
+    };
+    maneuverSystem.updateNodeDeltaV(ship5, 'pro', 40, axes5);
+    const dvBefore = Math.hypot(n5.deltaV.x, n5.deltaV.y);
+    const period = getNodeOrbitPeriod(n5);
+    check('S10 圆轨道周期可解', period > 1000 && period < 100000);
+
+    const posBefore = { x: n5.relX, y: n5.relY };
+    const r1 = maneuverSystem.updateNodeTimeByTime(ship5, n5.time + period);
+    check('S10 整圈平移成功', r1.ok === true);
+    check('S10 整圈后位置回到原处（误差 < 1 m）',
+        Math.hypot(n5.relX - posBefore.x, n5.relY - posBefore.y) < 1);
+    check('S10 整圈后 |Δv| 不变', Math.abs(Math.hypot(n5.deltaV.x, n5.deltaV.y) - dvBefore) < 1e-6);
+    check('S10 整圈后分量不变（仍为顺向 40）', Math.abs(n5.dvPro - 40) < 1e-6);
+
+    const r2 = maneuverSystem.updateNodeTimeByTime(ship5, n5.time + period * 0.5);
+    check('S10 半圈平移成功', r2.ok === true);
+    check('S10 半圈后位置到对侧（x ≈ −1e6）', n5.relX < -9e5);
+
+    const r3 = maneuverSystem.updateNodeTimeByTime(ship5, n5.time + period * 10);
+    check('S10 多圈平移成功（10 圈）', r3.ok === true);
+
+    const escNode = {
+        time: 0, relX: 1e6, relY: 0, anchorBody: 'Kerbin',
+        relVelX: 0, relVelY: 12000, dvPro: 0, dvRadial: 0, deltaV: { x: 0, y: 0 }
+    };
+    check('S10 逃逸轨道周期为 null（按周期平移不可用）', getNodeOrbitPeriod(escNode) === null);
+    check('S10 逃逸轨道仍可做纯时间编辑（解析传播）', propagateNodeSnapshot(escNode, 600) !== null);
+}
+
 console.log(`\n结果: ${pass} 通过 / ${fail} 失败`);
 process.exit(fail > 0 ? 1 : 0);

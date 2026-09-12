@@ -1,10 +1,13 @@
-// 机动视图（V 切换）纯逻辑单测：聚焦候选 / fit 上限 / 可用性 / 相机接管（node 环境）
+// 机动视图（V 切换）纯逻辑单测：聚焦目标（当前星系全部天体）/ fit 口径 / 可用性 / 缩放夹取
 // 用法: node test_maneuver_view.mjs
 globalThis.window = globalThis.window || {};
 
-const { celestialBodies, updateCelestialBodies } = await import('./src/physics/physics.js');
-const { getFocusCandidates, computeFitZoom, isManeuverAvailable, apoapsisOf, findStarAncestor, branchChildOfStar } = await import('./src/flightView.js');
-const { camera, setZoomLimits, setZoom, getZoomLimits } = await import('./src/camera.js');
+const { celestialBodies, updateCelestialBodies, getAbsolutePosition } = await import('./src/physics/physics.js');
+const {
+    getFocusTargets, computeBodyFitRadius, computeFitZoom, isManeuverAvailable,
+    apoapsisOf, findStarAncestor, branchChildOfStar, resolveCurrentStar
+} = await import('./src/flightView.js');
+const { setZoomLimits, setZoom, getZoomLimits } = await import('./src/camera.js');
 
 updateCelestialBodies(0);
 
@@ -17,47 +20,62 @@ const mun = byName('Mun');
 const minmus = byName('Minmus');
 const kerbol = byName('Kerbol');
 
-// V1: 恒星解析与分支子天体（数据驱动）
+// 伪飞船（宿主 Kerbin）
+const ship = {
+    pos: { x: kerbin.radius + 100000, y: 0 },
+    vel: { x: 0, y: 2200 },
+    currentSOI: 'Kerbin'
+};
+
+// V1: 恒星解析与分支
 check('V1 findStarAncestor(Kerbin) = Kerbol', findStarAncestor(kerbin) === kerbol);
 check('V1 findStarAncestor(Mun) = Kerbol', findStarAncestor(mun) === kerbol);
 check('V1 分支子天体: Kerbin→Kerbin', branchChildOfStar(kerbin) === kerbin);
 check('V1 分支子天体: Mun→Kerbin', branchChildOfStar(mun) === kerbin);
+check('V1 resolveCurrentStar(ship) = Kerbol', resolveCurrentStar(ship) === kerbol);
 
-// V2: 候选规则
-const cKerbin = getFocusCandidates(kerbin);
-check('V2 Kerbin 候选数 = 2（宿主 + 恒星）', cKerbin.length === 2);
-check('V2 候选1 = 宿主自身，fit = 最远卫星（Minmus）轨道远心距',
-    cKerbin[0].kind === 'host' && cKerbin[0].body === kerbin
-    && Math.abs(cKerbin[0].fitRadius - apoapsisOf(minmus)) < 1);
-check('V2 候选2 = 恒星，fit = Kerbin 绕 Kerbol 轨道远心距',
-    cKerbin[1].kind === 'star' && cKerbin[1].body === kerbol
-    && Math.abs(cKerbin[1].fitRadius - apoapsisOf(kerbin)) < 1);
+// V2: 聚焦目标 = 当前星系全部天体（层级有序）
+const targets = getFocusTargets(kerbin);
+const sysCount = celestialBodies.filter(b => findStarAncestor(b) === kerbol).length;
+check('V2 目标数 = 当前星系全部天体', targets.length === sysCount && sysCount > 10);
+check('V2 首项 = 恒星(depth 0)', targets[0].body === kerbol && targets[0].depth === 0 && targets[0].kind === 'star');
+const munT = targets.find(t => t.body === mun);
+const kerbinT = targets.find(t => t.body === kerbin);
+check('V2 Kerbin depth=1 / Mun depth=2（层级缩进依据）', kerbinT.depth === 1 && munT.depth === 2);
+check('V2 卫星排在所属行星之后（Mun 紧随 Kerbin）',
+    targets.indexOf(munT) > targets.indexOf(kerbinT));
 
-const cMun = getFocusCandidates(mun);
-check('V2 Mun（无卫星）候选只有恒星', cMun.length === 1 && cMun[0].kind === 'star');
-check('V2 Mun 的恒星 fit = Kerbin 轨道', Math.abs(cMun[0].fitRadius - apoapsisOf(kerbin)) < 1);
+// V3: fit 口径（沿用现有规则并推广）
+check('V3 Kerbin → 最远卫星（Minmus）轨道',
+    Math.abs(kerbinT.fitRadius - apoapsisOf(minmus)) < 1);
+check('V3 Mun → 自身绕 Kerbin 的轨道',
+    Math.abs(munT.fitRadius - apoapsisOf(mun)) < 1);
+check('V3 Kerbol → 玩家分支那一环（Kerbin 轨道）',
+    Math.abs(targets[0].fitRadius - apoapsisOf(kerbin)) < 1);
+check('V3 Minmus → 自身绕 Kerbin 的轨道',
+    Math.abs(computeBodyFitRadius(minmus, kerbin) - apoapsisOf(minmus)) < 1);
+// 宿主为 Mun 时，恒星的 fit 仍取玩家分支（Kerbin 轨道）
+check('V3 宿主 Mun 时 Kerbol fit 仍 = Kerbin 轨道',
+    Math.abs(computeBodyFitRadius(kerbol, mun) - apoapsisOf(kerbin)) < 1);
 
-// V3: 可用性
-check('V3 Kerbin SOI 可用', isManeuverAvailable(kerbin) === true);
-check('V3 Mun SOI 可用', isManeuverAvailable(mun) === true);
-check('V3 恒星宿主不可用（无父轨道）', isManeuverAvailable(kerbol) === false);
-check('V3 深空（无宿主）不可用', isManeuverAvailable(null) === false);
-
-// V4: fit 上限关系（canvas 1920×1080）
+// V4: fit 与缩放上限关系（canvas 1920×1080）
 const canvas = { width: 1920, height: 1080 };
-const zoomHost = computeFitZoom(cKerbin[0].fitRadius, canvas);   // 聚焦 Kerbin（最远卫星）
-const zoomStar = computeFitZoom(cKerbin[1].fitRadius, canvas);   // 聚焦恒星（Kerbin 轨道）
-check('V4 聚焦宿主允许更深放大（上限更大）', zoomHost > zoomStar);
-check('V4 fit 与半径反比', Math.abs(zoomStar * cKerbin[1].fitRadius - 0.9 * 540) < 1e-6);
-check('V4 恒星档上限量级合理（1e-8 级）', zoomStar > 1e-9 && zoomStar < 1e-7);
+const zoomKerbin = computeFitZoom(kerbinT.fitRadius, canvas);
+const zoomStar = computeFitZoom(targets[0].fitRadius, canvas);
+check('V4 聚焦小天体系统允许更深放大（上限更大）', zoomKerbin > zoomStar);
+check('V4 fit 与半径反比', Math.abs(zoomStar * targets[0].fitRadius - 0.9 * 540) < 1e-6);
 
-// V5: 相机缩放上下限（视图档位）
-setZoomLimits(1e-12, zoomStar);       // 模拟进入机动视图（恒星档）
-check('V5 上限生效（俯冲放大被夹）', Math.abs(setZoom(1e-3) - zoomStar) < 1e-15);
-check('V5 下限保留可继续缩小', setZoom(1e-12) === 1e-12);
-setZoomLimits(1e-12, 10);             // 模拟退出机动视图
-check('V5 退出后放大上限恢复', Math.abs(setZoom(5) - 5) < 1e-12);
-check('V5 取回上下限接口', getZoomLimits().max === 10);
+// V5: 可用性（始终可用，仅要求有活动飞船）
+check('V5 有飞船 → 可用（即使宿主是恒星/深空）', isManeuverAvailable(ship) === true);
+check('V5 无飞船 → 不可用', isManeuverAvailable(null) === false);
+
+// V6: 相机缩放上下限（视图档位）
+setZoomLimits(1e-12, zoomStar);
+check('V6 上限生效（放大被夹）', Math.abs(setZoom(1e-3) - zoomStar) < 1e-15);
+check('V6 下限保留可继续缩小', setZoom(1e-12) === 1e-12);
+setZoomLimits(1e-12, 10);
+check('V6 退出后放大上限恢复', Math.abs(setZoom(5) - 5) < 1e-12);
+check('V6 取回上下限接口', getZoomLimits().max === 10);
 
 console.log(`\n结果: ${pass} 通过 / ${fail} 失败`);
 process.exit(fail > 0 ? 1 : 0);
