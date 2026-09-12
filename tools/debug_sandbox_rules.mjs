@@ -1,9 +1,9 @@
 // TEMP: 沙盒/生涯资源规则冒烟测试（0.2.0 阶段7）
-// 运行：node debug_sandbox_rules.mjs
+// 运行：node tools/debug_sandbox_rules.mjs
 globalThis.window = {};
-import { gameState } from './src/gameState.js';
-import { consumeStorage, consumeCargo } from './src/resources/cargoSystem.js';
-import { consumePlayerResource } from './src/resources/resourceSystem.js';
+import { gameState } from '../src/gameState.js';
+import { consumeStorage, consumeCargo } from '../src/resources/cargoSystem.js';
+import { consumePlayerResource } from '../src/resources/resourceSystem.js';
 
 let pass = 0;
 let fail = 0;

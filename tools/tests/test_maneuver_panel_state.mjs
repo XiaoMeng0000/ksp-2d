@@ -1,5 +1,5 @@
 // 机动节点面板三行状态纯函数单测（node 环境，最小 DOM 桩）
-// 用法: node test_maneuver_panel_state.mjs
+// 用法: node tools/tests/test_maneuver_panel_state.mjs
 globalThis.window = globalThis.window || {};
 
 const noop = () => {};
@@ -31,7 +31,7 @@ globalThis.document = {
 globalThis.localStorage = { getItem: () => null, setItem: noop };
 globalThis.requestAnimationFrame = noop;
 
-const { computeManeuverRowStates } = await import('./src/ui/maneuverUI.js');
+const { computeManeuverRowStates } = await import('../../src/ui/maneuverUI.js');
 
 let pass = 0, fail = 0;
 const check = (name, cond) => { cond ? pass++ : fail++; console.log((cond ? 'PASS ' : 'FAIL ') + name); };

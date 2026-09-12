@@ -1,6 +1,6 @@
 // 虚线展开量基准（决定性测量）：统计每帧 "路径长度 ÷ 虚线周期" 的总和
 // —— 浏览器把虚线按弧长逐段展开，段数爆炸是 2D canvas 掉帧的经典元凶。
-// 用法: node bench_dash_cost.mjs
+// 用法: node tools/bench/bench_dash_cost.mjs
 globalThis.window = globalThis.window || {};
 const noop = () => {};
 globalThis.window.addEventListener = noop;
@@ -97,10 +97,10 @@ const CANVAS = {
     getContext: () => makeCtx()
 };
 
-const { celestialBodies, setActiveSystems, updateCelestialBodies } = await import('./src/physics/physics.js');
-const { stateToKepler } = await import('./src/physics/orbitalMechanics.js');
-const { camera } = await import('./src/camera.js');
-const { render } = await import('./src/renderer.js');
+const { celestialBodies, setActiveSystems, updateCelestialBodies } = await import('../../src/physics/physics.js');
+const { stateToKepler } = await import('../../src/physics/orbitalMechanics.js');
+const { camera } = await import('../../src/camera.js');
+const { render } = await import('../../src/renderer.js');
 
 setActiveSystems(['kerbolar']);
 updateCelestialBodies(0);

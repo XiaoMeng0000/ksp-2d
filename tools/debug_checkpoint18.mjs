@@ -1,10 +1,10 @@
 // TEMP: 检查点18 复现脚本 — 用存档真实数据跑轨道预测
-// 运行：node debug_checkpoint18.mjs
+// 运行：node tools/debug_checkpoint18.mjs
 globalThis.window = { _soiDiag: true };
-import { eventBus, Events } from './src/eventBus.js';
-import { updateCelestialBodies, celestialBodies } from './src/physics/physics.js';
-import { predictTrajectoryPatched, getSOIHostAtTime, bodyFuturePos } from './src/physics/orbitalPrediction.js';
-import { stateToKepler } from './src/physics/orbitalMechanics.js';
+import { eventBus, Events } from '../src/eventBus.js';
+import { updateCelestialBodies, celestialBodies } from '../src/physics/physics.js';
+import { predictTrajectoryPatched, getSOIHostAtTime, bodyFuturePos } from '../src/physics/orbitalPrediction.js';
+import { stateToKepler } from '../src/physics/orbitalMechanics.js';
 
 // 存档数据（检查点18，世界123）
 const gameTime = 1189879.348697089;

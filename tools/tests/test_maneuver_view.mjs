@@ -1,13 +1,13 @@
 // 机动视图（V 切换）纯逻辑单测：聚焦目标（当前星系全部天体）/ fit 口径 / 可用性 / 缩放夹取
-// 用法: node test_maneuver_view.mjs
+// 用法: node tools/tests/test_maneuver_view.mjs
 globalThis.window = globalThis.window || {};
 
-const { celestialBodies, updateCelestialBodies, getAbsolutePosition } = await import('./src/physics/physics.js');
+const { celestialBodies, updateCelestialBodies, getAbsolutePosition } = await import('../../src/physics/physics.js');
 const {
     getFocusTargets, computeBodyFitRadius, computeFitZoom, isManeuverAvailable,
     apoapsisOf, findStarAncestor, branchChildOfStar, resolveCurrentStar
-} = await import('./src/flightView.js');
-const { setZoomLimits, setZoom, getZoomLimits } = await import('./src/camera.js');
+} = await import('../../src/flightView.js');
+const { setZoomLimits, setZoom, getZoomLimits } = await import('../../src/camera.js');
 
 updateCelestialBodies(0);
 
@@ -80,7 +80,7 @@ check('V6 取回上下限接口', getZoomLimits().max === 10);
 // V7: 相机平滑过渡动画（0.3.0）
 {
     const { camera, animateCameraTo, updateCameraAnimation, isCameraAnimating, cancelCameraAnimation, setZoomLimits } =
-        await import('./src/camera.js');
+        await import('../../src/camera.js');
     setZoomLimits(1e-12, 10);
 
     // 动态目标（模拟公转天体：位置随时间移动）
@@ -119,9 +119,9 @@ check('V6 取回上下限接口', getZoomLimits().max === 10);
 
 // V8: 平滑过渡不硬跳（0.3.0 修复"先突然缩小再动画"）
 {
-    const { camera, isCameraAnimating, updateCameraAnimation, setZoomLimits: szl } = await import('./src/camera.js');
-    const { flightView } = await import('./src/flightView.js');
-    const { VIEW_CONFIG } = await import('./src/config/viewConfig.js');
+    const { camera, isCameraAnimating, updateCameraAnimation, setZoomLimits: szl } = await import('../../src/camera.js');
+    const { flightView } = await import('../../src/flightView.js');
+    const { VIEW_CONFIG } = await import('../../src/config/viewConfig.js');
     szl(1e-12, 10);
     camera.zoom = 2e-4;                       // 近景档
     camera.x = 12345; camera.y = -6789;

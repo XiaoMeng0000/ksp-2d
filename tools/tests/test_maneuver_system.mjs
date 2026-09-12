@@ -1,10 +1,10 @@
 // 机动节点系统（生命周期/进度）自测（node 环境，临时脚本）
-// 用法: node test_maneuver_system.mjs
+// 用法: node tools/tests/test_maneuver_system.mjs
 globalThis.window = globalThis.window || {};
 globalThis.console = console;
 
-const { eventBus, Events } = await import('./src/eventBus.js');
-const { maneuverSystem } = await import('./src/ship/maneuverSystem.js');
+const { eventBus, Events } = await import('../../src/eventBus.js');
+const { maneuverSystem } = await import('../../src/ship/maneuverSystem.js');
 
 const ship = {
     id: 'sys_ship', mode: 'on_rails',
@@ -58,7 +58,7 @@ check('S7 删除成功且数组清空', del === true && ship.maneuverNodes.lengt
 
 // S8: 方案B —— 节点拖到新位置后，"顺向 100 m/s"应变为【新位置的顺向】
 {
-    const { computeNodeAxes } = await import('./src/physics/maneuverPrediction.js');
+    const { computeNodeAxes } = await import('../../src/physics/maneuverPrediction.js');
     const ship3 = { id: 's8', mode: 'on_rails', thrust: { ax: 0, ay: 0 }, maneuverNodes: [] };
     maneuverSystem.createNode(ship3, {
         time: 100, relX: 1e6, relY: 0, anchorBody: 'Kerbin', velRel: { x: 0, y: 2000 }
@@ -82,7 +82,7 @@ check('S7 删除成功且数组清空', del === true && ship.maneuverNodes.lengt
 
 // S9: 完成后节点仍可编辑（0.3.0 打磨：参照轨迹常驻，可规划"拐回来"）
 {
-    const { computeNodeAxes } = await import('./src/physics/maneuverPrediction.js');
+    const { computeNodeAxes } = await import('../../src/physics/maneuverPrediction.js');
     // 节点 Δv = 顺向（速度 (0,2000) → 顺向单位向量 (0,1)）→ 推力须同向才能烧足
     const ship4 = { id: 's9', mode: 'thrust', thrust: { ax: 0, ay: 1 }, maneuverNodes: [] };
     maneuverSystem.createNode(ship4, {
@@ -108,7 +108,7 @@ check('S7 删除成功且数组清空', del === true && ship.maneuverNodes.lengt
 
 // S10: 纯时间编辑（规划面板改时间 / 按周期平移）
 {
-    const { getNodeOrbitPeriod, propagateNodeSnapshot } = await import('./src/physics/maneuverPrediction.js');
+    const { getNodeOrbitPeriod, propagateNodeSnapshot } = await import('../../src/physics/maneuverPrediction.js');
     const ship5 = { id: 's10', mode: 'on_rails', thrust: { ax: 0, ay: 0 }, maneuverNodes: [] };
     maneuverSystem.createNode(ship5, {
         time: 1000, relX: 1e6, relY: 0, anchorBody: 'Kerbin', velRel: { x: 0, y: 2246 }

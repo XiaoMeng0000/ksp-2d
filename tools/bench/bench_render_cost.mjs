@@ -1,7 +1,7 @@
 // 渲染开销基准（常规验证用，无需浏览器）：
 // 用"计数 Proxy ctx"跑真实 render()，统计每帧 canvas 调用次数与 JS 耗时，
 // 对比 Kerbolar 系（17 天体）与测试星系（少数天体）在**同一缩放档**下的开销差异。
-// 用法: node bench_render_cost.mjs
+// 用法: node tools/bench/bench_render_cost.mjs
 globalThis.window = globalThis.window || {};
 
 // —— 最小 DOM 桩（与 test_module_graph 同风格）
@@ -64,10 +64,10 @@ function makeCtx() {
     // 注：counts 通过闭包返回给调用方（见下）
 }
 
-const { celestialBodies, setActiveSystems, updateCelestialBodies } = await import('./src/physics/physics.js');
-const { stateToKepler } = await import('./src/physics/orbitalMechanics.js');
-const { camera } = await import('./src/camera.js');
-const { render } = await import('./src/renderer.js');
+const { celestialBodies, setActiveSystems, updateCelestialBodies } = await import('../../src/physics/physics.js');
+const { stateToKepler } = await import('../../src/physics/orbitalMechanics.js');
+const { camera } = await import('../../src/camera.js');
+const { render } = await import('../../src/renderer.js');
 
 const CANVAS = {
     width: 1280,

@@ -2,12 +2,12 @@
 // 数值实验：① 双燃料按配方停机 vs 全燃料烧尽 的 Δv 高估
 //          ② 预测 Euler(dt=0.05) vs 物理 RK4(dt=0.05) 燃烧弧终点偏差
 //          ③ 过节点后指向：当前实现 vs 同半径最近点方案 的角度差与帧间抖动
-// 用法: node debug_maneuver_precision.mjs
+// 用法: node tools/debug_maneuver_precision.mjs
 globalThis.window = globalThis.window || {};
 
-const { celestialBodies, updateCelestialBodies } = await import('./src/physics/physics.js');
-const { stateToKepler } = await import('./src/physics/orbitalMechanics.js');
-const { rk4Integrate } = await import('./src/physics/integrator.js');
+const { celestialBodies, updateCelestialBodies } = await import('../src/physics/physics.js');
+const { stateToKepler } = await import('../src/physics/orbitalMechanics.js');
+const { rk4Integrate } = await import('../src/physics/integrator.js');
 
 updateCelestialBodies(0);
 const home = celestialBodies.find(b => b.isHomeworld);

@@ -1,12 +1,12 @@
 // 机动节点预测引擎自测（node 环境，临时脚本）
-// 用法: node test_maneuver_prediction.mjs
+// 用法: node tools/tests/test_maneuver_prediction.mjs
 // 注：浏览器全局 window 在 node 下缺失，注入最小垫片后再动态导入业务模块
 globalThis.window = globalThis.window || {};
 
-const { celestialBodies, updateCelestialBodies } = await import('./src/physics/physics.js');
-const { stateToKepler, keplerPositionAtTime } = await import('./src/physics/orbitalMechanics.js');
-const { predictTrajectoryPatched } = await import('./src/physics/orbitalPrediction.js');
-const { predictManeuverTrajectories, walkToTime, planBurnArc, computeManeuverDirection } = await import('./src/physics/maneuverPrediction.js');
+const { celestialBodies, updateCelestialBodies } = await import('../../src/physics/physics.js');
+const { stateToKepler, keplerPositionAtTime } = await import('../../src/physics/orbitalMechanics.js');
+const { predictTrajectoryPatched } = await import('../../src/physics/orbitalPrediction.js');
+const { predictManeuverTrajectories, walkToTime, planBurnArc, computeManeuverDirection } = await import('../../src/physics/maneuverPrediction.js');
 
 // 天体位置初始化（浏览器侧由 main.js 每帧推进；node 测试需手动初始化）
 updateCelestialBodies(0);

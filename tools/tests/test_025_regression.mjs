@@ -1,8 +1,8 @@
-// TEMP: 0.2.5 T1/T4 集成回归测试(node --input-type=module test_025_regression.mjs)
-import { gameState } from './src/gameState.js';
-import { shipSystem } from './src/ship/shipSystem.js';
-import { facilitySystem } from './src/facility/facilitySystem.js';
-import { celestialBodies, updateCelestialBodies } from './src/physics/physics.js';
+// TEMP: 0.2.5 T1/T4 集成回归测试(node --input-type=module tools/tests/test_025_regression.mjs)
+import { gameState } from '../../src/gameState.js';
+import { shipSystem } from '../../src/ship/shipSystem.js';
+import { facilitySystem } from '../../src/facility/facilitySystem.js';
+import { celestialBodies, updateCelestialBodies } from '../../src/physics/physics.js';
 
 let pass = 0;
 let fail = 0;

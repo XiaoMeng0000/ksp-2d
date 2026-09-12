@@ -3,15 +3,19 @@
 // ② 建节点语义与主视图轨道菜单一致（冻结时刻速度快照 → maneuverSystem.createNode →
 //    成功/已存在/失败三类通知）
 // ③ HUD 风格样式与交互（点轨道打开 / 点外部或 Esc 关闭 / 已存在节点时置灰）
-// 用法: node test_maneuver_inset_menu.mjs
+// 用法: node tools/tests/test_maneuver_inset_menu.mjs
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+// 项目根(锚定到脚本位置,任意 cwd 均可运行)
+const PROJECT_ROOT = join(import.meta.dirname, '..', '..');
 
 let pass = 0, fail = 0;
 const check = (name, cond) => { cond ? pass++ : fail++; console.log((cond ? 'PASS ' : 'FAIL ') + name); };
 
-const src = readFileSync('src/ui/maneuverViewPanel.js', 'utf8');
-const css = readFileSync('src/ui/styles/maneuverPanel.css', 'utf8');
-const strings = readFileSync('src/config/strings.js', 'utf8');
+const src = readFileSync(join(PROJECT_ROOT, 'src/ui/maneuverViewPanel.js'), 'utf8');
+const css = readFileSync(join(PROJECT_ROOT, 'src/ui/styles/maneuverPanel.css'), 'utf8');
+const strings = readFileSync(join(PROJECT_ROOT, 'src/config/strings.js'), 'utf8');
 
 // —— ① 只有一项
 check('M1 菜单项创建点仅一处（mvp-menu-item）',

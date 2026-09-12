@@ -1,5 +1,5 @@
 // 机动节点开销基准（常规验证）：定位"Kerbolar 系 + 存在机动节点"时机动视图掉帧的热点
-// 用法: node bench_maneuver_cost.mjs
+// 用法: node tools/bench/bench_maneuver_cost.mjs
 globalThis.window = globalThis.window || {};
 const noop = () => {};
 globalThis.window.addEventListener = noop;
@@ -52,12 +52,12 @@ const CANVAS = {
     getContext: () => makeCtx()
 };
 
-const { celestialBodies, setActiveSystems, updateCelestialBodies } = await import('./src/physics/physics.js');
-const { stateToKepler } = await import('./src/physics/orbitalMechanics.js');
-const { predictTrajectoryPatched, bodyFuturePos, getCachedTime } = await import('./src/physics/orbitalPrediction.js');
-const { predictManeuverTrajectories } = await import('./src/physics/maneuverPrediction.js');
-const { camera } = await import('./src/camera.js');
-const rendererMod = await import('./src/renderer.js');
+const { celestialBodies, setActiveSystems, updateCelestialBodies } = await import('../../src/physics/physics.js');
+const { stateToKepler } = await import('../../src/physics/orbitalMechanics.js');
+const { predictTrajectoryPatched, bodyFuturePos, getCachedTime } = await import('../../src/physics/orbitalPrediction.js');
+const { predictManeuverTrajectories } = await import('../../src/physics/maneuverPrediction.js');
+const { camera } = await import('../../src/camera.js');
+const rendererMod = await import('../../src/renderer.js');
 
 const { render } = rendererMod;
 
