@@ -7,12 +7,14 @@ const MAIN_MENU = [
     // 0.2.7：百科由 scene 改为覆盖式面板（不切场景/不中断 BGM），入口协议与设置一致
     { id: 'encyclopedia', label: '百科',  action: 'callback:openEncyclopedia' },
     { id: 'extra',        label: '额外内容',  action: 'submenu:extra' },
+    // 0.2.6：游戏公告由"额外内容"子菜单提升为一级入口（位于额外内容与设置之间）
+    { id: 'announcement', label: '游戏公告',  action: 'callback:openAnnouncement' },
     { id: 'settings',     label: '设置',      action: 'callback:openSettings' },
 ];
 
 // 二级菜单（额外内容子菜单）
+// 0.2.6：游戏公告已提升为一级入口，此处不再重复提供
 const EXTRA_MENU = [
-    { id: 'announcement', label: '游戏公告',  action: 'callback:openAnnouncement' },
     { id: 'galaxies', label: '已加载星系',  action: 'scene:galaxies' },
     { id: 'credits',  label: '制作人员',  action: 'scene:credits' },
     { id: 'license',  label: '版权声明',  action: 'scene:license' },

@@ -126,7 +126,7 @@ registerMenuScene({
     openStartGamePanel: () => openStartGamePanel(),
     openSettings: () => window.openSettings(),
     openEncyclopedia: () => window.openEncyclopedia(),
-    // 0.2.8：公告入口（主菜单额外内容子菜单）
+    // 0.2.8：公告入口（0.2.6 起为一级菜单项，不再位于额外内容子菜单）
     openAnnouncement: () => window.openAnnouncement(),
 });
 registerCreditsScene();
@@ -304,7 +304,8 @@ window.openEncyclopedia = function() {
     openEncyclopediaUI();
 };
 
-// 0.2.8 游戏公告入口（启动自动打开 / 主菜单额外内容；面板由 announcementUI 注册）
+// 0.2.8 游戏公告入口（启动自动打开 / 主菜单一级入口；面板由 announcementUI 注册）
+// 0.2.6：入口由"额外内容"子菜单提升为一级菜单项（见 menuConfig.MAIN_MENU），启动自动打开保持
 window.openAnnouncement = function() {
     openAnnouncementUI();
 };

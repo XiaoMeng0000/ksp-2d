@@ -49,6 +49,16 @@ check('A20 体验重点卡片存在且条目 ≥ 5', (() => {
     const s = cur.sections.find(x => x.title === '体验重点');
     return !!s && s.paragraphs.length >= 5;
 })());
+check('A20b 公告内含"界面调整：公告入口上移"卡片，并说明额外内容不再重复提供',
+    (() => {
+        const s = cur.sections.find(x => x.title === '界面调整：公告入口上移');
+        if (!s) return false;
+        const t = s.paragraphs.join('\n');
+        return /主菜单一级入口/.test(t) && /不再重复提供该入口/.test(t) && /自动打开公告的行为保持不变/.test(t);
+    })());
+check('A20c 体验重点含"公告入口"自检项',
+    (cur.sections.find(x => x.title === '体验重点') || { paragraphs: [] })
+        .paragraphs.some(p => /公告入口/.test(p)));
 
 // —— 其它版本公告不受影响
 check('A21 历史版本公告仍在（v0.2.5 / v0.2.4）',
@@ -61,6 +71,32 @@ check('A22 常驻条目（无版本号）仍在列表末尾', (() => {
 // —— 源码注释里不应残留旧版本号描述为当前版本
 const versionSrc = readFileSync('src/config/version.js', 'utf8');
 check('A23 version.js 注释示例同步为 0.2.6', /v0\.2\.6/.test(versionSrc) && !/VERSION_TEXT = 'v0\.2\.5'/.test(versionSrc));
+
+// ===== ⑤ 公告入口位置（0.2.6：由"额外内容"子菜单提升为一级菜单，位于额外内容与设置之间）=====
+{
+    const { MAIN_MENU, EXTRA_MENU } = await import('./src/config/menuConfig.js');
+    const mainSrc = readFileSync('main.js', 'utf8');
+
+    const idxAnn = MAIN_MENU.findIndex(m => m.action === 'callback:openAnnouncement');
+    const idxExtra = MAIN_MENU.findIndex(m => m.id === 'extra');
+    const idxSettings = MAIN_MENU.findIndex(m => m.id === 'settings');
+    check('B1 一级菜单含"游戏公告"入口', idxAnn >= 0 && MAIN_MENU[idxAnn].label === '游戏公告');
+    check('B2 位于"额外内容"之后、"设置"之前',
+        idxExtra >= 0 && idxSettings > idxAnn && idxAnn > idxExtra);
+    check('B3 一级菜单共 5 项且入口唯一',
+        MAIN_MENU.length === 5 && MAIN_MENU.filter(m => m.action === 'callback:openAnnouncement').length === 1);
+    check('B4 额外内容子菜单已移除该入口',
+        !EXTRA_MENU.some(m => m.action === 'callback:openAnnouncement'));
+    check('B5 额外内容子菜单仍保留 星系/制作/版权/返回 四项',
+        EXTRA_MENU.length === 4 && EXTRA_MENU.some(m => m.id === 'galaxies')
+        && EXTRA_MENU.some(m => m.id === 'credits') && EXTRA_MENU.some(m => m.id === 'license')
+        && EXTRA_MENU.some(m => m.action === 'back'));
+
+    // 回调链路完整：menuScene 的 callback: 协议 → main.js 注入 → window.openAnnouncement
+    check('B6 菜单回调表仍注册 openAnnouncement', /openAnnouncement: \(\) => window\.openAnnouncement\(\)/.test(mainSrc));
+    check('B7 window.openAnnouncement 仍存在（面板入口）', /window\.openAnnouncement = function\(\)/.test(mainSrc));
+    check('B8 启动自动打开公告的行为保留', /openAnnouncementUI\(\)/.test(mainSrc));
+}
 
 console.log(`\n结果: ${pass} 通过 / ${fail} 失败`);
 process.exit(fail > 0 ? 1 : 0);
