@@ -6,7 +6,7 @@ import { updateShipPhysics } from '../physics/physicsUpdate.js';
 import { updateCelestialBodies, getSOIHost, getAbsolutePosition, getRelativePosition, convertVelocityFrame, celestialBodies } from '../physics/physics.js';
 import { stateToKepler } from '../physics/orbitalMechanics.js';
 import { getTimeToNextSOISwitch } from '../physics/orbitalPrediction.js';
-import { render, renderFlightHud, getLastOrbitSegments, getLastOrbitMarkers, setOrbitHoverState, findNearestOrbitPoint, resolveOrbitHit, getLastManeuverPrediction } from '../renderer.js';
+import { render, renderFlightHud, getLastOrbitSegments, getLastOrbitMarkers, setOrbitHoverState, findNearestOrbitPoint, resolveOrbitHit, getLastManeuverPrediction, getNextPendingManeuverPrediction, getLastManeuverNodes } from '../renderer.js';
 import { showOrbitContextMenu, updateOrbitContextMenu } from '../ui/orbitContextMenu.js';
 import { updateManeuverUI, hideManeuverUI, isManeuverDragging, collapseManeuverEditing } from '../ui/maneuverUI.js';
 import { updateManeuverViewPanel, hideManeuverViewPanel } from '../ui/maneuverViewPanel.js';
@@ -512,13 +512,39 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                     const segments = getLastOrbitSegments();
                     if (segments && segments.length > 0) {
                         const mouseWorld = screenToWorld(canvasHitX, canvasHitY, _canvas);
-                        const hit = findNearestOrbitPoint(segments, mouseWorld, 12, _canvas);
+                        // 严格线性链（0.2.6）：可建点的链 = 链尾（无节点时=当前轨道；有节点时=最后一个
+                        // 节点的机动后链，即画面上那条粉色线）→ 命中检测同时考虑两者，优先更近的
+                        // 注意：本处理器内只有 ship（同作用域常量）；不可引用 update() 闭包里的 activeShip
+                        let hitSegs = segments;
+                        let hit = findNearestOrbitPoint(segments, mouseWorld, 12, _canvas);
+                        const tail = maneuverSystem.getNodesSorted(ship).slice(-1)[0];
+                        if (tail) {
+                            const tailPred = (getLastManeuverNodes() || []).find(en => en.node.id === tail.id);
+                            const tailSegs = tailPred && tailPred.segments;
+                            if (tailSegs && tailSegs.length) {
+                                const tailHit = findNearestOrbitPoint(tailSegs, mouseWorld, 12, _canvas);
+                                // 命中对象不含距离字段 → 用"鼠标到命中点的屏幕距离"比较（同为画布物理像素）
+                                const d2 = (h) => (h ? Math.hypot(h.screenX - canvasHitX, h.screenY - canvasHitY) : Infinity);
+                                if (tailHit && d2(tailHit) < d2(hit)) {
+                                    hit = tailHit;
+                                    hitSegs = tailSegs;
+                                }
+                            }
+                        }
                         if (hit) {
                             const cur = resolveOrbitHit(hit, _canvas);
-                            const seg = segments[hit.segmentIndex];
+                            const seg = hitSegs[hit.segmentIndex];
                             const absTime = (hit.timeOffset !== null && isFinite(seg.anchorTime))
                                 ? seg.anchorTime + hit.timeOffset
                                 : null;
+                            // 链尾节点建点需要该链上的速度快照 → 预先解析并随菜单数据下发
+                            let velRel = null;
+                            try {
+                                const st = absTime !== null ? walkToTime(hitSegs, absTime) : null;
+                                if (st && st.relVel) velRel = st.relVel;
+                            } catch (err) { /* 链瞬时缺失 → 退化显示 */ }
+                            // 命中非链尾链（旧链）时禁止建点：交由菜单提示（严格线性链口径）
+                            const isTipChain = (hitSegs === segments && !tail) || (tail && hitSegs !== segments);
                             showOrbitContextMenu(e.clientX, e.clientY, {
                                 worldX: cur ? cur.worldX : hit.worldX,
                                 worldY: cur ? cur.worldY : hit.worldY,
@@ -529,7 +555,9 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                                 // 世界坐标 = 宿主当前时刻位置 + 冻结的轨道相对坐标
                                 anchorBody: cur ? cur.anchorBody : null,
                                 relX: cur ? cur.relX : null,
-                                relY: cur ? cur.relY : null
+                                relY: cur ? cur.relY : null,
+                                velRel,
+                                canCreate: isTipChain
                             }, _canvas);
                             return;
                         }
@@ -914,10 +942,11 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 // 构建 SAS 目标朝向计算所需的飞行上下文
                 const host = getSOIHost(getAbsolutePosition(activeShip));
 
-                // 机动节点方向（0.2.5）：存在可执行节点时计算两态方向——
+                // 机动节点方向（0.2.5，0.2.6 多节点）：指向**执行目标 = 下一个未完成节点**——
                 //   过节点前 = 节点加速方向（恒定）；过节点后 = 达到目标轨道的当前燃烧方向（实时变）；
                 //   供 SAS 'maneuver' 模式指向、导航球机动标记、节点副钮可用性共同使用
-                const mvPred = getLastManeuverPrediction();
+                //   （面板仍编辑"选中节点"，二者解耦：选中另一个节点不会改变 SAS 指向）
+                const mvPred = getNextPendingManeuverPrediction() || getLastManeuverPrediction();
                 _hasManeuver = !!(mvPred && mvPred.plan && mvPred.plan.node && !mvPred.plan.node.executed
                     && mvPred.plan.dvMag > 1e-3);
                 // NaN/Infinity 方向防御：非有限角度会污染导航球 marker 坐标 → ctx.arc NaN

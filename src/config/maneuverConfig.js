@@ -52,5 +52,9 @@ export const MANEUVER_CONFIG = {
     handleProgradeColor: '#ffcc33',
     handleRadialColor: '#4fc3f7',
     // 手柄图标尺寸（CSS 像素；0.2.5 打磨定稿 25px = 初版 33px 的 3/4）
-    handleIconSize: 25
+    handleIconSize: 25,
+    // 多节点（0.2.6）：每帧最多重算的计划数。
+    // 节点数量不设上限，编辑前序节点会让其下游全部重投影 → 若一帧内全部重算会卡顿；
+    // 超出预算的节点本帧沿用上一帧的计划（下一帧继续追赶），视觉上仅晚一帧。
+    planRecomputeBudget: 3
 };

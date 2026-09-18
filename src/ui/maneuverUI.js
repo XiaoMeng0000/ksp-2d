@@ -11,7 +11,7 @@
 import { t } from '../config/strings.js';
 import { eventBus, Events } from '../eventBus.js';
 import { maneuverSystem } from '../ship/maneuverSystem.js';
-import { getLastManeuverPrediction, getLastOrbitSegments, findNearestOrbitPoint, resolveOrbitHit } from '../renderer.js';
+import { getLastManeuverPrediction, getLastOrbitSegments, getLastManeuverNodes, findNearestOrbitPoint, resolveOrbitHit } from '../renderer.js';
 import { screenToWorld, cssToCanvas, canvasToCss, worldToScreen } from '../camera.js';
 import { getCachedTime, bodyFuturePos } from '../physics/orbitalPrediction.js';
 import { walkToTime } from '../physics/maneuverPrediction.js';
@@ -25,7 +25,7 @@ import { MANEUVER_CONFIG } from '../config/maneuverConfig.js';
 
 // ===== 模块状态 =====
 let _panel = null;          // 加速计时器面板
-let _icon = null;           // 节点图标（空心圆）
+let _icon = null;           // 节点图标（空心圆）——表示**选中**节点（带十字手柄）
 let _handles = {};          // 十字型四向手柄 DOM
 let _lines = {};            // 中心圆 → 方向图标的实线衔接线
 let _canvas = null;
@@ -52,6 +52,9 @@ const HANDLE_ICONS = {
 };
 // 染色 dataURL 缓存（texture/color 组合，40px 高清底图）
 const _iconDataUrlCache = new Map();
+const _minorIcons = new Map();   // nodeId → DOM（非选中节点的简化图标，多节点 0.2.6）
+let _switchIdxEl = null;         // 节点切换器索引文本（◀ i/N ▶）
+let _execHintEl = null;          // 执行指向提示（选中 ≠ 执行目标时显示，多节点 0.2.6）
 
 let _tailSvg = null;        // 卡片下方自适应尖角（SVG 容器）
 let _tailBody = null;       // 尖角黑底本体（path）
@@ -75,6 +78,11 @@ function ensureDom() {
         '<div class="maneuver-title">' +
             '<div class="maneuver-title-text"></div>' +
             '<div class="maneuver-title-line"></div>' +
+            '<div class="maneuver-switch">' +
+                '<span class="maneuver-switch-btn maneuver-switch-prev">◀</span>' +
+                '<span class="maneuver-switch-idx"></span>' +
+                '<span class="maneuver-switch-btn maneuver-switch-next">▶</span>' +
+            '</div>' +
         '</div>' +
         '<div class="maneuver-body">' +
             '<div class="maneuver-btns">' +
@@ -106,7 +114,8 @@ function ensureDom() {
                 '</div>' +
             '</div>' +
         '</div>' +
-        '<div class="maneuver-bar-wrap"><div class="maneuver-bar-fill"></div></div>';
+        '<div class="maneuver-bar-wrap"><div class="maneuver-bar-fill"></div></div>' +
+        '<div class="maneuver-exec-hint"></div>';
     document.body.appendChild(_panel);
 
     // 静态文案
@@ -127,7 +136,8 @@ function ensureDom() {
     greenBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         const ship = _lastShip;
-        const node = ship ? maneuverSystem.getNode(ship) : null;
+        // 定点加速指向**执行目标**（下一个未完成节点），与面板选中的编辑目标解耦（0.2.6）
+        const node = ship ? (maneuverSystem.getNextPendingNode(ship) || maneuverSystem.getNode(ship)) : null;
         if (!ship || !node || node.executed) return;
         const target = node.time - MANEUVER_CONFIG.warpLeadTime;
         if (target <= getCachedTime()) {
@@ -152,6 +162,29 @@ function ensureDom() {
             window.showNotification(t('maneuver.deleted'), 'info');
         }
     });
+
+    // 节点切换器（多节点 0.2.6：单面板 + ◀ i/N ▶；面板其余部分始终绑定选中节点）
+    const prevBtn = _panel.querySelector('.maneuver-switch-prev');
+    const nextBtn = _panel.querySelector('.maneuver-switch-next');
+    const switchIdx = _panel.querySelector('.maneuver-switch-idx');
+    if (prevBtn) {
+        prevBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (!_lastShip) return;
+            maneuverSystem.cycleSelected(_lastShip, -1);
+            emitClickSound(prevBtn);
+        });
+    }
+    if (nextBtn) {
+        nextBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (!_lastShip) return;
+            maneuverSystem.cycleSelected(_lastShip, 1);
+            emitClickSound(nextBtn);
+        });
+    }
+    _switchIdxEl = switchIdx;
+    _execHintEl = _panel.querySelector('.maneuver-exec-hint');
 
     // 卡片下方自适应尖角（SVG）：黑底本体 + 两条紫色斜边（颜色走 CSS，顶点每帧按进度前沿重算）
     _tailSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -234,8 +267,9 @@ function tintedIconDataUrl(texKey, color) {
 }
 
 // ===== 拖拽（时间 / Δv 轴速率式） =====
-function beginTimeDrag(e) {
-    _drag = { mode: 'time' };
+// nodeId 可选（多节点 0.2.6）：拖动指定节点；缺省 = 选中节点
+function beginTimeDrag(e, nodeId) {
+    _drag = { mode: 'time', nodeId: nodeId || null };
     _icon.setPointerCapture(e.pointerId);
 }
 
@@ -273,6 +307,45 @@ function tickDvAccumulate() {
     _drag.rafId = window.requestAnimationFrame(tickDvAccumulate);
 }
 
+// 非选中节点的简化图标（多节点 0.2.6）：只画空心圆，可点击选中、可拖动改时刻；
+// 十字手柄仍只属于选中节点（避免多手柄互相遮挡）。机动视图内整体隐藏（与 HUD 显隐口径一致）。
+function updateMinorIcons(canvas, selectedNode, hideGizmo) {
+    const entries = getLastManeuverNodes() || [];
+    const alive = new Set();
+    if (!hideGizmo) {
+        for (const e of entries) {
+            if (!e.node || (selectedNode && e.node.id === selectedNode.id)) continue;
+            if (!e.nodeScreen) continue;
+            alive.add(e.node.id);
+            let el = _minorIcons.get(e.node.id);
+            if (!el) {
+                el = document.createElement('div');
+                el.className = 'maneuver-node-icon maneuver-node-icon-minor';
+                el.style.display = 'none';
+                const nodeId = e.node.id;
+                el.addEventListener('pointerdown', (ev) => {
+                    ev.stopPropagation();
+                    ev.preventDefault();
+                    if (_lastShip) maneuverSystem.setSelectedNode(_lastShip, nodeId);
+                    _editing = true;
+                    beginTimeDrag(ev, nodeId);
+                });
+                document.body.appendChild(el);
+                _minorIcons.set(nodeId, el);
+            }
+            const css = canvasToCss(e.nodeScreen.x, e.nodeScreen.y, canvas);
+            const left = css.x + 'px';
+            const top = css.y + 'px';
+            if (el.style.left !== left) el.style.left = left;
+            if (el.style.top !== top) el.style.top = top;
+            if (el.style.display !== 'block') el.style.display = 'block';
+        }
+    }
+    for (const [id, el] of _minorIcons) {
+        if (!alive.has(id) && el.style.display !== 'none') el.style.display = 'none';
+    }
+}
+
 function onDragMove(e) {
     if (!_drag || !_canvas) return;
     const ship = _lastShip;
@@ -304,7 +377,7 @@ function onDragMove(e) {
                     relY: cur ? cur.relY : null,
                     anchorBody: cur ? cur.anchorBody : null,
                     velRel
-                });
+                }, _drag.nodeId || undefined);
             }
         }
     } else if (_drag.mode === 'dv') {
@@ -361,6 +434,28 @@ export function updateManeuverUI(canvas, ship) {
     // ---- 机动视图内隐藏节点图标与手柄（0.2.5：远景下图标仅是行星上一点，
     //      细节交由规划面板的放大图；加速计时器面板保留显示） ----
     const hideGizmo = flightView.isManeuver();
+
+    // ---- 多节点（0.2.6）：切换器读数 + 非选中节点的简化图标 ----
+    const sortedNodes = maneuverSystem.getNodesSorted(ship);
+    if (_switchIdxEl) {
+        const idx = sortedNodes.findIndex(n => n.id === node.id);
+        const text = sortedNodes.length > 1
+            ? ((idx >= 0 ? idx + 1 : '-') + '/' + sortedNodes.length)
+            : '';
+        if (_switchIdxEl.textContent !== text) _switchIdxEl.textContent = text;
+    }
+    updateMinorIcons(canvas, node, hideGizmo);
+
+    // 执行指向提示（多节点）：执行目标 = 下一个未完成节点；与选中不同时明确告知玩家，
+    // 避免"面板在编辑 A、SAS 却指向 B"的困惑
+    if (_execHintEl) {
+        const pending = maneuverSystem.getNextPendingNode(ship);
+        const diff = pending && pending.id !== node.id;
+        const text = diff ? '▶ ' + formatTCountdown(Math.max(0, pending.time - getCachedTime())) : '';
+        if (_execHintEl.textContent !== text) _execHintEl.textContent = text;
+        const disp = text ? 'block' : 'none';
+        if (_execHintEl.style.display !== disp) _execHintEl.style.display = disp;
+    }
 
     // ---- 图标屏幕位置：预测链内优先；退化用冻结轨道坐标 ----
     let iconCss = null;
@@ -616,6 +711,10 @@ export function hideManeuverUI() {
     for (const axis of HANDLE_AXES) {
         if (_handles[axis]) _handles[axis].style.display = 'none';
         if (_lines[axis]) _lines[axis].style.display = 'none';
+    }
+    // 非选中节点的简化图标（多节点 0.2.6）
+    for (const el of _minorIcons.values()) {
+        if (el.style.display !== 'none') el.style.display = 'none';
     }
 }
 

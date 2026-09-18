@@ -222,6 +222,58 @@
     cursor: move;
     z-index: 935;
 }
+
+/* 非选中节点的简化图标（多节点 0.2.6）：小一圈、暗一档；点击即选中并可直接拖动改时刻 */
+.maneuver-node-icon-minor {
+    width: 16px;
+    height: 16px;
+    margin-left: -8px;
+    margin-top: -8px;
+    border-width: 1px;
+    opacity: 0.7;
+    box-shadow: none;
+    z-index: 930;
+}
+.maneuver-node-icon-minor:hover {
+    opacity: 1;
+}
+
+/* 节点切换器（多节点：单面板 + ◀ i/N ▶） */
+.maneuver-switch {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex: none;
+}
+.maneuver-switch-btn {
+    width: 14px;
+    text-align: center;
+    color: var(--text-bright);
+    opacity: 0.75;
+    cursor: pointer;
+    font-size: 10px;
+    line-height: 14px;
+}
+.maneuver-switch-btn:hover {
+    opacity: 1;
+    color: var(--progress-green);
+}
+.maneuver-switch-idx {
+    min-width: 24px;
+    text-align: center;
+    font-size: 10px;
+    color: var(--progress-green);
+}
+
+/* 执行指向提示（多节点 0.2.6：选中节点 ≠ 执行目标时显示，避免"编辑 A、SAS 指向 B"的困惑） */
+.maneuver-exec-hint {
+    display: none;
+    margin-top: 4px;
+    text-align: right;
+    font-size: 10px;
+    color: var(--progress-green);
+    opacity: 0.85;
+}
 .maneuver-handle {
     position: fixed;
     /* 0.2.5 打磨：图标定稿 25px（33px 的 3/4） */

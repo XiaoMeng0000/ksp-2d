@@ -14,7 +14,7 @@ import { t } from '../config/strings.js';
 import { flightView } from '../flightView.js';
 import { maneuverSystem } from '../ship/maneuverSystem.js';
 import { shipSystem } from '../ship/shipSystem.js';
-import { getLastOrbitSegments, getLastManeuverPrediction } from '../renderer.js';
+import { getLastOrbitSegments, getLastManeuverPrediction, getLastManeuverNodes } from '../renderer.js';
 import { celestialBodies, getSOIHost, getAbsolutePosition } from '../physics/physics.js';
 import { getOrbitalDirectionAngles } from '../physics/orbitalMechanics.js';
 import { walkToTime, getNodeOrbitPeriod } from '../physics/maneuverPrediction.js';
@@ -338,18 +338,23 @@ function onInsetHover(e) {
                 break;
             }
         }
-        if (cursor === 'default' && _hit.node
-            && Math.hypot(p.x - _hit.node.x, p.y - _hit.node.y) <= MANEUVER_CONFIG.nodeHitRadius) {
-            cursor = 'grab';
+        if (cursor === 'default' && _hit.nodes) {
+            for (const n of _hit.nodes) {
+                if (Math.hypot(p.x - n.x, p.y - n.y) <= MANEUVER_CONFIG.nodeHitRadius) {
+                    cursor = 'grab';
+                    break;
+                }
+            }
         }
     }
 
     if (cursor === 'default') {
         const ship = getShip();
         const host = ship && ship.currentSOI ? celestialBodies.find(b => b.name === ship.currentSOI) : null;
-        const segs = getLastOrbitSegments();
-        if (host && segs && segs.length) {
-            const near = nearestOrbitPointInInset(segs, p, host, 24);
+        // 指针提示同样只给"链尾"：其他链不接受建点（严格线性链），故不显示可点击光标
+        const tip = tipChain();
+        if (host && tip) {
+            const near = nearestOrbitPointInInset([tip], p, host, 24);
             if (near) {
                 cursor = 'pointer';
                 hover = { x: p.x, y: p.y, absTime: near.absTime };
@@ -379,17 +384,10 @@ function openNodeMenu(clientX, clientY, data, ship) {
     menu.appendChild(el('div', 'mvp-menu-title',
         'T-' + formatTCountdown(remain) + t('mvp.menuTitleSuffix')));
 
-    const exists = !!(ship && Array.isArray(ship.maneuverNodes) && ship.maneuverNodes.length > 0);
-    const item = el('div', 'mvp-menu-item' + (exists ? ' disabled' : ''),
-        '+ ' + t('mvp.createNode'));
+    // 多节点（0.2.6）：允许创建多个节点，因此该项不再因"已有节点"禁用；
+    // 执行目标（SAS/定点加速）始终指向下一个未完成节点
+    const item = el('div', 'mvp-menu-item', '+ ' + t('mvp.createNode'));
     item.addEventListener('click', () => {
-        if (exists) {
-            if (typeof window.showNotification === 'function') {
-                window.showNotification(t('maneuver.alreadyExists'), 'warning');
-            }
-            closeNodeMenu();
-            return;
-        }
         const result = maneuverSystem.createNode(ship, {
             time: data.absTime,
             relX: data.relX,
@@ -426,15 +424,18 @@ function onInsetClick(e) {
     if (!ship) return;
     const host = ship.currentSOI ? celestialBodies.find(b => b.name === ship.currentSOI) : null;
     if (!host) return;
-    const segs = getLastOrbitSegments();
-    if (!segs || segs.length === 0) return;
+    // 严格线性链：只有"链尾"（无节点时的当前轨道 / 最后一个节点的机动后链）可以继续建点
+    const tip = tipChain();
+    const chains = tip ? [tip] : [];
+    if (chains.length === 0) return;
     const p = toInsetLocal(e);
-    const near = nearestOrbitPointInInset(segs, p, host, 24);
+    const near = nearestOrbitPointInInset(chains, p, host, 24);
     if (!near) {
         closeNodeMenu();
         return;
     }
-    const st = walkToTime(segs, near.absTime);
+    // 快照取自链尾那条链（链式规划：新节点自动承接上一节点的机动后状态）
+    const st = walkToTime(near.segs, near.absTime);
     if (!st) return;
     openNodeMenu(e.clientX, e.clientY, {
         absTime: near.absTime,
@@ -466,9 +467,13 @@ function onInsetPointerDown(e) {
             return;
         }
     }
-    const n = _hit.node;
-    if (n && Math.hypot(p.x - n.x, p.y - n.y) <= MANEUVER_CONFIG.nodeHitRadius) {
-        _drag = { mode: 'node' };
+    // 节点标记：命中的那个即成为选中目标并开始拖动（多节点 0.2.6；手柄仍只属于选中节点）
+    const hitNode = (_hit.nodes || []).find(n => Math.hypot(p.x - n.x, p.y - n.y) <= MANEUVER_CONFIG.nodeHitRadius);
+    if (hitNode) {
+        if (!hitNode.selected) {
+            maneuverSystem.setSelectedNode(ship, hitNode.id);
+        }
+        _drag = { mode: 'node', nodeId: hitNode.id };
         e.preventDefault();
     }
 }
@@ -491,22 +496,25 @@ function onInsetPointerMove(e) {
 
     if (_drag.mode === 'node') {
         // 沿轨道拖动：把指针映射到放大图内的最近轨道点 → 反解时刻（与主视图同思路）
-        const node = maneuverSystem.getNode(ship);
-        const segs = getLastOrbitSegments();
-        if (!node || !segs || segs.length === 0 || !_hit) return;
+        const nodeId = _drag.nodeId || (maneuverSystem.getNode(ship) || {}).id;
+        // 严格线性链：拖节点只在**它自己所属的那条链**上解析（时间必然在前序燃烧之后）
+        const own = nodeId ? chainForNode(nodeId) : null;
+        const chains = own ? [own] : collectChains();
+        if (!nodeId || chains.length === 0 || !_hit) return;
         const hostBody = ship.currentSOI ? celestialBodies.find(b => b.name === ship.currentSOI) : null;
         const p = toInsetLocal(e);
-        const near = nearestOrbitPointInInset(segs, p, hostBody);
+        const near = nearestOrbitPointInInset(chains, p, hostBody);
         if (!near) return;
-        const st = walkToTime(segs, near.absTime);
+        const st = walkToTime(near.segs, near.absTime);
         if (!st) return;
+        // 拖动的是被按下的那个节点（多节点），新状态取自光标所在链
         maneuverSystem.updateNodeTime(ship, {
             time: near.absTime,
             relX: st.relPos.x,
             relY: st.relPos.y,
             anchorBody: st.host.name,
             velRel: st.relVel
-        });
+        }, nodeId);
     }
 }
 
@@ -539,32 +547,82 @@ function toInsetLocal(e) {
 
 // 放大图内最近轨道点（含到达时刻）：只沿**宿主系**段搜索（换系段的坐标不属于本地轨道，
 // 参与搜索会把节点吸附到错误时刻）
-function nearestOrbitPointInInset(segs, p, host, thresholdPx) {
+// 本帧可用链（多节点 0.2.6）：基础链（当前轨道）+ 各节点的机动后链。
+// 建点 / 拖节点 / 悬停都按"光标所在链"解析 → 在预测链上操作时快照自动取自该链（链式规划）
+function collectChains() {
+    const list = [];
+    const base = getLastOrbitSegments();
+    if (base && base.length) list.push({ segs: base, ownerId: null });
+    for (const e of (getLastManeuverNodes() || [])) {
+        if (e.segments && e.segments.length) list.push({ segs: e.segments, ownerId: e.node.id });
+    }
+    return list;
+}
+
+// 链尾（唯一允许继续规划的那条链）：无节点 = 基础链（当前轨道）；
+// 有节点 = 时间序**最后一条节点的机动后链** —— 严格线性链（0.2.6 总监定稿）：
+// 节点 2 只能建在节点 1 的链路上、节点 3 只能建在 2 的链路上，每一级只允许一个，不可分支。
+function tipChain() {
+    const entries = getLastManeuverNodes() || [];
+    if (entries.length === 0) {
+        const base = getLastOrbitSegments();
+        return (base && base.length) ? { segs: base, ownerId: null } : null;
+    }
+    const last = entries[entries.length - 1];
+    if (last && last.segments && last.segments.length) {
+        return { segs: last.segments, ownerId: last.node.id };
+    }
+    return null;
+}
+
+// 某节点**所属的那条链**（严格线性链）：首节点 = 基础链；其余 = 其前一个节点的机动后链。
+// 拖节点只在这条链上解析 → 时间必然落在"前序燃烧结束之后"，不会把节点拖到前序之前打乱链序。
+function chainForNode(nodeId) {
+    const entries = getLastManeuverNodes() || [];
+    const idx = entries.findIndex(e => e.node && e.node.id === nodeId);
+    if (idx <= 0) {
+        const base = getLastOrbitSegments();
+        return (base && base.length) ? { segs: base, ownerId: null } : null;
+    }
+    const prevEntry = entries[idx - 1];
+    if (prevEntry && prevEntry.segments && prevEntry.segments.length) {
+        return { segs: prevEntry.segments, ownerId: prevEntry.node.id };
+    }
+    return null;
+}
+
+function nearestOrbitPointInInset(chains, p, host, thresholdPx) {
     if (!_hit || !_hit.geom || !isFinite(_hit.geom.scale)) return null;
     const g = _hit.geom;
     let best = null;
     let bestD2 = (thresholdPx || 30) * (thresholdPx || 30);   // 命中阈值（CSS px，默认与主视图一致）
-    for (const seg of segs) {
-        const anchorName = seg.anchorBody || seg.segSoiName;
-        if (anchorName && host && anchorName !== host.name) continue;
-        const pts = seg.relPoints;
-        if (!pts || pts.length < 2) continue;
-        for (let i = 1; i < pts.length; i++) {
-            const a = insetPoint(pts[i - 1], g);
-            const b = insetPoint(pts[i], g);
-            const hit = distToSegmentSq(p.x, p.y, a.x, a.y, b.x, b.y);
-            if (hit.d2 < bestD2) {
-                bestD2 = hit.d2;
-                const t0 = pts[i - 1].t;
-                const t1 = pts[i].t;
-                const tLocal = (t0 !== undefined && t1 !== undefined)
-                    ? t0 + (t1 - t0) * hit.t
-                    : null;
-                best = {
-                    absTime: (tLocal !== null && isFinite(seg.anchorTime))
-                        ? seg.anchorTime + tLocal
-                        : null
-                };
+    for (const entry of (chains || [])) {
+        const segs = entry.segs || entry;
+        const ownerId = entry.ownerId !== undefined ? entry.ownerId : null;
+        for (const seg of segs) {
+            const anchorName = seg.anchorBody || seg.segSoiName;
+            if (anchorName && host && anchorName !== host.name) continue;
+            const pts = seg.relPoints;
+            if (!pts || pts.length < 2) continue;
+            for (let i = 1; i < pts.length; i++) {
+                const a = insetPoint(pts[i - 1], g);
+                const b = insetPoint(pts[i], g);
+                const hit = distToSegmentSq(p.x, p.y, a.x, a.y, b.x, b.y);
+                if (hit.d2 < bestD2) {
+                    bestD2 = hit.d2;
+                    const t0 = pts[i - 1].t;
+                    const t1 = pts[i].t;
+                    const tLocal = (t0 !== undefined && t1 !== undefined)
+                        ? t0 + (t1 - t0) * hit.t
+                        : null;
+                    best = {
+                        absTime: (tLocal !== null && isFinite(seg.anchorTime))
+                            ? seg.anchorTime + tLocal
+                            : null,
+                        segs,
+                        ownerId
+                    };
+                }
             }
         }
     }
@@ -772,11 +830,32 @@ function drawInset(canvas, ship, node, pred, now) {
     drawSegments(ctx, segs, geom, {
         stroke: 'rgba(61,255,61,0.85)', lineWidth: 1.4, dash: null
     }, host, cssW, cssH);
-    // 燃烧弧（亮绿加粗）+ 机动后轨道（虚线，超长自动降级实线）
-    if (pred && pred.burnArc) {
-        drawSegments(ctx, [pred.burnArc], geom, { stroke: '#3dff3d', lineWidth: 2.6, dash: null }, host, cssW, cssH);
+
+    // 多节点链式（0.2.6）：逐节点绘制 燃烧弧 + 机动后链；
+    // 选中节点高亮（亮绿实线弧 + 亮虚线链），其余节点降一档亮度（总监定稿：全部链都画、选中高亮）
+    const nodeEntries = getLastManeuverNodes() || [];
+    for (const e of nodeEntries) {
+        const dim = !e.selected;
+        if (e.burnArc) {
+            drawSegments(ctx, [e.burnArc], geom, {
+                stroke: dim ? 'rgba(61,255,61,0.5)' : '#3dff3d',
+                lineWidth: dim ? 1.6 : 2.6,
+                dash: null
+            }, host, cssW, cssH);
+        }
+        if (e.segments && e.segments.length) {
+            drawSegments(ctx, e.segments, geom, {
+                stroke: dim ? 'rgba(61,255,61,0.42)' : 'rgba(61,255,61,0.75)',
+                lineWidth: dim ? 1 : 1.2,
+                dash: [7, 5]
+            }, host, cssW, cssH);
+        }
     }
-    drawSegments(ctx, postSegs, geom, { stroke: 'rgba(61,255,61,0.75)', lineWidth: 1.2, dash: [7, 5] }, host, cssW, cssH);
+    // 兼容：无多节点数据（旧路径）时仍画单节点预测
+    if (nodeEntries.length === 0 && pred && pred.burnArc) {
+        drawSegments(ctx, [pred.burnArc], geom, { stroke: '#3dff3d', lineWidth: 2.6, dash: null }, host, cssW, cssH);
+        drawSegments(ctx, postSegs, geom, { stroke: 'rgba(61,255,61,0.75)', lineWidth: 1.2, dash: [7, 5] }, host, cssW, cssH);
+    }
     ctx.restore();
 
     // —— 宿主天体：中心空心圆（双环）
@@ -795,7 +874,26 @@ function drawInset(canvas, ship, node, pred, now) {
         drawShipMarker(ctx, sp.x, sp.y, head);
     }
 
-    // —— 机动节点：空心圆 + 四向手柄 + 虚线衔接线（HUD 化）
+    // —— 机动节点（多节点 0.2.6）：所有节点画空心圆标记；**仅选中节点**画四向手柄与衔接线
+    _hit.nodes = [];
+    for (const e of (getLastManeuverNodes() || [])) {
+        const st = e.plan && e.plan.nodeState;
+        if (!st) continue;
+        const p = insetPoint(st.relPos, geom);
+        _hit.nodes.push({ id: e.node.id, x: p.x, y: p.y, selected: !!e.selected });
+        if (e.selected) {
+            _hit.node = p;
+            _hit.nodeId = e.node.id;
+        }
+    }
+    // 非选中节点标记（暗一档）
+    for (const n of _hit.nodes) {
+        if (n.selected) continue;
+        ctx.strokeStyle = 'rgba(61,255,61,0.55)';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.arc(n.x, n.y, 5, 0, Math.PI * 2); ctx.stroke();
+    }
+
     if (node && pred && pred.plan && pred.plan.nodeState) {
         const np = insetPoint(pred.plan.nodeState.relPos, geom);
         _hit.node = np;

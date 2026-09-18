@@ -153,6 +153,7 @@ ksp-2d/
   - [UI 开发规范](docs/UI开发规范.md) · [UI 面板视觉风格规范](docs/UI面板视觉风格规范.md)
   - [天体添加流程](docs/天体添加流程.md) · [纹理标准化流程](docs/纹理标准化流程.md) · [音频标准化流程](docs/音频标准化流程.md)
   - [资源系统方案](docs/resource-system-plan.md) · [公告编写规范](docs/公告编写规范.md)
+  - [渲染改造设想](docs/渲染改造设想.md)（设想稿，待决策，未开工）
 
 **核心开发约定**（完整版见 CONTRIBUTING.md）：
 

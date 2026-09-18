@@ -310,7 +310,7 @@ const STRINGS = {
     'maneuver.warpToBurnTip': '时间加速至节点前10秒',
     'maneuver.deleteTip': '删除机动计划',
     'maneuver.created': '机动计划已创建',
-    'maneuver.alreadyExists': '已存在机动计划，请先删除旧计划',
+    'maneuver.alreadyExists': '已存在机动计划，请先删除旧计划',   // 0.2.6 多节点后可创建多个；此文案仅保留作极端失败路径兜底
     'maneuver.createFailed': '机动计划创建失败：该点不在可预测范围内',
     'maneuver.arrived': '已到达机动节点时刻，请按计划点火',
     'maneuver.completed': '机动计划 ΔV 已达成',

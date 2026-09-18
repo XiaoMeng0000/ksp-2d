@@ -117,12 +117,16 @@ export function showOrbitContextMenu(clientX, clientY, data, canvas) {
                 }
                 if (_menuData && _menuData.absTime !== null && _menuData.absTime !== undefined) {
                     // 冻结节点时刻速度快照（0.2.5 打磨：节点时刻已过时重建预测状态，永不失效）
-                    let velRel = null;
-                    try {
-                        const st = walkToTime(getLastOrbitSegments(), _menuData.absTime);
-                        if (st && st.relVel) velRel = st.relVel;
-                    } catch (err) {
-                        // 预测链瞬时缺失（如模式切换过渡帧）→ 跳过速度快照，走退化显示
+                    // 多节点（0.2.6）：命中链尾（最后一个节点的机动后链）时，场景层已随菜单下发
+                    // 该链上的速度快照 → 优先使用；否则回退到当前轨道链解析
+                    let velRel = _menuData.velRel || null;
+                    if (!velRel) {
+                        try {
+                            const st = walkToTime(getLastOrbitSegments(), _menuData.absTime);
+                            if (st && st.relVel) velRel = st.relVel;
+                        } catch (err) {
+                            // 预测链瞬时缺失（如模式切换过渡帧）→ 跳过速度快照，走退化显示
+                        }
                     }
                     const result = maneuverSystem.createNode(ship, {
                         time: _menuData.absTime,
