@@ -37,7 +37,7 @@ globalThis.localStorage = { getItem: () => null, setItem: noop };
 const { celestialBodies, updateCelestialBodies } = await import('./src/physics/physics.js');
 const { stateToKepler } = await import('./src/physics/orbitalMechanics.js');
 const { camera } = await import('./src/camera.js');
-const { render, getLastManeuverNodes, getNextPendingManeuverPrediction, getManeuverSelectedId } = await import('./src/renderer.js');
+const { render, getLastManeuverNodes, getNextPendingManeuverPrediction, getManeuverSelectedId, getLastOrbitSegments } = await import('./src/renderer.js');
 const { maneuverSystem } = await import('./src/ship/maneuverSystem.js');
 
 updateCelestialBodies(0);
@@ -266,6 +266,49 @@ check('M11 次帧零重投影（全部节点版本号不变，缓存命中）',
     check('M13 onClick 内无裸 activeShip（作用域越界会抛 ReferenceError → 菜单打不开）',
         !/\bactiveShip\b/.test(bare));
     check('M13 onClick 用同作用域的 ship 查询节点', /maneuverSystem\.getNodesSorted\(ship\)/.test(body));
+}
+
+// ===== M14 回归护栏：非首节点可拖动（曾因"只查当前轨道链"导致除首节点外都拖不动）=====
+{
+    const { readFileSync } = await import('node:fs');
+    const uiSrc = readFileSync('src/ui/maneuverUI.js', 'utf8');
+    check('M14 主视图拖拽按"该节点所属链"解析', /function chainForNode\(nodeId\)/.test(uiSrc)
+        && /const chain = chainForNode\(nodeId\);/.test(uiSrc));
+    check('M14 主视图不再依赖 resolveOrbitHit（它只认当前轨道链）',
+        !/resolveOrbitHit/.test(uiSrc.replace(/\/\/[^\n]*/g, '')));
+    check('M14 命中换算在指定链上完成', /function resolveHitOnChain\(chain, hit\)/.test(uiSrc)
+        && /const cur = resolveHitOnChain\(chain, hit\);/.test(uiSrc));
+    check('M14 指针捕获挂在"被按下的元素"上且容错', /const target = e\.currentTarget \|\| _icon;/.test(uiSrc)
+        && /catch \(err\) \{ \/\* 捕获失败/.test(uiSrc));
+    check('M14 简化图标拖动时带上 nodeId', /beginTimeDrag\(ev, nodeId\);/.test(uiSrc));
+
+    // 行为：第二个节点的快照必须落在"第一个节点的机动后链"上（这样拖拽才命中得到）
+    const shipD = makeShip();
+    const d1 = maneuverSystem.createNode(shipD, { time: 150, relX: r0, relY: 0, anchorBody: 'Kerbin', velRel: { x: 0, y: v0 } });
+    maneuverSystem.updateNodeDeltaV(shipD, 'pro', 150, { pro: { x: 0, y: 1 }, retro: { x: 0, y: -1 }, radOut: { x: 1, y: 0 }, radIn: { x: -1, y: 0 } }, d1.node.id);
+    frame(shipD);
+    const ch = getLastManeuverNodes();
+    const tip = ch[ch.length - 1].segments;
+    const { walkToTime: walk, computeNodeAxes: axesOf } = await import('./src/physics/maneuverPrediction.js');
+    const st = walk(tip, 150 + 400);
+    const d2 = maneuverSystem.createNode(shipD, { time: 150 + 400, relX: st.relPos.x, relY: st.relPos.y, anchorBody: st.host.name, velRel: st.relVel });
+    frame(shipD);
+    // 节点 2 到"节点 1 机动后链"的最近距离 vs 到"当前轨道链"的最近距离（宿主参考系）
+    const nearest = (segs, x, y) => {
+        let m = Infinity;
+        for (const seg of (segs || [])) {
+            for (const p of seg.relPoints) {
+                const dd = Math.hypot(p.x - x, p.y - y);
+                if (dd < m) m = dd;
+            }
+        }
+        return m;
+    };
+    const minTip = nearest(tip, d2.node.relX, d2.node.relY);
+    const minBase = nearest(getLastOrbitSegments(), d2.node.relX, d2.node.relY);
+    console.log(`     节点 2 距机动后链 ${(minTip / 1000).toFixed(1)} km / 距当前轨道链 ${(minBase / 1000).toFixed(1)} km`);
+    check('M14 节点 2 更贴近"节点 1 的机动后链"（拖拽必须按所属链命中）', minTip < minBase / 5);
+    check('M14 节点 2 远离当前轨道链（证明基链命中必然失败）', minBase > 10000);
 }
 
 console.log(`\n结果: ${pass} 通过 / ${fail} 失败`);

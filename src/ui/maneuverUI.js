@@ -11,7 +11,7 @@
 import { t } from '../config/strings.js';
 import { eventBus, Events } from '../eventBus.js';
 import { maneuverSystem } from '../ship/maneuverSystem.js';
-import { getLastManeuverPrediction, getLastOrbitSegments, getLastManeuverNodes, findNearestOrbitPoint, resolveOrbitHit } from '../renderer.js';
+import { getLastManeuverPrediction, getLastOrbitSegments, getLastManeuverNodes, findNearestOrbitPoint } from '../renderer.js';
 import { screenToWorld, cssToCanvas, canvasToCss, worldToScreen } from '../camera.js';
 import { getCachedTime, bodyFuturePos } from '../physics/orbitalPrediction.js';
 import { walkToTime } from '../physics/maneuverPrediction.js';
@@ -266,11 +266,43 @@ function tintedIconDataUrl(texKey, color) {
     return url;
 }
 
+// 该节点**所属的链**（主视图拖拽用，严格线性链）：首节点 = 当前轨道链；
+// 其余 = 其前一个节点的机动后链 —— 节点 2 在节点 1 的机动后链上，若继续只查当前轨道
+// 会永远命中不到（旧 bug：除首节点外都拖不动）。
+function chainForNode(nodeId) {
+    const entries = getLastManeuverNodes() || [];
+    const idx = entries.findIndex(e => e.node && e.node.id === nodeId);
+    if (idx <= 0) return getLastOrbitSegments();
+    const prev = entries[idx - 1];
+    return (prev && prev.segments && prev.segments.length) ? prev.segments : getLastOrbitSegments();
+}
+
+// 在**指定链**上解析命中点的轨道坐标与速度快照（resolveOrbitHit 只认当前轨道链，故此处自行换算）
+function resolveHitOnChain(chain, hit) {
+    if (!chain || !hit) return null;
+    const seg = chain[hit.segmentIndex];
+    if (!seg || !seg.relPoints || seg.relPoints.length < 2) return null;
+    const pi = Math.max(0, Math.min(hit.pointIndex !== undefined ? hit.pointIndex : 0, seg.relPoints.length - 2));
+    const p0 = seg.relPoints[pi];
+    const p1 = seg.relPoints[pi + 1];
+    const t = (hit.segT !== undefined) ? Math.max(0, Math.min(1, hit.segT)) : 0;
+    return {
+        relX: p0.x + (p1.x - p0.x) * t,
+        relY: p0.y + (p1.y - p0.y) * t,
+        anchorBody: seg.anchorBody || seg.segSoiName || null
+    };
+}
+
 // ===== 拖拽（时间 / Δv 轴速率式） =====
 // nodeId 可选（多节点 0.2.6）：拖动指定节点；缺省 = 选中节点
 function beginTimeDrag(e, nodeId) {
     _drag = { mode: 'time', nodeId: nodeId || null };
-    _icon.setPointerCapture(e.pointerId);
+    // 指针捕获对象必须是**收到按下的那个元素**（可能是非选中节点的简化图标）；
+    // 元素可能已隐藏/尚未显示 → 捕获失败不影响拖拽（window 上仍有 pointermove 监听）
+    try {
+        const target = e.currentTarget || _icon;
+        if (target && target.setPointerCapture) target.setPointerCapture(e.pointerId);
+    } catch (err) { /* 捕获失败仅失去"拖出元素仍收事件"的保险，不阻断拖拽 */ }
 }
 
 function beginDvDrag(axis, e) {
@@ -355,20 +387,21 @@ function onDragMove(e) {
     }
 
     if (_drag.mode === 'time') {
-        // 图标沿轨道拖动 → 命中当前帧预测链 → 重算节点时刻/轨道坐标/速度快照
+        // 图标沿轨道拖动 → 命中**该节点自己所属的链**（严格线性链：节点 2 在节点 1 的机动后链上）
+        const nodeId = _drag.nodeId || (maneuverSystem.getNode(ship) || {}).id;
+        const chain = chainForNode(nodeId);
         const rect = _canvas.getBoundingClientRect();
         const canvasPt = cssToCanvas(e.clientX - rect.left, e.clientY - rect.top, _canvas);
         const world = screenToWorld(canvasPt.x, canvasPt.y, _canvas);
-        const segments = getLastOrbitSegments();
-        if (segments && segments.length > 0) {
-            const hit = findNearestOrbitPoint(segments, world, 30, _canvas);
+        if (chain && chain.length > 0) {
+            const hit = findNearestOrbitPoint(chain, world, 30, _canvas);
             if (hit && hit.timeOffset !== null && hit.timeOffset !== undefined) {
-                const seg = segments[hit.segmentIndex];
+                const seg = chain[hit.segmentIndex];
                 const absTime = seg.anchorTime + hit.timeOffset;
-                const cur = resolveOrbitHit(hit, _canvas);
+                const cur = resolveHitOnChain(chain, hit);
                 let velRel = null;
                 try {
-                    const st = walkToTime(segments, absTime);
+                    const st = walkToTime(chain, absTime);
                     if (st && st.relVel) velRel = st.relVel;
                 } catch (err) { /* 瞬时缺失 → 跳过速度快照 */ }
                 maneuverSystem.updateNodeTime(ship, {
@@ -377,7 +410,7 @@ function onDragMove(e) {
                     relY: cur ? cur.relY : null,
                     anchorBody: cur ? cur.anchorBody : null,
                     velRel
-                }, _drag.nodeId || undefined);
+                }, nodeId || undefined);
             }
         }
     } else if (_drag.mode === 'dv') {
