@@ -730,11 +730,15 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             const allShips = shipSystem.getAllShips();
             const allFacilities = facilitySystem.getAllFacilities();
 
-            // 时间加速 — 档位上限：点火 → 物理加速档(≤4x)；SOI 切换时间保护（剩余时间 T →
-            // ≤T 最大档位：切换点至少 1 真实秒帧预算且保护最高档下 10s 内必达）；否则放开全部档位
-            // 先设置档位上限再算 simDt：保证降档在本帧物理推进前生效（否则边界穿越帧会按旧高倍率大步长穿越导致位置跳变）
+            // 时间加速 — 双通道（KSP 式）：点火 → 时间通道锁 1x（setThrustLock：时间加速态强制落 1x，
+            // 时间通道 >1x 操作弹通知拒绝；物理加速通道仍可用 Alt 进入，任何时刻可用），
+            // 档位上限同时收到物理上限(≤4x)；SOI 切换时间保护（剩余时间 T → ≤T 最大档位）；
+            // 先设置点火锁与档位上限再算 simDt：保证降档在本帧物理推进前生效
+            // （否则边界穿越帧会按旧高倍率大步长穿越导致位置跳变）
+            const thrusting = !!(activeShip && activeShip.throttle > 0);
+            timeWarp.setThrustLock(thrusting);
             let warpMaxIndex = timeWarp.getMaxIndex();
-            if (activeShip && activeShip.throttle > 0) {
+            if (thrusting) {
                 warpMaxIndex = timeWarp.getPhysicsMaxIndex();
             } else if (activeShip && getSOIWarpProtectEnabled()) {
                 // SOI 切换时间保护（替代旧"≥99% 半径 → 限 100x"距离制）：
@@ -903,8 +907,11 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 _dockPromptFacId = null;
             }
 
-            // 朝向控制（仅对活动飞船生效；加速时锁输入，飞船保持朝向）
-            if (activeShip && warpRate <= 1) {
+            // 朝向控制（仅对活动飞船生效）：
+            // - 1x 与**物理加速态**（Alt 进入，≤4x）：可控——转向 / SAS / 机动正常（KSP 物理加速语义）
+            // - **时间加速态**（>1x 常规通道）：锁输入，飞船保持朝向（上轨仿真，操控被忽略）
+            const controlAllowed = warpRate <= 1 || timeWarp.isPhysicsMode();
+            if (activeShip && controlAllowed) {
                 // 确保 SAS 控制器存在（兜底：新建飞船 / 切换飞船）
                 if (!activeShip._sasController) {
                     activeShip._sasController = new SASController(activeShip);
@@ -970,22 +977,24 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 };
 
                 // SAS 控制器计算扭矩（OFF 模式内部返回 0，即纯手动旋转）
-                const torque = activeShip._sasController.update(dt, manualInput, sasContext);
+                // 时间基准用 simDt（= dt × 加速倍率）：物理加速 2x/4x 下姿态动力学随仿真时间推进，
+                // 玩家观感即"转向更快"（KSP 物理加速语义）；1x 时 simDt === dt，行为不变。
+                const torque = activeShip._sasController.update(simDt, manualInput, sasContext);
 
                 // 统一物理积分（替代旧的 A/D 分支和 SAS 预留分支）
                 const moi = activeShip.momentOfInertia || 1.0;
                 const angularAccel = torque / moi;
                 if (typeof activeShip.angularVelocity !== 'number') activeShip.angularVelocity = 0;
-                activeShip.angularVelocity += angularAccel * dt;
+                activeShip.angularVelocity += angularAccel * simDt;
 
                 // 角速度积分 → 朝向
-                activeShip.heading += activeShip.angularVelocity * dt;
+                activeShip.heading += activeShip.angularVelocity * simDt;
                 activeShip.heading = ((activeShip.heading % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
 
-                // 油门调整（Shift/Ctrl 渐变，Z/X 瞬时）
+                // 油门调整（Shift/Ctrl 渐变，Z/X 瞬时）—— 同样按仿真时间，物理加速下响应同步变快
                 if (typeof activeShip.throttle !== 'number') activeShip.throttle = 0;
-                if (inputManager.isDown('ShiftLeft')) activeShip.throttle += _throttleRate * dt;
-                if (inputManager.isDown('ControlLeft')) activeShip.throttle -= _throttleRate * dt;
+                if (inputManager.isDown('ShiftLeft')) activeShip.throttle += _throttleRate * simDt;
+                if (inputManager.isDown('ControlLeft')) activeShip.throttle -= _throttleRate * simDt;
                 if (inputManager.isDown('KeyZ')) activeShip.throttle = 1;
                 if (inputManager.isDown('KeyX')) activeShip.throttle = 0;
                 activeShip.throttle = Math.max(0, Math.min(1, activeShip.throttle));

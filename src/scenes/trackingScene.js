@@ -382,10 +382,11 @@ export function registerTrackingScene({ getTime, setTime, canvas }) {
             const activeId = activeShip ? activeShip.id : null;
             const allShips = shipSystem.getAllShips();
 
-            // 时间加速 — 追踪站无推力放开全部档位；SOI 切换时间保护：仅活动飞船按
-            // "到下一次切换剩余时间 T"限档（保护最高档 = ≤T 的最大档位）；
+            // 时间加速 — 追踪站无推力：清除点火锁（时间通道全开，与飞行场景同规则）；
+            // SOI 切换时间保护：仅活动飞船按"到下一次切换剩余时间 T"限档（保护最高档 = ≤T 的最大档位）；
             // 非活动飞船即将切 SOI 不触发降档（与飞行场景一致）。
             // 可在设置 → 游戏 中关闭（关闭后放开全部档位，RK4 兜底限档不受影响）
+            timeWarp.setThrustLock(false);
             let warpMaxIndex = timeWarp.getMaxIndex();
             if (getSOIWarpProtectEnabled() && activeShip) {
                 const warpHost = activeShip.currentSOI

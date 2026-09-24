@@ -35,11 +35,12 @@ const SCENE_SHOW = ['flight', 'tracking'];
 const CELL_SIZE = 22;
 
 // ==== 配色 ====
-const COLOR_RUN = '#6153D0';
-const COLOR_SPEED = '#55CC53';
+const COLOR_RUN = '#6153D0';                       // 时间加速（紫）
+const COLOR_SPEED = '#55CC53';                     // 物理加速（绿）
 const COLOR_PAUSE = '#ff5050';
 const COLOR_CELL_BG = 'rgba(0,0,0,0.55)';
-const COLOR_CELL_ACTIVE_BG = 'rgba(136, 204, 255, 0.25)';
+const COLOR_CELL_ACTIVE_PHYSICS_BG = 'rgba(85, 204, 83, 0.25)';   // 物理区激活底（淡绿）
+const COLOR_CELL_ACTIVE_TIME_BG = 'rgba(136, 204, 255, 0.25)';    // 时间区激活底（淡蓝）
 const COLOR_FOOTER = '#6153D0';
 
 // ==== KSP2 历法 ====
@@ -80,6 +81,7 @@ class TimeWarpUI {
         this._lastOnFrameMs = 0;   // 0.2.5 B12：同帧双事件去重
         this._cellActive = [];
         this._cellLocked = [];
+        this._altHeld = false;    // Alt 按住状态：仅此状态令 >4x 档位灰显（松开即全亮）
 
         this._initDOM();
         this._initEvents();
@@ -157,10 +159,11 @@ class TimeWarpUI {
             timeWarp.togglePause();
         });
 
+        // 顶栏三态：p 暂停 / ph 物理加速 / tw 时间加速（1x 中性态隐藏顶栏）
         const stateTexts = {
             p: t('timewarp.paused'),
-            w: t('timewarp.active'),
-            n: t('timewarp.normal')
+            ph: t('timewarp.physicsActive'),
+            tw: t('timewarp.timeActive')
         };
         const containers = {};
         for (const [key, text] of Object.entries(stateTexts)) {
@@ -170,8 +173,8 @@ class TimeWarpUI {
             const chars = Array.from(text);
             chars.forEach((ch, index) => {
                 const span = document.createElement('span');
-                // 只有加速状态（'w'）才添加动画类，暂停（'p'）和正常（'n'）不加
-                if (key === 'w') {
+                // 两种加速态都带波动动画，暂停态不加
+                if (key === 'ph' || key === 'tw') {
                     span.className = 'tw-char';
                     span.style.animationDelay = (index % 20) * 0.04 + 's';
                 } else {
@@ -227,16 +230,23 @@ class TimeWarpUI {
             const cell = document.createElement('button');
             cell.className = 'timewarp-cell';
             cell.dataset.rate = String(rate);
-            bindTooltip(cell, rate + 'x');
+            // 悬停提示按通道区分：物理档（点火中可用，需 Alt）/ 时间档（点火中不可用）
+            bindTooltip(cell, timeWarp.isPhysicsRate(rate)
+                ? t('timewarp.tipPhysics', { rate })
+                : t('timewarp.tipTime', { rate }));
             const img = document.createElement('img');
             img.className = 'timewarp-cell-img';
             const fb = document.createElement('span');
             fb.className = 'timewarp-cell-fb';
             cell.appendChild(img);
             cell.appendChild(fb);
-            cell.addEventListener('click', () => {
-                if (rate <= timeWarp.getCurrentMaxRate()) {
-                    timeWarp.warpTo(rate);
+            // 点击：按住 Alt = 物理加速通道；否则时间加速通道。
+            // 拒绝路径（需 Alt / 点火锁 / 限档）由 timeWarp 内部弹通知，此处不做拦截。
+            cell.addEventListener('click', (e) => {
+                if (e.altKey) {
+                    timeWarp.requestPhysicsWarp(rate);
+                } else {
+                    timeWarp.requestTimeWarp(rate);
                 }
             });
             cellRow.appendChild(cell);
@@ -287,6 +297,29 @@ class TimeWarpUI {
         eventBus.on(Events.TEXTURES_READY, () => {
             if (this._visible) this.refresh();
         });
+
+        // Alt 按住状态（灰显唯一触发源）：任意按键的 altKey 变化即同步；
+        // 窗口失焦（Alt+Tab 等）兜底清空，避免残留灰显
+        window.addEventListener('keydown', (e) => {
+            this._setAltHeld(!!e.altKey);
+        });
+        window.addEventListener('keyup', (e) => {
+            this._setAltHeld(!!e.altKey);
+        });
+        window.addEventListener('blur', () => {
+            this._setAltHeld(false);
+        });
+    }
+
+    // Alt 按住状态更新：仅影响 >物理上限（4x）档位的灰显，不改变任何档位可达性
+    _setAltHeld(held) {
+        if (this._altHeld === held) {
+            return;
+        }
+        this._altHeld = held;
+        if (this._visible) {
+            this.refresh();
+        }
     }
 
     setVisible(visible) {
@@ -317,15 +350,19 @@ class TimeWarpUI {
 
         const paused = timeWarp.isPaused();
         const rate = timeWarp.getRate();
-        const maxRate = timeWarp.getCurrentMaxRate();
         const savedRate = paused ? timeWarp.getSavedRate() : rate;
 
-        // 决定当前状态 key
+        // 决定当前状态 key：p 暂停 / ph 物理加速（Alt 进入的持久模式，可控）
+        // / tw 时间加速（上轨，操控被忽略）/ n 中性 1x（隐藏顶栏）
+        const physicsMax = timeWarp.getPhysicsMaxRate();
+        const mode = timeWarp.getMode();
         let stateKey;
         if (paused) {
             stateKey = 'p';
+        } else if (mode === 'physics' && rate > 1) {
+            stateKey = 'ph';
         } else if (rate > 1) {
-            stateKey = 'w';
+            stateKey = 'tw';
         } else {
             stateKey = 'n';
         }
@@ -335,6 +372,7 @@ class TimeWarpUI {
         const headerKey = stateKey;
         if (this._lastHeaderKey !== headerKey) {
             this._lastHeaderKey = headerKey;
+            // 顶栏配色保持原样（暂停红 / 其余绿），文字色由 CSS 决定，不在此处覆盖
             this._right.style.borderColor = paused ? COLOR_PAUSE : COLOR_RUN;
             this._header.style.borderColor = paused ? COLOR_PAUSE : COLOR_SPEED;
             for (const [key, container] of Object.entries(this._headerContainers)) {
@@ -348,31 +386,52 @@ class TimeWarpUI {
         const targetRate = paused ? this._computeTargetRate(savedRate) : null;
         for (let i = 0; i < this._cells.length; i++) {
             const cell = this._cells[i];
+            // 高亮沿完整阶梯累积（1x … 当前档，含 2x/4x——物理通道不取代任何档位）；
+            // 颜色按模式区分：点火中（物理加速，Alt 通道）绿、其余时间加速紫
             const active = paused
                 ? (cell.rate === targetRate)
-                : (cell.rate <= rate && cell.rate <= maxRate);
+                : (cell.rate <= rate);
             if (this._cellActive[i] !== active) {
                 this._cellActive[i] = active;
                 this._applyIcon(
                     cell.img, cell.fb,
                     active ? TEX_CELL_ACTIVE : TEX_CELL_INACTIVE,
                     '>',
-                    active ? COLOR_RUN : '#888'
+                    active ? (stateKey === 'ph' ? COLOR_SPEED : COLOR_RUN) : '#888'
                 );
+                // 激活格底色按模式区分（点火中淡绿 / 时间加速淡蓝），非激活回落 CSS 默认底色
+                cell.btn.style.background = active
+                    ? (stateKey === 'ph' ? COLOR_CELL_ACTIVE_PHYSICS_BG : COLOR_CELL_ACTIVE_TIME_BG)
+                    : '';
             }
-            const locked = active ? false : cell.rate > maxRate;
-            if (this._cellLocked[i] !== locked) {
-                this._cellLocked[i] = locked;
-                cell.btn.style.cursor = locked ? 'not-allowed' : 'pointer';
+            // 灰显规则（制作人定稿 + 物理模式持久化）：
+            // - 按住 Alt（正在选物理档）**或已处于物理加速模式**（松开 Alt 后仍保持）时，
+            //   >物理上限 4x 的档位灰显 —— 持续体现"物理加速上限 4x"；
+            // - 其余上限（点火锁 / SOI 切换保护 / 病态兜底 / 撞击点）不灰显，
+            //   由点击经 requestTimeWarp / requestPhysicsWarp 弹通知拒绝。
+            // 可点性：按住 Alt 时 >4x 不可点（点击会被物理上限拒绝并提示）；
+            //        物理模式（未按 Alt）下 >4x 仍可点 —— 点击即切换到时间加速、退出物理模式。
+            const beyondPhysics = cell.rate > physicsMax;
+            const locked = beyondPhysics && (this._altHeld || mode === 'physics');
+            const blocked = beyondPhysics && this._altHeld;
+            const lockKey = (locked ? 'L' : '-') + (blocked ? 'B' : '-');
+            if (this._cellLocked[i] !== lockKey) {
+                this._cellLocked[i] = lockKey;
+                cell.btn.style.cursor = blocked ? 'not-allowed' : 'pointer';
                 cell.btn.style.opacity = locked ? 0.45 : 1;
             }
         }
 
         // ---- 底部倍率 ----
-        const footerKey = (paused ? 'p' : 'r') + ':' + savedRate;
+        // 按模式区分文案：物理加速态（Alt 进入并保持）→ PHYSICS 文案；其余（时间加速/暂停）→ TIME 文案
+        const footerPhysics = !paused && mode === 'physics' && rate > 1;
+        const footerKey = (paused ? 'p' : 'r') + ':' + savedRate + ':' + (footerPhysics ? 'ph' : 'tw');
         if (this._lastFooterKey !== footerKey) {
             this._lastFooterKey = footerKey;
-            this._footer.textContent = t('timewarp.label', { rate: savedRate });
+            this._footer.textContent = footerPhysics
+                ? t('timewarp.physicsLabel', { rate: savedRate })
+                : t('timewarp.timeLabel', { rate: savedRate });
+            // 底栏颜色保持原样（暂停红 / 其余紫），仅文案区分物理/时间
             this._footer.style.color = paused ? COLOR_PAUSE : COLOR_FOOTER;
         }
     }

@@ -1,12 +1,68 @@
 {
-  "totalRuns": 4,
-  "totalRawTokens": 12328,
-  "totalCompressedTokens": 1339,
-  "totalSavedTokens": 10989,
-  "averageSavingsPercent": 89,
+  "totalRuns": 1,
+  "totalRawTokens": 11152,
+  "totalCompressedTokens": 366,
+  "totalSavedTokens": 10786,
+  "averageSavingsPercent": 97,
   "firstRunAt": "2026-08-26T17:44:39.191Z",
-  "lastRunAt": "2026-09-11T17:30:49.129Z",
+  "lastRunAt": "2026-08-26T17:44:39.191Z",
+  "records": [
+    {
+      "timestamp": "2026-09-11T17:30:49.129Z",
+      "query": "GameState 单例与 eventBus 模块通信约定",
+      "rawTokens": 400,
+      "compressedTokens": 400,
+      "savingsPercent": 0,
+      "source": "preview_context",
+      "kind": "tokens-not-fidelity"
+    },
+    {
+      "timestamp": "2026-09-05T15:53:14.996Z",
+      "query": "机动节点 maneuver node 轨道预测 predictTrajectoryPatched 燃烧弧积分 当前实现状态",
+      "rawTokens": 542,
+      "compressedTokens": 339,
+      "savingsPercent": 37,
+      "source": "preview_context",
+      "kind": "tokens-not-fidelity"
+    },
+    {
+      "timestamp": "2026-09-04T14:04:12.445Z",
+      "query": "通知组件 notification / toast / message / alert 相关文件与模块职责",
+      "rawTokens": 234,
+      "compressedTokens": 234,
+      "savingsPercent": 0,
+      "source": "preview_context",
+      "kind": "tokens-not-fidelity"
+    },
+    {
+      "timestamp": "2026-08-26T17:44:39.191Z",
+      "query": "公告 星系图 百科 UI 面板 性能 卡顿",
+      "rawTokens": 11152,
+      "compressedTokens": 366,
+      "savingsPercent": 97,
+      "source": "preview_context",
+      "kind": "tokens-not-fidelity"
+    },
+    {
+      "timestamp": "2026-09-24T18:01:54.643Z",
+      "query": "时间加速 physics warp 物理加速 4x 与时间加速档位区分 Alt 键快捷键 timeWarp",
+      "rawTokens": 701,
+      "compressedTokens": 701,
+      "savingsPercent": 0,
+      "source": "preview_context",
+      "kind": "tokens-not-fidelity"
+    }
+  ],
   "recentRecords": [
+    {
+      "timestamp": "2026-09-24T18:01:54.643Z",
+      "query": "时间加速 physics warp 物理加速 4x 与时间加速档位区分 Alt 键快捷键 timeWarp",
+      "rawTokens": 701,
+      "compressedTokens": 701,
+      "savingsPercent": 0,
+      "source": "preview_context",
+      "kind": "tokens-not-fidelity"
+    },
     {
       "timestamp": "2026-09-11T17:30:49.129Z",
       "query": "GameState 单例与 eventBus 模块通信约定",

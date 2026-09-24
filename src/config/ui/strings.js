@@ -409,13 +409,22 @@ const STRINGS = {
     'destroyed.loadMenuMissing': '存档菜单未加载',
 
     // ---------- 时间加速 HUD ----------
+    // 双通道（KSP 式）：物理加速 = 1x/2x/4x（任何时刻可用，需按住 Alt 进入）；
+    //                  时间加速 = 10x 起（点火中锁 1x）
     'timewarp.utTip': '点击切换时间显示模式（任务时间开发中）',
     'timewarp.pauseTip': '点击暂停/恢复时间加速',
     'timewarp.wip': '任务时间开发中',
     'timewarp.paused': '|| 时间已暂停',
-    'timewarp.active': '>> 时间加速启用 >>',
-    'timewarp.normal': '废弃文本，不应使用',
-    'timewarp.label': (p) => `TIME WARP= ${p.rate}x`,
+    'timewarp.physicsActive': '>> 物理加速启用 >>',
+    'timewarp.timeActive': '>> 时间加速启用 >>',
+    'timewarp.physicsLabel': (p) => `PHYSICS WARP= ${p.rate}x`,
+    'timewarp.timeLabel': (p) => `TIME WARP= ${p.rate}x`,
+    'timewarp.tipPhysics': (p) => `物理加速 ${p.rate}x · 点火中可用（需按住 Alt）`,
+    'timewarp.tipTime': (p) => `时间加速 ${p.rate}x · 点火中不可用`,
+    'timewarp.blockedByThrust': '加速时无法使用时间加速',
+    'timewarp.capped': (p) => `当前限档 ${p.rate}x（SOI 切换保护 / 物理稳定性保护）`,
+    'timewarp.physicsCap': '物理加速上限 4x',
+    'timewarp.thrustLockedNotice': '点火中时间加速已锁定 1x',
 
     // ---------- 设置场景 ----------
     'settings.title': '设置',

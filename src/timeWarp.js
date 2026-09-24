@@ -13,8 +13,16 @@ const WARP_RATES = [0, 1, 2, 4, 10, 50, 100, 1000, 10000, 100000, 1000000, 10000
 // 仅过滤 0x 暂停档：4x 物理档与其余档位均占面板格（第三格 = 4x）
 export const PANEL_RATES = WARP_RATES.filter((r) => r !== 0);
 
-// 物理加速上限（thrust 模式允许的最大倍率）
+// 物理加速上限（物理通道允许的最大倍率；任何时刻可用，含点火中）
 const PHYSICS_WARP_MAX = 4;
+
+// KSP 式双通道划分 —— 均从同一档位表派生，禁止手写第二份常量：
+// - 物理加速通道 PHYSICS_RATES = {2, 4}：**点火中唯一可用的加速**，只能按住 Alt 进入，
+//   任何时刻可用（含点火中）；上限 4x。
+// - 时间加速通道 = WARP_RATES 完整阶梯（1x/2x/4x/10x/50x …）：不按 Alt 的常规加速，
+//   保留全部档位（含 2x/4x，物理通道不"取代"任何档位）；点火中锁 1x（>1x 操作被拒并弹通知）。
+// - 1x 为两通道共有的中性档，0x 为暂停档。
+export const PHYSICS_RATES = WARP_RATES.filter((r) => r > 1 && r <= PHYSICS_WARP_MAX);
 
 // 病态区间（无解析轨道、RK4 兜底积分）时允许的最大倍率
 // stateToKepler 返回 null 且 GM>0 时，物理层走 RK4 子步循环（每帧最多 simDt/0.05 步）。
@@ -34,6 +42,12 @@ class TimeWarp {
         this._savedIndex = this._index;           // 大圆按钮暂停前档位
         this._maxIndex = WARP_RATES.length - 1;   // 档位上限（由场景每帧设置）
         this._warpTarget = null;                  // 定点加速目标 { time, onArrive }（0.2.4）
+        this._thrustLocked = false;               // 点火锁：时间通道锁 1x（飞行场景每帧设置）
+        // 加速模式（持久状态，不随 Alt 松开而失效）：
+        //   'neutral'  1x 无加速（两通道共有）
+        //   'physics'  物理加速（Alt 进入，1x<rate≤4x）：飞船保持实时物理与操控
+        //   'time'     时间加速（常规通道，rate>1x）：飞船上轨，操控被忽略
+        this._mode = 'neutral';
         this._initKeyListener();
     }
 
@@ -73,9 +87,45 @@ class TimeWarp {
         return WARP_RATES[this._maxIndex];
     }
 
-    // 物理加速档位上限索引（thrust 模式最高允许 4x）
+    // 物理加速档位上限索引（物理通道最高允许 4x）
     getPhysicsMaxIndex() {
         return WARP_RATES.indexOf(PHYSICS_WARP_MAX);
+    }
+
+    // 物理加速上限倍率（UI 判定"按住 Alt 时 >4x 变灰"用）
+    getPhysicsMaxRate() {
+        return PHYSICS_WARP_MAX;
+    }
+
+    // 是否物理加速档（2x/4x；1x 为两通道共有中性档，不计入）
+    isPhysicsRate(rate) {
+        return rate > 1 && rate <= PHYSICS_WARP_MAX;
+    }
+
+    // 是否时间加速档（10x 起）
+    isTimeRate(rate) {
+        return rate > PHYSICS_WARP_MAX;
+    }
+
+    // 当前加速模式：'neutral' | 'physics' | 'time'
+    // 由玩家进入的通道决定并**保持**（物理加速不因松开 Alt 而退出），不按倍率推导
+    getMode() {
+        return this._mode;
+    }
+
+    // 是否处于物理加速模式（飞船保持实时物理与操控，点火中亦可）
+    isPhysicsMode() {
+        return this._mode === 'physics';
+    }
+
+    // 设置模式（内部：随通道请求切换；1x 回落中性态）
+    _setModeForRate(mode, rate) {
+        this._mode = rate > 1 ? mode : 'neutral';
+    }
+
+    // 点火锁状态（时间通道是否被锁 1x）
+    isThrustLocked() {
+        return this._thrustLocked;
     }
 
     /**
@@ -127,6 +177,27 @@ class TimeWarp {
         }
     }
 
+    /**
+     * 点火锁（KSP 语义）：点火中时间加速通道锁 1x —— 时间加速态强制落回 1x，
+     * 且时间通道 >1x 的操作被拒绝（弹通知）；物理加速通道不受影响（任何时刻可用）。
+     * 飞行场景每帧调用（追踪站无推力，传 false；切换场景后由当前场景覆盖）。
+     * @param {boolean} locked
+     */
+    setThrustLock(locked) {
+        const next = !!locked;
+        if (next === this._thrustLocked) {
+            return;
+        }
+        this._thrustLocked = next;
+        // 点火瞬间：**时间加速态**（含常规通道的 2x/4x 低档）强制落回 1x；
+        // 物理加速态（Alt 进入）不落档 —— 点火中物理加速照常可用（KSP 语义）
+        if (next && this._mode === 'time' && WARP_RATES[this._index] > 1) {
+            this._setModeForRate('time', 1);
+            this.warpToIndex(WARP_RATES.indexOf(1));
+            this._notify(t('timewarp.thrustLockedNotice'));
+        }
+    }
+
     // === 加减档（玩家手动操作 = 打断定点加速） ===
 
     /**
@@ -143,25 +214,130 @@ class TimeWarp {
         }
     }
 
-    // 升档（0x → 1x 即从暂停恢复）
-    increase() {
-        this._cancelWarpTarget(true);   // 玩家升档 = 打断定点
-        if (this._index >= this._maxIndex) {
-            return;
+    // 统一通知出口（拒绝/锁定提示一律走这里，文案一律 strings.js）
+    _notify(text) {
+        if (typeof window.showNotification === 'function') {
+            window.showNotification(text, 'info');
         }
-        this.warpToIndex(this._index + 1);
     }
 
-    // 降档（1x → 0x 即暂停）
+    // === 通道请求（面板点击与键盘统一入口；含点火锁 / 上限拒绝与通知） ===
+
+    /**
+     * 时间加速通道请求（不按 Alt）：完整阶梯 1x/2x/4x/10x/50x …（物理通道不取代任何档位）。
+     * 拒绝路径（均弹通知）：
+     *   1) 点火中且 >1x → 时间通道锁 1x（此时只能用 Alt 物理加速）
+     *   2) 超出当前生效上限（SOI 保护 / 病态兜底 / 撞击点 / 物理上限）
+     * @param {number} rate - 目标倍率
+     * @returns {{ok: boolean, reason?: string}}
+     */
+    requestTimeWarp(rate) {
+        this._cancelWarpTarget(true);   // 玩家切档 = 打断定点
+        const idx = WARP_RATES.indexOf(rate);
+        if (idx < 0) {
+            return { ok: false, reason: 'invalid' };
+        }
+        if (this._thrustLocked && rate > 1) {
+            this._notify(t('timewarp.blockedByThrust'));
+            return { ok: false, reason: 'thrustLocked' };
+        }
+        if (idx > this._maxIndex) {
+            this._notify(t('timewarp.capped', { rate: WARP_RATES[this._maxIndex] }));
+            return { ok: false, reason: 'capped' };
+        }
+        this._setModeForRate('time', rate);
+        this.warpToIndex(idx);
+        return { ok: true };
+    }
+
+    /**
+     * 物理加速通道请求（按住 Alt）：接受 1x/2x/4x，任何时刻可用（含点火中）。
+     * 拒绝路径（均弹通知）：>4x（物理上限）、超出当前生效上限。
+     * @param {number} rate - 目标倍率
+     * @returns {{ok: boolean, reason?: string}}
+     */
+    requestPhysicsWarp(rate) {
+        this._cancelWarpTarget(true);   // 玩家切档 = 打断定点
+        if (rate > PHYSICS_WARP_MAX) {
+            this._notify(t('timewarp.physicsCap'));
+            return { ok: false, reason: 'physicsCap' };
+        }
+        const idx = WARP_RATES.indexOf(rate);
+        if (idx < 0) {
+            return { ok: false, reason: 'invalid' };
+        }
+        if (idx > this._maxIndex) {
+            this._notify(t('timewarp.capped', { rate: WARP_RATES[this._maxIndex] }));
+            return { ok: false, reason: 'capped' };
+        }
+        this._setModeForRate('physics', rate);
+        this.warpToIndex(idx);
+        return { ok: true };
+    }
+
+    // 时间通道升档（. 键）：0x → 1x 恢复；1x → 2x → 4x → 10x → … 沿完整阶梯逐级
+    // （2x/4x 属时间阶梯的正常档位，物理通道不取代任何档位）
+    increase() {
+        if (this._index >= WARP_RATES.length - 1) {
+            return;                                       // 已到最高档
+        }
+        this.requestTimeWarp(WARP_RATES[this._index + 1]);
+    }
+
+    // 时间通道降档（, 键）：1x → 0x 暂停；其余逐级降（10x → 4x → 2x → 1x）
     decrease() {
-        this._cancelWarpTarget(true);   // 玩家降档 = 打断定点
         if (this._index <= 0) {
             return;
         }
-        this.warpToIndex(this._index - 1);
+        const target = WARP_RATES[this._index - 1];
+        if (target === 0) {
+            this._cancelWarpTarget(true);
+            this.warpToIndex(0);                          // 暂停不受点火锁限制
+            return;
+        }
+        this.requestTimeWarp(target);
     }
 
-    // 跳到指定倍率
+    // 物理通道升档（Alt+.）：暂停 → 1x；1x → 2x → 4x；时间加速态（≥10x）一次落到 4x
+    increasePhysics() {
+        const cur = WARP_RATES[this._index];
+        let target;
+        if (cur < 1) {
+            target = 1;                                   // 暂停 → 先恢复 1x
+        } else if (cur > PHYSICS_WARP_MAX) {
+            target = PHYSICS_WARP_MAX;                    // 时间加速态 → 一次落 4x
+        } else if (cur < PHYSICS_WARP_MAX) {
+            target = PHYSICS_RATES.find((r) => r > cur) || PHYSICS_WARP_MAX;
+        } else {
+            target = cur;                                 // 已在 4x
+        }
+        if (target === cur) {
+            return;
+        }
+        this.requestPhysicsWarp(target);
+    }
+
+    // 物理通道降档（Alt+,）：4x → 2x → 1x；时间加速态（≥10x）退到 1x
+    decreasePhysics() {
+        const cur = WARP_RATES[this._index];
+        let target;
+        if (cur <= 1) {
+            target = cur;                                 // 0x/1x 不再降
+        } else if (cur > PHYSICS_WARP_MAX) {
+            target = 1;                                   // 时间加速态 → 退到 1x
+        } else {
+            target = 1;
+            for (const r of PHYSICS_RATES) {
+                if (r < cur) { target = r; }
+            }
+        }
+        if (target === cur) {
+            return;
+        }
+        this.requestPhysicsWarp(target);
+    }
+
+    // 跳到指定倍率（低层 API：不校验通道与点火锁；玩家操作走上面两条 request* 通道入口）
     warpTo(rate) {
         this._cancelWarpTarget(true);   // 玩家指定倍率 = 打断定点
         const idx = WARP_RATES.indexOf(rate);
@@ -177,6 +353,7 @@ class TimeWarp {
         if (this._index === 0) {
             return;
         }
+        this._mode = 'neutral';
         this.warpToIndex(WARP_RATES.indexOf(1));
     }
 
@@ -187,6 +364,7 @@ class TimeWarp {
      */
     resetOnLoad() {
         this._warpTarget = null;
+        this._mode = 'neutral';
         this.warpToIndex(WARP_RATES.indexOf(1));
     }
 
@@ -229,6 +407,7 @@ class TimeWarp {
     completeWarpToTime() {
         const cb = this._warpTarget ? this._warpTarget.onArrive : null;
         this._warpTarget = null;
+        this._mode = 'neutral';
         this.warpToIndex(WARP_RATES.indexOf(1));
         if (typeof cb === 'function') {
             cb();
@@ -263,7 +442,9 @@ class TimeWarp {
             index: this._index,
             paused,
             // 切换前是否处于暂停：供 audioDirector 区分"取消暂停(恢复)"与普通切档
-            wasPaused
+            wasPaused,
+            // 通道模式（由倍率推导）：'neutral' | 'physics' | 'time'，供 UI / 音效区分物理与时间加速
+            mode: this.getMode()
         });
     }
 
@@ -294,25 +475,14 @@ class TimeWarp {
                 return;
             }
 
-            // Alt+, / Alt+. — 物理加速微调（1x~4x）
+            // Alt+, / Alt+. — 物理加速通道（1x/2x/4x）：任何时刻可用（含点火中）；
+            // 时间加速态（≥10x）下 Alt+. 一次落到 4x、Alt+, 退到 1x
             if (e.altKey && (e.code === 'Comma' || e.code === 'Period')) {
                 e.preventDefault();
-                const physicsMinIdx = WARP_RATES.indexOf(1);
-                const physicsMaxIdx = WARP_RATES.indexOf(PHYSICS_WARP_MAX);
                 if (e.code === 'Period') {
-                    if (this._index >= physicsMaxIdx) {
-                        this.warpToIndex(physicsMaxIdx);
-                    } else if (this._index >= physicsMinIdx) {
-                        this.increase();
-                    } else {
-                        this.warpToIndex(physicsMinIdx);
-                    }
+                    this.increasePhysics();
                 } else {
-                    if (this._index <= physicsMaxIdx && this._index > physicsMinIdx) {
-                        this.decrease();
-                    } else if (this._index > physicsMaxIdx) {
-                        this.warpToIndex(physicsMaxIdx);
-                    }
+                    this.decreasePhysics();
                 }
                 return;
             }
