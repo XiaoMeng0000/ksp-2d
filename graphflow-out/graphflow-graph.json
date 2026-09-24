@@ -13758,6 +13758,28 @@
         "signature": "raw export const audioDirector = new AudioDirector(); (exported) @src/audio/audioDirector.js:212",
         "signatureHash": "52054156"
       }
+    },
+    {
+      "id": "dialogue-session:j4ceqw",
+      "type": "Decision",
+      "content": "dialogue-session session-df6c843a-f3ba-42e5-b050-1a9972516012 turns=1 tip=dialogue:j4ceqw:0001",
+      "metadata": {
+        "kind": "dialogue-session",
+        "record": "{\"id\":\"dialogue-session:j4ceqw\",\"name\":\"session-df6c843a-f3ba-42e5-b050-1a9972516012\",\"turnCount\":1,\"topicTokens\":[\"assistant\",\"fill\",\"reply\"],\"createdAt\":1790267916833,\"updatedAt\":1790267916833,\"tipTurnId\":\"dialogue:j4ceqw:0001\"}",
+        "name": "session-df6c843a-f3ba-42e5-b050-1a9972516012"
+      }
+    },
+    {
+      "id": "dialogue:j4ceqw:0001",
+      "type": "Decision",
+      "content": "dialogue-turn #1 Q: (assistant reply fill) | A: # 交付:版本号已改为 0.3.0-alpha + 一个需要你拍板的连带影响 ## 一、已完成 `src/config/version.js` → `VERSION_TEXT = 'v0.3.0-alpha (Build 202609)'`(沿用文件里既定的预发布格式 `vX.Y.Z-alpha (Build YYY…",
+      "metadata": {
+        "kind": "dialogue-turn",
+        "record": "{\"id\":\"dialogue:j4ceqw:0001\",\"sessionId\":\"dialogue-session:j4ceqw\",\"seq\":1,\"userQuery\":\"(assistant reply fill)\",\"assistantReply\":\"# 交付:版本号已改为 0.3.0-alpha + 一个需要你拍板的连带影响 ## 一、已完成 `src/config/version.js` → `VERSION_TEXT = 'v0.3.0-alpha (Build 202609)'`(沿用文件里既定的预发布格式 `vX.Y.Z-alpha (Build YYYYMM)` ✓)。 - 主菜单右下角与 ESC 菜单底部会显示该版本号 ✓; - 存档\\\"导出世界\\\"里的 `appVersion` 字段只是信息字段、**不参与兼容性校验**(已核对 `saveManager.js`),因此带 `-alpha` 不影响读档 ✓; - 我另在 `version.js` 注释里标注了预发布期的公告排序行为(见下)。 ## 二、连带影响(实测数据,需你决定) 版本号带 `-alpha` 后,**没有任何公告会被识别为\\\"当前版本\\\"** → 公告栏按规范第四章回退为**版本升序**,结果是: ``` 公告页首屏显示：轨道工程师 0.2.4（最早的公告） 最新公告 v0.2.6 排在第 4 项 左侧导航：无高亮项 ``` 也就是说,开发期每次启动自动弹出的公告会是**最旧的那份** —— 这显然不是你想要的首屏。 ## 三、三个处理方案(请择一) | 方案 | 做法 | 效果 | 工作量 | |---|---|---|---| | **A(推荐)** | 无当前版本公告时,排序改为**降序**(最新在最上) | 首屏显示 0.2.6(最新已发布),导航不高亮任何项(语义诚实:你跑的是 0.3.0-alpha,尚无公告) | ~5 行(含规范文档一行) | | B | 保持现状(最旧在最上) | 首屏永远是 0.2.4,开发期一直如此 | 0 | | C | 预发布期把\\\"**版本最高的正式版公告**\\\"当作当前版本 | 首屏显示 0.2.6 **且导航高亮它** —— 体验最好,但把一个正式版标成\\\"当前\\\"略有歧义 | ~10 行 | 我倾向 **A**:既保证\\\"首屏永远是最新公告\\\",又不在语义上把 0.2.6 说成当前版本;等 0.3.0 正式发布、公告条目建好后,会自动恢复\\\"当前版本置顶 + 高亮\\\"。 ## 四、当前测试状态 `test_announcement_026.mjs` **33/33 通过**(A1 已改为校验预发布格式、A3 改为校验\\\"预发布期无当前版本公告\\\"这一事实,而不是之前写死的 0.2.6 置顶)✓。 你回复 A / B / C(或\\\"按推荐来\\\"),我就落地对应的排序改动 + 同步更新 `docs/公告编写规范.md` 第四章 + 测试断言;之后即可正式进入 0.3.0 开发。\",\"jumped\":false,\"relatedNodeIds\":[],\"createdAt\":1790267916833,\"updatedAt\":1790267916833,\"title\":\"(assistant reply fill)\",\"summary\":\"# 交付:版本号已改为 0.3.0-alpha + 一个需要你拍板的连带影响 ## 一、已完成 `src/config/version.js` → `VERSION_TEXT = 'v0.3.0-alpha (Build 202609)'`(沿用文件里既定的预发布格式 `vX.Y.Z-alpha (Build YYYYMM)` ✓)\"}",
+        "seq": 1,
+        "sessionId": "dialogue-session:j4ceqw",
+        "jumped": false
+      }
     }
   ],
   "edges": [
@@ -22030,6 +22052,11 @@
       "from": "module:src/audio/audioDirector",
       "to": "module:src/sceneManager",
       "relation": "imports"
+    },
+    {
+      "from": "dialogue:j4ceqw:0001",
+      "to": "dialogue-session:j4ceqw",
+      "relation": "part_of"
     }
   ]
 }

@@ -8,13 +8,15 @@ const check = (name, cond) => { cond ? pass++ : fail++; console.log((cond ? 'PAS
 const { VERSION_TEXT } = await import('./src/config/version.js');
 const { ANNOUNCEMENTS } = await import('./src/config/announcementConfig.js');
 
-// —— 版本号
-check('A1 VERSION_TEXT = v0.2.6', VERSION_TEXT === 'v0.2.6');
+// —— 版本号（0.3.0 开发期：预发布号）
+check('A1 VERSION_TEXT 为 0.3.0 预发布号（vX.Y.Z-alpha (Build YYYYMM)）',
+    /^v0\.3\.0-alpha \(Build \d{6}\)$/.test(VERSION_TEXT));
 
-// —— 当前版本公告存在且置顶
+// —— 0.3.0-alpha 期间：没有公告被识别为"当前版本"（排序按版本升序回退）
 check('A2 存在 v0.2.6 公告条目', ANNOUNCEMENTS.some(a => a.version === 'v0.2.6'));
-check('A3 当前版本公告排在最前（自动排序）', ANNOUNCEMENTS[0].version === 'v0.2.6');
-const cur = ANNOUNCEMENTS[0];
+check('A3 预发布期无"当前版本"公告（回退排序，行为见规范第四章）',
+    ANNOUNCEMENTS.every(a => a.version !== VERSION_TEXT));
+const cur = ANNOUNCEMENTS.find(a => a.version === 'v0.2.6');
 check('A4 大标题格式为「轨道工程师 0.2.6」', cur.title === '轨道工程师 0.2.6');
 
 // —— 结构校验（规范第二/三章）
