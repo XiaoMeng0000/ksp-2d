@@ -1,7 +1,7 @@
 /* ============================================================
    scenes.css — 菜单类文档场景(信息页 / 星系图鉴 / 版权声明 / 制作人员)
-   覆盖 infoScene.js / galaxiesScene.js / licenseScene.js / creditsScene.js
-   （游戏百科于 0.2.7 面板化，样式已迁入 ksp2_panels.css）
+   覆盖 galaxiesScene.js / licenseScene.js / creditsScene.js
+   （游戏百科于 0.2.7 面板化、公告栏于 0.2.8 面板化，样式均已迁入 ksp2_panels.css）
    ============================================================ */
 
 /* ---- 全屏遮罩面板(info / galaxies 共用) ---- */

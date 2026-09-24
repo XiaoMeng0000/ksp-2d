@@ -2727,10 +2727,10 @@
     {
       "id": "dialogue-session:1eaz9np",
       "type": "Decision",
-      "content": "dialogue-session session-97fb4dfb-7c3a-4e22-9c4a-fbb4c5c8d468 turns=12 tip=dialogue:1eaz9np:0012",
+      "content": "dialogue-session session-97fb4dfb-7c3a-4e22-9c4a-fbb4c5c8d468 turns=14 tip=dialogue:1eaz9np:0014",
       "metadata": {
         "kind": "dialogue-session",
-        "record": "{\"id\":\"dialogue-session:1eaz9np\",\"name\":\"session-97fb4dfb-7c3a-4e22-9c4a-fbb4c5c8d468\",\"tipTurnId\":\"dialogue:1eaz9np:0012\",\"turnCount\":12,\"topicTokens\":[\"assistant\",\"fill\",\"reply\"],\"createdAt\":1790271074467,\"updatedAt\":1790272640947}",
+        "record": "{\"id\":\"dialogue-session:1eaz9np\",\"name\":\"session-97fb4dfb-7c3a-4e22-9c4a-fbb4c5c8d468\",\"tipTurnId\":\"dialogue:1eaz9np:0014\",\"turnCount\":14,\"topicTokens\":[\"assistant\",\"fill\",\"reply\"],\"createdAt\":1790271074467,\"updatedAt\":1790275159977}",
         "name": "session-97fb4dfb-7c3a-4e22-9c4a-fbb4c5c8d468"
       }
     },
@@ -2860,7 +2860,7 @@
       "content": "dialogue-turn #11 Q: (assistant reply fill) | A: 数字很干脆，而且**结论与预期相反**： ## 像素级复刻 = 体积**变大 6.3 倍**，不是变小 | 文件 | 原 PNG | 不同颜色数 | 合并游程数 | 像素级 SVG | 比值 | |---|---|---|---|---|---| | `icon_soi_enter.png` | 492 B | 2 …",
       "metadata": {
         "kind": "dialogue-turn",
-        "record": "{\"id\":\"dialogue:1eaz9np:0011\",\"sessionId\":\"dialogue-session:1eaz9np\",\"seq\":11,\"userQuery\":\"(assistant reply fill)\",\"assistantReply\":\"数字很干脆，而且**结论与预期相反**： ## 像素级复刻 = 体积**变大 6.3 倍**，不是变小 | 文件 | 原 PNG | 不同颜色数 | 合并游程数 | 像素级 SVG | 比值 | |---|---|---|---|---|---| | `icon_soi_enter.png` | 492 B | 2 | 84 | 1,289 B | **2.6×** | | `icon_soi_exit.png` | 508 B | 2 | 83 | 1,291 B | **2.5×** | | `timewarp_cell_active.png` | 361 B | 6 | 298 | 4,121 B | **11.4×** | | `timewarp_cell_inactive.png` | 353 B | 6 | 298 | 4,121 B | **11.7×** | | **合计** | **1,714 B** | | | **10,822 B** | **6.3×** | （SVG 用的已经是最紧凑写法：按颜色分组、逐行游程合并、只用 1 单位高的 `<path>` + `shape-rendering=\\\"crispEdges\\\"`，一个像素不多余。） **为什么反了**：PNG 的 deflate + 调色板压缩对**小尺寸像素画几乎是理论最优**；而 `timewarp_cell` 那张 20×16 里有 **298 段颜色游程**（绿色斜面做了三档明暗抖动），SVG 要把每一段都写成一段路径，成本爆炸。 **通用规律**：SVG 只在大尺寸、少色块、几何化的图形上赢（比如一个 200×200 的圆角图标，PNG 要几 KB，SVG 只要 200 字节）。像素画是它的**最差场景**。 --- ## 那\\\"缩小资产体积\\\"真正该动的是哪里 我顺手量了一下全项目资产的构成： | 类别 | 体积 | 占比 | 备注 | |---|---|---|---| | **字体** | **294.5 MB** | 63% | 18 个 JetBrainsMapleMono 字重，**只有 Regular + Bold 被引用** | | **天体贴图** | **84.2 MB** | 18% | 17 张，单张 3.5–7.5 MB | | 音频 | ~89 MB | 19% | ogg 已压缩，余量有限 | | UI/图标（含你问的这 4 张） | ~1 MB | 0.2% | 你这 4 张合计 **1.7 KB**，占全项目 **0.0004%** | 要我先量一下天体贴图的实际像素尺寸吗？84 MB 的 17 张 1:1 圆形贴图，如果分辨率远超游戏实际绘制尺寸，那才是真正能砍下几十 MB 的地方——**这比抠 1.7 KB 的图标有意义得多**。 ## 不过——如果你要 SVG 不是为了体积 那理由可能是这三条，它们都成立： | 动机 | 是否成立 | 说明 | |---|---|---| | **分辨率无关** | ✅ | 现在 SOI 图标只有 55×20，高 DPI 屏放大必糊；SVG 不会 | | **与既有规范一致** | ✅ | `sas/`、`icon_escMenu/`、`tracking_station/` 都已是 SVG，这 4 张是遗留的 PNG | | **能合并文件** | ✅ | `timewarp_cell_active/inactive` 只差底色，若按项目既有的「白色模板 + 运行时染色」改法，**2 个文件可并成 1 个** | **请你定方向**：是\\\"为了体积\\\"（那这条路走不通，我建议改攻字体/贴图），还是\\\"为了分辨率与规范一致\\\"（那我照做，但要接受体积涨到 10.8 KB）？\",\"parentTurnId\":\"dialogue:1eaz9np:0010\",\"jumped\":false,\"relatedNodeIds\":[],\"createdAt\":1790272551969,\"updatedAt\":1790272551969,\"title\":\"(assistant reply fill)\",\"summary\":\"数字很干脆，而且**结论与预期相反**： ## 像素级复刻 = 体积**变大 6.3 倍**，不是变小 | 文件 | 原 PNG | 不同颜色数 | 合并游程数 | 像素级 SVG | 比值 | |---|---|---|---|---|---| | `icon_soi_enter.png` | 492 B | 2 | 84 | 1,289 B | **2.6×** | | `icon_soi_…\",\"supersedesTurnIds\":[\"dialogue:1eaz9np:0010\"],\"validAt\":1790272551969}",
+        "record": "{\"id\":\"dialogue:1eaz9np:0011\",\"sessionId\":\"dialogue-session:1eaz9np\",\"seq\":11,\"userQuery\":\"(assistant reply fill)\",\"assistantReply\":\"数字很干脆，而且**结论与预期相反**： ## 像素级复刻 = 体积**变大 6.3 倍**，不是变小 | 文件 | 原 PNG | 不同颜色数 | 合并游程数 | 像素级 SVG | 比值 | |---|---|---|---|---|---| | `icon_soi_enter.png` | 492 B | 2 | 84 | 1,289 B | **2.6×** | | `icon_soi_exit.png` | 508 B | 2 | 83 | 1,291 B | **2.5×** | | `timewarp_cell_active.png` | 361 B | 6 | 298 | 4,121 B | **11.4×** | | `timewarp_cell_inactive.png` | 353 B | 6 | 298 | 4,121 B | **11.7×** | | **合计** | **1,714 B** | | | **10,822 B** | **6.3×** | （SVG 用的已经是最紧凑写法：按颜色分组、逐行游程合并、只用 1 单位高的 `<path>` + `shape-rendering=\\\"crispEdges\\\"`，一个像素不多余。） **为什么反了**：PNG 的 deflate + 调色板压缩对**小尺寸像素画几乎是理论最优**；而 `timewarp_cell` 那张 20×16 里有 **298 段颜色游程**（绿色斜面做了三档明暗抖动），SVG 要把每一段都写成一段路径，成本爆炸。 **通用规律**：SVG 只在大尺寸、少色块、几何化的图形上赢（比如一个 200×200 的圆角图标，PNG 要几 KB，SVG 只要 200 字节）。像素画是它的**最差场景**。 --- ## 那\\\"缩小资产体积\\\"真正该动的是哪里 我顺手量了一下全项目资产的构成： | 类别 | 体积 | 占比 | 备注 | |---|---|---|---| | **字体** | **294.5 MB** | 63% | 18 个 JetBrainsMapleMono 字重，**只有 Regular + Bold 被引用** | | **天体贴图** | **84.2 MB** | 18% | 17 张，单张 3.5–7.5 MB | | 音频 | ~89 MB | 19% | ogg 已压缩，余量有限 | | UI/图标（含你问的这 4 张） | ~1 MB | 0.2% | 你这 4 张合计 **1.7 KB**，占全项目 **0.0004%** | 要我先量一下天体贴图的实际像素尺寸吗？84 MB 的 17 张 1:1 圆形贴图，如果分辨率远超游戏实际绘制尺寸，那才是真正能砍下几十 MB 的地方——**这比抠 1.7 KB 的图标有意义得多**。 ## 不过——如果你要 SVG 不是为了体积 那理由可能是这三条，它们都成立： | 动机 | 是否成立 | 说明 | |---|---|---| | **分辨率无关** | ✅ | 现在 SOI 图标只有 55×20，高 DPI 屏放大必糊；SVG 不会 | | **与既有规范一致** | ✅ | `sas/`、`icon_escMenu/`、`tracking_station/` 都已是 SVG，这 4 张是遗留的 PNG | | **能合并文件** | ✅ | `timewarp_cell_active/inactive` 只差底色，若按项目既有的「白色模板 + 运行时染色」改法，**2 个文件可并成 1 个** | **请你定方向**：是\\\"为了体积\\\"（那这条路走不通，我建议改攻字体/贴图），还是\\\"为了分辨率与规范一致\\\"（那我照做，但要接受体积涨到 10.8 KB）？\",\"parentTurnId\":\"dialogue:1eaz9np:0010\",\"jumped\":false,\"relatedNodeIds\":[],\"createdAt\":1790272551969,\"updatedAt\":1790272551969,\"title\":\"(assistant reply fill)\",\"summary\":\"数字很干脆，而且**结论与预期相反**： ## 像素级复刻 = 体积**变大 6.3 倍**，不是变小 | 文件 | 原 PNG | 不同颜色数 | 合并游程数 | 像素级 SVG | 比值 | |---|---|---|---|---|---| | `icon_soi_enter.png` | 492 B | 2 | 84 | 1,289 B | **2.6×** | | `icon_soi_…\",\"supersedesTurnIds\":[\"dialogue:1eaz9np:0010\"],\"validAt\":1790272551969,\"invalidAt\":1790274941622}",
         "seq": 11,
         "sessionId": "dialogue-session:1eaz9np",
         "jumped": false
@@ -2872,7 +2872,7 @@
       "content": "dialogue-turn #12 Q: (assistant reply fill) | A: 两个实测都出来了，结论很明确。 ## 一、gzip 实测：你的直觉对了一半 | | 原始 | gzip 后 | 压缩率 | |---|---|---|---| | `timewarp_cell_active.png` | 361 B | **384 B** | **−6%（反而变大）** | | 像素级 SVG（同一…",
       "metadata": {
         "kind": "dialogue-turn",
-        "record": "{\"id\":\"dialogue:1eaz9np:0012\",\"sessionId\":\"dialogue-session:1eaz9np\",\"seq\":12,\"userQuery\":\"(assistant reply fill)\",\"assistantReply\":\"两个实测都出来了，结论很明确。 ## 一、gzip 实测：你的直觉对了一半 | | 原始 | gzip 后 | 压缩率 | |---|---|---|---| | `timewarp_cell_active.png` | 361 B | **384 B** | **−6%（反而变大）** | | 像素级 SVG（同一张） | 4,121 B | **856 B** | **−79%（文本压得动）** | **你说得没错**——SVG 是文本，CDN 的 gzip 能压掉 79%；而 PNG 早已是 deflate 压缩格式，再 gzip 只会加上一层头尾开销，**反而涨了 23 字节**。 **但净结果仍然是 SVG 更大**：856 B vs 384 B = **2.2 倍**。因为原始体积差了 11 倍，压缩只能把它追回到 2.2 倍，追不平。 ## 二、真正的瓶颈：本次页面加载实测 | 类型 | 个数 | 传输量 | |---|---|---| | **PNG 贴图** | 43 | **85.9 MB** | | **音频（ogg）** | 23 | **66.5 MB** | | **字体（ttf）** | 4 | **37.6 MB** | | 代码（JS） | 113 | 1.3 MB | | SVG 图标 | 22 | ~20 KB | | **合计** | **206 个资源** | **191.3 MB** | **你这 4 个图标合计 1.7 KB，占首屏的 0.0009%。** 把它们优化到 0 字节，首屏从 191.3 MB 变成 191.3 MB —— 在小数点后第四位才动。而 GitHub Pages（Fastly CDN）对 PNG/OGG 这类**已压缩格式**的 gzip 帮不上忙，所以上面这张表在 GH Pages 上基本原样成立。 ## 三、要提速该动的是这三个（按性价比排序） | 优先级 | 目标 | 体积 | 可行手段 | 预估收益 | |---|---|---|---|---| | **1** | **字体** | 37.6 MB | JetBrainsMapleMono 是**完整 CJK 等宽字体**，单字重 19 MB，而游戏只用到极少数汉字字形 → **子集化**（subset 到实际用到的字符集），或用 `woff2` 格式 | **37.6 MB → 可能 < 1 MB** | | **2** | **天体贴图** | 85.9 MB | 需先量实际分辨率——若远超游戏绘制尺寸就是纯浪费；另可转 WebP（lossless 或 q90） | 保守估 30–70% | | **3** | **音频** | 66.5 MB | 11 首 BGM 现在**全部启动预加载**。改为按天体类型**懒加载**（玩家在 Kerbin 就先不下载 Jool 的音乐），或降码率 | 首屏可省 50 MB+ | **第 1 项一分钱不花就能拿 37 MB**，而且它只是换文件格式/做子集，不动任何代码。 --- ## 我的建议 **这 4 个图标改 SVG 这件事，从\\\"体积/加载速度\\\"角度不划算，别做。** 但如果你要的是**分辨率无关**（现在 55×20 在高 DPI 屏放大必糊）或**与 `sas/`、`icon_escMenu/` 的 SVG 规范统一**，那理由成立，10 KB 的代价可以忽略——**只是别把它当成性能优化**。 要不要我接着量一下 **17 张天体贴图的真实像素尺寸**？那是 85.9 MB 的大头，一张表就能看出有多少是白扔的。\",\"parentTurnId\":\"dialogue:1eaz9np:0011\",\"jumped\":false,\"relatedNodeIds\":[],\"createdAt\":1790272640947,\"updatedAt\":1790272640947,\"title\":\"(assistant reply fill)\",\"summary\":\"两个实测都出来了，结论很明确\"}",
+        "record": "{\"id\":\"dialogue:1eaz9np:0012\",\"sessionId\":\"dialogue-session:1eaz9np\",\"seq\":12,\"userQuery\":\"(assistant reply fill)\",\"assistantReply\":\"两个实测都出来了，结论很明确。 ## 一、gzip 实测：你的直觉对了一半 | | 原始 | gzip 后 | 压缩率 | |---|---|---|---| | `timewarp_cell_active.png` | 361 B | **384 B** | **−6%（反而变大）** | | 像素级 SVG（同一张） | 4,121 B | **856 B** | **−79%（文本压得动）** | **你说得没错**——SVG 是文本，CDN 的 gzip 能压掉 79%；而 PNG 早已是 deflate 压缩格式，再 gzip 只会加上一层头尾开销，**反而涨了 23 字节**。 **但净结果仍然是 SVG 更大**：856 B vs 384 B = **2.2 倍**。因为原始体积差了 11 倍，压缩只能把它追回到 2.2 倍，追不平。 ## 二、真正的瓶颈：本次页面加载实测 | 类型 | 个数 | 传输量 | |---|---|---| | **PNG 贴图** | 43 | **85.9 MB** | | **音频（ogg）** | 23 | **66.5 MB** | | **字体（ttf）** | 4 | **37.6 MB** | | 代码（JS） | 113 | 1.3 MB | | SVG 图标 | 22 | ~20 KB | | **合计** | **206 个资源** | **191.3 MB** | **你这 4 个图标合计 1.7 KB，占首屏的 0.0009%。** 把它们优化到 0 字节，首屏从 191.3 MB 变成 191.3 MB —— 在小数点后第四位才动。而 GitHub Pages（Fastly CDN）对 PNG/OGG 这类**已压缩格式**的 gzip 帮不上忙，所以上面这张表在 GH Pages 上基本原样成立。 ## 三、要提速该动的是这三个（按性价比排序） | 优先级 | 目标 | 体积 | 可行手段 | 预估收益 | |---|---|---|---|---| | **1** | **字体** | 37.6 MB | JetBrainsMapleMono 是**完整 CJK 等宽字体**，单字重 19 MB，而游戏只用到极少数汉字字形 → **子集化**（subset 到实际用到的字符集），或用 `woff2` 格式 | **37.6 MB → 可能 < 1 MB** | | **2** | **天体贴图** | 85.9 MB | 需先量实际分辨率——若远超游戏绘制尺寸就是纯浪费；另可转 WebP（lossless 或 q90） | 保守估 30–70% | | **3** | **音频** | 66.5 MB | 11 首 BGM 现在**全部启动预加载**。改为按天体类型**懒加载**（玩家在 Kerbin 就先不下载 Jool 的音乐），或降码率 | 首屏可省 50 MB+ | **第 1 项一分钱不花就能拿 37 MB**，而且它只是换文件格式/做子集，不动任何代码。 --- ## 我的建议 **这 4 个图标改 SVG 这件事，从\\\"体积/加载速度\\\"角度不划算，别做。** 但如果你要的是**分辨率无关**（现在 55×20 在高 DPI 屏放大必糊）或**与 `sas/`、`icon_escMenu/` 的 SVG 规范统一**，那理由成立，10 KB 的代价可以忽略——**只是别把它当成性能优化**。 要不要我接着量一下 **17 张天体贴图的真实像素尺寸**？那是 85.9 MB 的大头，一张表就能看出有多少是白扔的。\",\"parentTurnId\":\"dialogue:1eaz9np:0011\",\"jumped\":false,\"relatedNodeIds\":[],\"createdAt\":1790272640947,\"updatedAt\":1790272640947,\"title\":\"(assistant reply fill)\",\"summary\":\"两个实测都出来了，结论很明确\",\"invalidAt\":1790274941622}",
         "seq": 12,
         "sessionId": "dialogue-session:1eaz9np",
         "jumped": false
@@ -16637,6 +16637,30 @@
         "sessionId": "dialogue-session:1cniils",
         "jumped": false
       }
+    },
+    {
+      "id": "dialogue:1eaz9np:0013",
+      "type": "Decision",
+      "content": "dialogue-turn #13 Q: (assistant reply fill) | A: 扫描结果出来了，而且**比预想的更有信息量**——真正的死文件是 3 个，其中两个的注释直接暴露了成因： ``` src/config/solarSystem.js ← 你截图这个（注释已失效，没人引用） src/scenes/encyclopediaScene.js ← 注释：\"保留待手动删除（文件系统沙箱拒绝删除…",
+      "metadata": {
+        "kind": "dialogue-turn",
+        "record": "{\"id\":\"dialogue:1eaz9np:0013\",\"sessionId\":\"dialogue-session:1eaz9np\",\"seq\":13,\"userQuery\":\"(assistant reply fill)\",\"assistantReply\":\"扫描结果出来了，而且**比预想的更有信息量**——真正的死文件是 3 个，其中两个的注释直接暴露了成因： ``` src/config/solarSystem.js ← 你截图这个（注释已失效，没人引用） src/scenes/encyclopediaScene.js ← 注释：\\\"保留待手动删除（文件系统沙箱拒绝删除操作）\\\" src/scenes/infoScene.js ← 注释同上 ``` --- # 先说结论 **屎山不可能杜绝，但可以控制增速。而且它主要不是\\\"写烂代码\\\"造成的，是\\\"改完之后不收尾\\\"造成的。** 你截图那个文件就是活证：它是上一次重构（星系数据拆分）的兼容转发层，**零引用**，而它的注释写着\\\"保证任何遗漏的旧引用路径不中断\\\"——实测遗漏的旧引用**一个都没有**。它被保留 2 小时后，注释里的路径就被我搬走了，于是变成**错误信息**。 那两个 `*Scene.js` 更关键：上一轮 AI 想删但沙箱不让删，于是**把\\\"待删\\\"写进文件注释里**收工。注释没人会去读 → 下次有人看到这个文件，不知道它是死是活。 ## 屎山的五条生成机制（全部有本仓库实证） | # | 机制 | 本仓库证据 | |---|---|---| | 1 | **删除受阻 → 死文件只能\\\"登记待删\\\"，登记在没人看的地方** | `encyclopediaScene.js` / `infoScene.js` 的注释；`solarSystem.js` 连注释都没更新 | | 2 | **\\\"以防万一\\\"的兼容层没有到期机制** | `solarSystem.js`：单体应用根本没有外部消费者，\\\"兼容旧引用\\\"这个理由从来不成立 | | 3 | **文档硬编码代码结构 → 必然漂移** | 本次抓到 4 处（`天体添加流程.md` 的 `solarSystem.js`、`纹理流程.md` 的 `celestial/`、`CONTRIBUTING.md`、`textureConfig.js` 的\\\"白色单色模板\\\"） | | 4 | **同一信息多处维护** | 曾经的 `textureConfig` 总表（已修）；残留的 `solarSystemData` 这个名字——文件已删，名字还在 | | 5 | **没有机器守门，且 push 即上线** | 无 `package.json`、无检查 CI；GitHub Pages 是 push 就部署，**坏掉的游戏会直接上线** | **注意第 5 条的量级**：本次三批任务，我自己就产出了 117 处 import 改动。**如果没有穷举校验，光靠我\\\"觉得改齐了\\\"，会有 9 处漏网**——那 9 处会让对应界面直接白屏。 --- # 对策：把\\\"靠人记得\\\"换成\\\"靠机器查出来\\\" ## 立即可做（成本 5 分钟） **① 删除 3 个死文件** —— 你执行（沙箱只允许你删）： ```powershell git rm src/config/solarSystem.js src/scenes/encyclopediaScene.js src/scenes/infoScene.js ``` **② 顺手修掉文档里 2 处失效引用**：`音频标准化流程.md` 第 90、188 行仍写\\\"在 `solarSystem.js` 给 CelestialBody 加 musicType\\\"，应改为 `src/config/world/systems/<星系>.js`。这个我可以做。 ## 短期（推荐，成本约半小时） **③ 固化三个校验脚本**到已有的 `tools/` 目录（零依赖 Node）： | 脚本 | 查什么 | 本次实战价值 | |---|---|---| | `check-imports.mjs` | 全部相对 import（**含裸 import**）目标是否存在 | 抓出了 9 处漏网 | | `check-assets.mjs` | 所有 `'assets/...'` 路径字符串是否指向真实文件 | 抓出 scanner.png 与注释漂移 | | `check-dead.mjs` | 零引用文件（白名单排除入口） | 抓出上面 3 个死文件 | **⚠️ 但有个必须遵守的前提**：这三个脚本**自己也要被校验**——我第一版 `check-dead` 就漏了裸 import，把 12 个活文件误判成死的。所以每个脚本要内置一个\\\"已知坏样本\\\"自检用例，跑的时候先验证自己还抓得住。 ## 中期（最强，成本约 15 分钟） **④ 接到 GitHub Pages 部署流程上**：`.github/workflows/jekyll-gh-pages.yml` 已经在跑，在它前面加一步跑 `check-all`，**失败就不部署**。这样坏代码物理上不了线，彻底摆脱\\\"靠人记得跑脚本\\\"。 ## 一条纪律（写进 `AI工作规范.md`） > **禁止保留兼容转发层。** 本项目是单体应用，无外部消费者，\\\"兼容旧引用\\\"不构成理由。 > 若确需保留，必须登记进 `docs/技术债清单.md` 并写明到期条件，且**不得只写在文件注释里**。 --- # 我的推荐 **③ + ④**（脚本 + CI 守门）是真正解决问题的，因为它不依赖任何人的记性——包括我的。① 和 ② 是立刻清理现场。 **但最终要不要做、做到哪一步，你定。** 我倾向全都做，因为这次的教训很硬：**我在同一个会话里，既靠脚本抓出了 9 处自己的漏网，又差点被自己的错误扫描误导。** 要开工的话，我建议顺序是：② 我修文档 → ① 你删文件 → ③ 我写脚本（含自检）→ ④ 你审 CI 改动。你说从哪步开始？\",\"parentTurnId\":\"dialogue:1eaz9np:0012\",\"jumped\":false,\"relatedNodeIds\":[],\"createdAt\":1790274941622,\"updatedAt\":1790274941622,\"title\":\"(assistant reply fill)\",\"summary\":\"扫描结果出来了，而且**比预想的更有信息量**——真正的死文件是 3 个，其中两个的注释直接暴露了成因： ``` src/config/solarSystem.js ← 你截图这个（注释已失效，没人引用） src/scenes/encyclopediaScene.js ← 注释：\\\"保留待手动删除（文件系统沙箱拒绝删除操作）\\\" src/scenes/infoScene.js ← 注释同上 ``` …\",\"supersedesTurnIds\":[\"dialogue:1eaz9np:0011\",\"dialogue:1eaz9np:0012\"],\"validAt\":1790274941622,\"invalidAt\":1790275159977}",
+        "seq": 13,
+        "sessionId": "dialogue-session:1eaz9np",
+        "jumped": false
+      }
+    },
+    {
+      "id": "dialogue:1eaz9np:0014",
+      "type": "Decision",
+      "content": "dialogue-turn #14 Q: (assistant reply fill) | A: # 清理完成，全项复查通过 | 项 | 结果 | |---|---| | 死文件删除 | **3 个**（`git rm` 已暂存）：`config/solarSystem.js`、`scenes/encyclopediaScene.js`、`scenes/infoScene.js` | | 连带的文本残留 | **…",
+      "metadata": {
+        "kind": "dialogue-turn",
+        "record": "{\"id\":\"dialogue:1eaz9np:0014\",\"sessionId\":\"dialogue-session:1eaz9np\",\"seq\":14,\"userQuery\":\"(assistant reply fill)\",\"assistantReply\":\"# 清理完成，全项复查通过 | 项 | 结果 | |---|---| | 死文件删除 | **3 个**（`git rm` 已暂存）：`config/solarSystem.js`、`scenes/encyclopediaScene.js`、`scenes/infoScene.js` | | 连带的文本残留 | **5 处**已清（见下） | | 全项目指向已删文件的引用 | **0** | | 零引用文件 | **0** | | 相对 import 断链 | **0** | | 应用验证 | 61/61 纹理、17 天体、菜单 5 项齐全、加载画面正常 | **清掉的 5 处文本残留**（删文件不删这些，就是留信息坑）： | 位置 | 原文 | 改为 | |---|---|---| | `公告编写规范.md:5` | 渲染面板见 `src/scenes/infoScene.js` | `src/ui/announcementUI.js` | | `音频标准化流程.md:90` | `solarSystem.js` 给天体加 `musicType` | `src/config/world/systems/<星系>.js` | | `音频标准化流程.md:188` | `solarSystem` 天体加 `musicType` | 星系配置（同上） | | `scenes.css:3` | 覆盖 **infoScene.js** / galaxiesScene.js / … | 删掉已废弃项，并补注公告栏 0.2.8 也已面板化 | | `ksp2_panels.css:1429` | 公告栏（**infoScene.js**）复用 `.enc-*` | 公告栏（`announcementUI.js`，面板 id 沿用 `#infoScenePanel`） | --- # 但还有两处命名残留 —— 这才是\\\"屎山\\\"的成年形态 删掉文件只是切掉了地表部分，**符号还在替它活着**： ## ① `solarSystemData` / `starSystemMeta`（推荐现在就改） ```js // ========== 兼容旧名聚合导出 ========== // starSystemMeta:solarSystem.js 旧导出名,星系查看面板使用 ``` **问题很直白**：它自称\\\"兼容旧名\\\"，而它兼容的那个 `solarSystem.js` **已经不存在了**。这个别名现在没有任何兼容对象，只是一个**误导性的名字**——将来有人看到 `solarSystemData` 会去找 `solarSystem.js`，找不到。 | 项 | 值 | |---|---| | 使用处 | 4 处，2 个文件（`bodyRenderables.js`、`galaxiesScene.js`） | | 定义处 | 1 个文件（`starSystemIndex.js`） | | 改动量 | **3 个文件，5 处** | | 风险 | 极低（纯符号改名，无行为变化） | | 建议新名 | `allSystemBodies` / `allSystemMetas`（准确描述\\\"全部已注册星系的天体/元信息\\\"） | ## ② `#infoScenePanel` / `#infoSceneNav` / `#infoSceneContent`（建议评估后再定） 同样是命名残留，但**它们是活的**（`announcementUI.js` 在用，CSS 20 处选择器），只是名字来自已删的文件。 | 项 | 值 | |---|---| | 改动量 | JS **5 处** + CSS **20 处**，共 25 处 | | 风险 | 中等——改漏一处 CSS 选择器会**静默失效**（只是样式丢失，不报错） | | 我的倾向 | 可以改，但要一次改净；若暂不改，至少要像现在这样**注释里写明沿革**（我已在 CSS 顶部补了） | --- # 关于你一直强调的宗旨 这轮清理恰好第三次验证了同一件事：**我今天靠肉眼发现了 3 次残留，每次都是\\\"脚本一跑就露馅\\\"**—— 1. 117 处 import 改完后，脚本抓出 **9 处漏网** 2. 103 处资产路径，脚本抓出 `scanner.png` 与注释漂移 3. 3 个死文件 + 5 处文本残留，全是扫出来的 而\\\"文本提到不存在的文件\\\"这类残留，**恰恰是可以做成第 4 个检查脚本的**（`check-stale-refs.mjs`：扫描所有文档/注释里的 `*.js` 路径，验证文件是否存在）。今天这 5 处，脚本能在 1 秒内全部列出。 **所以下一步我建议：把 ① 改掉 → 然后落地那 4 个检查脚本 + 挂到 GH Pages 部署前。** 现在请你定两件事： 1. **① 的改名**（`solarSystemData` → `allSystemBodies` 等）—— 现在就做吗？ 2. **② 的 DOM id** —— 一并改净，还是保持现状 + 注释说明？ （当前那 3 个删除 + 5 处文本修正还没提交，等你一并决定后我再整理提交。）\",\"parentTurnId\":\"dialogue:1eaz9np:0013\",\"jumped\":false,\"relatedNodeIds\":[],\"createdAt\":1790275159977,\"updatedAt\":1790275159977,\"title\":\"(assistant reply fill)\",\"summary\":\"| 项 | 值 | |---|---| | 使用处 | 4 处，2 个文件（`bodyRenderables.js`、`galaxiesScene.js`） | | 定义处 | 1 个文件（`starSystemIndex.js`） | | 改动量 | **3 个文件，5 处** | | 风险 | 极低（纯符号改名，无行为变化） | | 建议新名 | `allSystemBodies` / `a…\",\"supersedesTurnIds\":[\"dialogue:1eaz9np:0013\"],\"validAt\":1790275159977}",
+        "seq": 14,
+        "sessionId": "dialogue-session:1eaz9np",
+        "jumped": false
+      }
     }
   ],
   "edges": [
@@ -27643,6 +27667,71 @@
     {
       "from": "dialogue:1cniils:0007",
       "to": "dialogue:1eaz9np:0010",
+      "relation": "same_topic"
+    },
+    {
+      "from": "dialogue:1eaz9np:0013",
+      "to": "dialogue-session:1eaz9np",
+      "relation": "part_of"
+    },
+    {
+      "from": "dialogue:1eaz9np:0012",
+      "to": "dialogue:1eaz9np:0013",
+      "relation": "next_section"
+    },
+    {
+      "from": "dialogue:1eaz9np:0013",
+      "to": "dialogue:1eaz9np:0011",
+      "relation": "supersedes"
+    },
+    {
+      "from": "dialogue:1eaz9np:0013",
+      "to": "dialogue:1eaz9np:0012",
+      "relation": "supersedes"
+    },
+    {
+      "from": "dialogue:1eaz9np:0013",
+      "to": "dialogue:1cniils:0007",
+      "relation": "same_topic"
+    },
+    {
+      "from": "dialogue:1eaz9np:0013",
+      "to": "dialogue:1cniils:0006",
+      "relation": "same_topic"
+    },
+    {
+      "from": "dialogue:1eaz9np:0013",
+      "to": "dialogue:1cniils:0005",
+      "relation": "same_topic"
+    },
+    {
+      "from": "dialogue:1eaz9np:0014",
+      "to": "dialogue-session:1eaz9np",
+      "relation": "part_of"
+    },
+    {
+      "from": "dialogue:1eaz9np:0013",
+      "to": "dialogue:1eaz9np:0014",
+      "relation": "next_section"
+    },
+    {
+      "from": "dialogue:1eaz9np:0014",
+      "to": "dialogue:1eaz9np:0013",
+      "relation": "supersedes"
+    },
+    {
+      "from": "dialogue:1eaz9np:0014",
+      "to": "dialogue:1cniils:0007",
+      "relation": "same_topic"
+    },
+    {
+      "from": "dialogue:1eaz9np:0014",
+      "to": "dialogue:1cniils:0006",
+      "relation": "same_topic"
+    },
+    {
+      "from": "dialogue:1eaz9np:0014",
+      "to": "dialogue:1cniils:0005",
       "relation": "same_topic"
     }
   ]
