@@ -2,13 +2,13 @@
 
 import { uiManager } from './uiManager.js';
 import { eventBus, Events } from '../eventBus.js';
-import { SHIP_TEMPLATES } from '../ship/shipTemplates.js';
-import { SHIP_CATEGORIES } from '../ship/shipCategories.js';
-import { getModuleDef } from '../ship/moduleTypes.js';
+import { SHIP_TEMPLATES } from '../config/entities/shipTemplates.js';
+import { SHIP_CATEGORIES } from '../config/entities/shipCategories.js';
+import { getModuleDef } from '../config/entities/moduleTypes.js';
 import { textureManager } from '../graphics/textureManager.js';
 import { renderIconHtml, showModuleSelectorPopup } from './uiComponents.js';
 import { makePanelDraggable, cascadePanelOpen } from './panelDrag.js';
-import { t } from '../config/strings.js';
+import { t } from '../config/ui/strings.js';
 
 // EventBus 迁移 — 缓存最近一帧的飞船渲染数据，供 UI 只读函数使用
 let _cachedShipData = null;
@@ -274,7 +274,7 @@ function renderShipBuilderSlots() {
         if (def) {
             slotDiv.innerHTML = `
                 <div class="builder-slot-label">${t('build.slotIndex', { i: index + 1 })}</div>
-                <div style="font-size:11px;">${renderIconHtml(def.iconTextureKey, def.icon)} ${def.name}</div>
+                <div style="font-size:11px;">${renderIconHtml(def.iconTexture, def.icon)} ${def.name}</div>
             `;
         } else {
             slotDiv.innerHTML = `

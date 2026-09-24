@@ -1,4 +1,4 @@
-"use strict";
+'use strict';
 
 import { meta as kerbolarMeta, bodies as kerbolarBodies } from './systems/kerbolarSystem.js';
 import { meta as testbolarMeta, bodies as testbolarBodies } from './systems/testSystem.js';

@@ -1,7 +1,7 @@
 'use strict';
 
 import { eventBus, Events } from '../eventBus.js';
-import { fontConfig } from './fontConfig.js';
+import { fontConfig } from '../config/assets/fontConfig.js';
 
 // FontManager 单例类 — 字体预加载管理
 // 职责：通过 FontFace API 主动加载字体并注册到 document.fonts，

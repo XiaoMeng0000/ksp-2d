@@ -33,8 +33,8 @@
 - 渲染：HTML5 Canvas 2D。
 - 状态管理：`GameState` 单例；模块间通信走 `EventBus` 发布订阅。
 - 物理：轨道力学用开普勒解析解，推力积分用 RK4。
-- 数据：所有配置放在 `src/config/`；天体数据定义在 `solarSystem.js`，天体须按父天体在前的数组顺序排列。
-- 飞船相关文件集中在 `src/ship/`；模块配置在 `src/ship/moduleTypes.js`。
+- 数据：所有配置放在 `src/config/`（按 world/entities/gameplay/ui/assets/meta 分域）；天体数据定义在 `src/config/world/systems/*.js`，天体须按父天体在前的数组顺序排列。
+- 飞船相关文件集中在 `src/ship/`；模块配置在 `src/config/entities/moduleTypes.js`。
 - 增量实现 + 独立验证阶段：大功能拆分为可单独验证的小步。
 - 临时代码标注 `// TEMP:`；不确定处标注 `// TODO:`。
 

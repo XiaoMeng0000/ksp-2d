@@ -1,12 +1,19 @@
 'use strict';
 
-// 天体图层配置（数据驱动）— key 对应 celestialBody.textureKey
-// 支持两种结构：
-// 1. 单模式（无 LOD）：{ layers: [...] }  ← Kerbin 等行星用
-// 2. 多模式（LOD 分级）：{ modes: { near: {...}, far: {...} }, nearScreenR: number, farScreenR: number }  ← Kerbol 等恒星用
+// 天体渲染配置（0.3.0）— 默认规则 + 例外表
+//
+// 默认规则：天体配置（systems/*.js）里声明了 texture → 自动注册一层表面贴图（zIndex 0），
+//           无需在本文件登记。新增普通天体因此只需改天体配置 + 放图，本文件零改动。
+// 例外表：只登记无法由默认规则推导的特殊渲染配置，key 为 celestialBody.textureKey（渲染查找键）
+//   - dres  ：表面贴图 + 程序星环（4 条环带）
+//   - kerbol：near / far 两档 LOD 分级（远景档不含贴图，整档由程序光晕构成）
+//
+// 注意：例外表内的贴图路径与其天体配置中的 texture 同值 —— 这是刻意的显式声明
+//       （LOD 阈值 / 星环参数属于渲染层专属配置，不宜下沉到物理数据层）；
+//       若调整 Dres / Kerbol 的贴图路径，需一并修改此处。
 //
 // layer 字段：
-//   texture: string       // textureConfig 中的纹理 key（贴图层用）
+//   texture: string       // 贴图路径（贴图层用）
 //   program: string       // 程序效果名称（如 'star_glow'，与 texture 二选一）
 //   alpha: number         // 0~1 透明度
 //   scale: number         // 相对缩放倍率（光晕放大层用，默认 1）
@@ -14,69 +21,14 @@
 //   zIndex: number        // 图层顺序（小的在下，大的在上）
 
 import { renderableManager } from './renderable.js';
+import { solarSystemData } from '../config/world/starSystemIndex.js';
 
 export const bodyRenderableConfigs = {
-    // Kerbin：单模式，表面贴图，无 LOD
-    kerbin: {
-        layers: [
-            { texture: 'kerbin_surface', zIndex: 0 }
-        ]
-    },
-
-    // Mun：单模式，表面贴图，无 LOD
-    mun: {
-        layers: [
-            { texture: 'mun_surface', zIndex: 0 }
-        ]
-    },
-
-    // Minmus：单模式，表面贴图，无 LOD
-    minmus: {
-        layers: [
-            { texture: 'minmus_surface', zIndex: 0 }
-        ]
-    },
-
-    // Duna：单模式，表面贴图，无 LOD
-    duna: {
-        layers: [
-            { texture: 'duna_surface', zIndex: 0 }
-        ]
-    },
-
-    // Ike：单模式，表面贴图，无 LOD
-    ike: {
-        layers: [
-            { texture: 'ike_surface', zIndex: 0 }
-        ]
-    },
-
-    // Eve：单模式，表面贴图，无 LOD
-    eve: {
-        layers: [
-            { texture: 'eve_surface', zIndex: 0 }
-        ]
-    },
-
-    // Gilly：单模式，表面贴图，无 LOD
-    gilly: {
-        layers: [
-            { texture: 'gilly_surface', zIndex: 0 }
-        ]
-    },
-
-    // Moho：单模式，表面贴图，无 LOD
-    moho: {
-        layers: [
-            { texture: 'moho_surface', zIndex: 0 }
-        ]
-    },
-
-    // Dres：单模式，表面贴图 + 程序星环（2D 俯视为正圆环带，多细分分层）
+    // Dres：表面贴图 + 程序星环（2D 俯视为正圆环带，多细分分层）
     // 参考 KSP2 官方效果：环带更暗、更薄、离天体更远，整体呈深灰半透明并带细密分层。
     dres: {
         layers: [
-            { texture: 'dres_surface', zIndex: 0 },
+            { texture: 'assets/images/celestial/kerbolar/dres.png', zIndex: 0 },
             {
                 program: 'planet_ring',
                 color: '#9d9d9d',
@@ -96,55 +48,6 @@ export const bodyRenderableConfigs = {
         ]
     },
 
-    // Jool：单模式，表面贴图，无 LOD（气态巨行星）
-    jool: {
-        layers: [
-            { texture: 'jool_surface', zIndex: 0 }
-        ]
-    },
-
-    // Laythe：单模式，表面贴图，无 LOD（海洋卫星）
-    laythe: {
-        layers: [
-            { texture: 'laythe_surface', zIndex: 0 }
-        ]
-    },
-
-    // Vall：单模式，表面贴图，无 LOD（冰卫星）
-    vall: {
-        layers: [
-            { texture: 'vall_surface', zIndex: 0 }
-        ]
-    },
-
-    // Tylo：单模式，表面贴图，无 LOD（大型冰卫星）
-    tylo: {
-        layers: [
-            { texture: 'tylo_surface', zIndex: 0 }
-        ]
-    },
-
-    // Bop：单模式，表面贴图，无 LOD（捕获小卫星）
-    bop: {
-        layers: [
-            { texture: 'bop_surface', zIndex: 0 }
-        ]
-    },
-
-    // Pol：单模式，表面贴图，无 LOD（捕获小卫星）
-    pol: {
-        layers: [
-            { texture: 'pol_surface', zIndex: 0 }
-        ]
-    },
-
-    // Eeloo：单模式，表面贴图，无 LOD（冰矮行星）
-    eeloo: {
-        layers: [
-            { texture: 'eeloo_surface', zIndex: 0 }
-        ]
-    },
-
     // Kerbol：LOD 分级渲染
     // nearScreenR / farScreenR 定义两档的阈值（像素），中间为过渡区
     kerbol: {
@@ -152,7 +55,7 @@ export const bodyRenderableConfigs = {
             // 近景档（屏幕半径 >= 200px）：表面清晰 + 弱橙黄光晕（小范围，避免遮挡内行星）
             near: {
                 layers: [
-                    { texture: 'kerbol_surface', alpha: 1.0, zIndex: 0 },
+                    { texture: 'assets/images/celestial/kerbolar/kerbol.png', alpha: 1.0, zIndex: 0 },
                     { program: 'star_glow', color: '#ffaa33', alpha: 0.15, scale: 1.15, zIndex: 1 }
                 ]
             },
@@ -173,9 +76,28 @@ export const bodyRenderableConfigs = {
 };
 
 // 将配置注册进 RenderableManager（main.js 启动时调用一次）
+// 遍历全量星系静态数据（starSystemRegistry 的超集）而非当前激活集，
+// 保证后续切换到任意星系组合时，其天体渲染层已注册就绪
 export function registerBodyRenderables() {
-    for (const [key, config] of Object.entries(bodyRenderableConfigs)) {
-        renderableManager.register(key, config);
+    let registered = 0;
+
+    for (const body of solarSystemData) {
+        const key = body.textureKey;
+        if (!key) continue;
+
+        const override = bodyRenderableConfigs[key];
+        if (override) {
+            renderableManager.register(key, override);
+            registered++;
+        } else if (body.texture) {
+            // 默认规则：声明了贴图就画一层
+            renderableManager.register(key, {
+                layers: [{ texture: body.texture, zIndex: 0 }]
+            });
+            registered++;
+        }
+        // 既无例外配置也无贴图的占位天体（如测试星系）→ 不注册，渲染层走代表色纯色兜底
     }
-    console.log(`[BodyRenderables] 已注册 ${Object.keys(bodyRenderableConfigs).length} 个天体渲染配置`);
+
+    console.log(`[BodyRenderables] 已注册 ${registered} 个天体渲染配置`);
 }

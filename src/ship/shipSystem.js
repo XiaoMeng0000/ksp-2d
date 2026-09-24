@@ -1,7 +1,7 @@
 // 飞船系统 - 飞船实例创建、存储和管理核心模块
 import { gameState } from '../gameState.js';
-import { SHIP_TEMPLATES } from './shipTemplates.js';
-import { getModuleDef } from './moduleTypes.js';
+import { SHIP_TEMPLATES } from '../config/entities/shipTemplates.js';
+import { getModuleDef } from '../config/entities/moduleTypes.js';
 
 class ShipSystem {
     constructor() {
@@ -73,9 +73,7 @@ class ShipSystem {
             angularVelocity: 0,      // 当前角速度（rad/s）
             throttle: 0,             // 油门 0.0~1.0
             sasMode: 'off',          // 预留：SAS模式 'off'|'hold'|'prograde'|'retrograde'
-            sasTargetHeading: null,  // 预留：SAS目标朝向（弧度）
-            // 船体图标纹理 key（继承自模板，为 null 时使用默认图）
-            iconTextureKey: template.iconTextureKey || null
+            sasTargetHeading: null   // 预留：SAS目标朝向（弧度）
         };
 
         // 模块系统 - 处理安装的模块，累加物理属性

@@ -9,7 +9,7 @@ import { stateToKepler, keplerToState, getOrbitalDirectionAngles } from './orbit
 import { bodyFuturePos, patchedStep, getCachedTime } from './orbitalPrediction.js';
 import { celestialBodies } from './physics.js';
 import { getTotalMass, getFuelAmount, G0 } from '../resources/resourceSystem.js';
-import { MANEUVER_CONFIG } from '../config/maneuverConfig.js';
+import { MANEUVER_CONFIG } from '../config/gameplay/maneuverConfig.js';
 
 // 沿预测链时间寻址：返回 absTime 时刻飞船的 { relPos, relVel, host, time, kepler }
 // 命中段的解析 kepler 优先（keplerToState 解析推进），无 kepler 段（径向直线 / RK4

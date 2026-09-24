@@ -4,7 +4,7 @@ import { uiManager } from './uiManager.js';
 import { sceneManager } from '../sceneManager.js';
 import { saveManager } from '../saveManager.js';
 import { gameState } from '../gameState.js';
-import { t } from '../config/strings.js';
+import { t } from '../config/ui/strings.js';
 import { formatGameTime, formatGameDate } from '../utils/format.js';
 import { openNewCampaignDialog } from './newCampaignDialog.js';
 import { createInputDialog } from './uiComponents.js';

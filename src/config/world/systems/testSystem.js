@@ -1,6 +1,6 @@
 "use strict";
 
-import { CelestialBody } from '../../physics/celestialBody.js';
+import { CelestialBody } from '../../../physics/celestialBody.js';
 
 // ========== Testbolar 系(测试家园星系) ==========
 // 原型:6.5 步「临时太阳系数据」(v0.2.3 根提交,缩放尺度)

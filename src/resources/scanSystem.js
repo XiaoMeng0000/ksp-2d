@@ -10,13 +10,13 @@
 
 import { gameState } from '../gameState.js';
 import { eventBus, Events } from '../eventBus.js';
-import { getModuleDef } from '../ship/moduleTypes.js';
+import { getModuleDef } from '../config/entities/moduleTypes.js';
 import { shipSystem } from '../ship/shipSystem.js';
-import { getBodyResources } from '../config/bodyResources.js';
+import { getBodyResources } from '../config/world/bodyResources.js';
 import { celestialBodies } from '../physics/physics.js';
-import { getResourceType } from './resourceTypes.js';
+import { getResourceType } from '../config/entities/resourceTypes.js';
 import { isScansEnabled } from './modeRules.js';
-import { t } from '../config/strings.js';
+import { t } from '../config/ui/strings.js';
 
 // KSP 一天 = 6 小时 = 21600 秒（Kerbin 自转周期）
 export const GAME_DAY_SECONDS = 21600;

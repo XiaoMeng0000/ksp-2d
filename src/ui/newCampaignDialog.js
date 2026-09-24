@@ -1,12 +1,12 @@
 'use strict';
 
 import { uiManager } from './uiManager.js';
-import { t } from '../config/strings.js';
+import { t } from '../config/ui/strings.js';
 import { openSystemSelectPanel } from './systemSelectPanel.js';
 import {
     getSystemById,
     getDefaultSystemIds
-} from '../config/starSystemIndex.js';
+} from '../config/world/starSystemIndex.js';
 
 // 创建新战役对话框 — 0.2.5 新增
 // 从"开始游戏"面板的「创建新战役」进入，以覆盖层形式展示（案例图2 结构）：

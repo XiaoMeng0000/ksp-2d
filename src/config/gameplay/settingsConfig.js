@@ -4,7 +4,7 @@
 // 分类/设置行/选项集中于此定义，UI 只读渲染，文案一律引用 strings.js 的 key。
 // 新增设置项：在 SETTINGS_ROWS 对应分类下加一行即可，无需改渲染逻辑。
 
-import { VOLUME_STORAGE_KEYS, VOLUME_DEFAULTS } from '../audio/audioConfig.js';
+import { VOLUME_STORAGE_KEYS, VOLUME_DEFAULTS } from '../assets/audioConfig.js';
 
 // ==== SOI 切换时间保护开关（设置面板行 + 飞行/追踪场景读取共用同一存储键，默认启用） ====
 export const SOI_PROTECT_STORAGE_KEY = 'ksp2d.soiWarpProtect';

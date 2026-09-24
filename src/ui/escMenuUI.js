@@ -7,9 +7,9 @@ import { sceneManager } from '../sceneManager.js';
 import { saveManager } from '../saveManager.js';
 import { gameState } from '../gameState.js';
 import { toggleDebugPanel, refreshDebugPanel } from './debugUI.js';
-import { t } from '../config/strings.js';
-import { ESC_ACTIONS, ESC_SECTIONS } from '../config/escMenuConfig.js';
-import { VERSION_TEXT } from '../config/version.js';
+import { t } from '../config/ui/strings.js';
+import { ESC_ACTIONS, ESC_SECTIONS } from '../config/ui/escMenuConfig.js';
+import { VERSION_TEXT } from '../config/meta/version.js';
 import { formatUniverseTime } from '../utils/format.js';
 
 // ============================================================

@@ -10,7 +10,7 @@
 //   · 图内仍按 SOI 截断（超出 SOI 的段被裁掉）
 // 数据来源：渲染层本帧缓存（getLastOrbitSegments / getLastManeuverPrediction），UI 不直连物理
 
-import { t } from '../config/strings.js';
+import { t } from '../config/ui/strings.js';
 import { flightView } from '../flightView.js';
 import { maneuverSystem } from '../ship/maneuverSystem.js';
 import { shipSystem } from '../ship/shipSystem.js';
@@ -21,8 +21,8 @@ import { walkToTime, getNodeOrbitPeriod } from '../physics/maneuverPrediction.js
 import { getCachedTime, bodyFuturePos } from '../physics/orbitalPrediction.js';
 import { computeDeltaV } from '../resources/resourceSystem.js';
 import { formatTCountdown } from '../utils/format.js';
-import { MANEUVER_CONFIG } from '../config/maneuverConfig.js';
-import { VIEW_CONFIG } from '../config/viewConfig.js';
+import { MANEUVER_CONFIG } from '../config/gameplay/maneuverConfig.js';
+import { VIEW_CONFIG } from '../config/gameplay/viewConfig.js';
 import { timeWarp } from '../timeWarp.js';
 
 // ===== 模块状态 =====

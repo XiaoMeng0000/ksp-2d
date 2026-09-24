@@ -1,8 +1,8 @@
 'use strict';
 
 import { uiManager } from './uiManager.js';
-import { ENCYCLOPEDIA } from '../config/encyclopediaConfig.js';
-import { t } from '../config/strings.js';
+import { ENCYCLOPEDIA } from '../config/ui/encyclopediaConfig.js';
+import { t } from '../config/ui/strings.js';
 
 // 游戏百科（0.2.7 全量面板化：由 scene 改为 uiManager 覆盖式面板，参照设置页面板化先例）
 // 收益：菜单 BGM 连续、分类状态保留（重开不丢）、自动获得 UI_PANEL_OPENED/CLOSED 面板音效

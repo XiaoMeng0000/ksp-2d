@@ -2,8 +2,8 @@
 
 import { sceneManager } from '../sceneManager.js';
 import { textureManager } from '../graphics/textureManager.js';
-import { solarSystemData, starSystemMeta, getSystemBodiesById } from '../config/starSystemIndex.js';
-import { t } from '../config/strings.js';
+import { solarSystemData, starSystemMeta, getSystemBodiesById } from '../config/world/starSystemIndex.js';
+import { t } from '../config/ui/strings.js';
 
 // ========== 样式常量（Canvas 绘制用；色值与 CSS 变量保持一致）
 // 注意：Canvas 无法读取 CSS 变量，此处实色为 --theme-bg / --ut-gold / --text-* 的对应值 ==========
@@ -16,7 +16,6 @@ const FONT_MONO = 'monospace';
 // 对比图绘制常量
 const CHART_HEIGHT_BASE = 260;     // 对比图画布基础高度（行星中轴 + 上下留白 + 卫星区）
 const SAT_VSTEP = 30;              // 卫星垂直排列步长（直径 + 名称标注 + 间隙）
-const CHART_TEXTURE_SUFFIX = '_surface';  // 贴图 key 后缀：textureKey + '_surface'
 const PLANET_MIN_SIZE = 26;        // 行星最小直径（px，对数刻度下限，保证小行星可见）
 const PLANET_MAX_SIZE = 84;        // 行星最大直径上限（px，对数刻度上限，受画布高度限制）
 const PLANET_SPACING = 40;         // 相邻行星间距（px）
@@ -48,8 +47,8 @@ function registerGalaxiesScene() {
 
     // 绘制单个天体贴图（圆形裁切；贴图缺失时用颜色兜底）
     function _drawBodyImage(ctx, body, diameter, cx, cy) {
-        const key = body.textureKey + CHART_TEXTURE_SUFFIX;
-        const img = textureManager.get(key);
+        // 0.3.0：贴图路径就近声明在天体配置里，直接取用（不再拼 '_surface' 约定后缀）
+        const img = body.texture ? textureManager.get(body.texture) : null;
         const r = diameter / 2;
 
         ctx.save();

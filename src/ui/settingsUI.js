@@ -3,8 +3,8 @@
 import { uiManager } from './uiManager.js';
 import { sceneManager } from '../sceneManager.js';
 import { audioCore } from '../audio/audioCore.js';
-import { t } from '../config/strings.js';
-import { SETTINGS_CATEGORIES, SETTINGS_ROWS, SETTINGS_GROUP_LABELS } from '../config/settingsConfig.js';
+import { t } from '../config/ui/strings.js';
+import { SETTINGS_CATEGORIES, SETTINGS_ROWS, SETTINGS_GROUP_LABELS } from '../config/gameplay/settingsConfig.js';
 
 // 设置面板 — 0.2.5 从 scene 抽离为覆盖式 UI 面板，配置数据驱动
 // 原 settingsScene.js 以 scene 形式注册，切换场景会触发 audioDirector 停止音乐

@@ -1,6 +1,6 @@
 'use strict';
 
-import { VERSION_TEXT } from './version.js';
+import { VERSION_TEXT } from '../meta/version.js';
 
 // ============================================================
 // 游戏公告配置(公告栏面板化后,内容统一在此维护)

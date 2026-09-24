@@ -21,17 +21,17 @@ import { sasUI } from '../ui/sasUI.js';
 import { showTooltip, hideTooltip } from '../ui/uiTooltip.js';
 import { clearOrbitLabels } from '../ui/orbitLabels.js';
 import { facilitySystem } from '../facility/facilitySystem.js';
-import { getModuleDef } from '../ship/moduleTypes.js';
-import { getFacilityType } from '../facility/facilityTypes.js';
+import { getModuleDef } from '../config/entities/moduleTypes.js';
+import { getFacilityType } from '../config/entities/facilityTypes.js';
 import { getTotalMass, getResource, getFuelAmount, getFuelCapacity } from '../resources/resourceSystem.js';
 import { updateScanProgress } from '../resources/scanSystem.js';
 import { computeManeuverDirection } from '../physics/maneuverPrediction.js';
-import { getEngineType } from '../resources/engineConfig.js';
+import { getEngineType } from '../config/entities/engineConfig.js';
 import { consumeCargo, hasCargoHold, getCargoAmount } from '../resources/cargoSystem.js';
 import { isBalanceEnforced } from '../resources/modeRules.js';
 import { timeWarp } from '../timeWarp.js';
-import { getSOIWarpProtectEnabled } from '../config/settingsConfig.js';
-import { t } from '../config/strings.js';
+import { getSOIWarpProtectEnabled } from '../config/gameplay/settingsConfig.js';
+import { t } from '../config/ui/strings.js';
 
 // 由 main.js 在注册时注入的依赖
 let _throttleRate = 1.0;

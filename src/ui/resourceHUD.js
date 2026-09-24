@@ -7,7 +7,7 @@
 import { gameState } from '../gameState.js';
 import { eventBus, Events } from '../eventBus.js';
 import { uiManager } from './uiManager.js';
-import { t } from '../config/strings.js';
+import { t } from '../config/ui/strings.js';
 
 // 游戏模式 → 显示文本（数据驱动收敛：文案入库 strings.js）
 const MODE_TEXT = {

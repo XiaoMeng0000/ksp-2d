@@ -2,13 +2,13 @@
 
 // 设施系统 — 设施类型配置
 
-// 舱室定义
+// 舱室定义（iconTexture: 0.3.0 起资产就近声明，路径相对项目根目录）
 const COMPARTMENT_DEFS = {
-    bridge:           { name: '指令舱',     icon: '🎛️' },
-    dock_hub:         { name: '对接枢纽',   icon: '🔗' },
-    supply_terminal:  { name: '补给终端',   icon: '⛽' },
-    assembly_shop:    { name: '装配车间',   icon: '🔧' },
-    laboratory:       { name: '实验室',     icon: '🔬' }
+    bridge:           { name: '指令舱',     icon: '🎛️', iconTexture: 'assets/images/facilities/compartments/bridge.png' },
+    dock_hub:         { name: '对接枢纽',   icon: '🔗', iconTexture: 'assets/images/facilities/compartments/dock_hub.png' },
+    supply_terminal:  { name: '补给终端',   icon: '⛽', iconTexture: 'assets/images/facilities/compartments/supply_terminal.png' },
+    assembly_shop:    { name: '装配车间',   icon: '🔧', iconTexture: 'assets/images/facilities/compartments/assembly_shop.png' },
+    laboratory:       { name: '实验室',     icon: '🔬', iconTexture: 'assets/images/facilities/compartments/laboratory.png' }
 };
 
 // 服务名称映射
@@ -44,7 +44,7 @@ const FACILITY_TYPES = [
         description: '综合性轨道建造与维护平台，支持飞船装配、对接补给和改装作业',
         color: '#4488ff',
         icon: '🏭',
-        iconTextureKey: 'comp_assembly_shop',
+        iconTexture: 'assets/images/facilities/compartments/assembly_shop.png',
         baseDocks: 2,
         compartments: ['bridge', 'dock_hub', 'supply_terminal', 'assembly_shop'],
         services: ['dock', 'undock', 'refuel', 'refit', 'build_ship', 'switch_control'],
@@ -58,7 +58,7 @@ const FACILITY_TYPES = [
         description: '专用燃料与物资补给节点，为往来飞船提供推进剂加注服务',
         color: '#44cc88',
         icon: '⛽',
-        iconTextureKey: 'comp_supply_terminal',
+        iconTexture: 'assets/images/facilities/compartments/supply_terminal.png',
         baseDocks: 1,
         compartments: ['bridge', 'dock_hub', 'supply_terminal'],
         services: ['dock', 'undock', 'refuel'],
@@ -72,7 +72,7 @@ const FACILITY_TYPES = [
         description: '轨道科学实验平台，配备先进实验室，可解锁新型蓝图技术',
         color: '#cc88ff',
         icon: '🔬',
-        iconTextureKey: 'comp_laboratory',
+        iconTexture: 'assets/images/facilities/compartments/laboratory.png',
         baseDocks: 1,
         compartments: ['bridge', 'dock_hub', 'supply_terminal', 'laboratory'],
         services: ['dock', 'undock', 'refuel', 'unlock_blueprint'],
@@ -94,6 +94,11 @@ export function getAllFacilityTypes() {
 // 根据舱室 ID 返回舱室定义对象
 export function getCompartmentDef(compartmentId) {
     return COMPARTMENT_DEFS[compartmentId] || null;
+}
+
+// 返回全部舱室定义（资产清单聚合用；0.3.0）
+export function getAllCompartments() {
+    return Object.entries(COMPARTMENT_DEFS).map(([id, def]) => ({ id, ...def }));
 }
 
 // 返回指定设施类型的舱室定义数组（已解析的完整舱室对象列表）

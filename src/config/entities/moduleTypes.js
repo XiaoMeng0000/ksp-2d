@@ -10,10 +10,12 @@ const CATEGORY_NAMES = {
 // capability → 飞行工具栏入口配置（数据驱动收敛）
 // icon: 工具栏按钮图标（emoji fallback）；labelKey: strings.js 文案 key；
 // iconId: 可选 DOM id（供事件委托/样式定位），无则 null
+// iconTexture: 按钮贴图路径（0.3.0 起资产就近声明，为空则只用 emoji）
 const CAPABILITY_TOOLBAR = {
-    deploy_facility: { icon: '🔧', labelKey: 'facility.deploy', iconId: 'icon_deploy_facility' },
-    cargo_hold:      { icon: '📦', labelKey: 'cargo.title',     iconId: 'icon_cargo_hold' },
-    scan_resources:  { icon: '🔭', labelKey: 'scan.menuTitle',  iconId: 'icon_scan_resources' }
+    deploy_facility: { icon: '🔧', labelKey: 'facility.deploy', iconId: 'icon_deploy_facility', iconTexture: 'assets/images/ships/assembly_shop(ship).png' },
+    cargo_hold:      { icon: '📦', labelKey: 'cargo.title',     iconId: 'icon_cargo_hold',      iconTexture: 'assets/images/ships/cargo_hold.png' },
+    // TODO: scanner.png 资产待补（美术未出图）—— 缺失时按钮回退 emoji，不阻塞其他功能
+    scan_resources:  { icon: '🔭', labelKey: 'scan.menuTitle',  iconId: 'icon_scan_resources',  iconTexture: 'assets/images/ships/scanner.png' }
 };
 
 const MODULE_TYPES = [
@@ -23,7 +25,7 @@ const MODULE_TYPES = [
         category: 'structure',
         description: '增加干质量与转动惯量，使飞船转弯和加速更慢（测试用）',
         icon: '⚓',
-        iconTextureKey: 'mod_test_ballast',
+        iconTexture: 'assets/images/ships/test_ballast.png',
         price: 0,
         capability: null,
         massBonus: 5.0,
@@ -35,7 +37,7 @@ const MODULE_TYPES = [
         category: 'construction',
         description: '部署设施的必要组件。飞船进入目标天体圆轨道后可部署设施，部署后此模块被消耗。（该模块仅供测试使用！',
         icon: '🏗️',
-        iconTextureKey: 'mod_construction_package',
+        iconTexture: 'assets/images/ships/construction_package.png',
         price: 100,
         capability: 'deploy_facility',
         massBonus: 2.0,
@@ -50,7 +52,7 @@ const MODULE_TYPES = [
         category: 'science',
         description: '探测天体 tier1 级资源分布（水冰、金属矿石）。',
         icon: '🔭',
-        iconTextureKey: 'icon_scan_resources',
+        iconTexture: 'assets/images/ships/scanner.png',
         price: 0,
         capability: 'scan_resources',
         scanTier: 1,
@@ -63,7 +65,7 @@ const MODULE_TYPES = [
         category: 'science',
         description: '探测天体 tier1~2 级资源分布（含稀土矿、裂变材料）。',
         icon: '🔭',
-        iconTextureKey: 'icon_scan_resources',
+        iconTexture: 'assets/images/ships/scanner.png',
         price: 0,
         capability: 'scan_resources',
         scanTier: 2,
@@ -76,7 +78,7 @@ const MODULE_TYPES = [
         category: 'science',
         description: '探测天体全部资源分布（含氦-3 等隐藏资源）。',
         icon: '🔭',
-        iconTextureKey: 'icon_scan_resources',
+        iconTexture: 'assets/images/ships/scanner.png',
         price: 0,
         capability: 'scan_resources',
         scanTier: 3,
@@ -94,7 +96,7 @@ const MODULE_TYPES = [
         category: 'logistics',
         description: '扩展货仓（500 kg），可存放推进剂、原料与材料套装。飞船自带燃料不计入货仓。',
         icon: '📦',
-        iconTextureKey: 'icon_cargo_hold',
+        iconTexture: 'assets/images/ships/cargo_hold.png',
         price: 20,
         capability: 'cargo_hold',
         cargoCapacity: 500,
@@ -107,7 +109,7 @@ const MODULE_TYPES = [
         category: 'logistics',
         description: '扩展货仓（2000 kg），可存放推进剂、原料与材料套装。飞船自带燃料不计入货仓。',
         icon: '📦',
-        iconTextureKey: 'icon_cargo_hold',
+        iconTexture: 'assets/images/ships/cargo_hold.png',
         price: 60,
         capability: 'cargo_hold',
         cargoCapacity: 2000,
@@ -120,7 +122,7 @@ const MODULE_TYPES = [
         category: 'logistics',
         description: '扩展货仓（8000 kg），可存放推进剂、原料与材料套装。飞船自带燃料不计入货仓。',
         icon: '📦',
-        iconTextureKey: 'icon_cargo_hold',
+        iconTexture: 'assets/images/ships/cargo_hold.png',
         price: 150,
         capability: 'cargo_hold',
         cargoCapacity: 8000,
@@ -136,6 +138,11 @@ export function getModuleDef(moduleTypeId) {
 // 获取 capability 的飞行工具栏入口配置（未配置返回 null）
 export function getCapabilityToolbar(capability) {
     return CAPABILITY_TOOLBAR[capability] || null;
+}
+
+// 返回全部能力工具栏配置（资产清单聚合用；0.3.0）
+export function getAllCapabilityToolbars() {
+    return Object.values(CAPABILITY_TOOLBAR);
 }
 
 export function getAllModules() {

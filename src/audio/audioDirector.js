@@ -2,7 +2,7 @@
 
 import { eventBus, Events } from '../eventBus.js';
 import { audioCore } from './audioCore.js';
-import { getMenuMusicVariant, getRandomSfxId, getPanelOpenSfxId, isPanelCloseMuted, getUiClickPlayConfig, getScreenPositionRate, uiHoverConfig, getWarpSfxRate, warpSfxConfig } from './audioConfig.js';
+import { getMenuMusicVariant, getRandomSfxId, getPanelOpenSfxId, isPanelCloseMuted, getUiClickPlayConfig, getScreenPositionRate, uiHoverConfig, getWarpSfxRate, warpSfxConfig } from '../config/assets/audioConfig.js';
 import { getMusicTypeForSOI } from '../physics/physics.js';
 import { gameState } from '../gameState.js';
 import { sceneManager } from '../sceneManager.js';

@@ -8,7 +8,7 @@
 // 交互（0.2.5 定稿）：节点存在期间 图标/十字手柄/面板 全部常驻可操作；
 //   空白点击仅终止进行中的拖拽（不隐藏任何元素，拖动能力永不失能）
 
-import { t } from '../config/strings.js';
+import { t } from '../config/ui/strings.js';
 import { eventBus, Events } from '../eventBus.js';
 import { maneuverSystem } from '../ship/maneuverSystem.js';
 import { getLastManeuverPrediction, getLastOrbitSegments, getLastManeuverNodes, findNearestOrbitPoint } from '../renderer.js';
@@ -21,7 +21,7 @@ import { computeDeltaV } from '../resources/resourceSystem.js';
 import { textureManager } from '../graphics/textureManager.js';
 import { timeWarp } from '../timeWarp.js';
 import { formatTCountdown } from '../utils/format.js';
-import { MANEUVER_CONFIG } from '../config/maneuverConfig.js';
+import { MANEUVER_CONFIG } from '../config/gameplay/maneuverConfig.js';
 
 // ===== 模块状态 =====
 let _panel = null;          // 加速计时器面板

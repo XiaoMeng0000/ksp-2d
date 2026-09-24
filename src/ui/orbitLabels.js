@@ -15,8 +15,8 @@
 //   展开状态按 type 记录在模块级（悬停/锁定两个集合），退出场景（clearOrbitLabels）时重置。
 // 惰性初始化：容器在首次 sync 时创建（顶层不碰 DOM，便于 node 环境加载）。
 
-import { t } from '../config/strings.js';
-import { ORBIT_POINT_TYPES } from '../config/orbitPointTypes.js';
+import { t } from '../config/ui/strings.js';
+import { ORBIT_POINT_TYPES } from '../config/gameplay/orbitPointTypes.js';
 import { formatGameDurationLong, formatMeters } from '../utils/format.js';
 import { textureManager } from '../graphics/textureManager.js';
 import { escapeHtml } from './uiComponents.js';

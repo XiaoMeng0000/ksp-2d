@@ -1,5 +1,5 @@
 import { eventBus, Events } from '../eventBus.js';
-import { textureConfig } from './textureConfig.js';
+import { getTextureManifest } from '../config/assets/assetManifest.js';
 
 class TextureManager {
     constructor() {
@@ -14,7 +14,9 @@ class TextureManager {
     }
 
     init() {
-        const keys = Object.keys(textureConfig);
+        // 0.3.0：清单来源改为聚合层 —— 实体配置里的资产（路径即 key）+ 无主通用 UI 图标
+        const manifest = getTextureManifest();
+        const keys = Object.keys(manifest);
         this._total = keys.length;
         this._completed = 0;
         this._ready = false;
@@ -29,28 +31,34 @@ class TextureManager {
         console.log(`[TextureManager] 开始加载 ${this._total} 个纹理...`);
 
         for (const key of keys) {
-            const path = textureConfig[key];
+            const path = manifest[key];
             this._loadTexture(key, path);
         }
 
         return this;
     }
 
+    // 加载单个纹理时用于展示的短名（路径条目只显示文件名，避免加载日志过长）
+    _displayName(key, path) {
+        return key === path ? path.split('/').pop() : key;
+    }
+
     _loadTexture(key, path) {
         const img = new Image();
+        const name = this._displayName(key, path);
 
         img.onload = () => {
             this._textures.set(key, img);
-            eventBus.emit(Events.TEXTURE_PROGRESS, { key, loaded: this._completed + 1, total: this._total, success: true });
+            eventBus.emit(Events.TEXTURE_PROGRESS, { key, name, loaded: this._completed + 1, total: this._total, success: true });
             this._completed++;
-            console.log(`[TextureManager] 已加载: ${key} (${this._completed}/${this._total})`);
+            console.log(`[TextureManager] 已加载: ${name} (${this._completed}/${this._total})`);
             this._checkAllDone();
         };
 
         img.onerror = () => {
-            eventBus.emit(Events.TEXTURE_PROGRESS, { key, loaded: this._completed + 1, total: this._total, success: false });
+            eventBus.emit(Events.TEXTURE_PROGRESS, { key, name, loaded: this._completed + 1, total: this._total, success: false });
             this._completed++;
-            console.error(`[TextureManager] 加载失败: ${key} → ${path} (${this._completed}/${this._total})`);
+            console.error(`[TextureManager] 加载失败: ${name} → ${path} (${this._completed}/${this._total})`);
             eventBus.emit(Events.TEXTURE_LOAD_ERROR, { key, path });
             this._checkAllDone();
         };

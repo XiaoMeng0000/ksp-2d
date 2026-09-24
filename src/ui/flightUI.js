@@ -4,8 +4,8 @@ import { uiManager } from './uiManager.js';
 import { eventBus, Events } from '../eventBus.js';
 import { gameState } from '../gameState.js';
 import { facilitySystem } from '../facility/facilitySystem.js';
-import { getFacilityCompartments, getFacilityType, getCompartmentDef } from '../facility/facilityTypes.js';
-import { getModuleDef, getCapabilityToolbar } from '../ship/moduleTypes.js';
+import { getFacilityCompartments, getFacilityType, getCompartmentDef } from '../config/entities/facilityTypes.js';
+import { getModuleDef, getCapabilityToolbar } from '../config/entities/moduleTypes.js';
 import { textureManager } from '../graphics/textureManager.js';
 import { renderIconHtml, renderFuelBarsHtml, showModuleSelectorPopup } from './uiComponents.js';
 import { showTooltip, hideTooltip } from './uiTooltip.js';
@@ -18,9 +18,9 @@ import {
     getShipScanTier, getScanProgress, startScan, cancelScan,
     getScanDuration, getVisibleBodyResources, GAME_DAY_SECONDS
 } from '../resources/scanSystem.js';
-import { getResourceType } from '../resources/resourceTypes.js';
+import { getResourceType } from '../config/entities/resourceTypes.js';
 import { celestialBodies } from '../physics/physics.js';
-import { t } from '../config/strings.js';
+import { t } from '../config/ui/strings.js';
 import { makePanelDraggable, cascadePanelOpen } from './panelDrag.js';
 
 // EventBus 迁移 — 缓存最近一帧的飞船渲染数据，供 UI 只读函数使用
@@ -106,7 +106,7 @@ function renderToolbarIcons(mode, data) {
     if (mode === 'off' || !data) return;
 
     // 图标行：裸图标 + 右侧状态竖条（无方框底，参考图样式）
-    const createIcon = (icon, title, onClick, textureKey, iconId, panelId) => {
+    const createIcon = (icon, title, onClick, texture, iconId, panelId) => {
         const item = document.createElement('div');
         item.className = 'toolbar-item';
         item.dataset.toolbarId = iconId || '';
@@ -123,8 +123,8 @@ function renderToolbarIcons(mode, data) {
         });
 
         // PNG 纹理就绪时用 <img>，否则 fallback 到 Emoji
-        if (textureKey) {
-            const tex = textureManager.get(textureKey);
+        if (texture) {
+            const tex = textureManager.get(texture);
             if (tex) {
                 const img = document.createElement('img');
                 img.src = tex.src;
@@ -168,6 +168,7 @@ function renderToolbarIcons(mode, data) {
             seen.add(def.capability);
 
             // 数据驱动收敛：图标/文案由 CAPABILITY_TOOLBAR 查表，行为按 capability 分发
+            // 0.3.0：按钮贴图取 tb.iconTexture（就近声明），iconId 只作 DOM id 用
             const tb = getCapabilityToolbar(def.capability);
             if (!tb) continue;
             const onClick = () => {
@@ -181,7 +182,7 @@ function renderToolbarIcons(mode, data) {
                     if (ship) openPage('scan', t('scan.menuTitle'), buildScanContent(ship));
                 }
             };
-            createIcon(tb.icon, t(tb.labelKey), onClick, tb.iconId, tb.iconId, CAPABILITY_PANEL[def.capability] || null);
+            createIcon(tb.icon, t(tb.labelKey), onClick, tb.iconTexture, tb.iconId, CAPABILITY_PANEL[def.capability] || null);
         }
     } else if (mode === 'facility') {
         const facility = facilitySystem.getFacility(data.facilityId);
@@ -196,12 +197,12 @@ function renderToolbarIcons(mode, data) {
             if (comp.id === 'assembly_shop') {
                 createIcon(compIcon, compName, () => {
                     window.openShipBuilder();
-                }, 'comp_' + comp.id, comp.id, 'shipBuilder');
+                }, comp.iconTexture, comp.id, 'shipBuilder');
             } else {
                 // 0.2.4 多面板并存:不再先关闭建造面板,舱室面板与建造面板可同时存在
                 createIcon(compIcon, compName, () => {
                     openCompartmentPanel(facility, comp.id);
-                }, 'comp_' + comp.id, comp.id, comp.id);
+                }, comp.iconTexture, comp.id, comp.id);
             }
         }
     }
@@ -321,13 +322,14 @@ function buildScanContent(ship) {
     }
 
     const tier = getShipScanTier(ship);
-    const bodyTexKey = body.textureKey ? body.textureKey + '_surface' : null;
+    // 0.3.0：天体贴图路径就近声明在天体配置里，直接取用（不再拼 '_surface' 约定后缀）
+    const bodyTexture = body.texture || null;
 
     // 分区一：扫描目标大卡片（左图右文，对齐参考图 IdentityCard）
     let html = '<div class="tkp-section">' + t('scan.targetSection') + '</div>'
         + '<div class="tkp-card">'
         + '<div class="tkp-card-main">'
-        + '<div class="tkp-card-icon">' + renderIconHtml(bodyTexKey, '🪐', 72) + '</div>'
+        + '<div class="tkp-card-icon">' + renderIconHtml(bodyTexture, '🪐', 72) + '</div>'
         + '<div class="tkp-card-info">'
         + '<div class="tkp-card-title">' + body.name + '</div>'
         + '<div class="tkp-sub">' + t('scan.scannerTier', { tier: tier }) + '</div>'
@@ -491,7 +493,7 @@ function buildModuleManageContent(facility, shipId) {
             const def = getModuleDef(mod.type);
             html += '<div class="tkp-slot" style="display:flex;align-items:center;justify-content:space-between;gap:6px;padding:6px 8px;">'
                 + '<span style="font-size:11px;color:var(--text-main);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'
-                + renderIconHtml(def?.iconTextureKey, def?.icon, 12) + ' ' + (def ? def.name : mod.type) + '</span>'
+                + renderIconHtml(def?.iconTexture, def?.icon, 12) + ' ' + (def ? def.name : mod.type) + '</span>'
                 + '<button data-action="uninstall-module" data-ship-id="' + shipId + '" data-mod-id="' + mod.id + '" class="tkp-btn" style="flex:none;height:20px;padding:0 8px;font-size:10px;">' + t('build.uninstall') + '</button>'
                 + '</div>';
         } else {

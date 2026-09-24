@@ -13,7 +13,7 @@
 //   · 机动视图内时间加速不受限；滚轮始终作用于相机缩放（含面板区域）
 
 import { camera, setZoomLimits, setZoom, animateCameraTo, isCameraAnimating, cancelCameraAnimation } from './camera.js';
-import { VIEW_IDS, VIEW_CONFIG } from './config/viewConfig.js';
+import { VIEW_IDS, VIEW_CONFIG } from './config/gameplay/viewConfig.js';
 import { celestialBodies, getSOIHost, getAbsolutePosition } from './physics/physics.js';
 
 // ===== 纯函数：层级数据推导（可单测） =====

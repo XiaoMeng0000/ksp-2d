@@ -1,7 +1,7 @@
 'use strict';
 
 import { eventBus, Events } from '../eventBus.js';
-import { buildAudioManifest, MUSIC_VOLUME, getSfxChannel, getStoredVolume } from './audioConfig.js';
+import { buildAudioManifest, MUSIC_VOLUME, getSfxChannel, getStoredVolume } from '../config/assets/audioConfig.js';
 
 // 音乐淡入/淡出时长（秒）
 const FADE_DURATION = 0.4;

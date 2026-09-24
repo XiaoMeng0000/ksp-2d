@@ -9,9 +9,9 @@
 //   4. 自动物流接口预留：后续在设施间自动传递资源（当前仅骨架）
 // 全局资源仅保留科技点（science）；材料套装等实体资源全部落位到设施/飞船货仓
 
-import { RESOURCE_TYPES, getResourceType } from './resourceTypes.js';
-import { getModuleDef } from '../ship/moduleTypes.js';
-import { getFacilityType } from '../facility/facilityTypes.js';
+import { RESOURCE_TYPES, getResourceType } from '../config/entities/resourceTypes.js';
+import { getModuleDef } from '../config/entities/moduleTypes.js';
+import { getFacilityType } from '../config/entities/facilityTypes.js';
 import { isBalanceEnforced } from './modeRules.js';
 
 // 可存储资源（科技点为全局资源，不入货仓/设施存储）

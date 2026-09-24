@@ -1,5 +1,18 @@
-// 纹理资源配置 — 数据驱动的纹理清单
-// key → 相对于项目根目录的图片路径
+'use strict';
+
+// 纹理资源配置 —「无主」通用 UI 图标的集中声明（0.3.0 起资产分两层）
+//
+// 分层约定（详见 src/config/assets/assetManifest.js）：
+//   1. 有实体归属的资产 → 就近声明在实体自己的配置里，本文件不再登记：
+//        · 天体表面贴图   → src/config/systems/*.js         的 texture
+//        · 飞船模块图标   → src/ship/moduleTypes.js         的 iconTexture
+//        · 飞船能力图标   → src/ship/moduleTypes.js         的 CAPABILITY_TOOLBAR.iconTexture
+//        · 设施/舱室图标  → src/facility/facilityTypes.js   的 iconTexture
+//        · 飞船船体两态图 → src/ship/shipTemplates.js       的 textures
+//   2. 无实体归属的通用 UI 图标 → 仍集中在本文件，key 为短标识
+//
+// 新增图片时先判断归属：能挂到某实体上的一律就近声明，只有纯 UI 装饰才加在这里。
+
 export const textureConfig = {
     title: 'assets/images/menu/title.png',
     menu_bg: 'assets/images/menu/background.png',
@@ -9,6 +22,8 @@ export const textureConfig = {
     link_qq: 'assets/images/menu/link_icons/icon_qq.png',
     link_email: 'assets/images/menu/link_icons/icon_email.png',
     link_github: 'assets/images/menu/link_icons/github.gif',
+
+    // 通用设施兜底图（轨道地图上无专属图时的设施绘制用）
     facility: 'assets/images/facilities/facility.png',
 
     // esc界面图标
@@ -43,46 +58,9 @@ export const textureConfig = {
     icon_tracking_all: 'assets/images/ui/tracking_station/all.svg',
     icon_tracking_ship: 'assets/images/ui/tracking_station/ship_port.svg',
 
-    // 设施舱室图标
-    comp_bridge: 'assets/images/facilities/compartments/bridge.png',
-    comp_dock_hub: 'assets/images/facilities/compartments/dock_hub.png',
-    comp_supply_terminal: 'assets/images/facilities/compartments/supply_terminal.png',
-    comp_assembly_shop: 'assets/images/facilities/compartments/assembly_shop.png',
-    comp_laboratory: 'assets/images/facilities/compartments/laboratory.png',
-
-    // 飞船能力图标
-    icon_deploy_facility: 'assets/images/ships/assembly_shop(ship).png',
-
-    // 飞船资源扫描/货运能力图标（0.2.0 阶段5：🔭/📦 的 PNG 替换，图片待美术补位）
-    icon_scan_resources: 'assets/images/ships/scanner.png',
-    icon_cargo_hold: 'assets/images/ships/cargo_hold.png',
-
-    // 飞船模块图标
-    mod_test_ballast: 'assets/images/ships/test_ballast.png',
-    mod_construction_package: 'assets/images/ships/construction_package.png',
-
-    // 飞船船体图标（飞行场景）
-    ship_default_active: 'assets/images/ships/bodies/ship_default_active.png',
-    ship_default_inactive: 'assets/images/ships/bodies/ship_default_inactive.png',
-
-    // 天体贴图
-    kerbin_surface: 'assets/images/bodies/kerbin.png',
-    kerbol_surface: 'assets/images/bodies/kerbol.png',
-    mun_surface: 'assets/images/bodies/mun.png',
-    minmus_surface: 'assets/images/bodies/minmus.png',
-    duna_surface: 'assets/images/bodies/duna.png',
-    ike_surface: 'assets/images/bodies/ike.png',
-    eve_surface: 'assets/images/bodies/eve.png',
-    gilly_surface: 'assets/images/bodies/gilly.png',
-    moho_surface: 'assets/images/bodies/moho.png',
-    dres_surface: 'assets/images/bodies/dres.png',
-    jool_surface: 'assets/images/bodies/jool.png',
-    laythe_surface: 'assets/images/bodies/laythe.png',
-    vall_surface: 'assets/images/bodies/vall.png',
-    tylo_surface: 'assets/images/bodies/tylo.png',
-    bop_surface: 'assets/images/bodies/bop.png',
-    pol_surface: 'assets/images/bodies/pol.png',
-    eeloo_surface: 'assets/images/bodies/eeloo.png',
+    // 飞船船体通用兜底图（模板未配置自有 textures 时使用，两态）
+    ship_default_active: 'assets/images/ships/hulls/ship_default_active.png',
+    ship_default_inactive: 'assets/images/ships/hulls/ship_default_inactive.png',
 
     // 时间加速 UI
     timewarp_pause: 'assets/images/ui/timewarp_pause.png',

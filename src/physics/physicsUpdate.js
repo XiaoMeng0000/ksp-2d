@@ -1,4 +1,4 @@
-"use strict";
+'use strict';
 
 import { eventBus, Events } from '../eventBus.js';
 import { getSOIHost, getAbsolutePosition, getRelativePosition, convertVelocityFrame, celestialBodies } from './physics.js';

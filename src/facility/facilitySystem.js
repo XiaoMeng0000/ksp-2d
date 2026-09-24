@@ -3,11 +3,11 @@
 // 设施系统 — 设施注册表/管理器单例
 import { gameState } from '../gameState.js';
 import { eventBus, Events } from '../eventBus.js';
-import { getFacilityType } from './facilityTypes.js';
+import { getFacilityType } from '../config/entities/facilityTypes.js';
 import { stateToKepler, keplerToState } from '../physics/orbitalMechanics.js';
 import { celestialBodies } from '../physics/physics.js';
 import { shipSystem } from '../ship/shipSystem.js';
-import { SHIP_TEMPLATES } from '../ship/shipTemplates.js';
+import { SHIP_TEMPLATES } from '../config/entities/shipTemplates.js';
 import { initFacilityStorage, consumeStorage, addStorage, refuelFromStorage } from '../resources/cargoSystem.js';
 
 class FacilitySystem {

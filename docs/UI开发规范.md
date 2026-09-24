@@ -109,7 +109,7 @@ src/
 
 ### 5. 文本外置(阶段 1.5 成果)
 
-- 所有用户可见文本 → `src/config/strings.js`,用 `t(key, params)` 引用。
+- 所有用户可见文本 → `src/config/ui/strings.js`,用 `t(key, params)` 引用。
 - key 按功能前缀分组:`common.` `esc.` `archive.` `tracking.` `facility.` `dock.` `build.` `sas.` `timewarp.` `settings.` `info.` `deploy.` `galaxies.` `newgame.` `load.` `feedback.` `save.` `atmo.` 等。
 - 动态命名文本进 `t('key', { name: xxx })` 插值;日期等复杂格式在插值函数内处理。
 - **数据配置文本**(solarSystem/moduleTypes/facilityTypes/shipTemplates/encyclopediaConfig/menuConfig 的 label)属数据层,**不迁移**。

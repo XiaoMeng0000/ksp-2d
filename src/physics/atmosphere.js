@@ -1,4 +1,4 @@
-"use strict";
+'use strict';
 
 // 环境危害检测模块 — 大气引爆 + 表面危险边界
 //
@@ -14,7 +14,7 @@
 import { eventBus, Events } from '../eventBus.js';
 import { getAbsolutePosition, celestialBodies } from './physics.js';
 import { shipSystem } from '../ship/shipSystem.js';
-import { t } from '../config/strings.js';
+import { t } from '../config/ui/strings.js';
 
 // 大气进入倒计时（秒）
 const ATMO_WARNING_TIME = 10;

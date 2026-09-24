@@ -3,7 +3,7 @@
 import { sceneManager } from '../sceneManager.js';
 import { eventBus, Events } from '../eventBus.js';
 import { textureManager } from '../graphics/textureManager.js';
-import { t } from '../config/strings.js';
+import { t } from '../config/ui/strings.js';
 
 const LOGO_SEQUENCE = [
     { type: 'image', textureKey: 'project_logo', maxWidthRatio: 0.45, fadeIn: 0.8, hold: 1.5, fadeOut: 0.8 },

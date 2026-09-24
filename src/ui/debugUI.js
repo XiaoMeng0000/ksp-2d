@@ -3,7 +3,7 @@
 import { uiManager } from './uiManager.js';
 import { eventBus, Events } from '../eventBus.js';
 import { celestialBodies } from '../physics/physics.js';
-import { t } from '../config/strings.js';
+import { t } from '../config/ui/strings.js';
 
 // 缓存最近一帧的飞船渲染数据
 let _cachedShipData = null;

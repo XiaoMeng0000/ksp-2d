@@ -8,10 +8,10 @@
 // 布局与样式：flight.css（#shipStatusPanel / .ss-*）
 
 import { eventBus, Events } from '../eventBus.js';
-import { t } from '../config/strings.js';
+import { t } from '../config/ui/strings.js';
 import { renderIconHtml } from './uiComponents.js';
 import { getTotalMass, computeDeltaV, G0 } from '../resources/resourceSystem.js';
-import { getResourceType } from '../resources/resourceTypes.js';
+import { getResourceType } from '../config/entities/resourceTypes.js';
 import { celestialBodies } from '../physics/physics.js';
 
 // DOM 写入节流间隔（ms）— 燃烧/时间加速下数字跟手即可

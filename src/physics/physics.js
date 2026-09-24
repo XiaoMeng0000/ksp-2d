@@ -5,7 +5,7 @@ import {
     computeSystemPosition,
     getDefaultSystemIds,
     validateSystemSelection
-} from '../config/starSystemIndex.js';
+} from '../config/world/starSystemIndex.js';
 import { keplerPositionAtTime } from './orbitalMechanics.js';
 
 // 天体集合:数组引用全生命周期不变,内容随激活集原地重建(所有引用方自动生效)

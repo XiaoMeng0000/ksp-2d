@@ -6,7 +6,7 @@
 import { uiManager } from './uiManager.js';
 import { createNotification, createDialog, createInputDialog, createConfirmDialog, renderIconHtml, escapeHtml } from './uiComponents.js';
 import { saveManager } from '../saveManager.js';
-import { t } from '../config/strings.js';
+import { t } from '../config/ui/strings.js';
 
 // 层级存档 - 暴露 UI 组件到全局，供 main.js 使用
 window.__createDialog = createDialog;

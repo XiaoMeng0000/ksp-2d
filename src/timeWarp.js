@@ -2,7 +2,7 @@
 
 import { sceneManager } from './sceneManager.js';
 import { eventBus, Events } from './eventBus.js';
-import { t } from './config/strings.js';
+import { t } from './config/ui/strings.js';
 
 // 时间加速档位表（索引 0 = 暂停 / 0x）
 // KSP2 原版档位 + 0x 暂停档：. 升档 / , 降档，0x 即暂停

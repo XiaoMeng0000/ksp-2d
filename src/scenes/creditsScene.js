@@ -2,8 +2,8 @@
 
 import { sceneManager } from '../sceneManager.js';
 import { textureManager } from '../graphics/textureManager.js';
-import { CREDITS } from '../config/creditsConfig.js';
-import { t } from '../config/strings.js';
+import { CREDITS } from '../config/meta/creditsConfig.js';
+import { t } from '../config/ui/strings.js';
 
 // 制作人员（0.2.7：顶部 // 标题 + 左右分割式布局；分割线仅限内容区，不覆盖装饰线/返回按钮区域）
 // 视觉走 scenes.css（#creditsPanel / .doc-* 共用类）

@@ -2,9 +2,9 @@
 
 import { textureManager } from '../graphics/textureManager.js';
 import { eventBus, Events } from '../eventBus.js';
-import { t } from '../config/strings.js';
-import { getResourceType } from '../resources/resourceTypes.js';
-import { getModuleDef, getModuleCategories, getModulesByCategory } from '../ship/moduleTypes.js';
+import { t } from '../config/ui/strings.js';
+import { getResourceType } from '../config/entities/resourceTypes.js';
+import { getModuleDef, getModuleCategories, getModulesByCategory } from '../config/entities/moduleTypes.js';
 
 export function createNotification(message, type = 'info', duration = 2000) {
     // 创建或获取通知容器
@@ -265,7 +265,8 @@ export function escapeHtml(str) {
         .replace(/'/g, '&#39;');
 }
 
-// 辅助：将 textureKey 转为 PNG <img> HTML 字符串，纹理未就绪时返回 fallback Emoji
+// 辅助：将纹理清单 key 转为 <img> HTML 字符串，纹理未就绪时返回 fallback Emoji
+// 0.3.0：key 可为「实体配置里的资产路径」（就近声明）或「通用 UI 图标短 key」
 export function renderIconHtml(textureKey, fallbackEmoji, sizePx) {
     if (!textureKey) return fallbackEmoji || '';
     const tex = textureManager.get(textureKey);
@@ -366,7 +367,7 @@ export function showModuleSelectorPopup(opts) {
         const installedRow = document.createElement('div');
         installedRow.className = 'msp-installed';
         installedRow.innerHTML = t('build.installed')
-            + '<span style="color:var(--accent);">' + renderIconHtml(installedDef.iconTextureKey, installedDef.icon) + ' ' + installedDef.name + '</span>';
+            + '<span style="color:var(--accent);">' + renderIconHtml(installedDef.iconTexture, installedDef.icon) + ' ' + installedDef.name + '</span>';
         popup.appendChild(installedRow);
     }
 
@@ -391,7 +392,7 @@ export function showModuleSelectorPopup(opts) {
             const row = document.createElement('div');
             row.className = 'msp-row';
             // 名称（左）
-            let labelHtml = '<span>' + renderIconHtml(def.iconTextureKey, def.icon) + ' ' + def.name + '</span>';
+            let labelHtml = '<span>' + renderIconHtml(def.iconTexture, def.icon) + ' ' + def.name + '</span>';
             // 行尾（右）：建造=加成+价格 / 设施=价格或免费
             if (opts.showBonuses) {
                 labelHtml += '<span class="msp-bonus">'

@@ -2,8 +2,8 @@
 
 import { sceneManager } from '../sceneManager.js';
 import { textureManager } from '../graphics/textureManager.js';
-import { LICENSE } from '../config/licenseConfig.js';
-import { t } from '../config/strings.js';
+import { LICENSE } from '../config/meta/licenseConfig.js';
+import { t } from '../config/ui/strings.js';
 
 // 版权声明（与制作人员同款：顶部 // 标题 + 左右分割式布局；分割线仅限内容区，不覆盖装饰线/返回按钮区域）
 // 视觉走 scenes.css（#licensePanel / .doc-* 共用类）

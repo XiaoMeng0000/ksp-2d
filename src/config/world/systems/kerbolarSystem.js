@@ -1,6 +1,6 @@
 "use strict";
 
-import { CelestialBody } from '../../physics/celestialBody.js';
+import { CelestialBody } from '../../../physics/celestialBody.js';
 
 // ========== Kerbolar 系(家园星系) ==========
 // 天体驱动器 6.5 步
@@ -30,7 +30,8 @@ export const bodies = [
         hasAtmosphere: true,
         color: '#ffcc44',
         position: { x: 0, y: 0 },
-        textureKey: 'kerbol'
+        textureKey: 'kerbol',
+        texture: 'assets/images/celestial/kerbolar/kerbol.png'
     }),
     new CelestialBody({
         name: 'Moho',
@@ -47,7 +48,8 @@ export const bodies = [
         orbitE: 0.2,
         orbitOmega: Math.PI / 12,  // 15°（官方近点幅角，转弧度）
         orbitTheta0: 3.14,
-        textureKey: 'moho'
+        textureKey: 'moho',
+        texture: 'assets/images/celestial/kerbolar/moho.png'
     }),
     new CelestialBody({
         name: 'Eve',
@@ -64,7 +66,8 @@ export const bodies = [
         orbitE: 0.01,
         orbitOmega: 0,
         orbitTheta0: 3.14,
-        textureKey: 'eve'
+        textureKey: 'eve',
+        texture: 'assets/images/celestial/kerbolar/eve.png'
     }),
     new CelestialBody({
         name: 'Gilly',
@@ -81,7 +84,8 @@ export const bodies = [
         orbitE: 0.55,
         orbitOmega: Math.PI / 18,  // 10°（官方近点幅角，转弧度）
         orbitTheta0: 0.9,
-        textureKey: 'gilly'
+        textureKey: 'gilly',
+        texture: 'assets/images/celestial/kerbolar/gilly.png'
     }),
     new CelestialBody({
         name: 'Kerbin',
@@ -101,7 +105,8 @@ export const bodies = [
         isHomeworld: true,
         defaultOrbitAltitude: 300000,
         presetOrbits: { low: 80000, mid: 250000, high: 600000 },
-        textureKey: 'kerbin'
+        textureKey: 'kerbin',
+        texture: 'assets/images/celestial/kerbolar/kerbin.png'
     }),
     new CelestialBody({
         name: 'Mun',
@@ -118,7 +123,8 @@ export const bodies = [
         orbitE: 0,
         orbitOmega: 0,
         orbitTheta0: 1.7,
-        textureKey: 'mun'
+        textureKey: 'mun',
+        texture: 'assets/images/celestial/kerbolar/mun.png'
     }),
     new CelestialBody({
         name: 'Minmus',
@@ -135,7 +141,8 @@ export const bodies = [
         orbitE: 0,
         orbitOmega: Math.PI * 38 / 180,  // 保留官方近点幅角数据 38°（0.2.5：单位统一为弧度，原裸度数 38 会在设 e>0 时被当作 38rad）
         orbitTheta0: 0.9,  // 官方初始平近点角
-        textureKey: 'minmus'
+        textureKey: 'minmus',
+        texture: 'assets/images/celestial/kerbolar/minmus.png'
     }),
     new CelestialBody({
         name: 'Duna',
@@ -152,7 +159,8 @@ export const bodies = [
         orbitE: 0.051,
         orbitOmega: 0,
         orbitTheta0: 3.14,
-        textureKey: 'duna'
+        textureKey: 'duna',
+        texture: 'assets/images/celestial/kerbolar/duna.png'
     }),
     new CelestialBody({
         name: 'Ike',
@@ -169,7 +177,8 @@ export const bodies = [
         orbitE: 0.03,
         orbitOmega: 0,
         orbitTheta0: 1.7,
-        textureKey: 'ike'
+        textureKey: 'ike',
+        texture: 'assets/images/celestial/kerbolar/ike.png'
     }),
     new CelestialBody({
         name: 'Dres',
@@ -186,7 +195,8 @@ export const bodies = [
         orbitE: 0.145,
         orbitOmega: Math.PI / 2,  // 90°（官方近点幅角，转弧度）
         orbitTheta0: 3.14,
-        textureKey: 'dres'
+        textureKey: 'dres',
+        texture: 'assets/images/celestial/kerbolar/dres.png'
     }),
     new CelestialBody({
         name: 'Jool',
@@ -203,7 +213,8 @@ export const bodies = [
         orbitE: 0.05,
         orbitOmega: 0,
         orbitTheta0: 0.1,
-        textureKey: 'jool'
+        textureKey: 'jool',
+        texture: 'assets/images/celestial/kerbolar/jool.png'
     }),
     new CelestialBody({
         name: 'Laythe',
@@ -220,7 +231,8 @@ export const bodies = [
         orbitE: 0,
         orbitOmega: 0,
         orbitTheta0: 0.9,
-        textureKey: 'laythe'
+        textureKey: 'laythe',
+        texture: 'assets/images/celestial/kerbolar/laythe.png'
     }),
     new CelestialBody({
         name: 'Vall',
@@ -237,7 +249,8 @@ export const bodies = [
         orbitE: 0,
         orbitOmega: 0,
         orbitTheta0: 0.9,
-        textureKey: 'vall'
+        textureKey: 'vall',
+        texture: 'assets/images/celestial/kerbolar/vall.png'
     }),
     new CelestialBody({
         name: 'Tylo',
@@ -254,7 +267,8 @@ export const bodies = [
         orbitE: 0,
         orbitOmega: 0,
         orbitTheta0: 0.9,
-        textureKey: 'tylo'
+        textureKey: 'tylo',
+        texture: 'assets/images/celestial/kerbolar/tylo.png'
     }),
     new CelestialBody({
         name: 'Bop',
@@ -271,7 +285,8 @@ export const bodies = [
         orbitE: 0.235,
         orbitOmega: Math.PI * 25 / 180,  // 25°（官方近点幅角，转弧度）
         orbitTheta0: 0.9,
-        textureKey: 'bop'
+        textureKey: 'bop',
+        texture: 'assets/images/celestial/kerbolar/bop.png'
     }),
     new CelestialBody({
         name: 'Pol',
@@ -288,7 +303,8 @@ export const bodies = [
         orbitE: 0.171,
         orbitOmega: Math.PI * 15 / 180,  // 15°（官方近点幅角，转弧度）
         orbitTheta0: 0.9,
-        textureKey: 'pol'
+        textureKey: 'pol',
+        texture: 'assets/images/celestial/kerbolar/pol.png'
     }),
     new CelestialBody({
         name: 'Eeloo',
@@ -305,6 +321,7 @@ export const bodies = [
         orbitE: 0.26,
         orbitOmega: Math.PI * 260 / 180,  // 260°（官方近点幅角，转弧度）
         orbitTheta0: 3.14,
-        textureKey: 'eeloo'
+        textureKey: 'eeloo',
+        texture: 'assets/images/celestial/kerbolar/eeloo.png'
     })
 ];

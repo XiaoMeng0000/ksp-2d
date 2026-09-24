@@ -1,14 +1,14 @@
 'use strict';
 
 import { uiManager } from './uiManager.js';
-import { t } from '../config/strings.js';
+import { t } from '../config/ui/strings.js';
 import { createInfoDialog } from './uiComponents.js';
 import {
     starSystemRegistry,
     isHomeworldSystem,
     validateSystemSelection,
     getDefaultSystemIds
-} from '../config/starSystemIndex.js';
+} from '../config/world/starSystemIndex.js';
 
 // 星系选择面板 — 0.2.5 新增
 // 从"创建新战役"对话框的「星系配置」行点开,以覆盖层形式展示:

@@ -1,4 +1,4 @@
-"use strict";
+'use strict';
 
 // 时间加速 UI — KSP2 风格时间加速面板（常驻 HUD，事件驱动、无轮询）
 // 结构：单一面板 = 顶栏状态条(点击切换暂停/恢复) / 主内容行(UT+档位条) / 底栏倍率
@@ -11,7 +11,7 @@ import { sceneManager } from '../sceneManager.js';
 import { eventBus, Events } from '../eventBus.js';
 import { timeWarp, PANEL_RATES } from '../timeWarp.js';
 import { textureManager } from '../graphics/textureManager.js';
-import { t } from '../config/strings.js';
+import { t } from '../config/ui/strings.js';
 import { showTooltip, hideTooltip } from './uiTooltip.js';
 
 // 为元素绑定统一悬停提示（进入时触发一次，延迟显示、位置固定）

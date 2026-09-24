@@ -15,7 +15,7 @@
 //   · 节点数量不设上限；跟踪态不入存档（读档进度归零，与单节点时代一致）
 
 import { eventBus, Events } from '../eventBus.js';
-import { MANEUVER_CONFIG } from '../config/maneuverConfig.js';
+import { MANEUVER_CONFIG } from '../config/gameplay/maneuverConfig.js';
 import { getCachedTime } from '../physics/orbitalPrediction.js';
 import { computeNodeAxes, syncComponentsFromDeltaV, rebuildDeltaVFromComponents, propagateNodeSnapshot } from '../physics/maneuverPrediction.js';
 import { getTotalMass, getFuelAmount } from '../resources/resourceSystem.js';

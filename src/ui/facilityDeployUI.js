@@ -2,11 +2,11 @@
 
 import { uiManager } from './uiManager.js';
 import { eventBus, Events } from '../eventBus.js';
-import { getFacilityType, getFacilityCompartments, getFacilityCategories, getFacilitiesByCategory, getServiceName } from '../facility/facilityTypes.js';
+import { getFacilityType, getFacilityCompartments, getFacilityCategories, getFacilitiesByCategory, getServiceName } from '../config/entities/facilityTypes.js';
 import { textureManager } from '../graphics/textureManager.js';
 import { renderIconHtml } from './uiComponents.js';
 import { makePanelDraggable, cascadePanelOpen } from './panelDrag.js';
-import { t } from '../config/strings.js';
+import { t } from '../config/ui/strings.js';
 
 // 设施部署面板 — 设施类型选择面板
 const facilityDeployPanel = document.createElement('div');
@@ -67,7 +67,7 @@ function renderFacilityDeployCategories() {
                     ${facilities.length === 0 ? '<div style="padding:6px 10px;color:var(--text-dim);font-size:11px;">' + t('facility.noFacilities') + '</div>' :
                         facilities.map(fac => `
                             <button class="deploy-facility-btn" data-action="select-facility"
-                                data-facility-id="${fac.id}">${renderIconHtml(fac.iconTextureKey, fac.icon)} ${fac.name}</button>
+                                data-facility-id="${fac.id}">${renderIconHtml(fac.iconTexture, fac.icon)} ${fac.name}</button>
                         `).join('')}
                 </div>
             </div>
@@ -111,7 +111,7 @@ function renderFacilityDeployDetail(type) {
 
     const compartments = getFacilityCompartments(type.id);
     const compartmentsHtml = compartments.length > 0
-        ? compartments.map(c => `<span class="deploy-chip">${renderIconHtml('comp_' + c.id, c.icon)} ${c.name}</span>`).join('')
+        ? compartments.map(c => `<span class="deploy-chip">${renderIconHtml(c.iconTexture, c.icon)} ${c.name}</span>`).join('')
         : '';
 
     const servicesHtml = type.services.length > 0
@@ -120,7 +120,7 @@ function renderFacilityDeployDetail(type) {
 
     detailEl.innerHTML = `
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-            ${renderIconHtml(type.iconTextureKey, type.icon, 32)}
+            ${renderIconHtml(type.iconTexture, type.icon, 32)}
             <div>
                 <div style="color:var(--accent);font-size:13px;font-weight:bold;">${type.name}</div>
                 <div style="color:#${type.color.slice(1)};font-size:11px;">

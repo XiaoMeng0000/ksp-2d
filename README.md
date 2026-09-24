@@ -104,8 +104,8 @@ node server.js
 | 状态 | `GameState` 单例，所有模块读写的统一入口 |
 | 通信 | `EventBus` 发布 / 订阅，模块之间不直接互相调用 |
 | 物理 | 轨道段开普勒解析解（`r = p / (1 + e·cosθ)` 焦点极坐标方程）+ 推力段 RK4 数值积分 |
-| 数据 | 所有配置集中在 `src/config/`；天体数据在 `src/config/systems/*.js` |
-| 文本 | 所有用户可见文本走 `src/config/strings.js` 的 `t()`，不硬编码在业务模块 |
+| 数据 | 所有配置按域集中在 `src/config/`（world / entities / gameplay / ui / assets / meta）；天体数据在 `src/config/world/systems/*.js` |
+| 文本 | 所有用户可见文本走 `src/config/ui/strings.js` 的 `t()`，不硬编码在业务模块 |
 
 ---
 
@@ -169,7 +169,7 @@ ksp-2d/
 
 - 最新发布版：**v0.2.4**（[Releases](https://github.com/XiaoMeng0000/ksp-2d/releases)）
 - 开发中：0.2.5 机动节点系统与轨道机动视图的持续打磨
-- 游戏内「额外内容 → 游戏公告」记录每个版本的完整变更，源码位于 `src/config/announcementConfig.js`
+- 游戏内「额外内容 → 游戏公告」记录每个版本的完整变更，源码位于 `src/config/ui/announcementConfig.js`
 
 <!-- TODO: 路线图待补。建议列 3~5 条近期计划（如科研站实验室蓝图研究、更多星系、生涯经济平衡） -->
 
@@ -183,7 +183,7 @@ ksp-2d/
   各自版权方所有。
 - 本项目仅用于学习、交流与技术研究，**不以任何形式用于商业用途**。
 - 除上述第三方资源外，本项目的原创代码与原创美术由【逃逸速度】开发组保留权利。
-- 完整声明见游戏内「额外内容 → 版权声明」，对应源码 `src/config/licenseConfig.js`。
+- 完整声明见游戏内「额外内容 → 版权声明」，对应源码 `src/config/meta/licenseConfig.js`。
 
 **联系方式**
 

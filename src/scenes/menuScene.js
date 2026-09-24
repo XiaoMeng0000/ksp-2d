@@ -4,9 +4,9 @@ import { sceneManager } from '../sceneManager.js';
 import { textureManager } from '../graphics/textureManager.js';
 import { eventBus, Events } from '../eventBus.js';
 import { renderableManager } from '../graphics/renderable.js';
-import { MENUS } from '../config/menuConfig.js';
-import { LINKS_ICONS } from '../config/menuConfig.js'; // 1. 导入数据
-import { VERSION_TEXT } from '../config/version.js';
+import { MENUS } from '../config/ui/menuConfig.js';
+import { LINKS_ICONS } from '../config/ui/menuConfig.js'; // 1. 导入数据
+import { VERSION_TEXT } from '../config/meta/version.js';
 
 // 主菜单 — DOM 版（阶段 3：Canvas→DOM）
 // - 数据驱动：menuConfig.js 的 MENUS 定义各菜单按钮（label/action）

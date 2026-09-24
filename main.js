@@ -1,6 +1,6 @@
 // GameState 加载
 import { gameState } from './src/gameState.js';
-import { t } from './src/config/strings.js';
+import { t } from './src/config/ui/strings.js';
 
 // SaveManager - 加载存档管理器
 import './src/saveManager.js';
@@ -47,7 +47,7 @@ import { registerBodyRenderables } from './src/graphics/bodyRenderables.js';
 import { initCamera } from './src/camera.js';
 import { createStars } from './src/renderer.js';
 import { updateCelestialBodies, celestialBodies, setActiveSystems } from './src/physics/physics.js';
-import { getDefaultSystemIds, validateSystemSelection } from './src/config/starSystemIndex.js';
+import { getDefaultSystemIds, validateSystemSelection } from './src/config/world/starSystemIndex.js';
 import { stateToKepler } from './src/physics/orbitalMechanics.js';
 import { eventBus, Events } from './src/eventBus.js';
 import { registerFlightScene } from './src/scenes/flightScene.js';
@@ -185,9 +185,10 @@ if (textureManager.isReady() && audioCore.isReady() && fontManager.isReady()) {
     loadingScreen.style.display = 'flex';
 
     // === 纹理加载进度与完成 ===
-    const onTextureProgress = ({ key, loaded, total, success }) => {
+    const onTextureProgress = ({ key, name, loaded, total, success }) => {
         const line = document.createElement('div');
-        line.textContent = (success ? '[OK] ' : '[FAIL] ') + key + '.png';
+        // name 为展示用短名（路径类资产只显示文件名，SVG/GIF 也不会被误标成 .png）
+        line.textContent = (success ? '[OK] ' : '[FAIL] ') + (name || key);
         line.className = success ? 'loading-log-ok' : 'loading-log-fail';
         loadingLogContent.appendChild(line);
 

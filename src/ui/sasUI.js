@@ -8,7 +8,7 @@
 
 import { eventBus, Events } from '../eventBus.js';
 import { textureManager } from '../graphics/textureManager.js';
-import { t } from '../config/strings.js';
+import { t } from '../config/ui/strings.js';
 import { showTooltip, hideTooltip } from './uiTooltip.js';
 
 // EventBus — 缓存最近一帧飞船渲染数据（导航球姿态/方向，同 flightUI 模式）

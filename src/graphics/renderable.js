@@ -34,8 +34,8 @@ class RenderableManager {
     // });
     // renderableManager.register('kerbin', {
     //     layers: [
-    //         { texture: 'kerbin_surface' },
-    //         { texture: 'kerbin_clouds', alpha: 0.4, uvSpeed: { x: 0.02, y: 0 } }
+    //         { texture: 'assets/images/celestial/kerbolar/kerbin.png' },
+    //         { texture: 'assets/images/celestial/kerbolar/kerbin_clouds.png', alpha: 0.4, uvSpeed: { x: 0.02, y: 0 } }
     //     ]
     // });
     register(key, config) {

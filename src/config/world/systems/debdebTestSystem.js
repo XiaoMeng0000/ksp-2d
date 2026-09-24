@@ -1,6 +1,6 @@
 "use strict";
 
-import { CelestialBody } from '../../physics/celestialBody.js';
+import { CelestialBody } from '../../../physics/celestialBody.js';
 
 // ========== Debdeb (test) 星系(实体测试星系) ==========
 // 用途:验证跨星系航行、星系加载、SOI 重叠拒绝

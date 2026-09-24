@@ -1,3 +1,5 @@
+'use strict';
+
 const PHYSICAL_TO_DISPLAY_SCALE = 1;
 
 export class CelestialBody {
@@ -27,7 +29,10 @@ export class CelestialBody {
             radius = 0,
             atmosphereHeight = 0,
             hasAtmosphere = false,
-            textureKey = null
+            // 渲染查找键（renderableManager 的注册键，允许自定义，如测试星系的 'testbolar_star'）
+            textureKey = null,
+            // 0.3.0：天体表面贴图路径（就地声明在天体配置里；null = 无贴图，走代表色纯色兜底）
+            texture = null
         } = options;
 
         this.name = name;
@@ -56,6 +61,8 @@ export class CelestialBody {
         this.atmosphereHeight = atmosphereHeight;
         this.hasAtmosphere = hasAtmosphere;
         this.textureKey = textureKey || name.toLowerCase();
+        // 0.3.0：注意必须显式透传 —— 切换星系时天体经 structuredClone 克隆，只保留自有属性
+        this.texture = texture;
 
         // 天体在星系参考系中的绝对速度
         this.velocity = { x: 0, y: 0 };

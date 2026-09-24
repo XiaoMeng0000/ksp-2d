@@ -1,8 +1,8 @@
 'use strict';
 
 import { uiManager } from './uiManager.js';
-import { ANNOUNCEMENTS } from '../config/announcementConfig.js';
-import { t } from '../config/strings.js';
+import { ANNOUNCEMENTS } from '../config/ui/announcementConfig.js';
+import { t } from '../config/ui/strings.js';
 
 // 游戏公告（0.2.8 面板化：由 scene 改为 uiManager 覆盖式面板，参照百科面板化先例）
 // - 视觉复用 ksp2_panels.css 的 .enc-*（#infoScenePanel 选择器即公告面板，保留原 id）

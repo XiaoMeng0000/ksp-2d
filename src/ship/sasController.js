@@ -5,7 +5,7 @@
 //   3. 双死区：角度与角速度都小 → 停止输出；角度已到位但仍有角速度 → 持续刹车
 
 import { SASMode, computeTargetHeading } from './sasModes.js';
-import { SAS_CONTROL } from '../config/sasConfig.js';
+import { SAS_CONTROL } from '../config/gameplay/sasConfig.js';
 
 // 控制器参数（统一从配置文件读取，避免硬编码）
 const MAX_ANG_VEL = SAS_CONTROL.maxAngularVelocity;        // 绝对角速度上限（rad/s，约 115°/s）

@@ -4,16 +4,17 @@ import { predictTrajectoryPatched, predictTrajectoryBurned, bodyFuturePos, getCa
 import { getOrbitalInfo, stateToKepler, findSOIExitTime, timeToHyperPeriapsis } from './physics/orbitalMechanics.js';
 import { predictManeuverTrajectories, walkToTime, computeNodeAxes, syncComponentsFromDeltaV, rebuildDeltaVFromComponents } from './physics/maneuverPrediction.js';
 import { getTotalMass, getFuelAmount } from './resources/resourceSystem.js';
-import { MANEUVER_CONFIG } from './config/maneuverConfig.js';
-import { getFacilityType } from './facility/facilityTypes.js';
+import { MANEUVER_CONFIG } from './config/gameplay/maneuverConfig.js';
+import { getFacilityType } from './config/entities/facilityTypes.js';
+import { getShipBodyTexture } from './config/entities/shipTemplates.js';
 import { renderableManager } from './graphics/renderable.js';
 import { textureManager } from './graphics/textureManager.js';
 import { drawStarGlow, drawStarBall, drawPlanetRing } from './graphics/programEffects.js';
-import { STARFIELD_CONFIG } from './config/starfieldConfig.js';
+import { STARFIELD_CONFIG } from './config/gameplay/starfieldConfig.js';
 import { maneuverSystem } from './ship/maneuverSystem.js';
 import { flightView } from './flightView.js';
-import { t } from './config/strings.js';
-import { ORBIT_POINT_TYPES, ORBIT_MARKER_COLOR } from './config/orbitPointTypes.js';
+import { t } from './config/ui/strings.js';
+import { ORBIT_POINT_TYPES, ORBIT_MARKER_COLOR } from './config/gameplay/orbitPointTypes.js';
 import { syncOrbitLabels } from './ui/orbitLabels.js';
 import { formatDuration } from './utils/format.js';
 
@@ -477,9 +478,9 @@ function render(ctx, canvas, activeShip, options = {}) {
         ctx.translate(shipScreen.x, shipScreen.y);
         ctx.rotate(s.heading || 0);
 
-        // 船体图标：优先使用模板指定的纹理，否则用默认图
-        const shipTexKey = s.iconTextureKey || (isActive ? 'ship_default_active' : 'ship_default_inactive');
-        const shipTex = textureManager.get(shipTexKey);
+        // 船体图标：优先按模板解析自有两态图，否则用通用兜底图（0.3.0 就近声明 + 实时解析）
+        const shipTex = textureManager.get(getShipBodyTexture(s.templateId, isActive))
+            || textureManager.get(isActive ? 'ship_default_active' : 'ship_default_inactive');
         if (shipTex) {
             const halfSize = isActive ? Math.max(14, 16 * camera.zoom) : Math.max(4, 8 * camera.zoom);
             ctx.drawImage(shipTex, -halfSize, -halfSize, halfSize * 2, halfSize * 2);

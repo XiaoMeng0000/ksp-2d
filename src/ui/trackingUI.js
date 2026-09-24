@@ -1,19 +1,20 @@
-'use strict'
+'use strict';
 
 import { eventBus, Events } from '../eventBus.js';
 import { gameState } from '../gameState.js';
-import { getModuleDef } from '../ship/moduleTypes.js';
+import { getModuleDef } from '../config/entities/moduleTypes.js';
 import { renderIconHtml } from './uiComponents.js';
-import { getFacilityType } from '../facility/facilityTypes.js';
+import { getFacilityType } from '../config/entities/facilityTypes.js';
 import { facilitySystem } from '../facility/facilitySystem.js';
 import { sceneManager } from '../sceneManager.js';
 import { computeDeltaV, getTotalMass } from '../resources/resourceSystem.js';
 import { getVisibleBodyResources } from '../resources/scanSystem.js';
-import { getResourceType } from '../resources/resourceTypes.js';
+import { getResourceType } from '../config/entities/resourceTypes.js';
 import { isScansEnabled } from '../resources/modeRules.js';
-import { t } from '../config/strings.js';
+import { t } from '../config/ui/strings.js';
 import { celestialBodies } from '../physics/physics.js';
-import { ENCYCLOPEDIA } from '../config/encyclopediaConfig.js';
+import { ENCYCLOPEDIA } from '../config/ui/encyclopediaConfig.js';
+import { getTexturePath } from '../config/assets/assetManifest.js';
 import { focusTrackingNode, setTrackingNavTab } from '../scenes/trackingScene.js';
 import { formatGameTime } from '../utils/format.js';
 
@@ -189,7 +190,7 @@ function renderShipSections(node) {
         for (const [typeId, count] of Object.entries(counts)) {
             const def = getModuleDef(typeId);
             if (def) {
-                moduleHtml += `<div class="tracking-module-row">${renderIconHtml(def.iconTextureKey, def.icon)} ${def.name} ×${count}</div>`;
+                moduleHtml += `<div class="tracking-module-row">${renderIconHtml(def.iconTexture, def.icon)} ${def.name} ×${count}</div>`;
             }
         }
     }
@@ -423,10 +424,9 @@ window.hideTrackingInfo = function(opts = {}) {
 const trackingNav = document.createElement('div');
 trackingNav.id = 'trackingNav';
 
-// 从纹理管理器获取图标路径（确保纹理已加载，或使用后备路径）
-const textureMgr = window.__textureManager;
-const allIconSrc = textureMgr?.get('icon_tracking_all')?.src || 'assets/images/ui/tracking_station/all.svg';
-const vesselIconSrc = textureMgr?.get('icon_tracking_ship')?.src || 'assets/images/ui/tracking_station/ship_port.svg';
+// 图标路径统一从资产清单取（0.3.0：消除硬编码路径，也不再依赖纹理加载时机）
+const allIconSrc = getTexturePath('icon_tracking_all');
+const vesselIconSrc = getTexturePath('icon_tracking_ship');
 
 trackingNav.innerHTML = `
     <div class="tracking-nav-title">${t('tracking.stationName')}</div>

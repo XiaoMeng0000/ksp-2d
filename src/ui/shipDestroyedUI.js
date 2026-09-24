@@ -7,7 +7,7 @@
 import { eventBus, Events } from '../eventBus.js';
 import { sceneManager } from '../sceneManager.js';
 import { timeWarp } from '../timeWarp.js';
-import { t } from '../config/strings.js';
+import { t } from '../config/ui/strings.js';
 
 // 最近一次游戏时间缓存（CELESTIAL_TIME_UPDATED 广播，供损毁报告展示）
 let _lastGameTime = 0;

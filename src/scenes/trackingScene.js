@@ -1,7 +1,8 @@
 import { sceneManager } from '../sceneManager.js';
 import { shipSystem } from '../ship/shipSystem.js';
 import { facilitySystem } from '../facility/facilitySystem.js';
-import { getFacilityType } from '../facility/facilityTypes.js';
+import { getFacilityType } from '../config/entities/facilityTypes.js';
+import { getShipBodyTexture } from '../config/entities/shipTemplates.js';
 import { camera } from '../camera.js';
 import { updateShipPhysics } from '../physics/physicsUpdate.js';
 import { updateCelestialBodies, getAbsolutePosition, celestialBodies } from '../physics/physics.js';
@@ -10,8 +11,8 @@ import { render } from '../renderer.js';
 import { eventBus, Events } from '../eventBus.js';
 import { gameState } from '../gameState.js';
 import { timeWarp } from '../timeWarp.js';
-import { getSOIWarpProtectEnabled } from '../config/settingsConfig.js';
-import { t } from '../config/strings.js';
+import { getSOIWarpProtectEnabled } from '../config/gameplay/settingsConfig.js';
+import { t } from '../config/ui/strings.js';
 import { renderIconHtml } from '../ui/uiComponents.js';
 import { clearOrbitLabels } from '../ui/orbitLabels.js';
 
@@ -39,7 +40,8 @@ function buildShipNode(ship) {
         children: [],
         id: ship.id,
         soiName: ship.currentSOI || t('tracking.deepSpace'),
-        iconTextureKey: ship.iconTextureKey || 'ship_default_active',
+        // 0.3.0：船体图按模板实时解析（受控态），未配置则用通用兜底图
+        iconTexture: getShipBodyTexture(ship.templateId, true) || 'ship_default_active',
         // 追踪站摧毁 — 统一 delete 接口，未来设施节点也会有此接口
         delete: () => shipSystem.deleteShip(ship.id)
     };
@@ -57,7 +59,7 @@ function buildFacilityNode(f) {
         usedDocks: f.usedDocks,
         maxDocks: f.maxDocks,
         soiName: f.hostSOI || t('tracking.deepSpace'),
-        iconTextureKey: typeCfg ? typeCfg.iconTextureKey : null,
+        iconTexture: typeCfg ? typeCfg.iconTexture : null,
         delete: () => facilitySystem.deleteFacility(f.id)
     };
 }
@@ -208,7 +210,7 @@ export function renderTrackingNav(tree) {
 
         const main = document.createElement('div');
         main.className = 'tracking-node-main';
-        main.innerHTML = `${renderIconHtml(node.iconTextureKey, '◈', 14)}<span>${node.name}</span>`;
+        main.innerHTML = `${renderIconHtml(node.iconTexture, '◈', 14)}<span>${node.name}</span>`;
         div.appendChild(main);
 
         const sub = document.createElement('div');

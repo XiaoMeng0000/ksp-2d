@@ -1,4 +1,12 @@
 // 飞船系统 - 飞船模板配置
+//
+// textures（可选，0.3.0）：船体图两态，资产就近声明在模板里，缺省则用通用兜底图
+// （textureConfig 的 ship_default_active / ship_default_inactive）
+//   textures: {
+//       active:   'assets/images/ships/hulls/xxx_active.png',    // 受控飞船
+//       inactive: 'assets/images/ships/hulls/xxx_inactive.png'   // 非受控飞船
+//   }
+// 只声明单态时另一态复用同一张（见 getShipBodyTexture）。
 import { SHIP_CATEGORIES } from './shipCategories.js';
 
 export const SHIP_TEMPLATES = [
@@ -81,3 +89,16 @@ export const SHIP_TEMPLATES = [
     // { id: 'daedalus', name: '代达罗斯级', category: 'interplanetary', momentOfInertia: 10.0, reactionWheelTorque: 20.0, ... },
     // { id: 'hermes', name: '赫尔墨斯号', category: 'interplanetary', momentOfInertia: 10.0, reactionWheelTorque: 20.0, ... },
 ];
+
+// 取飞船模板的船体图路径（0.3.0：按 templateId 实时解析，不随建船快照，老存档飞船同样生效）
+// isActive: 是否受控（决定取 active / inactive 态）
+// 返回 null 表示模板未配置自有船体图，调用方回退通用兜底图
+export function getShipBodyTexture(templateId, isActive) {
+    const template = SHIP_TEMPLATES.find(t => t.id === templateId);
+    const textures = template && template.textures;
+    if (!textures) return null;
+    return (isActive ? textures.active : textures.inactive)
+        || textures.active
+        || textures.inactive
+        || null;
+}

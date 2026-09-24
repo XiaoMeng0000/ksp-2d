@@ -9,7 +9,7 @@
 // 本版功能占位：点击项弹"未完成"通知。后续：机动计划 / 时间加速至目标点 / 快进。
 // 显示优先级：#orbitLabels(500) < 锚点层(945) < 面板(950)——菜单显示在标签之上。
 
-import { t } from '../config/strings.js';
+import { t } from '../config/ui/strings.js';
 import { eventBus, Events } from '../eventBus.js';
 import { getCachedTime, bodyFuturePos } from '../physics/orbitalPrediction.js';
 import { celestialBodies } from '../physics/physics.js';
