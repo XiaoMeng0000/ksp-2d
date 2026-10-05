@@ -1,4 +1,5 @@
-// TEMP: 0.2.5 T1/T4 集成回归测试(node --input-type=module tools/tests/test_025_regression.mjs)
+// 0.2.5 T1/T4 集成回归测试（设施建造 / 起飞 / 存档读档通道）
+// 用法: node tools/tests/test_025_regression.mjs
 import { gameState } from '../../src/gameState.js';
 import { shipSystem } from '../../src/ship/shipSystem.js';
 import { facilitySystem } from '../../src/facility/facilitySystem.js';

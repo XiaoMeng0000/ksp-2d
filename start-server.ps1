@@ -10,7 +10,7 @@ while ($listener.IsListening) {
     
     $localPath = $request.Url.LocalPath
     if ($localPath -eq '/') { $localPath = '/index.html' }
-    $filePath = Join-Path 'D:\ksp—2d' $localPath.TrimStart('/')
+    $filePath = Join-Path $PSScriptRoot $localPath.TrimStart('/')
     
     if (Test-Path $filePath -PathType Leaf) {
         $content = [System.IO.File]::ReadAllBytes($filePath)

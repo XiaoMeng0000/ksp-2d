@@ -1,6 +1,6 @@
 // 多节点（0.2.6 二期）常规验证：链式规划 / 前序编辑重投影 / 链式质量 / 跟踪隔离 /
 // 乱序创建 / 按 id 删除 / 缓存零重算 / 旧存档兼容
-// 用法: node test_maneuver_multi.mjs
+// 用法: node tools/tests/test_maneuver_multi.mjs
 globalThis.window = globalThis.window || {};
 const noop = () => {};
 globalThis.window.addEventListener = noop;
@@ -34,11 +34,11 @@ globalThis.document = {
 };
 globalThis.localStorage = { getItem: () => null, setItem: noop };
 
-const { celestialBodies, updateCelestialBodies } = await import('./src/physics/physics.js');
-const { stateToKepler } = await import('./src/physics/orbitalMechanics.js');
-const { camera } = await import('./src/camera.js');
-const { render, getLastManeuverNodes, getNextPendingManeuverPrediction, getManeuverSelectedId, getLastOrbitSegments } = await import('./src/renderer.js');
-const { maneuverSystem } = await import('./src/ship/maneuverSystem.js');
+const { celestialBodies, updateCelestialBodies } = await import('../../src/physics/physics.js');
+const { stateToKepler } = await import('../../src/physics/orbitalMechanics.js');
+const { camera } = await import('../../src/camera.js');
+const { render, getLastManeuverNodes, getNextPendingManeuverPrediction, getManeuverSelectedId, getLastOrbitSegments } = await import('../../src/renderer.js');
+const { maneuverSystem } = await import('../../src/ship/maneuverSystem.js');
 
 updateCelestialBodies(0);
 const kerbin = celestialBodies.find(b => b.name === 'Kerbin');
@@ -211,9 +211,9 @@ check('M11 次帧零重投影（全部节点版本号不变，缓存命中）',
 // ===== M12 严格线性链（0.2.6 总监定稿）：创建门禁只认链尾 + 链序 = 时间序 =====
 {
     const { readFileSync } = await import('node:fs');
-    const panelSrc = readFileSync('src/ui/maneuverViewPanel.js', 'utf8');
-    const sceneSrc = readFileSync('src/scenes/flightScene.js', 'utf8');
-    const menuSrc = readFileSync('src/ui/orbitContextMenu.js', 'utf8');
+    const panelSrc = readFileSync(new URL('../../src/ui/maneuverViewPanel.js', import.meta.url), 'utf8');
+    const sceneSrc = readFileSync(new URL('../../src/scenes/flightScene.js', import.meta.url), 'utf8');
+    const menuSrc = readFileSync(new URL('../../src/ui/orbitContextMenu.js', import.meta.url), 'utf8');
 
     check('M12 面板提供链尾查询（tipChain）', /function tipChain\(\)/.test(panelSrc));
     check('M12 面板"建点/悬停"只用链尾链',
@@ -238,7 +238,7 @@ check('M11 次帧零重投影（全部节点版本号不变，缓存命中）',
     const tipSegs = chain1[chain1.length - 1].segments;
     check('M12 链尾链可用于继续建点', !!(tipSegs && tipSegs.length));
     // 在链尾链上取一个状态点建第二个节点（模拟放大图/主视图的建点路径）
-    const st = await import('./src/physics/maneuverPrediction.js').then(m => m.walkToTime(tipSegs, 100 + 300));
+    const st = await import('../../src/physics/maneuverPrediction.js').then(m => m.walkToTime(tipSegs, 100 + 300));
     check('M12 链尾链上可取到状态（链式快照来源）', !!(st && st.relPos && st.relVel));
     const b = maneuverSystem.createNode(shipL, {
         time: 100 + 300, relX: st.relPos.x, relY: st.relPos.y,
@@ -254,7 +254,7 @@ check('M11 次帧零重投影（全部节点版本号不变，缓存命中）',
 // ===== M13 回归护栏：点击处理器不得引用 update() 闭包的变量（曾因此导致左键点轨道打不开菜单）=====
 {
     const { readFileSync } = await import('node:fs');
-    const sceneSrc = readFileSync('src/scenes/flightScene.js', 'utf8');
+    const sceneSrc = readFileSync(new URL('../../src/scenes/flightScene.js', import.meta.url), 'utf8');
     const i = sceneSrc.indexOf('const onClick = (e)');
     const j = sceneSrc.indexOf("_canvas.addEventListener('click'", i);
     const body = (i >= 0 && j > i) ? sceneSrc.slice(i, j) : '';
@@ -271,7 +271,7 @@ check('M11 次帧零重投影（全部节点版本号不变，缓存命中）',
 // ===== M14 回归护栏：非首节点可拖动（曾因"只查当前轨道链"导致除首节点外都拖不动）=====
 {
     const { readFileSync } = await import('node:fs');
-    const uiSrc = readFileSync('src/ui/maneuverUI.js', 'utf8');
+    const uiSrc = readFileSync(new URL('../../src/ui/maneuverUI.js', import.meta.url), 'utf8');
     check('M14 主视图拖拽按"该节点所属链"解析', /function chainForNode\(nodeId\)/.test(uiSrc)
         && /const chain = chainForNode\(nodeId\);/.test(uiSrc));
     check('M14 主视图不再依赖 resolveOrbitHit（它只认当前轨道链）',
@@ -289,7 +289,7 @@ check('M11 次帧零重投影（全部节点版本号不变，缓存命中）',
     frame(shipD);
     const ch = getLastManeuverNodes();
     const tip = ch[ch.length - 1].segments;
-    const { walkToTime: walk, computeNodeAxes: axesOf } = await import('./src/physics/maneuverPrediction.js');
+    const { walkToTime: walk, computeNodeAxes: axesOf } = await import('../../src/physics/maneuverPrediction.js');
     const st = walk(tip, 150 + 400);
     const d2 = maneuverSystem.createNode(shipD, { time: 150 + 400, relX: st.relPos.x, relY: st.relPos.y, anchorBody: st.host.name, velRel: st.relVel });
     frame(shipD);

@@ -193,7 +193,7 @@ ksp-2d/
 
 ---
 
-## 开发者备注（临时）
+## 开发者备注
 
 `tools/` 下是开发过程中用于物理精度、渲染性能、UI 面板状态与存档规则验证的独立 Node 脚本，
 不属于游戏运行时，可按需单独执行（脚本内部按自身位置解析路径，从任意工作目录运行均可）。
@@ -201,7 +201,7 @@ ksp-2d/
 | 目录 | 内容 | 运行示例 |
 |------|------|----------|
 | `tools/bench/` | 渲染 / 虚线 / 机动节点的逐帧开销基准 | `node tools/bench/bench_render_cost.mjs` |
-| `tools/tests/` | 单测与回归：全模块图导入冒烟、机动系统 / 预测 / 视图 / 面板状态、0.2.5 回归 | `node tools/tests/test_module_graph.mjs` |
+| `tools/tests/` | 单测与回归：全模块图导入冒烟、机动多节点 / 预测 / 面板状态、0.2.5 回归 | `node tools/tests/test_module_graph.mjs` |
 | `tools/` | 一次性诊断脚本（跨 SOI 预测、存档复现、资源规则冒烟、机动精度调研） | `node tools/verify_fix.mjs` |
 
 各脚本头部注释均写有自身用途与用法。注意 `tools/debug_checkpoint18.mjs` 与

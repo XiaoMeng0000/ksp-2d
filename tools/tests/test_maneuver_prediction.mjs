@@ -1,4 +1,4 @@
-// 机动节点预测引擎自测（node 环境，临时脚本）
+// 机动节点预测引擎自测（node 环境）
 // 用法: node tools/tests/test_maneuver_prediction.mjs
 // 注：浏览器全局 window 在 node 下缺失，注入最小垫片后再动态导入业务模块
 globalThis.window = globalThis.window || {};

@@ -144,7 +144,7 @@ function bench(label, systems, shipSoi) {
 const rows = [];
 rows.push(bench('Kerbolar 系', ['kerbolar'], 'Kerbin'));
 rows.push(bench('测试星系', ['testbolar'], 'Kerbin (test)'));
-rows.push(bench('Debdeb 测试系', ['debdebTest'], null) );
+rows.push(bench('Debdeb 组合', ['testbolar', 'debdeb_test'], 'Debdeb (test)') );
 
 console.log('\n===== 对比 =====');
 console.log('星系'.padEnd(16) + '天体数'.padEnd(8) + 'JS ms/帧'.padEnd(12) + 'canvas 调用/帧');
