@@ -275,17 +275,37 @@ class TimeWarp {
         return { ok: true };
     }
 
-    // 时间通道升档（. 键）：0x → 1x 恢复；1x → 2x → 4x → 10x → … 沿完整阶梯逐级
-    // （2x/4x 属时间阶梯的正常档位，物理通道不取代任何档位）
-    increase() {
+    // 是否按物理通道步进（. / , 的通道判定；1x 中性态不算——两通道共有，无通道归属）
+    _inPhysicsChannel() {
+        return this._mode === 'physics' && WARP_RATES[this._index] > 1;
+    }
+
+    // 升档（. 键；按住 Alt 时亦走本入口，由 usePhysicsRoute 参数决定通道）：
+    // - 物理加速通道（Alt 进入并保持）：1x/2x/4x 内逐级，**4x 为上限 —— 不跨入时间通道**
+    //   （跨档位走 Alt+. 或鼠标点面板格）；到顶静默返回，不弹通知
+    // - 其余（neutral / time）：时间通道完整阶梯 0x → 1x → 2x → 4x → 10x → …
+    //   （2x/4x 属时间阶梯的正常档位，物理通道不取代任何档位）
+    // @param {boolean} [usePhysicsRoute] - 按住 Alt 时为 true：本次操作声明走物理通道（等价 Alt+.）
+    increase(usePhysicsRoute = false) {
+        if (usePhysicsRoute || this._inPhysicsChannel()) {
+            this.increasePhysics();
+            return;
+        }
         if (this._index >= WARP_RATES.length - 1) {
             return;                                       // 已到最高档
         }
         this.requestTimeWarp(WARP_RATES[this._index + 1]);
     }
 
-    // 时间通道降档（, 键）：1x → 0x 暂停；其余逐级降（10x → 4x → 2x → 1x）
-    decrease() {
+    // 降档（, 键；按住 Alt 时亦走本入口，由 usePhysicsRoute 参数决定通道）：
+    // - 物理加速通道：4x → 2x → 1x（1x 落回中性态）；1x 再按才进 0x 暂停
+    // - 其余（neutral / time）：1x → 0x 暂停；其余逐级降（10x → 4x → 2x → 1x）
+    // @param {boolean} [usePhysicsRoute] - 按住 Alt 时为 true：本次操作声明走物理通道（等价 Alt+,）
+    decrease(usePhysicsRoute = false) {
+        if (usePhysicsRoute || this._inPhysicsChannel()) {
+            this.decreasePhysics();
+            return;
+        }
         if (this._index <= 0) {
             return;
         }
@@ -495,14 +515,14 @@ class TimeWarp {
                 return;
             }
 
-            // , — 降档（1x → 0x 即暂停）
+            // , — 降档（1x → 0x 即暂停；物理加速态在 1x~4x 内降，由入口按通道分派）
             if (!e.altKey && e.code === 'Comma') {
                 e.preventDefault();
                 this.decrease();
                 return;
             }
 
-            // . — 升档（0x → 1x 即恢复）
+            // . — 升档（0x → 1x 即恢复；物理加速态在 1x~4x 内升，由入口按通道分派）
             if (!e.altKey && e.code === 'Period') {
                 e.preventDefault();
                 this.increase();
