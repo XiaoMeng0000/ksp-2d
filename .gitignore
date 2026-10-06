@@ -1,0 +1,9 @@
+# 开发工具产物 —— 均可在本机重新生成，不入库（详见 README「开发者备注」）
+
+# GraphFlow：代码图谱与上下文压缩工具的缓存与输出
+.graphflow/
+.graphflow-cache/
+graphflow-out/
+
+# 开发过程截图（本机产物）
+Screenshots/
