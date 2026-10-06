@@ -14,7 +14,7 @@ const CATEGORY_NAMES = {
 const CAPABILITY_TOOLBAR = {
     deploy_facility: { icon: '🔧', labelKey: 'facility.deploy', iconId: 'icon_deploy_facility', iconTexture: 'assets/images/ships/assembly_shop(ship).png' },
     cargo_hold:      { icon: '📦', labelKey: 'cargo.title',     iconId: 'icon_cargo_hold',      iconTexture: 'assets/images/ships/cargo_hold.png' },
-    // TODO: scanner.png 资产待补（美术未出图）—— 缺失时按钮回退 emoji，不阻塞其他功能
+    // 扫描仪图标已入位；纹理未就绪时按钮仍回退 emoji
     scan_resources:  { icon: '🔭', labelKey: 'scan.menuTitle',  iconId: 'icon_scan_resources',  iconTexture: 'assets/images/ships/scanner.png' }
 };
 
