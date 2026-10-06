@@ -167,9 +167,10 @@ ksp-2d/
 
 ## 版本与路线
 
-- 最新发布版：**v0.2.4**（[Releases](https://github.com/XiaoMeng0000/ksp-2d/releases)）
-- 开发中：0.2.5 机动节点系统与轨道机动视图的持续打磨
-- 游戏内「额外内容 → 游戏公告」记录每个版本的完整变更，源码位于 `src/config/ui/announcementConfig.js`
+- 最新发布版：**v0.2.6**（[Releases](https://github.com/XiaoMeng0000/ksp-2d/releases)）
+- 开发中：**0.3.0-beta1** —— 时间加速双通道（物理加速 / 时间加速）与数据驱动、模块化重构
+- 长期方向：**下一代渲染层**（WebGL2）先在独立原型项目中研发——程序化星球、大气散射、云层与气态巨星等画面提升，成熟后整体迁回本仓库
+- 游戏内「游戏公告」（主菜单一级入口）记录每个版本的完整变更，源码位于 `src/config/ui/announcementConfig.js`
 
 <!-- TODO: 路线图待补。建议列 3~5 条近期计划（如科研站实验室蓝图研究、更多星系、生涯经济平衡） -->
 
