@@ -1,3 +1,4 @@
+'use strict';
 // GameState 加载
 import { gameState } from './src/gameState.js';
 import { t } from './src/config/ui/strings.js';
@@ -311,8 +312,7 @@ window.openAnnouncement = function() {
     openAnnouncementUI();
 };
 
-// 层级存档 - 当前世界 ID
-window.currentWorldId = null;
+// 层级存档 - 当前世界 ID 由 GameState.worldId 持有（0.2.5 整改：原 window.currentWorldId 全局）
 
 // 0.2.5 创建新战役核心逻辑（供"创建新战役"对话框调用）
 // name: 战役名称; starSystems: 星系组合 id 数组(创建时绑定,创建后不可更改)
@@ -418,7 +418,7 @@ window.applyNewGameCreation = function(name, starSystems) {
     // 先创建世界（含名称冲突检测），成功后再切场景
     const worldId = window.__saveManager.createWorld(name, systemIds);
     if (worldId) {
-        window.currentWorldId = worldId;
+        gameState.setState({ worldId });
         sceneManager.switchTo('flight');
         window.showNotification(t('newgame.success'), 'success');
     } else {

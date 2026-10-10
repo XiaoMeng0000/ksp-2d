@@ -1,7 +1,8 @@
-'use strict'
+'use strict';
 
 import { uiManager } from './uiManager.js';
 import { eventBus, Events } from '../eventBus.js';
+import { shipSystem } from '../ship/shipSystem.js';
 import { gameState } from '../gameState.js';
 import { facilitySystem } from '../facility/facilitySystem.js';
 import { getFacilityCompartments, getFacilityType, getCompartmentDef } from '../config/entities/facilityTypes.js';
@@ -175,10 +176,10 @@ function renderToolbarIcons(mode, data) {
                 if (def.capability === 'deploy_facility') {
                     window.openFacilityDeployPanel();
                 } else if (def.capability === 'cargo_hold') {
-                    const ship = window.__shipSystem?.getActiveShip();
+                    const ship = shipSystem.getActiveShip();
                     if (ship) openPage('cargo', t('cargo.title'), buildShipCargoContent(ship));
                 } else if (def.capability === 'scan_resources') {
-                    const ship = window.__shipSystem?.getActiveShip();
+                    const ship = shipSystem.getActiveShip();
                     if (ship) openPage('scan', t('scan.menuTitle'), buildScanContent(ship));
                 }
             };
@@ -671,7 +672,7 @@ function buildBridgeContent(facility) {
 
 // 对接枢纽内容（0.2.7 分区布局：对接操作区 + 停靠飞船卡网格）
 function buildDockHubContent(facility) {
-    const activeShip = window.__shipSystem?.getActiveShip();
+    const activeShip = shipSystem.getActiveShip();
     const freeDocks = (facility.maxDocks || 0) - (facility.usedDocks || 0);
 
     // 分区一：对接操作
@@ -721,7 +722,7 @@ function bindDockHubEvents(facility) {
     const dockBtn = page.contentEl.querySelector('#dockCurrentShipBtn');
     if (dockBtn) {
         dockBtn.addEventListener('click', () => {
-            const activeShip = window.__shipSystem?.getActiveShip();
+            const activeShip = shipSystem.getActiveShip();
             if (activeShip && _currentFacility) {
                 facilitySystem.dockShip(_currentFacility.id, activeShip.id);
                 const updated = facilitySystem.getFacility(_currentFacility.id);
@@ -963,7 +964,7 @@ function onPageContentClick(e) {
         if (_currentFacility) promptTransferAmount(_currentFacility, shipId, resId, 'unload');
     } else if (action === 'start-scan') {
         // 0.2.0 阶段6：开始扫描（失败分支通知提示，含"资源已知"）
-        const ship = window.__shipSystem?.getActiveShip();
+        const ship = shipSystem.getActiveShip();
         if (ship && ship.currentSOI) {
             const result = startScan(ship, ship.currentSOI);
             if (!result.ok) {
@@ -975,7 +976,7 @@ function onPageContentClick(e) {
             openPage('scan', t('scan.menuTitle'), buildScanContent(ship));
         }
     } else if (action === 'cancel-scan') {
-        const ship = window.__shipSystem?.getActiveShip();
+        const ship = shipSystem.getActiveShip();
         cancelScan();
         if (ship) openPage('scan', t('scan.menuTitle'), buildScanContent(ship));
     } else if (action === 'toggle-res-group') {

@@ -1,4 +1,4 @@
-'use strict'
+'use strict';
 
 import { uiManager } from './uiManager.js';
 import { eventBus, Events } from '../eventBus.js';

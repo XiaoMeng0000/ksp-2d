@@ -1,3 +1,4 @@
+'use strict';
 // 飞船系统 - 飞船实例创建、存储和管理核心模块
 import { gameState } from '../gameState.js';
 import { SHIP_TEMPLATES } from '../config/entities/shipTemplates.js';

@@ -1,3 +1,4 @@
+'use strict';
 // 模块系统 - 模块类型配置
 
 const CATEGORY_NAMES = {

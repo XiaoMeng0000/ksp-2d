@@ -1,3 +1,4 @@
+'use strict';
 // 飞船系统 - 飞船分类定义（仅标签，无数值）
 export const SHIP_CATEGORIES = {
     probe: { id: 'probe', name: '探测火箭' },

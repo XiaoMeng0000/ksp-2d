@@ -1,3 +1,4 @@
+'use strict';
 import { shipSystem } from '../ship/shipSystem.js';
 import { camera, screenToWorld, cssToCanvas, worldToScreen, updateCameraAnimation } from '../camera.js';
 import { inputManager } from '../input.js';
@@ -23,7 +24,7 @@ import { clearOrbitLabels } from '../ui/orbitLabels.js';
 import { facilitySystem } from '../facility/facilitySystem.js';
 import { getModuleDef } from '../config/entities/moduleTypes.js';
 import { getFacilityType } from '../config/entities/facilityTypes.js';
-import { getTotalMass, getResource, getFuelAmount, getFuelCapacity } from '../resources/resourceSystem.js';
+import { getTotalMass, getResource, drainResource, getFuelAmount, getFuelCapacity } from '../resources/resourceSystem.js';
 import { updateScanProgress } from '../resources/scanSystem.js';
 import { computeManeuverDirection } from '../physics/maneuverPrediction.js';
 import { getEngineType } from '../config/entities/engineConfig.js';
@@ -62,14 +63,28 @@ function setShipStatusPanelHidden(hidden) {
 let _lastOrbitTipX = -9999;    // 最近一次工具提示触发时鼠标位置（移动防抖）
 let _lastOrbitTipY = -9999;
 
-// 可见性筛选状态 — 控制飞行场景中非活动飞船/设施的显示
-let _visibilityState = { ships: true, facilities: true, facilityRange: true, bodyOrbits: true, soiLabels: true };
+// 可见性筛选状态由 sasUI 面板独占持有（0.2.5 整改：原经 window.__visibilityState 暴露），
+// 本场景渲染时经 sasUI.getVisibilityState() 读取，不再自持副本
 
-// 暴露到全局供 sasUI 面板调用
-window.__visibilityState = _visibilityState;
-window.__toggleVisibility = function(type) {
-    _visibilityState[type] = !_visibilityState[type];
-};
+// 追踪站设施聚焦请求 — 场景未就绪时暂存，进入飞行场景时消费（原 window.__pendingFacilityId）
+let _pendingFacilityId = null;
+
+eventBus.on(Events.FACILITY_FOCUS_REQUESTED, ({ facilityId }) => {
+    _pendingFacilityId = facilityId || null;
+});
+
+// 应用待处理的设施聚焦请求（对齐相机并切换活动设施）
+function _applyPendingFacilityFocus() {
+    if (!_pendingFacilityId) return;
+    const fac = facilitySystem.getFacility(_pendingFacilityId);
+    _pendingFacilityId = null;
+    if (!fac) return;
+    _activeFacilityId = fac.id;
+    gameState.setState({ activeShipId: null, activeFacilityId: fac.id });
+    const facAbsPos = getAbsolutePosition(fac);
+    camera.x = facAbsPos.x;
+    camera.y = facAbsPos.y;
+}
 
 // SHIP_COMMAND 处理器 — 接收 UI 层发出的飞船操作命令，由物理层统一执行
 eventBus.on(Events.SHIP_COMMAND, ({ action, params }) => {
@@ -446,18 +461,8 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             // 视图档位复位：进场景回到默认"普通聚焦视图"并恢复其缩放范围（0.2.5）
             flightView.reset();
 
-            // 接收追踪站的设施聚焦请求
-            if (window.__pendingFacilityId) {
-                const fac = facilitySystem.getFacility(window.__pendingFacilityId);
-                if (fac) {
-                    _activeFacilityId = fac.id;
-                    gameState.setState({ activeShipId: null, activeFacilityId: fac.id });
-                    const facAbsPos = getAbsolutePosition(fac);
-                    camera.x = facAbsPos.x;
-                    camera.y = facAbsPos.y;
-                }
-                delete window.__pendingFacilityId;
-            }
+            // 接收追踪站的设施聚焦请求（eventBus 下发，见上方 FACILITY_FOCUS_REQUESTED）
+            _applyPendingFacilityFocus();
 
             // 显示可见性筛选面板（场景进入自动打开，不产生打开音效）
             sasUI.showVisibilityPanel({ silent: true });
@@ -1040,10 +1045,8 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 if (engineDef && engineDef.props.length > 0) {
                     const totalRatio = engineDef.props.reduce((sum, p) => sum + p.ratio, 0);
                     for (const prop of engineDef.props) {
-                        const slot = getResource(activeShip, prop.id);
-                        if (slot) {
-                            slot.amount = Math.max(0, slot.amount - massFlow * prop.ratio / totalRatio * simDt);
-                        }
+                        // 按比例扣减：有多少扣多少，燃料可恰好烧到 0（不能走"全有或全无"接口）
+                        drainResource(activeShip, prop.id, massFlow * prop.ratio / totalRatio * simDt);
                     }
                     // 任一配方燃料耗尽 → 引擎停机（不修改 maxThrust，修复 B1）
                     const anyEmpty = engineDef.props.some(prop => {
@@ -1110,7 +1113,7 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             const activeShip = shipSystem.getActiveShip();
             const renderFacilities = facilitySystem.getAllFacilities();
             render(ctx, _canvas, activeShip, {
-                visibility: _visibilityState,
+                visibility: sasUI.getVisibilityState(),
                 facilities: renderFacilities,
                 // 0.2.5（H4）：渲染层不直连业务模块，飞船列表由场景层注入
                 ships: shipSystem.getAllShips(),

@@ -1,3 +1,4 @@
+'use strict';
 import { eventBus, Events } from '../eventBus.js';
 import { celestialBodies, getAbsolutePosition } from './physics.js';
 import { rk4Integrate } from './integrator.js';

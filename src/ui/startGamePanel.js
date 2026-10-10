@@ -301,12 +301,13 @@ function loadSelectedGame() {
         window.showNotification(t('startgame.selectWorldHint'), 'warning');
         return;
     }
-    window.currentWorldId = _selectedWorldId;
     const success = saveManager.loadCheckpoint(_selectedWorldId, _selectedCheckpointId);
     if (!success) {
         // 加载失败(含星系组合与当前配置不兼容):保持面板打开,不切场景
         return;
     }
+    // 读档成功后才落世界 ID —— loadCheckpoint 内部经 setState 全量替换状态，先写会被覆盖
+    gameState.setState({ worldId: _selectedWorldId });
     closeStartGamePanel();
     sceneManager.switchTo('flight');
 }

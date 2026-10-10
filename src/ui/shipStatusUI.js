@@ -13,6 +13,7 @@ import { renderIconHtml } from './uiComponents.js';
 import { getTotalMass, computeDeltaV, G0 } from '../resources/resourceSystem.js';
 import { getResourceType } from '../config/entities/resourceTypes.js';
 import { celestialBodies } from '../physics/physics.js';
+import { shipSystem } from '../ship/shipSystem.js';
 
 // DOM 写入节流间隔（ms）— 燃烧/时间加速下数字跟手即可
 const UPDATE_MIN_INTERVAL = 200;
@@ -162,7 +163,7 @@ eventBus.on(Events.RENDER_DATA, () => {
     const now = performance.now();
     if (now - _lastUpdate < UPDATE_MIN_INTERVAL) return;
 
-    const ship = window.__shipSystem?.getActiveShip?.() || null;
+    const ship = shipSystem.getActiveShip() || null;
     if (!ship) {
         container.style.display = 'none';
         return;

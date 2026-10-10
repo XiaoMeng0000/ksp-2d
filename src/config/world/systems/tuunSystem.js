@@ -1,4 +1,4 @@
-"use strict";
+'use strict';
 
 // ========== Tuun 星系(占位) ==========
 // placeholder: true 表示占位星系(仅展示,无真实天体数据)

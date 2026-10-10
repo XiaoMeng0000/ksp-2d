@@ -1,3 +1,4 @@
+'use strict';
 // 键盘输入管理器
 
 class InputManager {

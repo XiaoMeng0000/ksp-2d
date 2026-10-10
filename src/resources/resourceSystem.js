@@ -7,11 +7,11 @@
 import { gameState } from '../gameState.js';
 import { isResourceFree } from './modeRules.js';
 import { getCargoUsed } from './cargoSystem.js';
+import { getSlot, addSlotAmount, drainSlotAmount } from './resourceSlot.js';
 
 // 获取资源槽（{amount, capacity}），不存在返回 null
 export function getResource(holder, resourceId) {
-    if (!holder || !holder.resources || !holder.resources[resourceId]) return null;
-    return holder.resources[resourceId];
+    return getSlot(holder, resourceId);
 }
 
 // 设置资源存量（amount 自动截断到 [0, capacity]）
@@ -29,8 +29,7 @@ export function setResource(holder, resourceId, amount) {
 export function addResource(holder, resourceId, amount) {
     const slot = getResource(holder, resourceId);
     if (!slot) return false;
-    const cap = typeof slot.capacity === 'number' ? slot.capacity : Infinity;
-    slot.amount = Math.max(0, Math.min(cap, slot.amount + amount));
+    addSlotAmount(slot, amount);
     return true;
 }
 
@@ -40,6 +39,16 @@ export function consumeResource(holder, resourceId, amount) {
     if (!slot || slot.amount < amount) return false;
     slot.amount -= amount;
     return true;
+}
+
+// 按比例扣减资源，返回实际扣减量（按时间连续扣减用，如引擎每帧燃烧）
+// 与 consumeResource 的语义差异：consumeResource 是「全有或全无」的原子操作，余额不足时
+// 整体拒绝、一个单位都不扣；本接口则能扣多少扣多少，扣到余额为 0 为止，
+// 因此燃料可以恰好烧尽（amount 永不为负）。
+export function drainResource(holder, resourceId, amount) {
+    const slot = getResource(holder, resourceId);
+    if (!slot) return 0;
+    return drainSlotAmount(slot, amount);
 }
 
 // 获取飞船总质量（干质量 + 全部推进剂存量 + 货仓货物；兼容旧 fuel 字段）

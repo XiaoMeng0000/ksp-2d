@@ -11,7 +11,7 @@
 import { t } from '../config/ui/strings.js';
 import { eventBus, Events } from '../eventBus.js';
 import { maneuverSystem } from '../ship/maneuverSystem.js';
-import { getLastManeuverPrediction, getLastOrbitSegments, getLastManeuverNodes, findNearestOrbitPoint } from '../renderer.js';
+import { getLastManeuverPrediction, getLastOrbitSegments, getLastManeuverNodes, getManeuverSelectedId, findNearestOrbitPoint } from '../renderer.js';
 import { screenToWorld, cssToCanvas, canvasToCss, worldToScreen } from '../camera.js';
 import { getCachedTime, bodyFuturePos } from '../physics/orbitalPrediction.js';
 import { walkToTime } from '../physics/maneuverPrediction.js';
@@ -449,6 +449,13 @@ export function updateManeuverUI(canvas, ship) {
     _canvas = canvas;
     _lastShip = ship;
     ensureDom();
+
+    // 选中态归属 UI 层（T6-1A）：渲染层已改为只读、不再回写选中态 ——
+    // 无选中时由 UI 自动选中首个节点（时刻序），保证机动面板始终有编辑目标
+    if (!getManeuverSelectedId()) {
+        const firstNode = maneuverSystem.getNodesSorted(ship)[0];
+        if (firstNode) maneuverSystem.setSelectedNode(ship, firstNode.id);
+    }
 
     const node = maneuverSystem.getNode(ship);
     if (!node) {

@@ -13,6 +13,7 @@ import { RESOURCE_TYPES, getResourceType } from '../config/entities/resourceType
 import { getModuleDef } from '../config/entities/moduleTypes.js';
 import { getFacilityType } from '../config/entities/facilityTypes.js';
 import { isBalanceEnforced } from './modeRules.js';
+import { addSlotAmount } from './resourceSlot.js';
 
 // 可存储资源（科技点为全局资源，不入货仓/设施存储）
 export const STORAGE_RESOURCE_IDS = RESOURCE_TYPES
@@ -110,17 +111,27 @@ export function getStorageAmount(facility, resourceId) {
     return facility.storage[resourceId].amount || 0;
 }
 
-// 设施存储增加（受该槽容量限制）；返回实际存入量
+// 设施存储增加（受该槽容量限制）；返回实际存入量（契约：恒 ≥ 0）
+// 槽级钳制逻辑与 resourceSystem 共用 resources/resourceSlot.js，避免两模块互相 import 成环
 export function addStorage(facility, resourceId, amount) {
     if (!facility || amount <= 0) return 0;
     if (!STORAGE_RESOURCE_IDS.includes(resourceId)) return 0;
     if (!facility.storage) initFacilityStorage(facility);
     const slot = facility.storage[resourceId];
     if (!slot) return 0;
+    // 容量缺失/非数字的槽视为"不可存"（与整改前 addStorage 的 cap=0 语义一致；
+    // 不可套用 addResource 的"缺容量=无上限"判别，否则会凭空放开写入）
     const cap = typeof slot.capacity === 'number' ? slot.capacity : 0;
-    const accepted = Math.min(amount, Math.max(0, cap - (slot.amount || 0)));
-    slot.amount = (slot.amount || 0) + accepted;
-    return accepted;
+    if (!(cap > 0)) return 0;
+    const before = slot.amount || 0;
+    // 越界脏值（amount > capacity，可由未做数值约束校验的存档导入落地）保持原样不动 ——
+    // 与整改前基线一致（基线此时返回 0 且不改槽值）。不在此处"顺手钳到容量"，因为那会让
+    // 本函数返回负值、破坏"返回实际存入量"契约，并使 transferCargoToStorage /
+    // transferBetweenFacilities 的 accepted > 0 判定失效，导致源端不扣减而目标槽溢出量
+    // 被丢弃 —— 即资源静默消失。
+    if (before > cap) return 0;
+    addSlotAmount(slot, amount);
+    return Math.max(0, (slot.amount || 0) - before);
 }
 
 // 设施存储消耗（余额不足返回 false 不扣；sandbox 兜底：有多少扣多少，扣到 0 仍成功）
@@ -186,10 +197,14 @@ export function refuelFromStorage(facility, ship) {
         if (need <= 0) continue;
         const supply = Math.min(need, getStorageAmount(facility, resId));
         if (supply <= 0) continue;
-        tank.amount += supply;
-        facility.storage[resId].amount -= supply;
-        transferred[resId] = supply;
-        total += supply;
+        // 槽级钳制与 resourceSystem 共用 resources/resourceSlot.js（避免模块互相 import 成环）
+        const tankBefore = tank.amount || 0;
+        addSlotAmount(tank, supply);
+        const accepted = Math.max(0, (tank.amount || 0) - tankBefore);
+        if (accepted <= 0) continue;
+        facility.storage[resId].amount -= accepted;
+        transferred[resId] = accepted;
+        total += accepted;
     }
     return { ok: total > 0, transferred };
 }

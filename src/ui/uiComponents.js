@@ -1,3 +1,4 @@
+'use strict';
 // UI组件 - 通知和对话框组件
 
 import { textureManager } from '../graphics/textureManager.js';

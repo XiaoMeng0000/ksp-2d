@@ -1,3 +1,4 @@
+'use strict';
 import { sceneManager } from '../sceneManager.js';
 import { shipSystem } from '../ship/shipSystem.js';
 import { facilitySystem } from '../facility/facilitySystem.js';

@@ -1,3 +1,4 @@
+'use strict';
 // GameState 单例模块
 
 import { eventBus, Events } from './eventBus.js';
@@ -20,8 +21,10 @@ const initialState = {
         }
     },
     missions: [],
-    gameTime: 0,
-    version: '0.2.0',
+    // T6-1B：原 version: '0.2.0' 死字段已删除（唯一读取方 saveManager.createWorld 已改用
+    //         SAVE_FORMAT_VERSION；发布版本显示走 config/meta/version.js 的 VERSION_TEXT）
+    // 当前战役世界 id（原 window.currentWorldId，0.2.5 整改：全局状态统一收敛到 GameState）
+    worldId: null,
     // 追踪站 - 当前场景
     currentScene: 'menu'
 };
@@ -115,7 +118,7 @@ class GameState {
     // 重置为初始状态
     reset() {
         this._state = this._deepClone(initialState);
-        this._notify(['ships', 'activeShipId', 'activeFacilityId', 'missions', 'facilities', 'gameTime', 'currentScene']);
+        this._notify(['ships', 'activeShipId', 'activeFacilityId', 'missions', 'facilities', 'worldId', 'currentScene']);
     }
 
     // 返回当前活动飞船

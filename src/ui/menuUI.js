@@ -1,4 +1,4 @@
-'use strict'
+'use strict';
 
 // 0.2.5：ESC 菜单已抽离为独立组件 escMenuUI.js（KSP2 控制台风格，独立 --esc-* 配色），
 // 本模块保留：通知/对话框的全局挂载、存档管理面板（archiveManagerPanel）。

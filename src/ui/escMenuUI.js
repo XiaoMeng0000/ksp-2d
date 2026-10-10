@@ -50,7 +50,7 @@ function getGameModeText() {
 
 // 当前存档（世界）名称 — ESC 菜单头部显示；无当前世界时回退机构名
 function getCurrentWorldName() {
-    const worldId = window.currentWorldId;
+    const worldId = gameState.getState().worldId;
     if (!worldId) return t('esc.agencyTitle');
     const world = saveManager.getWorldList().find(w => w.id === worldId);
     return world ? world.name : t('esc.agencyTitle');
@@ -358,7 +358,7 @@ function backToFlight() {
 // 存档（在当前世界创建检查点）
 function saveGame() {
     try {
-        const worldId = window.currentWorldId;
+        const worldId = gameState.getState().worldId;
         if (!worldId) {
             window.showNotification(t('common.noWorld'), 'info');
             return;
@@ -376,7 +376,7 @@ function saveGame() {
 
 // 读档（显示当前世界的检查点列表）
 function loadGame() {
-    const worldId = window.currentWorldId;
+    const worldId = gameState.getState().worldId;
     if (!worldId) {
         window.showNotification(t('common.noWorld'), 'info');
         return;
@@ -420,7 +420,7 @@ function quitToMenu() {
         t('esc.quitMessage'),
         () => {
             // 用户选择「保存并退出」
-            const worldId = window.currentWorldId;
+            const worldId = gameState.getState().worldId;
             if (worldId) {
                 const world = saveManager.getWorld(worldId);
                 const checkpointName = t('common.checkpointName', { n: world.checkpoints.length + 1 });

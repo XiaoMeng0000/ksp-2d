@@ -1,4 +1,4 @@
-"use strict";
+'use strict';
 
 import { CelestialBody } from '../../../physics/celestialBody.js';
 

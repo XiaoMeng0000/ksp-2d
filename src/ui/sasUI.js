@@ -8,8 +8,13 @@
 
 import { eventBus, Events } from '../eventBus.js';
 import { textureManager } from '../graphics/textureManager.js';
+import { shipSystem } from '../ship/shipSystem.js';
 import { t } from '../config/ui/strings.js';
 import { showTooltip, hideTooltip } from './uiTooltip.js';
+
+// 可见性筛选状态 — 控制飞行场景中非活动飞船/设施的显示（0.2.5 整改：原挂在
+// window.__visibilityState，由本面板独占状态并直接读写，飞行场景经方法读取）
+const _visibilityState = { ships: true, facilities: true, facilityRange: true, bodyOrbits: true, soiLabels: true };
 
 // EventBus — 缓存最近一帧飞船渲染数据（导航球姿态/方向，同 flightUI 模式）
 // 同时按"是否有活动飞船"控制按钮框显隐（设施操作模式无活动飞船 → 隐藏）
@@ -915,7 +920,7 @@ class SASUI {
             }
 
             btn.addEventListener('click', () => {
-                const ship = window.__shipSystem?.getActiveShip?.();
+                const ship = shipSystem.getActiveShip();
                 if (def.id === 'sas') {
                     if (ship) {
                         ship.sasMode = ship.sasMode === 'off' ? 'stability' : 'off';
@@ -1169,9 +1174,7 @@ class SASUI {
         checkbox.type = 'checkbox';
         checkbox.dataset.visType = type;
         checkbox.addEventListener('change', () => {
-            if (typeof window.__toggleVisibility === 'function') {
-                window.__toggleVisibility(type);
-            }
+            this.toggleVisibility(type);
         });
         label.appendChild(checkbox);
 
@@ -1187,7 +1190,7 @@ class SASUI {
      */
     _updateVisibilityCheckboxes() {
         if (!this._visibilityContent) return;
-        const state = window.__visibilityState || { ships: true, facilities: true };
+        const state = this.getVisibilityState();
         const checkboxes = this._visibilityContent.querySelectorAll('input[type="checkbox"]');
         checkboxes.forEach(cb => {
             const type = cb.dataset.visType;
@@ -1195,6 +1198,18 @@ class SASUI {
                 cb.checked = state[type] !== false;
             }
         });
+    }
+
+    // 可见性筛选状态（返回直接引用，供渲染层读取；本面板为唯一写入方）
+    getVisibilityState() {
+        return _visibilityState;
+    }
+
+    // 切换单个可见性筛选开关（原 window.__toggleVisibility）
+    toggleVisibility(type) {
+        if (type in _visibilityState) {
+            _visibilityState[type] = !_visibilityState[type];
+        }
     }
 }
 

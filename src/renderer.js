@@ -1,3 +1,4 @@
+'use strict';
 import { camera, worldToScreen } from './camera.js';
 import { celestialBodies, getAbsolutePosition } from './physics/physics.js';
 import { predictTrajectoryPatched, predictTrajectoryBurned, bodyFuturePos, getCachedTime } from './physics/orbitalPrediction.js';
@@ -966,14 +967,10 @@ function prepareManeuverPredictions(ship, baseSegments, canvas) {
         prev = node;
     }
 
-    // 选中节点：以 maneuverSystem 的显式选中为准（缺省 = 下一个未执行节点，并回写系统，
-    // 保证渲染层与 UI/编辑层对"当前选中"的认知一致 —— 多节点 0.2.6）
+    // 选中节点：**只读** maneuverSystem 的选中态（T6-1A：写选中态是 UI 层职责，
+    // 渲染层不再回写；"无选中时自动选中"由 ui/maneuverUI.js 负责）
     const selNode = maneuverSystem.getSelectedNode(ship);
     _mvSelectedId = selNode ? selNode.id : null;
-    if (!_mvSelectedId && out.length > 0) {
-        _mvSelectedId = out[0].node.id;
-        maneuverSystem.setSelectedNode(ship, _mvSelectedId);
-    }
 
     const sel = out.find(o => o.node.id === _mvSelectedId) || out[0];
     _mvNodes = out.map(o => ({

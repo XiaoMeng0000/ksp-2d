@@ -2,11 +2,12 @@
 
 // 玩家 HUD（0.2.0 阶段4；0.2.7 调整）
 // 左上角常驻显示：游戏模式 + 当前载具名（原科技点显示已替换为载具名）
-// 数据源：GameState.player（模式）+ __shipSystem 活动飞船（载具名）；事件驱动 + 低频兜底轮询
+// 数据源：GameState.player（模式）+ shipSystem 活动飞船（载具名）；事件驱动 + 低频兜底轮询
 
 import { gameState } from '../gameState.js';
 import { eventBus, Events } from '../eventBus.js';
 import { uiManager } from './uiManager.js';
+import { shipSystem } from '../ship/shipSystem.js';
 import { t } from '../config/ui/strings.js';
 
 // 游戏模式 → 显示文本（数据驱动收敛：文案入库 strings.js）
@@ -29,7 +30,7 @@ document.body.appendChild(hudEl);
 
 // 当前载具名（活动飞船；无则空）
 function _getActiveShipName() {
-    const ship = window.__shipSystem?.getActiveShip?.();
+    const ship = shipSystem.getActiveShip();
     return ship ? (ship.displayName || ship.id) : '';
 }
 

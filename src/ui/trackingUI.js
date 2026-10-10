@@ -6,6 +6,7 @@ import { getModuleDef } from '../config/entities/moduleTypes.js';
 import { renderIconHtml } from './uiComponents.js';
 import { getFacilityType } from '../config/entities/facilityTypes.js';
 import { facilitySystem } from '../facility/facilitySystem.js';
+import { shipSystem } from '../ship/shipSystem.js';
 import { sceneManager } from '../sceneManager.js';
 import { computeDeltaV, getTotalMass } from '../resources/resourceSystem.js';
 import { getVisibleBodyResources } from '../resources/scanSystem.js';
@@ -140,8 +141,8 @@ function renderInfo(node) {
 // 追踪站 - 飞船分组（飞行状态 / 模块）
 function renderShipSections(node) {
     // 追踪站 - 用真实 ID 获取具体飞船（而非总是活动飞船）
-    const ship = (window.__shipSystem && node.id)
-        ? window.__shipSystem.getShip(node.id)
+    const ship = node.id
+        ? shipSystem.getShip(node.id)
         : (_cachedShipData && _cachedShipData.exists
             ? { vel: _cachedShipData.vel, currentSOI: _cachedShipData.currentSOI,
                 dryMass: _cachedShipData.dryMass, isp: _cachedShipData.isp,
@@ -339,14 +340,14 @@ trackingInfo.addEventListener('click', (e) => {
         }
         case 'control-node': {
             if (node.type === 'ship') {
-                const activeShip = window.__shipSystem?.getActiveShip();
-                if (node.id && node.id !== activeShip?.id && typeof window.__shipSystem !== 'undefined') {
-                    window.__shipSystem.switchShip(node.id);
+                const activeShip = shipSystem.getActiveShip();
+                if (node.id && node.id !== activeShip?.id) {
+                    shipSystem.switchShip(node.id);
                 }
             }
-            // 设施类型：传递 ID 给飞行场景聚焦
+            // 设施类型：经 eventBus 向飞行场景下发聚焦请求（原 window.__pendingFacilityId）
             if (node.type === 'facility') {
-                window.__pendingFacilityId = node.id;
+                eventBus.emit(Events.FACILITY_FOCUS_REQUESTED, { facilityId: node.id });
             }
             // 切换到飞行场景（设施也走这里，飞行场景会处理聚焦）
             if (typeof sceneManager !== 'undefined') {
@@ -357,7 +358,7 @@ trackingInfo.addEventListener('click', (e) => {
         case 'destroy-node': {
             // 飞船最小保留检查（仅飞船类型）
             if (node.type === 'ship') {
-                const allShips = window.__shipSystem?.getAllShips() || [];
+                const allShips = shipSystem.getAllShips() || [];
                 if (allShips.length <= 1) {
                     if (typeof window.showNotification === 'function') {
                         window.showNotification(t('tracking.keepAtLeastOneShip'), 'warning');

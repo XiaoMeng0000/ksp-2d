@@ -1,3 +1,4 @@
+'use strict';
 // 事件总线模块
 
 // 预定义事件名常量
@@ -44,6 +45,8 @@ export const Events = {
     MANEUVER_DELETED: 'maneuver:deleted',        // 节点删除，payload: { shipId }
     MANEUVER_ARRIVED: 'maneuver:arrived',        // 到达节点时刻（倒计时归零），payload: { shipId, node }
     MANEUVER_COMPLETED: 'maneuver:completed',    // 手动燃烧达成节点 Δv，payload: { shipId, node }
+    // 飞行场景进入时的设施聚焦请求（0.2.5 整改：原经 window.__pendingFacilityId 传递）
+    FACILITY_FOCUS_REQUESTED: 'facility:focusRequested',   // payload: { facilityId }
     // 时间加速事件
     TIME_WARP_CHANGED: 'timeWarp:changed'       // 档位/暂停状态变化
 };

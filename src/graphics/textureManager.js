@@ -1,3 +1,4 @@
+'use strict';
 import { eventBus, Events } from '../eventBus.js';
 import { getTextureManifest } from '../config/assets/assetManifest.js';
 

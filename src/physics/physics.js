@@ -1,3 +1,4 @@
+'use strict';
 // 天体驱动器 6.5步
 import {
     getSystemById,

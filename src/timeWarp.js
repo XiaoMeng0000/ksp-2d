@@ -1,4 +1,4 @@
-"use strict";
+'use strict';
 
 import { sceneManager } from './sceneManager.js';
 import { eventBus, Events } from './eventBus.js';

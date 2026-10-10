@@ -1,4 +1,4 @@
-'use strict'
+'use strict';
 
 import { uiManager } from './uiManager.js';
 import { eventBus, Events } from '../eventBus.js';
@@ -8,6 +8,8 @@ import { getModuleDef } from '../config/entities/moduleTypes.js';
 import { textureManager } from '../graphics/textureManager.js';
 import { renderIconHtml, showModuleSelectorPopup } from './uiComponents.js';
 import { makePanelDraggable, cascadePanelOpen } from './panelDrag.js';
+import { shipSystem } from '../ship/shipSystem.js';
+import { facilitySystem } from '../facility/facilitySystem.js';
 import { t } from '../config/ui/strings.js';
 
 // EventBus 迁移 — 缓存最近一帧的飞船渲染数据，供 UI 只读函数使用
@@ -313,7 +315,7 @@ function buildShip() {
     const shipName = t('build.shipNameSuffix', { name: selectedShip.name });
     const installedModules = selectedModules.filter(m => m !== null);
 
-    const result = window.__facilitySystem.buildShip(facility.id, selectedShip.id, shipName, installedModules);
+    const result = facilitySystem.buildShip(facility.id, selectedShip.id, shipName, installedModules);
     if (!result || !result.ok) {
         // 失败原因分类提示（材料不足 / 模板异常等）；扣费失败/退款均由 facilitySystem 闭环
         const reason = result ? result.reason : 'createFailed';
@@ -326,7 +328,7 @@ function buildShip() {
     }
 
     // 0.2.5：立即切换到新船控制（相机与工具栏由飞行场景下一帧自动跟随）
-    window.__shipSystem.switchShip(result.ship.id);
+    shipSystem.switchShip(result.ship.id);
 
     // 模块系统 - 建造完成后重置模块选择
     selectedModules = [];

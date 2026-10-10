@@ -1,3 +1,4 @@
+'use strict';
 // UI 管理器模块
 
 import { eventBus, Events } from '../eventBus.js';

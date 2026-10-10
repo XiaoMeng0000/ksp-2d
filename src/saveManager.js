@@ -1,3 +1,4 @@
+'use strict';
 // 存档管理器模块
 
 import { gameState } from './gameState.js';
@@ -10,7 +11,7 @@ import { stateToKepler } from './physics/orbitalMechanics.js';
 import { celestialBodies, setActiveSystems, getActiveSystemIds } from './physics/physics.js';
 import { eventBus, Events } from './eventBus.js';
 import { t } from './config/ui/strings.js';
-import { VERSION_TEXT } from './config/meta/version.js';
+import { VERSION_TEXT, SAVE_FORMAT_VERSION, WORLD_EXPORT_FORMAT_VERSION } from './config/meta/version.js';
 import { validateSystemSelection } from './config/world/starSystemIndex.js';
 import { createInfoDialog } from './ui/uiComponents.js';
 import { initFacilityStorage, addStorage } from './resources/cargoSystem.js';
@@ -218,7 +219,7 @@ class SaveManager {
             metadata: {
                 name: name || '新世界',
                 createdAt: now,
-                configVersion: state.version || '0.1.0',
+                configVersion: SAVE_FORMAT_VERSION,
                 // 星系组合:创建时绑定,创建后不可更改
                 starSystems: systemIds
             },
@@ -379,7 +380,9 @@ class SaveManager {
             player: this._sanitizePlayerForSave(world.player),
             missions: checkpoint.missions,
             facilities: checkpoint.facilities,
-            gameTime: checkpoint.gameTime,
+            // 注：不写 gameState.gameTime —— 该字段已从 initialState 移除（游戏时钟由
+            // main.js 的 _celestialTime 持有，是「状态统一存放于 GameState」的明确例外）。
+            // 时钟恢复走下方 CELESTIAL_TIME_UPDATED 事件；checkpoint.gameTime 存档字段本身保留不动。
             activeShipId: checkpoint.activeShipId,
             activeFacilityId: checkpoint.activeFacilityId || null,
             // 同步存档绑定的星系组合(创建后不可改)
@@ -696,7 +699,7 @@ class SaveManager {
 
         const exportData = {
             format: 'ksp2d_world_export',
-            version: '1.0',
+            version: WORLD_EXPORT_FORMAT_VERSION,
             exportedAt: Date.now(),
             appVersion: VERSION_TEXT,
             world: world

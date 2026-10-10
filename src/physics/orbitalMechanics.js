@@ -1,3 +1,4 @@
+'use strict';
 function stateToKepler(pos, vel, gm) {
     // 深空（无有效引力场）：无法定义轨道根数，返回 null（物理层走 RK4 匀速直线）
     if (!(gm > 0) || !isFinite(gm)) return null;
