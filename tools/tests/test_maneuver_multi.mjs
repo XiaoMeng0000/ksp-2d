@@ -37,7 +37,9 @@ globalThis.localStorage = { getItem: () => null, setItem: noop };
 const { celestialBodies, updateCelestialBodies } = await import('../../src/physics/physics.js');
 const { stateToKepler } = await import('../../src/physics/orbitalMechanics.js');
 const { camera } = await import('../../src/camera.js');
-const { render, getLastManeuverNodes, getNextPendingManeuverPrediction, getManeuverSelectedId, getLastOrbitSegments } = await import('../../src/renderer.js');
+const { render, getLastOrbitSegments } = await import('../../src/renderer.js');
+// 机动数据来源改为领域层（0.2.6 阶段2：渲染层不再充当 maneuver 数据总线）——仅换 import 来源，调用处与断言不变
+const { getChainNodes: getLastManeuverNodes, getNextPendingPrediction: getNextPendingManeuverPrediction } = await import('../../src/ship/maneuverChain.js');
 const { maneuverSystem } = await import('../../src/ship/maneuverSystem.js');
 
 updateCelestialBodies(0);

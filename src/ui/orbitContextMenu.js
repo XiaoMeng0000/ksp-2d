@@ -19,7 +19,9 @@ import { timeWarp } from '../timeWarp.js';
 import { shipSystem } from '../ship/shipSystem.js';
 import { maneuverSystem } from '../ship/maneuverSystem.js';
 import { timeToNextSOISwitch } from '../physics/orbitalPrediction.js';
-import { getLastOrbitMarkers, getLastOrbitSegments } from '../renderer.js';
+import { getBaseChain } from '../ship/maneuverChain.js';
+// 仅保留"本帧拱点标记"通道（屏幕空间渲染产物，非机动数据）——机动链数据一律取自领域层
+import { getLastOrbitMarkers } from '../renderer.js';
 import { walkToTime } from '../physics/maneuverPrediction.js';
 
 // 菜单项定义（数据驱动：action 行为标识 + 图标字符 + strings key）
@@ -122,7 +124,7 @@ export function showOrbitContextMenu(clientX, clientY, data, canvas) {
                     let velRel = _menuData.velRel || null;
                     if (!velRel) {
                         try {
-                            const st = walkToTime(getLastOrbitSegments(), _menuData.absTime);
+                            const st = walkToTime(getBaseChain(), _menuData.absTime);
                             if (st && st.relVel) velRel = st.relVel;
                         } catch (err) {
                             // 预测链瞬时缺失（如模式切换过渡帧）→ 跳过速度快照，走退化显示

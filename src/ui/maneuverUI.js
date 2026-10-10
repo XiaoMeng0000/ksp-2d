@@ -1,8 +1,8 @@
 'use strict';
 
 // 机动节点 UI（0.2.5）— 加速计时器面板 + 节点图标 + 十字型四向手柄（DOM 层）
-// 架构：UI 只订阅事件 + 每帧读渲染层预测缓存（getLastManeuverPrediction），
-//       不直连物理引擎；数据写操作统一走 maneuverSystem
+// 架构：UI 只订阅事件 + 每帧读**领域层本帧解析结果**（ship/maneuverChain），
+//       不直连物理引擎、不经渲染层取机动数据；数据写操作统一走 maneuverSystem
 // 命中分层：图标/手柄/面板为 DOM 元素置于画布之上，天然拦截 canvas 事件
 //   → 图标覆盖区优先于轨道线悬停/右键菜单（KSP 样式）
 // 交互（0.2.5 定稿）：节点存在期间 图标/十字手柄/面板 全部常驻可操作；
@@ -11,8 +11,14 @@
 import { t } from '../config/ui/strings.js';
 import { eventBus, Events } from '../eventBus.js';
 import { maneuverSystem } from '../ship/maneuverSystem.js';
-import { getLastManeuverPrediction, getLastOrbitSegments, getLastManeuverNodes, getManeuverSelectedId, findNearestOrbitPoint } from '../renderer.js';
-import { screenToWorld, cssToCanvas, canvasToCss, worldToScreen } from '../camera.js';
+import {
+    getChainNodes,
+    getBaseChain,
+    getChainSelectedId,
+    getSelectedPrediction,
+    findNearestChainPoint
+} from '../ship/maneuverChain.js';
+import { camera, screenToWorld, cssToCanvas, canvasToCss, worldToScreen } from '../camera.js';
 import { getCachedTime, bodyFuturePos } from '../physics/orbitalPrediction.js';
 import { walkToTime } from '../physics/maneuverPrediction.js';
 import { celestialBodies } from '../physics/physics.js';
@@ -270,11 +276,32 @@ function tintedIconDataUrl(texKey, color) {
 // 其余 = 其前一个节点的机动后链 —— 节点 2 在节点 1 的机动后链上，若继续只查当前轨道
 // 会永远命中不到（旧 bug：除首节点外都拖不动）。
 function chainForNode(nodeId) {
-    const entries = getLastManeuverNodes() || [];
+    const entries = getChainNodes();
     const idx = entries.findIndex(e => e.node && e.node.id === nodeId);
-    if (idx <= 0) return getLastOrbitSegments();
+    if (idx <= 0) return getBaseChain();
     const prev = entries[idx - 1];
-    return (prev && prev.segments && prev.segments.length) ? prev.segments : getLastOrbitSegments();
+    return (prev && prev.segments && prev.segments.length) ? prev.segments : getBaseChain();
+}
+
+// 节点图标的屏幕位置（屏幕空间属渲染/UI 层，故不放入领域模块）：
+// 计划状态优先；退化用冻结轨道坐标（relX/relY + 宿主当前时刻位置）
+function nodeIconCss(node, plan, canvas, now) {
+    if (plan && plan.nodeState) {
+        const hp = bodyFuturePos(plan.nodeState.host, now);
+        return worldToCanvasCss(plan.nodeState.relPos.x + hp.x, plan.nodeState.relPos.y + hp.y, canvas);
+    }
+    if (node && node.relX !== undefined && node.relX !== null && node.anchorBody) {
+        const b = celestialBodies.find(x => x.name === node.anchorBody);
+        const hp = b ? bodyFuturePos(b, now) : { x: 0, y: 0 };
+        return worldToCanvasCss(node.relX + hp.x, node.relY + hp.y, canvas);
+    }
+    return null;
+}
+
+// 屏幕像素阈值 → 世界长度阈值（世界→屏幕为等比相似变换，缩放系数 = camera.zoom），
+// 供领域层 findNearestChainPoint 使用（拖拽命中口径与渲染层悬停一致，均为屏幕像素）
+function pxToWorldThreshold(px) {
+    return (camera.zoom > 0) ? (px / camera.zoom) : 0;
 }
 
 // 在**指定链**上解析命中点的轨道坐标与速度快照（resolveOrbitHit 只认当前轨道链，故此处自行换算）
@@ -306,7 +333,7 @@ function beginTimeDrag(e, nodeId) {
 }
 
 function beginDvDrag(axis, e) {
-    const pred = getLastManeuverPrediction();
+    const pred = getSelectedPrediction();
     if (!pred || !pred.plan || !pred.plan.axes) return;
     _drag = {
         mode: 'dv',
@@ -342,12 +369,14 @@ function tickDvAccumulate() {
 // 非选中节点的简化图标（多节点 0.2.6）：只画空心圆，可点击选中、可拖动改时刻；
 // 十字手柄仍只属于选中节点（避免多手柄互相遮挡）。机动视图内整体隐藏（与 HUD 显隐口径一致）。
 function updateMinorIcons(canvas, selectedNode, hideGizmo) {
-    const entries = getLastManeuverNodes() || [];
+    const entries = getChainNodes();
+    const now = getCachedTime();
     const alive = new Set();
     if (!hideGizmo) {
         for (const e of entries) {
             if (!e.node || (selectedNode && e.node.id === selectedNode.id)) continue;
-            if (!e.nodeScreen) continue;
+            const css = nodeIconCss(e.node, e.plan, canvas, now);
+            if (!css) continue;
             alive.add(e.node.id);
             let el = _minorIcons.get(e.node.id);
             if (!el) {
@@ -365,7 +394,6 @@ function updateMinorIcons(canvas, selectedNode, hideGizmo) {
                 document.body.appendChild(el);
                 _minorIcons.set(nodeId, el);
             }
-            const css = canvasToCss(e.nodeScreen.x, e.nodeScreen.y, canvas);
             const left = css.x + 'px';
             const top = css.y + 'px';
             if (el.style.left !== left) el.style.left = left;
@@ -394,7 +422,7 @@ function onDragMove(e) {
         const canvasPt = cssToCanvas(e.clientX - rect.left, e.clientY - rect.top, _canvas);
         const world = screenToWorld(canvasPt.x, canvasPt.y, _canvas);
         if (chain && chain.length > 0) {
-            const hit = findNearestOrbitPoint(chain, world, 30, _canvas);
+            const hit = findNearestChainPoint(chain, world, pxToWorldThreshold(30));
             if (hit && hit.timeOffset !== null && hit.timeOffset !== undefined) {
                 const seg = chain[hit.segmentIndex];
                 const absTime = seg.anchorTime + hit.timeOffset;
@@ -451,10 +479,10 @@ export function updateManeuverUI(canvas, ship) {
     ensureDom();
 
     // 选中态归属 UI 层（T6-1A）：渲染层已改为只读、不再回写选中态 ——
-    // 无选中时由 UI 自动选中首个节点（时刻序），保证机动面板始终有编辑目标
-    if (!getManeuverSelectedId()) {
-        const firstNode = maneuverSystem.getNodesSorted(ship)[0];
-        if (firstNode) maneuverSystem.setSelectedNode(ship, firstNode.id);
+    // 无选中时由 UI 落库**业务模块的默认规则**（首个未执行节点，否则最后一个）。
+    // 旧实现此处取"时刻序首节点"，存在已执行节点时会与业务默认分歧 → 统一走 ensureSelected。
+    if (!getChainSelectedId()) {
+        maneuverSystem.ensureSelected(ship);
     }
 
     const node = maneuverSystem.getNode(ship);
@@ -463,7 +491,7 @@ export function updateManeuverUI(canvas, ship) {
         return;
     }
 
-    const pred = getLastManeuverPrediction();
+    const pred = getSelectedPrediction();
     const now = getCachedTime();
     const cfg = MANEUVER_CONFIG;
     const progress = maneuverSystem.getProgress(ship);
@@ -498,16 +526,7 @@ export function updateManeuverUI(canvas, ship) {
     }
 
     // ---- 图标屏幕位置：预测链内优先；退化用冻结轨道坐标 ----
-    let iconCss = null;
-    if (pred && pred.nodeScreen) {
-        iconCss = canvasToCss(pred.nodeScreen.x, pred.nodeScreen.y, canvas);
-    } else if (node.relX !== undefined && node.relX !== null && node.anchorBody) {
-        const b = celestialBodies.find(x => x.name === node.anchorBody);
-        const hp = b ? bodyFuturePos(b, now) : { x: 0, y: 0 };
-        const wx = node.relX + hp.x;
-        const wy = node.relY + hp.y;
-        iconCss = worldToCanvasCss(wx, wy, canvas);
-    }
+    const iconCss = nodeIconCss(node, plan, canvas, now);
     if (iconCss && !hideGizmo) {
         _icon.style.display = 'block';
         _icon.style.left = iconCss.x + 'px';

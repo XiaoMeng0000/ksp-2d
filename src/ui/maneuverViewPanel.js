@@ -8,13 +8,13 @@
 //   · 动态缩放规则（总监定稿）：参照半径 R = 当前轨道在 SOI 内的最大半径；
 //     绘满绘图区（板块面积 3/4）；逃逸/超 SOI → R 退化为 SOI 半径（"极限缩到 SOI 程度"）
 //   · 图内仍按 SOI 截断（超出 SOI 的段被裁掉）
-// 数据来源：渲染层本帧缓存（getLastOrbitSegments / getLastManeuverPrediction），UI 不直连物理
+// 数据来源：领域层本帧链解析（ship/maneuverChain），UI 不直连物理、不经渲染层取机动数据
 
 import { t } from '../config/ui/strings.js';
 import { flightView } from '../flightView.js';
 import { maneuverSystem } from '../ship/maneuverSystem.js';
 import { shipSystem } from '../ship/shipSystem.js';
-import { getLastOrbitSegments, getLastManeuverPrediction, getLastManeuverNodes } from '../renderer.js';
+import { getChainNodes, getBaseChain, getSelectedPrediction } from '../ship/maneuverChain.js';
 import { celestialBodies, getSOIHost, getAbsolutePosition } from '../physics/physics.js';
 import { getOrbitalDirectionAngles } from '../physics/orbitalMechanics.js';
 import { walkToTime, getNodeOrbitPeriod } from '../physics/maneuverPrediction.js';
@@ -262,7 +262,7 @@ function ensureDom() {
 function applyDvStep(rowDef, plus) {
     const ship = getShip();
     if (!ship) return;
-    const pred = getLastManeuverPrediction();
+    const pred = getSelectedPrediction();
     const axes = pred && pred.plan ? pred.plan.axes : null;
     if (!axes) return;
     const amount = (plus ? 1 : -1) * rowDef.sign * DV_STEP;
@@ -451,7 +451,7 @@ function onInsetPointerDown(e) {
     _dragMoved = false;
     if (!_hit || !_insetCanvas) return;
     const p = toInsetLocal(e);
-    const pred = getLastManeuverPrediction();
+    const pred = getSelectedPrediction();
     const axes = pred && pred.plan ? pred.plan.axes : null;
     // 手柄优先（比节点标记小，先判）
     for (const axis of ['pro', 'retro', 'radIn', 'radOut']) {
@@ -551,9 +551,9 @@ function toInsetLocal(e) {
 // 建点 / 拖节点 / 悬停都按"光标所在链"解析 → 在预测链上操作时快照自动取自该链（链式规划）
 function collectChains() {
     const list = [];
-    const base = getLastOrbitSegments();
+    const base = getBaseChain();
     if (base && base.length) list.push({ segs: base, ownerId: null });
-    for (const e of (getLastManeuverNodes() || [])) {
+    for (const e of (getChainNodes() || [])) {
         if (e.segments && e.segments.length) list.push({ segs: e.segments, ownerId: e.node.id });
     }
     return list;
@@ -563,9 +563,9 @@ function collectChains() {
 // 有节点 = 时间序**最后一条节点的机动后链** —— 严格线性链（0.2.6 总监定稿）：
 // 节点 2 只能建在节点 1 的链路上、节点 3 只能建在 2 的链路上，每一级只允许一个，不可分支。
 function tipChain() {
-    const entries = getLastManeuverNodes() || [];
+    const entries = getChainNodes() || [];
     if (entries.length === 0) {
-        const base = getLastOrbitSegments();
+        const base = getBaseChain();
         return (base && base.length) ? { segs: base, ownerId: null } : null;
     }
     const last = entries[entries.length - 1];
@@ -578,10 +578,10 @@ function tipChain() {
 // 某节点**所属的那条链**（严格线性链）：首节点 = 基础链；其余 = 其前一个节点的机动后链。
 // 拖节点只在这条链上解析 → 时间必然落在"前序燃烧结束之后"，不会把节点拖到前序之前打乱链序。
 function chainForNode(nodeId) {
-    const entries = getLastManeuverNodes() || [];
+    const entries = getChainNodes() || [];
     const idx = entries.findIndex(e => e.node && e.node.id === nodeId);
     if (idx <= 0) {
-        const base = getLastOrbitSegments();
+        const base = getBaseChain();
         return (base && base.length) ? { segs: base, ownerId: null } : null;
     }
     const prevEntry = entries[idx - 1];
@@ -674,7 +674,7 @@ export function updateManeuverViewPanel(canvas, ship) {
 
     const now = getCachedTime();
     const node = maneuverSystem.getNode(ship);
-    const pred = getLastManeuverPrediction();
+    const pred = getSelectedPrediction();
     const plan = pred && pred.plan ? pred.plan : null;
 
     // —— 聚焦天体下拉（数据驱动：当前星系全部天体，层级缩进）
@@ -787,7 +787,7 @@ function drawInset(canvas, ship, node, pred, now) {
     const host = ship && ship.currentSOI ? celestialBodies.find(b => b.name === ship.currentSOI) : null;
     if (!host) { _hit = null; return; }
 
-    const segs = getLastOrbitSegments() || [];
+    const segs = getBaseChain() || [];
     const postSegs = plan_segments(pred);
 
     // 参照半径 R（只看当前轨道；逃逸/超 SOI → SOI）
@@ -833,7 +833,7 @@ function drawInset(canvas, ship, node, pred, now) {
 
     // 多节点链式（0.2.6）：逐节点绘制 燃烧弧 + 机动后链；
     // 选中节点高亮（亮绿实线弧 + 亮虚线链），其余节点降一档亮度（总监定稿：全部链都画、选中高亮）
-    const nodeEntries = getLastManeuverNodes() || [];
+    const nodeEntries = getChainNodes() || [];
     for (const e of nodeEntries) {
         const dim = !e.selected;
         if (e.burnArc) {
@@ -876,7 +876,7 @@ function drawInset(canvas, ship, node, pred, now) {
 
     // —— 机动节点（多节点 0.2.6）：所有节点画空心圆标记；**仅选中节点**画四向手柄与衔接线
     _hit.nodes = [];
-    for (const e of (getLastManeuverNodes() || [])) {
+    for (const e of (getChainNodes() || [])) {
         const st = e.plan && e.plan.nodeState;
         if (!st) continue;
         const p = insetPoint(st.relPos, geom);

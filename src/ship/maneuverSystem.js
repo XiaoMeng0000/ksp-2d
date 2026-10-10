@@ -9,7 +9,7 @@
 // 事件：MANEUVER_CREATED / DELETED / ARRIVED / COMPLETED（UI 与音频层订阅）
 //
 // 多节点（0.2.6）语义（总监定稿）：
-//   · 链式规划：节点 2 的计划建立在"节点 1 烧完后的预测链"上（快照由渲染层链解析器写入）
+//   · 链式规划：节点 2 的计划建立在"节点 1 烧完后的预测链"上（快照由领域层 maneuverChain 链解析器写入）
 //   · 选择模型：显式选中（面板编辑选中节点）；SAS 与定点加速指向"下一个未完成节点"
 //   · 进度跟踪按节点隔离（Map，键 = 节点 id）；冲量归属于当前执行目标（下一个未完成节点）
 //   · 节点数量不设上限；跟踪态不入存档（读档进度归零，与单节点时代一致）
@@ -68,17 +68,34 @@ class ManeuverSystem {
         return null;
     }
 
-    // 选中的编辑目标（缺省 = 下一个未完成节点；全部完成后为最后一个节点）
+    // **纯读**选中目标（缺省 = 下一个未完成节点；全部完成后为最后一个节点）
+    // 与 getSelectedNode 的区别：不补发节点 id、不落库选中态、不排序依赖外部副作用 ——
+    // 供渲染/领域读取链使用，使调用链可被证明无副作用（R1 拆分）。
+    peekSelectedNode(ship) {
+        if (!ship || !Array.isArray(ship.maneuverNodes) || ship.maneuverNodes.length === 0) return null;
+        const id = this._selectedByShip.get(ship.id);
+        if (id) {
+            const found = ship.maneuverNodes.find(n => n.id === id);
+            if (found) return found;
+        }
+        // 兜底 = 业务默认规则：首个未执行节点，否则最后一个（时刻序）
+        const sorted = ship.maneuverNodes.slice().sort((a, b) => a.time - b.time);
+        return sorted.find(n => !n.executed) || sorted[sorted.length - 1] || null;
+    }
+
+    // **显式**落库选中态（命令层调用）：以业务默认规则（peekSelectedNode）纠正选中记录。
+    // 选中态写入是命令/UI 层职责，读取方一律走 peekSelectedNode。
+    ensureSelected(ship) {
+        const node = this.peekSelectedNode(ship);
+        if (node && node.id) this._selectedByShip.set(ship.id, node.id);
+        return node;
+    }
+
+    // 兼容旧调用方：与拆分前行为完全一致（副作用 getter = 补发 id + 落库选中态）
     getSelectedNode(ship) {
         if (!ship || !Array.isArray(ship.maneuverNodes) || ship.maneuverNodes.length === 0) return null;
         this._ensureIds(ship);
-        const id = this._selectedByShip.get(ship.id);
-        const found = id ? this.getNodeById(ship, id) : null;
-        if (found) return found;
-        const next = this.getNextPendingNode(ship);
-        const fallback = next || this.getNodesSorted(ship).slice(-1)[0] || null;
-        if (fallback) this._selectedByShip.set(ship.id, fallback.id);
-        return fallback;
+        return this.ensureSelected(ship);
     }
 
     // 切换选中（面板切换器 / 点击节点图标）
@@ -168,7 +185,7 @@ class ManeuverSystem {
             executed: false,
             // 链式失效版本号（多节点 0.2.6）：编辑/重投影时 +1，供下游节点判定是否重投影
             _rev: 0,
-            // 依赖记录（由渲染层链解析器写入）：{ predId, predRev }
+            // 依赖记录（由领域层 maneuverChain 链解析器写入）：{ predId, predRev }
             _deps: null,
             // 轨道坐标冻结锚（图标随轨道线移动、预测不可用时回退显示）
             relX: (data.relX !== null && data.relX !== undefined) ? data.relX : null,
@@ -177,7 +194,7 @@ class ManeuverSystem {
             // 节点时刻速度快照（host 局部系）：节点时刻已过/链外时重建预测状态
             relVelX: (data.velRel && isFinite(data.velRel.x)) ? data.velRel.x : null,
             relVelY: (data.velRel && isFinite(data.velRel.y)) ? data.velRel.y : null,
-            // 节点时刻质量快照：多节点下由渲染层链解析器按"前序节点燃烧后"的投影质量刷新
+            // 节点时刻质量快照：多节点下由领域层 maneuverChain 链解析器按"前序节点燃烧后"的投影质量刷新
             // （这里先写当前质量作为初值，链解析会在下一帧校正）
             massWet: getTotalMass(ship) || 0,
             massFuel: getFuelAmount(ship) || 0
@@ -212,7 +229,7 @@ class ManeuverSystem {
     // ===== 编辑 =====
 
     // 节点版本号（多节点链式失效用）：任何影响"该节点之后的链"的编辑都必须 +1，
-    // 渲染层链解析器据此判定下游节点是否需要重投影（位置/速度取新链，Δv 分量不变）。
+    // 领域层链解析器据此判定下游节点是否需要重投影（位置/速度取新链，Δv 分量不变）。
     _bumpRev(node) {
         if (!node) return;
         node._rev = (node._rev | 0) + 1;

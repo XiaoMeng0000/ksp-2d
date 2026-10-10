@@ -7,11 +7,13 @@ import { updateShipPhysics } from '../physics/physicsUpdate.js';
 import { updateCelestialBodies, getSOIHost, getAbsolutePosition, getRelativePosition, convertVelocityFrame, celestialBodies } from '../physics/physics.js';
 import { stateToKepler } from '../physics/orbitalMechanics.js';
 import { getTimeToNextSOISwitch } from '../physics/orbitalPrediction.js';
-import { render, renderFlightHud, getLastOrbitSegments, getLastOrbitMarkers, setOrbitHoverState, findNearestOrbitPoint, resolveOrbitHit, getLastManeuverPrediction, getNextPendingManeuverPrediction, getLastManeuverNodes } from '../renderer.js';
+import { render, renderFlightHud, getLastOrbitSegments, getLastOrbitMarkers, setOrbitHoverState, findNearestOrbitPoint, resolveOrbitHit } from '../renderer.js';
 import { showOrbitContextMenu, updateOrbitContextMenu } from '../ui/orbitContextMenu.js';
 import { updateManeuverUI, hideManeuverUI, isManeuverDragging, collapseManeuverEditing } from '../ui/maneuverUI.js';
 import { updateManeuverViewPanel, hideManeuverViewPanel } from '../ui/maneuverViewPanel.js';
 import { maneuverSystem } from '../ship/maneuverSystem.js';
+// 机动数据一律取自**领域层**（渲染层不再充当 maneuver 数据总线；轨道线/屏幕空间产物仍走 renderer 通道）
+import { updateManeuverChain, getChainNodes, getNextPendingPrediction, getSelectedPrediction } from '../ship/maneuverChain.js';
 import { flightView } from '../flightView.js';
 import { formatDuration } from '../utils/format.js';
 import { sceneManager } from '../sceneManager.js';
@@ -524,7 +526,7 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                         let hit = findNearestOrbitPoint(segments, mouseWorld, 12, _canvas);
                         const tail = maneuverSystem.getNodesSorted(ship).slice(-1)[0];
                         if (tail) {
-                            const tailPred = (getLastManeuverNodes() || []).find(en => en.node.id === tail.id);
+                            const tailPred = getChainNodes().find(en => en.node.id === tail.id);
                             const tailSegs = tailPred && tailPred.segments;
                             if (tailSegs && tailSegs.length) {
                                 const tailHit = findNearestOrbitPoint(tailSegs, mouseWorld, 12, _canvas);
@@ -958,7 +960,7 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 //   过节点前 = 节点加速方向（恒定）；过节点后 = 达到目标轨道的当前燃烧方向（实时变）；
                 //   供 SAS 'maneuver' 模式指向、导航球机动标记、节点副钮可用性共同使用
                 //   （面板仍编辑"选中节点"，二者解耦：选中另一个节点不会改变 SAS 指向）
-                const mvPred = getNextPendingManeuverPrediction() || getLastManeuverPrediction();
+                const mvPred = getNextPendingPrediction() || getSelectedPrediction();
                 _hasManeuver = !!(mvPred && mvPred.plan && mvPred.plan.node && !mvPred.plan.node.executed
                     && mvPred.plan.dvMag > 1e-3);
                 // NaN/Infinity 方向防御：非有限角度会污染导航球 marker 坐标 → ctx.arc NaN
@@ -1077,6 +1079,10 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             // 只读 ship.thrust 与模式，绝不写 mode/throttle/thrust（无自动执行原则）
             if (activeShip) {
                 maneuverSystem.update(activeShip, simDt);
+                // 0.2.6 阶段2：机动节点链解析（领域层 maneuverChain）每帧解析一次 ——
+                // 渲染阶段读同一份结果（幂等），轨道线 / 节点标记 / 右键菜单命中因此帧内同源；
+                // 必须在本帧物理推进与节点进度更新之后（否则链/执行目标落后一帧）
+                updateManeuverChain(activeShip);
             }
 
             // 相机跟随活动飞船，无活动飞船且选中设施时跟随设施

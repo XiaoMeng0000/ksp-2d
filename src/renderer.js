@@ -3,16 +3,22 @@ import { camera, worldToScreen } from './camera.js';
 import { celestialBodies, getAbsolutePosition } from './physics/physics.js';
 import { predictTrajectoryPatched, predictTrajectoryBurned, bodyFuturePos, getCachedTime } from './physics/orbitalPrediction.js';
 import { getOrbitalInfo, stateToKepler, findSOIExitTime, timeToHyperPeriapsis } from './physics/orbitalMechanics.js';
-import { predictManeuverTrajectories, walkToTime, computeNodeAxes, syncComponentsFromDeltaV, rebuildDeltaVFromComponents } from './physics/maneuverPrediction.js';
-import { getTotalMass, getFuelAmount } from './resources/resourceSystem.js';
-import { MANEUVER_CONFIG } from './config/gameplay/maneuverConfig.js';
+// 机动节点链解析（链式计算 / 快照重投影 / 质量投影 / 计划缓存）已搬至领域层：
+// 渲染层只读其结果并补屏幕投影（0.2.6 阶段2）；
+// 机动数据不再对外提供访问器（UI 与场景层直接取领域层），本层只保留轨道/屏幕空间通道
+import {
+    updateManeuverChain,
+    getChainNodes,
+    getSelectedPrediction,
+    findNearestChainPoint
+} from './ship/maneuverChain.js';
 import { getFacilityType } from './config/entities/facilityTypes.js';
+import { MANEUVER_CONFIG } from './config/gameplay/maneuverConfig.js';
 import { getShipBodyTexture } from './config/entities/shipTemplates.js';
 import { renderableManager } from './graphics/renderable.js';
 import { textureManager } from './graphics/textureManager.js';
 import { drawStarGlow, drawStarBall, drawPlanetRing } from './graphics/programEffects.js';
 import { STARFIELD_CONFIG } from './config/gameplay/starfieldConfig.js';
-import { maneuverSystem } from './ship/maneuverSystem.js';
 import { flightView } from './flightView.js';
 import { t } from './config/ui/strings.js';
 import { ORBIT_POINT_TYPES, ORBIT_MARKER_COLOR } from './config/gameplay/orbitPointTypes.js';
@@ -59,8 +65,8 @@ let _lastOrbitSegments = null;   // 本帧活动飞船轨道预测 segments（re
 let _lastOrbitMarkers = [];      // 本帧 Ap/Pe 标记屏幕位置（renderOrbitMarkers 写入）
 let _orbitHoverState = null;     // 悬停状态（setOrbitHoverState 写入，标记绘制消费）
 let _lastVisibility = {};        // 本帧可见性选项（render 写入，SOI 标签开关等消费）
-let _lastManeuverPrediction = null;  // 本帧机动节点预测缓存（prepareManeuverPrediction 写入，机动 UI 读取）
-// 多节点（0.2.6）：计划缓存改为按节点存放（见 _mvPlanCache），此处保留选中节点结果供 UI 读取
+let _lastManeuverPrediction = null;  // 本帧机动节点预测（读领域层 maneuverChain 结果 + 屏幕投影，机动 UI 读取）
+// 多节点（0.2.6）：链式计算与计划缓存在领域层 ship/maneuverChain.js，本层只做屏幕投影与绘制
 
 // rgba 字符串缓存（0.2.5 A8：hexToRgba 每帧对每个天体/设施重复 parse+拼接，按 (hex,alpha) 缓存）
 const _rgbaCache = new Map();
@@ -589,6 +595,8 @@ export {
     render,
     renderFlightHud,
     // 轨道交互骨架（0.2.4）：数据访问器 + 悬停状态通道 + 待填功能函数
+    // —— 保留的都是**轨道 / 屏幕空间产物**（不含机动数据）；机动数据一律由领域层
+    //    ship/maneuverChain.js 提供（UI 与场景层都直接取领域层）
     computeApPePositions,
     renderOrbitMarkers,
     findNearestOrbitPoint,
@@ -596,11 +604,7 @@ export {
     setOrbitHoverState,
     getOrbitHoverState,
     getLastOrbitSegments,
-    getLastOrbitMarkers,
-    getLastManeuverPrediction,
-    getLastManeuverNodes,
-    getManeuverSelectedId,
-    getNextPendingManeuverPrediction
+    getLastOrbitMarkers
 };
 
 // ========== 轨道线渲染系统 ==========
@@ -695,12 +699,20 @@ function renderOrbit(ship, ctx, canvas, isActive = true) {
         _lastOrbitSegments = null;
         _lastOrbitMarkers = [];
         _lastManeuverPrediction = null;
+        // 领域层本帧结果一并清空（否则交互层会读到上一艘飞船的链）
+        updateManeuverChain(null);
+        _mvNodes = [];
         syncOrbitLabels([], canvas);
         return;
     }
 
     let segments;
-    if (ship.mode === 'on_rails') {
+    if (isActive) {
+        // 基础链由领域层取（本模块不接受外部传入的链）：更新阶段已解析 → 此处纯读同一份结果，
+        // 轨道线、节点标记、命中检测因此共享同一份投影（帧内同源）
+        const frame = updateManeuverChain(ship);
+        segments = frame ? frame.baseSegments : null;
+    } else if (ship.mode === 'on_rails') {
         segments = predictTrajectoryPatched(ship);
     } else {
         // 推力模式：显示假设立即熄火的常规轨道
@@ -771,9 +783,9 @@ function renderOrbit(ship, ctx, canvas, isActive = true) {
         ctx.setLineDash([]);
     }
 
-    // 机动节点预测：计算 + 绘制红色预测线（燃烧弧 + 机动后轨道），缓存供 UI/交互层读取
+    // 机动节点预测：读领域层本帧结果 + 屏幕投影（燃烧弧 + 机动后轨道），缓存供 UI/交互层读取
     // （先于 renderOrbitMarkers：燃料耗尽点/Ap/Pe 标记经 extraDefs 并入同一标签管线）
-    _lastManeuverPrediction = prepareManeuverPredictions(ship, segments, canvas);
+    _lastManeuverPrediction = prepareManeuverPredictions(ship, canvas);
     renderManeuverOrbits(ship, ctx, canvas, _mvNodes);
 
     // 骨架：Ap/Pe 标记绘制调用点（renderOrbitMarkers 功能体待填，当前返回 []）
@@ -796,213 +808,64 @@ function renderOrbit(ship, ctx, canvas, isActive = true) {
 // { time: Number, deltaV: {x, y}, executed: Boolean }
 // 0.2.5 机动节点：扩展字段 relX/relY/anchorBody（节点在轨道上的冻结坐标，供图标锚定）
 
-// 机动节点预测准备：返回 { plan, segments, burnArc, maneuverMarkerDefs, nodeScreen, node }
-// 无节点 / 计算异常 → null。
+// 机动节点预测准备（多节点）：返回 { plan, segments, burnArc, maneuverMarkerDefs, nodeScreen, node }
+// ——返回的是**选中节点**的结果；**全部节点的结果一律由领域层 getChainNodes() 提供**
+//    （渲染层仅在内部持有本帧投影副本供绘制使用）。
+// 无节点 / 解析失败 → null。
 // 注意 1：不按 ship.mode 过滤——推力模式下（玩家按机动计划手动燃烧中）预测线必须保持显示，
 //         否则一开节流阀机动规划即消失，玩家无法按计划执行（0.2.5 修复）。
 // 注意 2：不按 node.executed 过滤——已完成节点继续显示预测轨迹（参照线常驻，
 //         玩家烧过头后可据此"拐回来"；编辑即重新进入计划态）。
-// ===== 多节点链式解析（0.2.6）=====
-// 结构：按时刻序遍历节点，逐个把"上一条链的状态"投影成该节点的快照 → 算计划 → 链前推 → 链式扣质量。
-// 失效：每个节点记录依赖（前序节点 id + 其版本号 _rev）。前序被编辑/重投影 → 版本变化 →
-//       下游节点自动重投影（位置/速度取自新链，Δv 分量不变、按新参考系重建世界矢量）。
-// 缓存：按节点对象缓存计划，键含版本号/时刻/Δv/质量/引擎参数——无编辑时逐帧零重算。
-let _mvPlanCache = new Map();      // node → { key, result }
-let _mvNodes = [];                 // 本帧解析结果（含每个节点的 plan/segments/nodeScreen）
-let _mvSelectedId = null;          // 本帧选中节点 id（UI/交互层读取）
-let _mvNextPending = null;         // 本帧执行目标（下一个未执行节点）的结果（SAS/定点加速用）
+//
+// ===== 多节点链式解析（0.2.6 阶段2：计算已搬至领域层 src/ship/maneuverChain.js）=====
+// 渲染层职责：只**读**领域层本帧结果，补屏幕投影（nodeScreen）与标记 def 后绘制。
+// 渲染路径**不写任何 node.* 快照字段**（relX/relY/relVelX/relVelY/anchorBody/massWet/
+// massFuel/_rev/_deps）——链解析 / 重投影 / 质量投影全部在 maneuverChain 内完成。
+// 帧内同源：同一份本帧结果同时供轨道线、节点标记、右键菜单命中使用（见 updateManeuverChain 幂等约定）。
+let _mvNodes = [];                 // 本帧解析结果（**渲染层内用**：逐节点绘制预测线，非对外总线）
 
-// 节点快照是否完整（computePlan 的冻结路径前提）
-function hasNodeSnapshot(node) {
-    return !!(node && node.relX !== null && node.relX !== undefined
-        && node.relY !== null && node.relY !== undefined
-        && isFinite(node.relVelX) && isFinite(node.relVelY) && node.anchorBody);
-}
-
-// 把链上状态写回节点快照（重投影：分量不变，世界矢量按新参考系重建）
-function reprojectNodeToState(node, st) {
-    if (!node || !st || !st.relPos || !st.relVel) return false;
-    const oldAxes = computeNodeAxes(
-        { x: node.relX, y: node.relY }, { x: node.relVelX, y: node.relVelY });
-    if (oldAxes) syncComponentsFromDeltaV(node, oldAxes);
-    node.relX = st.relPos.x;
-    node.relY = st.relPos.y;
-    node.relVelX = st.relVel.x;
-    node.relVelY = st.relVel.y;
-    node.anchorBody = st.host ? st.host.name : node.anchorBody;
-    const newAxes = computeNodeAxes({ x: node.relX, y: node.relY }, { x: node.relVelX, y: node.relVelY });
-    if (newAxes) rebuildDeltaVFromComponents(node, newAxes);
-    return true;
-}
-
-// 单节点计划（带缓存）
-// allowRecompute=false（本帧重算预算已用完）：命中缓存则沿用上一帧结果，未命中则返回降级空结果
-function planForNode(ship, node, chain, allowRecompute) {
-    const cacheKey = (node._rev | 0) + '|' + node.time + '|' + node.deltaV.x + '|' + node.deltaV.y + '|'
-        + (isFinite(node.massWet) && node.massWet > 0 ? node.massWet : -1) + '|'
-        + (ship.maxThrust || 0) + '|' + (ship.isp || 0);
-    const cached = _mvPlanCache.get(node);
-    if (cached && cached.key === cacheKey) return cached.result;
-    if (!allowRecompute && cached) return cached.result;      // 预算用完 → 沿用旧计划
-
-    let result;
-    try {
-        result = predictManeuverTrajectories(ship, node, chain);
-    } catch (err) {
-        // 隔离异常：机动预测失败仅降级（无红线/无标记），绝不让整帧渲染中断（黑屏防线）
-        console.error('[Maneuver] 机动预测异常（已降级）:', err);
-        result = { segments: [], burnArc: null, fuelOutPoint: null, plan: null };
+// 节点图标屏幕位置（屏幕空间属渲染层）：计划状态优先；
+// 退化用冻结轨道坐标（relX/relY + 宿主"当前时刻"位置）。
+function projectNodeScreen(node, plan, now, canvas) {
+    if (plan && plan.nodeState) {
+        const hp = bodyFuturePos(plan.nodeState.host, now);
+        return worldToScreen(plan.nodeState.relPos.x + hp.x, plan.nodeState.relPos.y + hp.y, canvas);
     }
-    _mvPlanCache.set(node, { key: cacheKey, result });
-    return result;
+    if (node && node.relX !== null && node.relX !== undefined && node.anchorBody) {
+        const b = celestialBodies.find(x => x.name === node.anchorBody);
+        const hp = b ? bodyFuturePos(b, now) : { x: 0, y: 0 };
+        return worldToScreen(node.relX + hp.x, node.relY + hp.y, canvas);
+    }
+    return null;
 }
 
-// 计划燃烧消耗的推进剂（质量投影用）：massFlow × 燃烧时长
-function burnFuelOf(result, ship) {
-    const plan = result && result.plan;
-    if (!plan || !plan.burnResult) return 0;
-    const isp = ship.isp || 0;
-    const thrust = ship.maxThrust || 0;
-    if (!(isp > 0) || !(thrust > 0)) return 0;
-    const massFlow = thrust / (isp * 9.80665);
-    const dur = plan.burnResult.burnDuration || 0;
-    return massFlow * dur;
-}
-
-// 机动节点预测准备（多节点）：返回 { plan, segments, burnArc, maneuverMarkerDefs, nodeScreen, node }
-// ——返回的是**选中节点**的结果（兼容既有 UI 接口）；全部节点结果经 getLastManeuverNodes() 读取。
-// 注意 1：不按 ship.mode 过滤（推力模式下预测线保持显示）。
-// 注意 2：不按 node.executed 过滤（已完成节点继续作为参照轨迹常驻）。
-function prepareManeuverPredictions(ship, baseSegments, canvas) {
-    if (!ship || !Array.isArray(ship.maneuverNodes) || ship.maneuverNodes.length === 0) {
-        _mvPlanCache.clear();
+function prepareManeuverPredictions(ship, canvas) {
+    // 幂等调用：更新阶段已解析本帧 → 此处纯读同一份结果（不重算、不写节点）
+    const frame = updateManeuverChain(ship);
+    if (!frame) {
         _mvNodes = [];
-        _mvSelectedId = null;
         return null;
     }
 
-    const nodes = ship.maneuverNodes.slice().sort((a, b) => a.time - b.time);
-    // 计划缓存清理（多节点 0.2.6）：节点增删后 Map 会残留已删除节点的条目 —
-    // 数量明显超出当前节点数时重建缓存（避免长会话内存缓慢增长）
-    if (_mvPlanCache.size > Math.max(8, nodes.length * 2)) {
-        const alive = new Set(nodes);
-        for (const key of Array.from(_mvPlanCache.keys())) {
-            if (!alive.has(key)) _mvPlanCache.delete(key);
-        }
-    }
     const now = getCachedTime();
-    const selectedIds = new Set();
-
-    let chain = baseSegments;
-    let massLeft = getTotalMass(ship) || 0;
-    let fuelLeft = getFuelAmount(ship) || 0;
-    let prev = null;
-    const out = [];
-    // 分帧重算预算（多节点护栏）：一帧内最多重算 N 个计划，其余沿用上一帧（下一帧追赶）
-    let recomputeBudget = MANEUVER_CONFIG.planRecomputeBudget || 3;
-
-    for (const node of nodes) {
-        // ① 旧节点快照回填 / 前序变化后的重投影
-        const predId = prev ? prev.id : null;
-        const predRev = prev ? (prev._rev | 0) : 0;
-        const deps = node._deps;
-        const needReproject = !hasNodeSnapshot(node)
-            || !deps || deps.predId !== predId || deps.predRev !== predRev;
-        if (needReproject) {
-            try {
-                const st = walkToTime(chain, node.time);
-                if (st) {
-                    reprojectNodeToState(node, st);
-                    node._rev = (node._rev | 0) + 1;
-                }
-            } catch (err) {
-                // 链瞬时缺失（模式切换过渡帧 / 节点时刻超出链跨度）→ 保留原快照，本帧不重试
-            }
-            // 记录依赖：无论成功与否都写入，避免每帧重复尝试
-            node._deps = { predId, predRev };
-            if (!hasNodeSnapshot(node)) {
-                node.massWet = massLeft;
-                node.massFuel = fuelLeft;
-            }
-        }
-
-        // ② 链式质量投影（前序燃烧后的剩余质量）
-        if (Math.abs((node.massWet || 0) - massLeft) > 0.01) {
-            node.massWet = massLeft;
-            node.massFuel = fuelLeft;
-        }
-
-        // ③ 计算该节点计划（按节点缓存 + 分帧预算）
-        const cacheHit = (() => {
-            const c = _mvPlanCache.get(node);
-            return !!(c && c.key === ((node._rev | 0) + '|' + node.time + '|' + node.deltaV.x + '|' + node.deltaV.y + '|'
-                + (isFinite(node.massWet) && node.massWet > 0 ? node.massWet : -1) + '|'
-                + (ship.maxThrust || 0) + '|' + (ship.isp || 0)));
-        })();
-        if (!cacheHit && recomputeBudget > 0) recomputeBudget -= 1;
-        const result = planForNode(ship, node, chain, !cacheHit && recomputeBudget >= 0);
-
-        // ④ 节点图标屏幕位置（plan 优先；退化用冻结轨道坐标）
-        let nodeScreen = null;
-        const plan = result.plan;
-        if (plan && plan.nodeState) {
-            const hp = bodyFuturePos(plan.nodeState.host, now);
-            nodeScreen = worldToScreen(plan.nodeState.relPos.x + hp.x, plan.nodeState.relPos.y + hp.y, canvas);
-        } else if (node.relX !== null && node.relX !== undefined && node.anchorBody) {
-            const b = celestialBodies.find(x => x.name === node.anchorBody);
-            const hp = b ? bodyFuturePos(b, now) : { x: 0, y: 0 };
-            nodeScreen = worldToScreen(node.relX + hp.x, node.relY + hp.y, canvas);
-        }
-
-        out.push({ node, result, plan, nodeScreen });
-        if (plan) selectedIds.add(node.id);
-
-        // ⑤ 链前推 + 扣质量
-        if (result.segments && result.segments.length > 0) chain = result.segments;
-        const used = burnFuelOf(result, ship);
-        if (used > 0) {
-            massLeft = Math.max(0, massLeft - used);
-            fuelLeft = Math.max(0, fuelLeft - used);
-        }
-        prev = node;
-    }
-
-    // 选中节点：**只读** maneuverSystem 的选中态（T6-1A：写选中态是 UI 层职责，
-    // 渲染层不再回写；"无选中时自动选中"由 ui/maneuverUI.js 负责）
-    const selNode = maneuverSystem.getSelectedNode(ship);
-    _mvSelectedId = selNode ? selNode.id : null;
-
-    const sel = out.find(o => o.node.id === _mvSelectedId) || out[0];
-    _mvNodes = out.map(o => ({
-        node: o.node,
-        plan: o.plan,
-        segments: o.result.segments,
-        burnArc: o.result.burnArc,
-        fuelOutPoint: o.result.fuelOutPoint,
-        nodeScreen: o.nodeScreen,
-        selected: o.node.id === _mvSelectedId
+    _mvNodes = getChainNodes().map(e => ({
+        node: e.node,
+        plan: e.plan,
+        segments: e.segments,
+        burnArc: e.burnArc,
+        fuelOutPoint: e.fuelOutPoint,
+        selected: e.selected,
+        nodeScreen: projectNodeScreen(e.node, e.plan, now, canvas)
     }));
 
+    const sel = getSelectedPrediction();
     if (!sel) return null;
-    const markerDefs = buildManeuverMarkerDefs(sel.node, sel.result, now);
-    // 执行目标（多节点 0.2.6）：下一个未执行节点 —— SAS 指向 / 定点加速 / 冲量归属都用它
-    const pendingEntry = out.find(o => !o.node.executed) || null;
-    _mvNextPending = pendingEntry
-        ? {
-            plan: pendingEntry.plan,
-            segments: pendingEntry.result.segments,
-            burnArc: pendingEntry.result.burnArc,
-            maneuverMarkerDefs: [],
-            nodeScreen: pendingEntry.nodeScreen,
-            node: pendingEntry.node
-        }
-        : null;
     return {
         plan: sel.plan,
-        segments: sel.result.segments,
-        burnArc: sel.result.burnArc,
-        maneuverMarkerDefs: markerDefs,
-        nodeScreen: sel.nodeScreen,
+        segments: sel.segments,
+        burnArc: sel.burnArc,
+        maneuverMarkerDefs: buildManeuverMarkerDefs(sel.node, sel, now),
+        nodeScreen: projectNodeScreen(sel.node, sel.plan, now, canvas),
         node: sel.node
     };
 }
@@ -1067,21 +930,6 @@ function buildManeuverMarkerDefs(node, result, now) {
         }
     }
     return markerDefs;
-}
-
-// 本帧全部节点的解析结果（UI/交互层读取：N 个图标、面板切换器、放大图全链显示）
-function getLastManeuverNodes() {
-    return _mvNodes;
-}
-
-// 本帧选中节点 id
-function getManeuverSelectedId() {
-    return _mvSelectedId;
-}
-
-// 本帧执行目标（下一个未执行节点）的预测结果：SAS 节点指向、定点加速、导航球标记用
-function getNextPendingManeuverPrediction() {
-    return _mvNextPending;
 }
 
 // 机动节点预测线绘制（0.2.6 多节点）：逐节点绘制 燃烧弧 + 机动后链；
@@ -1565,34 +1413,19 @@ function applyLabelAvoidance(markers) {
     }
 }
 
-// 屏幕空间点到线段的最短距离（平方）与线段插值参数 t（0~1）
-// 返回 { distSq, t }：distSq 供阈值比较（避免逐对开方），t 为命中点在线段上的位置。
-// 世界→屏幕是仿射变换（线性缩放 + Y 翻转 + 平移），线段映射保持线性，
-// 因此该 t 可直接复用于世界坐标与时间插值（见 findNearestOrbitPoint）。
-function distToSegmentSq(px, py, ax, ay, bx, by) {
-    const dx = bx - ax;
-    const dy = by - ay;
-    const lenSq = dx * dx + dy * dy;
-    let t = 0;
-    if (lenSq > 0) {
-        t = ((px - ax) * dx + (py - ay) * dy) / lenSq;
-        t = Math.max(0, Math.min(1, t));
-    }
-    const cx = ax + t * dx;
-    const cy = ay + t * dy;
-    const ex = px - cx;
-    const ey = py - cy;
-    return { distSq: ex * ex + ey * ey, t };
-}
+// 屏幕空间点到线段的最短距离计算已随搜索本体搬至领域层（ship/maneuverChain.js
+// 的 distToSegmentSq），渲染层只保留阈值换算与屏幕量补全。
 
 /**
  * 在轨道预测 segments 中找距鼠标最近的轨道点（屏幕空间点-线段距离）
- * 方案：鼠标世界坐标先转屏幕，逐点 worldToScreen 后计算屏幕空间点到线段的距离，
- * 阈值 thresholdPx 直接在屏幕像素空间比较 —— 避免"世界距离阈值 / zoom"
+ * 方案：阈值 thresholdPx 按屏幕像素比较 —— 避免"世界距离阈值 / zoom"
  * 在极限缩放下失效（zoom→0 时阈值膨胀为天文数字，悬停恒命中）。
+ * 搜索本体在领域层 findNearestChainPoint（世界坐标）：
+ * 世界→屏幕是等比相似变换（旋转 + 均匀缩放 + 平移），世界空间的距离比较与线段插值
+ * 参数 t 与屏幕空间完全等价，故此处只做"像素阈值 → 世界阈值"换算与屏幕量补全。
  * 命中点附带插值时间（段内秒偏移，绝对时刻 = seg.anchorTime + timeOffset）。
- * 悬停/右键共用本函数；内部使用 getSegmentAnchor 与轨道线渲染同口径锚点。
- * @param {Array} segments - getLastOrbitSegments() 的同一批 segments
+ * 悬停/右键共用本函数。
+ * @param {Array} segments - 预测段（本帧活动飞船基础链 / 机动后链）
  * @param {Object} mouseWorld - { x, y } 鼠标世界坐标（screenToWorld 产出）
  * @param {number} thresholdPx - 悬停判定阈值（屏幕像素）
  * @param {HTMLCanvasElement} canvas
@@ -1610,51 +1443,25 @@ function distToSegmentSq(px, py, ax, ay, bx, by) {
 function findNearestOrbitPoint(segments, mouseWorld, thresholdPx, canvas) {
     if (!segments || segments.length === 0 || !mouseWorld || !canvas) return null;
 
-    // 鼠标统一到屏幕空间（与线段点同坐标系比较）
-    const mouse = worldToScreen(mouseWorld.x, mouseWorld.y, canvas);
-    const thresholdSq = thresholdPx * thresholdPx;
-    let best = null;
-    let bestDistSq = thresholdSq;
+    const scale = screenWorldScale(canvas);
+    if (!(scale > 0)) return null;
 
-    for (let si = 0; si < segments.length; si++) {
-        const seg = segments[si];
-        if (!seg.relPoints || seg.relPoints.length < 2) continue;
-
-        const anchor = getSegmentAnchor(seg);
-        let prev = worldToScreen(seg.relPoints[0].x + anchor.x, seg.relPoints[0].y + anchor.y, canvas);
-
-        for (let pi = 1; pi < seg.relPoints.length; pi++) {
-            const rp = seg.relPoints[pi];
-            const cur = worldToScreen(rp.x + anchor.x, rp.y + anchor.y, canvas);
-
-            const hit = distToSegmentSq(mouse.x, mouse.y, prev.x, prev.y, cur.x, cur.y);
-            if (hit.distSq < bestDistSq) {
-                bestDistSq = hit.distSq;
-                const p0 = seg.relPoints[pi - 1];
-                // 屏幕线段上的插值参数 t 可直接复用于世界线段（仿射变换保线性）
-                best = {
-                    segmentIndex: si,
-                    pointIndex: pi - 1,
-                    segT: hit.t,
-                    worldX: (p0.x + (rp.x - p0.x) * hit.t) + anchor.x,
-                    worldY: (p0.y + (rp.y - p0.y) * hit.t) + anchor.y,
-                    screenX: prev.x + (cur.x - prev.x) * hit.t,
-                    screenY: prev.y + (cur.y - prev.y) * hit.t,
-                    soiName: seg.soiName,
-                    isCurrentSoi: seg.isCurrentSoi,
-                    // 时间与位置同参数插值；外部构造的段可能缺 t 字段，防御为 null
-                    timeOffset: (p0.t !== undefined && rp.t !== undefined)
-                        ? p0.t + (rp.t - p0.t) * hit.t
-                        : null
-                };
-            }
-            prev = cur;
-        }
-    }
-
+    const best = findNearestChainPoint(segments, mouseWorld, Math.abs(thresholdPx) / scale);
     if (!best) return null;
-    best.distPx = Math.sqrt(bestDistSq);
+
+    const s = worldToScreen(best.worldX, best.worldY, canvas);
+    best.screenX = s.x;
+    best.screenY = s.y;
+    best.distPx = best.distWorld * scale;
     return best;
+}
+
+// 世界→屏幕缩放（屏幕像素 / 世界长度）：世界→屏幕为等比相似变换（旋转 + 均匀缩放 + 平移），
+// 取相机中心附近两点的投影距离实测 —— 与相机内部实现解耦（改相机不影响命中口径）。
+function screenWorldScale(canvas) {
+    const o = worldToScreen(camera.x, camera.y, canvas);
+    const u = worldToScreen(camera.x + 1, camera.y, canvas);
+    return Math.hypot(u.x - o.x, u.y - o.y);
 }
 
 // 悬停状态通道：flightScene 在 mousemove 中写入，renderOrbitMarkers 绘制时消费
@@ -1669,11 +1476,6 @@ function getOrbitHoverState() {
 // 轨道几何数据通道：本帧已绘制内容，交互层只读（悬停检测 / 右键菜单数据源）
 function getLastOrbitSegments() {
     return _lastOrbitSegments;
-}
-
-// 本帧机动节点预测缓存（0.2.5）：机动 UI 面板/图标读取（plan/segments/nodeScreen/maneuverMarkerDefs）
-function getLastManeuverPrediction() {
-    return _lastManeuverPrediction;
 }
 
 function getLastOrbitMarkers() {
