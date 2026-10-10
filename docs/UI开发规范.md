@@ -137,13 +137,12 @@ src/
 | `window.openAnnouncement` | 公告面板入口(0.2.4 由 scene 面板化,announcementUI.js;启动进主菜单自动打开) |
 | `window.openShipBuilder / openFacilityDeployPanel` | 面板入口(flightUI 调用) |
 | `window.renderToolbarIcons / showDockPrompt / hideDockPrompt` | flightScene ↔ flightUI |
-| `window.__visibilityState / __toggleVisibility` | flightScene ↔ sasUI |
-| `window.__pendingFacilityId` | trackingUI → flightScene |
 | `window.updateTrackingInfo / hideTrackingInfo` | trackingScene ↔ trackingUI |
-| `window.__shipSystem / __saveManager / __eventBus` 等单例 | console 调试访问 + 惰性跨模块访问 |
+| `window.__shipSystem / __saveManager / __eventBus` 等单例 | **仅 console 调试访问**。生产代码**禁止**消费这些全局来访问业务系统(见 `AI工作规范.md` 第 7 节「铁律执行口径」);模块间一律走 `import` 或 `eventBus` |
 | `window._soiDiag / __DEBUG_STRINGS / __timeWarpKeyDebug` | 调试开关 |
 
 **已被收敛、勿再使用**:`window.__renderWorldList` 等存档管理函数(已改 menuUI 命名导出)、`window.__toggleShipCategory` 等建造/部署内部函数、`window.formatSpeed` 等格式化函数、`window.switchToThrustMode` 等调试函数。
+另(0.2.5 合规整改):`window.__visibilityState / __toggleVisibility`(状态已归 sasUI 面板独占,经 `getVisibilityState()` / `toggleVisibility()` 方法访问)、`window.__pendingFacilityId`(改用 `Events.FACILITY_FOCUS_REQUESTED` 事件)、`window.currentWorldId`(收敛为 `GameState.worldId`)。这三项**已从代码中移除**,不得再引用。
 
 ### 8. 数据驱动
 
