@@ -8,7 +8,8 @@ import { createNotification, createDialog, createInputDialog, createConfirmDialo
 import { saveManager } from '../saveManager.js';
 import { t } from '../config/ui/strings.js';
 
-// 层级存档 - 暴露 UI 组件到全局，供 main.js 使用
+// 层级存档 - 对话框组件的调试挂载（消费者已改为直接从 uiComponents.js import，
+// 此处保留仅供浏览器控制台调试，无生产消费方）
 window.__createDialog = createDialog;
 window.__createInputDialog = createInputDialog;
 // 退出优化 - 暴露确认对话框到全局

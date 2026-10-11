@@ -4,7 +4,7 @@ import { gameState } from './src/gameState.js';
 import { t } from './src/config/ui/strings.js';
 
 // SaveManager - 加载存档管理器
-import './src/saveManager.js';
+import { saveManager } from './src/saveManager.js';
 
 // TimeWarp - 时间加速/暂停（模块加载即安装全局按键监听）
 import './src/timeWarp.js';
@@ -416,7 +416,7 @@ window.applyNewGameCreation = function(name, starSystems) {
     }
 
     // 先创建世界（含名称冲突检测），成功后再切场景
-    const worldId = window.__saveManager.createWorld(name, systemIds);
+    const worldId = saveManager.createWorld(name, systemIds);
     if (worldId) {
         gameState.setState({ worldId });
         sceneManager.switchTo('flight');

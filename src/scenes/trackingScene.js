@@ -196,7 +196,9 @@ export function renderTrackingNav(tree) {
     function selectNode(node) {
         trackingSelectedId = node.id;
         focusTrackingNode(node);
-        window.updateTrackingInfo(node);
+        // 经 eventBus 刷新信息面板（铁律③：UI 只订阅事件刷新）。同步派发 ⇒
+        // 订阅方 updateTrackingInfo 必然在下一行 renderTrackingNav 之前完成
+        eventBus.emit(Events.TRACKING_INFO_SHOW, { node });
         renderTrackingNav(tree);
     }
 
@@ -357,14 +359,18 @@ export function registerTrackingScene({ getTime, setTime, canvas }) {
                 const absPos = getAbsolutePosition(activeShip);
                 trackingFocusPos = { x: absPos.x, y: absPos.y };
                 const shipName = activeShip.displayName || activeShip.id || t('tracking.typeShip');
-                window.updateTrackingInfo({
-                    id: activeShip.id,
-                    name: shipName,
-                    type: 'ship',
-                    soi: activeShip.currentSOI,
-                    // 追踪站摧毁 — 统一 delete 接口
-                    delete: () => shipSystem.deleteShip(activeShip.id)
-                }, { silent: true });
+                // 场景 enter 自动打开信息面板（silent：不产生打开音效）
+                eventBus.emit(Events.TRACKING_INFO_SHOW, {
+                    node: {
+                        id: activeShip.id,
+                        name: shipName,
+                        type: 'ship',
+                        soi: activeShip.currentSOI,
+                        // 追踪站摧毁 — 统一 delete 接口
+                        delete: () => shipSystem.deleteShip(activeShip.id)
+                    },
+                    silent: true
+                });
             }
         },
         exit: () => {
@@ -374,7 +380,7 @@ export function registerTrackingScene({ getTime, setTime, canvas }) {
                 activeShip.controlsLocked = false;
             }
             // 隐藏信息窗口（场景退出自动关闭，不产生关闭音效）
-            window.hideTrackingInfo && window.hideTrackingInfo({ silent: true });
+            eventBus.emit(Events.TRACKING_INFO_HIDE, { silent: true });
             // 清空轨道标签（追踪站同样产生 Ap/Pe 标记，退出后必须显式清理，防残留其他场景）
             clearOrbitLabels();
         },

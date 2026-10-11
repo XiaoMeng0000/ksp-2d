@@ -7,6 +7,7 @@ import { renderableManager } from '../graphics/renderable.js';
 import { MENUS } from '../config/ui/menuConfig.js';
 import { LINKS_ICONS } from '../config/ui/menuConfig.js'; // 1. 导入数据
 import { VERSION_TEXT } from '../config/meta/version.js';
+import { SETTINGS_ROWS } from '../config/gameplay/settingsConfig.js';
 
 // 主菜单 — DOM 版（阶段 3：Canvas→DOM）
 // - 数据驱动：menuConfig.js 的 MENUS 定义各菜单按钮（label/action）
@@ -21,6 +22,15 @@ let _container = null;      // 主菜单 DOM 容器
 let _onKeyDown = null;
 let _texturesReadyHandler = null;
 let _callbacks = {};
+let _menuBgMode = 'stars';          // 菜单背景模式缓存（进场景读一次，渲染路径不再读存储）
+let _settingsClosedHandler = null;
+
+// 读取菜单背景模式 —— 存储键取 settingsConfig 的定义（配置集中，不硬编码字面量）
+function _readMenuBgMode() {
+    const row = (SETTINGS_ROWS.display || []).find(r => r.group === 'menuBg');
+    if (!row) return 'stars';
+    return localStorage.getItem(row.storageKey) || row.defaultValue;
+}
 
 // 生成背景星空
 function _generateStars() {
@@ -255,6 +265,19 @@ function registerMenuScene(options) {
             _currentMenu = 'main';
             _generateStars();
 
+            // 菜单背景模式：进场景读一次并缓存（渲染路径不再触碰 localStorage）
+            _menuBgMode = _readMenuBgMode();
+
+            // 设置面板化后可在主菜单内直接改背景（不切场景），故在设置面板关闭时刷新缓存；
+            // 复用 uiManager 既有的 UI_PANEL_CLOSED 事件，不新增事件、不轮询
+            // 守卫：enter 可能被重复调用（场景重入/显式调用），避免重复订阅导致 exit 只注销得掉最后一个
+            if (!_settingsClosedHandler) {
+                _settingsClosedHandler = ({ panelId }) => {
+                    if (panelId === 'settings') _menuBgMode = _readMenuBgMode();
+                };
+                eventBus.on(Events.UI_PANEL_CLOSED, _settingsClosedHandler);
+            }
+
             _container = _buildMenuDOM();
             _renderMenuButtons('main');
 
@@ -282,8 +305,7 @@ function registerMenuScene(options) {
         },
 
         render(ctx) {
-            const menuBgMode = localStorage.getItem('ksp2d.menuBg') || 'stars';
-            if (menuBgMode === 'image') {
+            if (_menuBgMode === 'image') {
                 const bg = textureManager.get('menu_bg');
                 if (bg) {
                     ctx.drawImage(bg, 0, 0, _canvas.width, _canvas.height);
@@ -299,6 +321,10 @@ function registerMenuScene(options) {
             if (_onKeyDown) {
                 document.removeEventListener('keydown', _onKeyDown);
                 _onKeyDown = null;
+            }
+            if (_settingsClosedHandler) {
+                eventBus.off(Events.UI_PANEL_CLOSED, _settingsClosedHandler);
+                _settingsClosedHandler = null;
             }
             if (_texturesReadyHandler) {
                 eventBus.off(Events.TEXTURES_READY, _texturesReadyHandler);

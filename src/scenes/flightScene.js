@@ -21,6 +21,7 @@ import { gameState } from '../gameState.js';
 import { SASController } from '../ship/sasController.js';
 import { SAS_CYCLE_ORDER, SAS_DIRECTION_ORDER, computeNavballDirections as computeSasDirections } from '../ship/sasModes.js';
 import { sasUI } from '../ui/sasUI.js';
+import { renderToolbarIcons, showDockPrompt, hideDockPrompt } from '../ui/flightUI.js';
 import { showTooltip, hideTooltip } from '../ui/uiTooltip.js';
 import { clearOrbitLabels } from '../ui/orbitLabels.js';
 import { facilitySystem } from '../facility/facilitySystem.js';
@@ -687,7 +688,7 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
         },
         exit: () => {
             // 隐藏对接提示框，防止遗留到其他场景
-            window.hideDockPrompt();
+            hideDockPrompt();
             _dockPromptFacId = null;
 
             inputManager.disable();
@@ -894,9 +895,9 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             // 5d. 对接弹窗状态驱动（委托 UI 模块管理 HTML DOM，渲染函数不碰 UI）
             if (_nearFacility && activeShip) {
                 if (_dockPromptFacId !== _nearFacility.id) {
-                    if (_dockPromptFacId) window.hideDockPrompt();
+                    if (_dockPromptFacId) hideDockPrompt();
                     const facId = _nearFacility.id;
-                    window.showDockPrompt(_nearFacility, () => {
+                    showDockPrompt(_nearFacility, () => {
                         const ship = shipSystem.getActiveShip();
                         if (ship && _nearFacility) {
                             const result = facilitySystem.dockShip(facId, ship.id);
@@ -910,7 +911,7 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                     _dockPromptFacId = facId;
                 }
             } else if (_dockPromptFacId) {
-                window.hideDockPrompt();
+                hideDockPrompt();
                 _dockPromptFacId = null;
             }
 
@@ -1167,9 +1168,8 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             if (nextMode !== _lastToolbarMode || dataFingerprint !== _lastToolbarFingerprint) {
                 _lastToolbarMode = nextMode;
                 _lastToolbarFingerprint = dataFingerprint;
-                if (typeof window.renderToolbarIcons === 'function') {
-                    window.renderToolbarIcons(nextMode, nextData);
-                }
+                // 直接调用 flightUI 的命名导出（0.2.5 整改：原经 window.renderToolbarIcons 全局消费）
+                renderToolbarIcons(nextMode, nextData);
                 // 模式切换时关闭弹出页面面板（0.2.4:页面为多实例 .tkp-page）
                 for (const el of document.querySelectorAll('.tkp-page')) {
                     el.style.display = 'none';

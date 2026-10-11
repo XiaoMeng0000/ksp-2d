@@ -10,6 +10,7 @@ import { renderIconHtml, showModuleSelectorPopup } from './uiComponents.js';
 import { makePanelDraggable, cascadePanelOpen } from './panelDrag.js';
 import { shipSystem } from '../ship/shipSystem.js';
 import { facilitySystem } from '../facility/facilitySystem.js';
+import { gameState } from '../gameState.js';
 import { t } from '../config/ui/strings.js';
 
 // EventBus 迁移 — 缓存最近一帧的飞船渲染数据，供 UI 只读函数使用
@@ -306,7 +307,11 @@ function buildShip() {
     }
 
     // 建造必须在受控船坞的装配车间进行（扣费来源 = 当前受控设施存储）
-    const facility = window.__getControlledFacility ? window.__getControlledFacility() : null;
+    // 0.2.5 整改：原经 window.__getControlledFacility（flightUI 的模块级 _currentFacility）。
+    // 两者在同步时刻相等，但 _currentFacility 是**可能过期的镜像** —— 建造面板不随控制权
+    // 切换而关闭，玩家可在面板开着时把控制权切给飞船，此时旧镜像仍指向已不受控的设施，
+    // 旧代码会据此放行建造。故本处改读 GameState，保证「只对当前受控设施建造」。
+    const facility = gameState.getActiveFacility();
     if (!facility) {
         window.showNotification(t('build.noFacility'), 'error');
         return;
@@ -339,7 +344,7 @@ function buildShip() {
 }
 
 // 飞船建造UI - 打开建造界面
-window.openShipBuilder = function() {
+function openShipBuilder() {
     renderShipBuilderCategories();
     selectedShip = null;
     document.getElementById('shipBuilderStats').innerHTML = 
@@ -349,7 +354,16 @@ window.openShipBuilder = function() {
     uiManager.showPanel('shipBuilder');
     // 0.2.4 多面板并存:与其它浮层面板同开时错位,避免完全重叠
     cascadePanelOpen(shipBuilderPanel);
-};
+}
+
+// 保留调试挂载（裁定：允许挂载，禁止生产代码消费）
+window.openShipBuilder = openShipBuilder;
+
+// 工具栏「装配车间」经 eventBus 下发打开命令（0.2.5 整改：原 flightUI 直连 window.openShipBuilder，
+// 会与 flightUI 形成互相 import 的环）
+eventBus.on(Events.SHIP_BUILDER_REQUESTED, () => {
+    openShipBuilder();
+});
 
 // 飞船建造UI - 注册到 uiManager
 uiManager.registerPanel('shipBuilder', {

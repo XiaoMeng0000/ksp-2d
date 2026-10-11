@@ -8,7 +8,7 @@ import { facilitySystem } from '../facility/facilitySystem.js';
 import { getFacilityCompartments, getFacilityType, getCompartmentDef } from '../config/entities/facilityTypes.js';
 import { getModuleDef, getCapabilityToolbar } from '../config/entities/moduleTypes.js';
 import { textureManager } from '../graphics/textureManager.js';
-import { renderIconHtml, renderFuelBarsHtml, showModuleSelectorPopup } from './uiComponents.js';
+import { renderIconHtml, renderFuelBarsHtml, showModuleSelectorPopup, createDialog, createInputDialog } from './uiComponents.js';
 import { showTooltip, hideTooltip } from './uiTooltip.js';
 import {
     getCargoCapacity, getCargoUsed, getCargoAmount, hasCargoHold,
@@ -102,7 +102,7 @@ const CAPABILITY_PANEL = {
 // 统一工具栏 — 动态图标渲染（0.2.7 KSP2 重构：竖排标题 + 裸图标行 + 状态竖条选中态）
 // mode: 'ship' | 'facility' | 'off'
 // data: { modules, shipId } 或 { facilityId } 或 null
-function renderToolbarIcons(mode, data) {
+export function renderToolbarIcons(mode, data) {
     leftToolbar.innerHTML = '';
     if (mode === 'off' || !data) return;
 
@@ -174,7 +174,7 @@ function renderToolbarIcons(mode, data) {
             if (!tb) continue;
             const onClick = () => {
                 if (def.capability === 'deploy_facility') {
-                    window.openFacilityDeployPanel();
+                    eventBus.emit(Events.FACILITY_DEPLOY_REQUESTED);
                 } else if (def.capability === 'cargo_hold') {
                     const ship = shipSystem.getActiveShip();
                     if (ship) openPage('cargo', t('cargo.title'), buildShipCargoContent(ship));
@@ -197,7 +197,8 @@ function renderToolbarIcons(mode, data) {
 
             if (comp.id === 'assembly_shop') {
                 createIcon(compIcon, compName, () => {
-                    window.openShipBuilder();
+                    // 命令经 eventBus 下发（原 window.openShipBuilder；避免 flightUI ⇄ shipBuilderUI 互相 import 成环）
+                    eventBus.emit(Events.SHIP_BUILDER_REQUESTED);
                 }, comp.iconTexture, comp.id, 'shipBuilder');
             } else {
                 // 0.2.4 多面板并存:不再先关闭建造面板,舱室面板与建造面板可同时存在
@@ -423,15 +424,15 @@ function startFacilityTransfer(fromFacility, resId) {
         window.showNotification(t('facility.noOtherFacilities'), 'warning');
         return;
     }
-    // 临时 dialog：uiComponents.createDialog 依赖 window 绑定，直接内联构建列表
-    window.__createDialog(
+    // 临时 dialog：直接调用 uiComponents 导出的对话框（0.2.5 整改：原经 window.__createDialog）
+    createDialog(
         t('facility.transferTarget'),
         others.map(f => ({ id: f.id, name: f.name })),
         (toFacilityId) => {
             const toFacility = facilitySystem.getFacility(toFacilityId);
             if (!toFacility) return;
             const available = getStorageAmount(fromFacility, resId);
-            window.__createInputDialog(
+            createInputDialog(
                 t('facility.transferAmount', {
                     name: getResourceType(resId)?.name || resId,
                     from: fromFacility.name,
@@ -579,7 +580,7 @@ function promptTransferAmount(facility, shipId, resId, dir) {
         : getCargoAmount(ship, resId);
     if (max <= 0) return;
     const def = getResourceType(resId);
-    window.__createInputDialog(
+    createInputDialog(
         t(dir === 'load' ? 'cargo.loadAmount' : 'cargo.unloadAmount', {
             name: def ? def.name : resId, max: Math.floor(max)
         }),
@@ -788,7 +789,8 @@ setInterval(() => {
     }
 }, 500);
 
-// 全局辅助函数：获取当前受控设施（建造扣费等外部面板使用，0.2.0 阶段5）
+// 调试挂载：当前受控设施（0.2.0 阶段5 引入的全局辅助；现已无生产消费方 ——
+// shipBuilderUI 改读 gameState.getActiveFacility()，保留仅供控制台调试）
 window.__getControlledFacility = function() {
     return _currentFacility;
 };
@@ -847,17 +849,21 @@ document.getElementById('dockPromptBtn').addEventListener('click', () => {
     if (_dockCallback) _dockCallback();
 });
 
-window.showDockPrompt = function(facility, onDock) {
+export function showDockPrompt(facility, onDock) {
     if (!facility) return;
     document.getElementById('dockPromptFacName').textContent = facility.name || t('facility.typeName');
     _dockCallback = onDock;
     dockPromptEl.style.display = 'block';
-};
+}
 
-window.hideDockPrompt = function() {
+export function hideDockPrompt() {
     dockPromptEl.style.display = 'none';
     _dockCallback = null;
-};
+}
+
+// 保留调试挂载（裁定：允许挂载，禁止生产代码消费）
+window.showDockPrompt = showDockPrompt;
+window.hideDockPrompt = hideDockPrompt;
 
 // ========== 工具栏页面面板注册表（0.2.4 重构：每个内容页独立 .tkp-page 浮层） ==========
 // 页面 id:货仓 cargo / 扫描 scan / 指令舱 bridge / 对接枢纽 dock_hub /
@@ -1011,8 +1017,8 @@ eventBus.on(Events.SCENE_CHANGED, (data) => {
         uiManager.hidePanel('facilityDeploy');
         closeAllPages();
         clearActiveToolbar();
-        // 兜底隐藏对接提示框，防止场景切换时遗留
-        window.hideDockPrompt?.();
+        // 兜底隐藏对接提示框，防止场景切换时遗留（本模块自身函数，直接调用）
+        hideDockPrompt();
     }
     uiManager.hidePanel('esc');
 });

@@ -7,7 +7,7 @@ import { gameState } from '../gameState.js';
 import { t } from '../config/ui/strings.js';
 import { formatGameTime, formatGameDate } from '../utils/format.js';
 import { openNewCampaignDialog } from './newCampaignDialog.js';
-import { createInputDialog } from './uiComponents.js';
+import { createInputDialog, createConfirmDialog } from './uiComponents.js';
 
 // 开始游戏面板 — 0.2.5 新增
 // 主菜单"开始游戏"打开的内嵌式综合面板（0.2.6 由左侧滑出改为内嵌圆角，与设置页同款），
@@ -317,7 +317,7 @@ function deleteSelectedWorld() {
     const worlds = saveManager.getWorldList();
     const world = worlds.find(w => w.id === _selectedWorldId);
     if (!world) return;
-    window.__createConfirmDialog(
+    createConfirmDialog(
         t('archive.confirmDeleteTitle'),
         t('startgame.confirmDeleteWorld', { name: world.name }),
         () => {
@@ -338,7 +338,7 @@ function deleteSelectedCheckpoint() {
     const checkpoints = saveManager.getCheckpointList(_selectedWorldId);
     const cp = checkpoints.find(c => c.id === _selectedCheckpointId);
     if (!cp) return;
-    window.__createConfirmDialog(
+    createConfirmDialog(
         t('archive.confirmDeleteTitle'),
         t('startgame.confirmDeleteCheckpoint', { name: cp.name }),
         () => {

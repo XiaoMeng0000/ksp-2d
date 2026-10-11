@@ -160,7 +160,7 @@ function deployFacility() {
 }
 
 // 打开设施部署面板
-window.openFacilityDeployPanel = function() {
+function openFacilityDeployPanel() {
     renderFacilityDeployCategories();
     selectedFacilityTypeId = null;
     document.getElementById('facilityDeployDetail').innerHTML =
@@ -169,7 +169,15 @@ window.openFacilityDeployPanel = function() {
     uiManager.showPanel('facilityDeploy');
     // 0.2.4 多面板并存:与其它浮层面板同开时错位,避免完全重叠
     cascadePanelOpen(facilityDeployPanel);
-};
+}
+
+// 保留调试挂载（裁定：允许挂载，禁止生产代码消费）
+window.openFacilityDeployPanel = openFacilityDeployPanel;
+
+// 工具栏「部署设施」经 eventBus 下发打开命令（0.2.5 整改：原 flightUI 直连该全局）
+eventBus.on(Events.FACILITY_DEPLOY_REQUESTED, () => {
+    openFacilityDeployPanel();
+});
 
 // 设施部署面板 — 注册到 uiManager
 uiManager.registerPanel('facilityDeploy', {

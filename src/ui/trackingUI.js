@@ -3,7 +3,7 @@
 import { eventBus, Events } from '../eventBus.js';
 import { gameState } from '../gameState.js';
 import { getModuleDef } from '../config/entities/moduleTypes.js';
-import { renderIconHtml } from './uiComponents.js';
+import { renderIconHtml, createConfirmDialog } from './uiComponents.js';
 import { getFacilityType } from '../config/entities/facilityTypes.js';
 import { facilitySystem } from '../facility/facilitySystem.js';
 import { shipSystem } from '../ship/shipSystem.js';
@@ -16,7 +16,7 @@ import { t } from '../config/ui/strings.js';
 import { celestialBodies } from '../physics/physics.js';
 import { ENCYCLOPEDIA } from '../config/ui/encyclopediaConfig.js';
 import { getTexturePath } from '../config/assets/assetManifest.js';
-import { focusTrackingNode, setTrackingNavTab } from '../scenes/trackingScene.js';
+import { buildTrackingTree, focusTrackingNode, renderTrackingNav, setTrackingNavTab } from '../scenes/trackingScene.js';
 import { formatGameTime } from '../utils/format.js';
 
 // EventBus 迁移 — 缓存最近一帧的飞船渲染数据，供 UI 只读函数使用
@@ -367,20 +367,18 @@ trackingInfo.addEventListener('click', (e) => {
                 }
             }
             // 弹出确认对话框
-            window.__createConfirmDialog(
+            createConfirmDialog(
                 t('tracking.confirmDestroyTitle'),
                 node.type === 'facility' ? t('tracking.confirmDestroyFacilityMsg') : t('tracking.confirmDestroyMsg'),
                 () => {
                     if (typeof node.delete === 'function') {
                         node.delete();
                     }
-                    window.hideTrackingInfo();
-                    if (typeof window.buildTrackingTree === 'function') {
-                        const newTree = window.buildTrackingTree();
-                        if (typeof window.renderTrackingNav === 'function') {
-                            window.renderTrackingNav(newTree);
-                        }
-                    }
+                    hideTrackingInfo();
+                    // 直接调用 trackingScene 的命名导出（原经 window.buildTrackingTree /
+                    // window.renderTrackingNav 全局消费；两者已具名导出，且本行上方既有 import
+                    // 已建立 trackingUI → trackingScene 这条边，故不新增边、不成环）
+                    renderTrackingNav(buildTrackingTree());
                     if (typeof window.showNotification === 'function') {
                         window.showNotification(node.type === 'facility' ? t('tracking.facilityDestroyed') : t('tracking.shipDestroyed'), 'info');
                     }
@@ -398,7 +396,7 @@ trackingInfo.addEventListener('click', (e) => {
     }
 });
 
-window.updateTrackingInfo = function(node, opts = {}) {
+export function updateTrackingInfo(node, opts = {}) {
     // 仅"从无到有"广播打开事件：切换查看天体（有→有）不重复发声
     // opts.silent = true 用于场景 enter 自动打开（不产生打开音效）
     const wasHidden = !_currentNode;
@@ -408,9 +406,9 @@ window.updateTrackingInfo = function(node, opts = {}) {
         eventBus.emit(Events.UI_PANEL_OPENED, { panelId: 'trackingInfo' });
     }
     renderInfo(node);
-};
+}
 
-window.hideTrackingInfo = function(opts = {}) {
+export function hideTrackingInfo(opts = {}) {
     // 仅"从有到无"广播关闭事件：重复调用静默
     // opts.silent = true 用于场景 exit 自动关闭（不产生关闭音效）
     const wasVisible = !!_currentNode;
@@ -419,7 +417,23 @@ window.hideTrackingInfo = function(opts = {}) {
     if (wasVisible && !opts.silent) {
         eventBus.emit(Events.UI_PANEL_CLOSED, { panelId: 'trackingInfo' });
     }
-};
+}
+
+// 保留调试挂载（裁定：允许挂载，禁止生产代码消费）
+window.updateTrackingInfo = updateTrackingInfo;
+window.hideTrackingInfo = hideTrackingInfo;
+
+// 追踪站场景 → 信息面板刷新（铁律③：UI 只订阅事件刷新）
+// 走事件而非 import：trackingUI → trackingScene 已有既有边，反向 import 会成环（见 eventBus.js 注释）
+// 空值防御：事件是广播通道，发布方漏传 node 时若无此守卫，会把 _currentNode 污染成 undefined
+// 并在 renderInfo 内抛 TypeError（虽被 eventBus 的 try/catch 兜住，仍污染控制台）
+eventBus.on(Events.TRACKING_INFO_SHOW, ({ node, silent } = {}) => {
+    if (!node) return;
+    updateTrackingInfo(node, { silent: !!silent });
+});
+eventBus.on(Events.TRACKING_INFO_HIDE, ({ silent } = {}) => {
+    hideTrackingInfo({ silent: !!silent });
+});
 
 // 追踪站 - 导航栏（标题 + 顶部横向分类 Tab + 树容器）
 const trackingNav = document.createElement('div');

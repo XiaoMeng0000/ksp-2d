@@ -47,6 +47,16 @@ export const Events = {
     MANEUVER_COMPLETED: 'maneuver:completed',    // 手动燃烧达成节点 Δv，payload: { shipId, node }
     // 飞行场景进入时的设施聚焦请求（0.2.5 整改：原经 window.__pendingFacilityId 传递）
     FACILITY_FOCUS_REQUESTED: 'facility:focusRequested',   // payload: { facilityId }
+    // UI 命令事件（0.2.5 整改：原经 window.openFacilityDeployPanel / window.openShipBuilder 调用，
+    // 改走 eventBus 以避免 UI 模块间直接 import 成环，也让事件通道单向、可订阅）
+    FACILITY_DEPLOY_REQUESTED: 'ui:facilityDeployRequested',   // 请求打开设施部署面板（无 payload）
+    SHIP_BUILDER_REQUESTED: 'ui:shipBuilderRequested',         // 请求打开飞船建造面板（无 payload）
+    // 追踪站信息面板刷新（0.2.5 A 组整改：原经 window.updateTrackingInfo / window.hideTrackingInfo 消费）
+    // 为何走事件而非 import：trackingUI → trackingScene 已有既有边，反向 import 会成环；
+    // 且按铁律③「UI 只订阅事件刷新」，信息面板的显示/更新本就属刷新语义，事件是正解。
+    // 对照：showDockPrompt / hideDockPrompt 无环阻碍，按裁定 4「命令可直调 API」仍走 import。
+    TRACKING_INFO_SHOW: 'tracking:infoShow',   // payload: { node, silent }
+    TRACKING_INFO_HIDE: 'tracking:infoHide',   // payload: { silent }
     // 时间加速事件
     TIME_WARP_CHANGED: 'timeWarp:changed'       // 档位/暂停状态变化
 };
