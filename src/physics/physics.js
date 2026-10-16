@@ -7,7 +7,7 @@ import {
     getDefaultSystemIds,
     validateSystemSelection
 } from '../config/world/starSystemIndex.js';
-import { keplerPositionAtTime } from './orbitalMechanics.js';
+import { keplerPositionAtTime, keplerToState } from './orbitalMechanics.js';
 
 // 天体集合:数组引用全生命周期不变,内容随激活集原地重建(所有引用方自动生效)
 export const celestialBodies = [];
@@ -132,6 +132,54 @@ export function convertVelocityFrame(vel, fromHostName, toHostName) {
     vel.y = vel.y + oldVel.y - newVel.y;
 }
 
+// 天体轨道根数构造（位置与速度共用同一构造，保证两者同源）
+function bodyOrbitKepler(body) {
+    return {
+        a: body.orbitA,
+        e: body.orbitE,
+        theta: body.orbitTheta0,
+        omega: body.orbitOmega
+    };
+}
+
+// 天体相对父天体的解析位置（与历史位置推进完全同一调用，逐位一致）
+function relativeOrbitPos(body, parent, time) {
+    return keplerPositionAtTime(bodyOrbitKepler(body), parent.gm, time, body.orbitOmega);
+}
+
+// 天体相对父天体的解析状态 { pos, vel }（无父天体/父天体缺失 → null）。
+// 速度用 keplerToState 解析式（由 r = p/(1+e·cosθ) 的真近点角反推径向/切向分量），
+// 其 pos 即同参数的 keplerPositionAtTime 结果 → 位置与速度严格同源、零差分噪声。
+export function getBodyRelativeState(body, time) {
+    if (!body || !body.orbitParent) return null;
+    const parent = celestialBodies.find(b => b.name === body.orbitParent);
+    if (!parent) return null;
+    return keplerToState(bodyOrbitKepler(body), parent.gm, time);
+}
+
+// 天体绝对解析位置（沿 orbitParent 递归累加父位置）
+export function getBodyAbsolutePos(body, time) {
+    if (!body) return { x: 0, y: 0 };
+    const parent = body.orbitParent ? celestialBodies.find(b => b.name === body.orbitParent) : null;
+    if (!parent) return { x: body.position.x, y: body.position.y };
+    const parentPos = getBodyAbsolutePos(parent, time);
+    const relPos = relativeOrbitPos(body, parent, time);
+    return { x: parentPos.x + relPos.x, y: parentPos.y + relPos.y };
+}
+
+// 天体绝对解析状态 { pos, vel }（沿 orbitParent 递归累加父状态；无父天体 → 当前位置 + 零速度）
+export function getBodyAbsoluteState(body, time) {
+    if (!body) return { pos: { x: 0, y: 0 }, vel: { x: 0, y: 0 } };
+    const parent = body.orbitParent ? celestialBodies.find(b => b.name === body.orbitParent) : null;
+    if (!parent) return { pos: { x: body.position.x, y: body.position.y }, vel: { x: 0, y: 0 } };
+    const parentState = getBodyAbsoluteState(parent, time);
+    const rel = getBodyRelativeState(body, time);
+    return {
+        pos: { x: parentState.pos.x + rel.pos.x, y: parentState.pos.y + rel.pos.y },
+        vel: { x: parentState.vel.x + rel.vel.x, y: parentState.vel.y + rel.vel.y }
+    };
+}
+
 // 天体驱动器 6.6步
 export function updateCelestialBodies(time) {
     // 先更新所有位置，再计算绝对速度
@@ -147,25 +195,16 @@ export function updateCelestialBodies(time) {
         const parent = celestialBodies.find(b => b.name === body.orbitParent);
         if (!parent) continue;
 
-        const kepler = {
-            a: body.orbitA,
-            e: body.orbitE,
-            theta: body.orbitTheta0,
-            omega: body.orbitOmega
-        };
+        // 相对解析状态（位置推进沿用 keplerPositionAtTime，逐位不变）
+        const rel = getBodyRelativeState(body, time);
 
-        const relPos = keplerPositionAtTime(kepler, parent.gm, time, body.orbitOmega);
+        body.position.x = parent.position.x + rel.pos.x;
+        body.position.y = parent.position.y + rel.pos.y;
 
-        body.position.x = parent.position.x + relPos.x;
-        body.position.y = parent.position.y + relPos.y;
-
-        // 数值微分计算相对速度
-        const dt2 = 0.001;
-        const relPosNext = keplerPositionAtTime(kepler, parent.gm, time + dt2, body.orbitOmega);
-        relVelocities[body.name] = {
-            x: (relPosNext.x - relPos.x) / dt2,
-            y: (relPosNext.y - relPos.y) / dt2
-        };
+        // 相对速度用解析式（旧实现为 pos(t+1ms)−pos(t) 差商：绝对坐标 1e10~1e11 m 下
+        // 浮点分辨率 ~1e-6 m 与 1ms 位移（0.5~30 m）同阶 → 灾难性抵消，噪声 2e-3~6e-2 m/s
+        // 且逐帧伪随机；该速度经 convertVelocityFrame 用于真实 SOI 切换换系，会污染切换后轨道）
+        relVelocities[body.name] = rel.vel;
     }
 
     // 第二遍：累加父天体速度，得到绝对速度

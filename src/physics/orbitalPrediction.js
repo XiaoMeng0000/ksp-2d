@@ -1,8 +1,8 @@
 'use strict';
 import { eventBus, Events } from '../eventBus.js';
-import { celestialBodies, getAbsolutePosition } from './physics.js';
+import { celestialBodies, getAbsolutePosition, getBodyAbsolutePos, getBodyAbsoluteState } from './physics.js';
 import { rk4Integrate } from './integrator.js';
-import { stateToKepler, keplerPositionAtTime, keplerPositionAtTheta, findSOIIntersection, findSOIExitTime } from './orbitalMechanics.js';
+import { stateToKepler, keplerToState, keplerPositionAtTime, keplerPositionAtTheta, findSOIIntersection, findSOIExitTime } from './orbitalMechanics.js';
 
 // SOI 边界诊断开关 — 运行时从 window 读取，支持控制台热切换
 function soiDiagEnabled() {
@@ -22,28 +22,26 @@ export function getCachedTime() {
 
 // ========== 轨道预测辅助函数 ==========
 
-// 递归计算天体在 futureTime 时的绝对世界坐标
+// 递归计算天体在 futureTime 时的绝对世界坐标（薄包装 → physics.getBodyAbsolutePos，
+// 与物理层天体位置推进同一实现；renderer / maneuverViewPanel 等按点大量调用，
+// 故保持只走位置路径、不附带速度计算）
 export function bodyFuturePos(body, futureTime) {
-    if (!body) return { x: 0, y: 0 };
-    if (!body.orbitParent) return { x: body.position.x, y: body.position.y };
-
-    const parent = celestialBodies.find(b => b.name === body.orbitParent);
-    if (!parent) return { x: body.position.x, y: body.position.y };
-
-    const parentPos = bodyFuturePos(parent, futureTime);
-    const kepler = { a: body.orbitA, e: body.orbitE, theta: body.orbitTheta0, omega: body.orbitOmega };
-    const relPos = keplerPositionAtTime(kepler, parent.gm, futureTime, body.orbitOmega);
-
-    return { x: parentPos.x + relPos.x, y: parentPos.y + relPos.y };
+    return getBodyAbsolutePos(body, futureTime);
 }
 
-// 数值微分计算天体在 futureTime 时的速度
+// 天体在 futureTime 时的解析状态 { pos, vel }：位置与 bodyFuturePos 完全同源，
+// 速度为解析式（keplerToState 的 vel 分量，沿 orbitParent 递归累加父速度）
+export function bodyFutureState(body, futureTime) {
+    return getBodyAbsoluteState(body, futureTime);
+}
+
+// 解析计算天体在 futureTime 时的绝对速度。
+// 旧实现为 bodyFuturePos 的 dt2 = 1ms 前向差商：绝对坐标 1e10~1e11 m 的浮点分辨率约 1e-6 m，
+// 与 1ms 位移（|v|·1e-3 ≈ 0.5~30 m）同阶 → 灾难性抵消，速度噪声实测 2e-3~6e-2 m/s 且随 t
+// 伪随机变化；该噪声经 SOI 切换点写入下一段起始速度，使 SOI 内段根数逐帧乱跳
+// （检查点 2 实测 Eve 段 e 帧间抖动 5.4e-3、段末端世界坐标帧间二阶差分 1.8e6 m）。
 function bodyFutureVel(body, futureTime) {
-    if (!body) return { x: 0, y: 0 };
-    const dt2 = 0.001;
-    const pos1 = bodyFuturePos(body, futureTime);
-    const pos2 = bodyFuturePos(body, futureTime + dt2);
-    return { x: (pos2.x - pos1.x) / dt2, y: (pos2.y - pos1.y) / dt2 };
+    return bodyFutureState(body, futureTime).vel;
 }
 
 // 时间敏感的 SOI 检测：判断 pos 在 time 时刻属于哪个天体的 SOI
@@ -158,7 +156,7 @@ function patchedRadialLine(relPos, relVel, host, depth, maxSeg, segments, stepSt
 
     const startState = {
         relPos: { x: relPos.x, y: relPos.y },
-        relVel: { x: velRel.x, y: velRel.y },
+        relVel: { x: relVel.x, y: relVel.y },
         time: stepStartTime,
         body: host.name
     };
@@ -167,8 +165,9 @@ function patchedRadialLine(relPos, relVel, host, depth, maxSeg, segments, stepSt
     // 逃逸出 SOI（端点在边界）→ 切换递归
     if (host.gm > 0 && rT >= host.soiRadius - 1) {
         const switchT = stepStartTime + tTotal;
-        const hostPosEnd = bodyFuturePos(host, switchT);
-        const hostVelEnd = bodyFutureVel(host, switchT);
+        const hostStateEnd = bodyFutureState(host, switchT);
+        const hostPosEnd = hostStateEnd.pos;
+        const hostVelEnd = hostStateEnd.vel;
         const rBound = host.soiRadius;
         // 端点（SOI 边界，相对 host）= u×soiRadius；径向速度由能量守恒得出
         const nextAbsPos = { x: hostPosEnd.x + ux * rBound, y: hostPosEnd.y + uy * rBound };
@@ -279,11 +278,17 @@ function makeSegment(relPoints, host, stepStartTime, depth, startState) {
 // 段点结构（0.2.4 骨架新增 t 字段）：{ x, y, t } — x/y 为相对锚点坐标，
 // t 为自该段起点（anchorTime）起的游戏秒偏移；锚点绝对时刻 = anchorTime + t。
 // 供轨道悬停 Tooltip 的 T+ 显示与右键菜单"时间加速至此"计算（飞行Scene 交互层读取）。
-export function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segments) {
+// relPosHint（可选，默认 null）：调用方已持有高精度相对位置时直接传入。
+//   起因：posAbs − bodyFuturePos(host) 的减法在绝对坐标量级（~1e10 m，ulp ≈ 2e-6 m）上
+//   做，会把起点相对位置量化到微米级；该量化经解析推进放大（d(a)/d(r) ≈ 21 倍）、
+//   再经超长段推进与 SOI 出点几何放大，最终使段末端（Eve SOI 出点）出现米级帧间抖动
+//   （实测：无 hint 1.449 m → 有 hint 1.9e-3 m）。缺省时按原口径从绝对坐标重建，
+//   其他调用方（机动预测等）语义与数值完全不变。
+export function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, segments, relPosHint = null) {
     if (depth >= maxSeg) return;
 
     const hostPos = bodyFuturePos(host, stepStartTime);
-    const relPos = { x: posAbs.x - hostPos.x, y: posAbs.y - hostPos.y };
+    const relPos = relPosHint || { x: posAbs.x - hostPos.x, y: posAbs.y - hostPos.y };
     // 段起始状态快照（0.2.5 机动节点）：供 walkToTime 沿预测链时间寻址
     const segStartState = {
         relPos: { x: relPos.x, y: relPos.y },
@@ -352,8 +357,9 @@ export function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, 
 
         // 交点处切换参考系 → 递归（与椭圆穿越分支同构）
         const intersectionTime = stepStartTime + deltaT;
-        const hostPosEnd = bodyFuturePos(host, intersectionTime);
-        const hostVelEnd = bodyFutureVel(host, intersectionTime);
+        const hostStateEnd = bodyFutureState(host, intersectionTime);
+        const hostPosEnd = hostStateEnd.pos;
+        const hostVelEnd = hostStateEnd.vel;
 
         const nextAbsPos = {
             x: hostPosEnd.x + intersection.pos.x,
@@ -525,13 +531,17 @@ export function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, 
             return;
         }
 
-        // 二分法精确定位 SOI 切换时刻
+        // 二分法精确定位 SOI 切换时刻：按时间容差收敛（≤1e-6 s），迭代上限 64 次防死循环。
+        // 原固定 15 次在单格宽度大时残留可观误差（单格 = T/200，如 T=5.6e6 s 时单格 2.8e4 s，
+        // 15 次二分后残差仍达 0.86 s），切换点位置随帧在运动方向漂 ±v·残差（v≈3 km/s 时数百米）；
+        // 按 1e-6 s 收敛后位置残差 ≈ v·1e-6 ≈ 毫米级，不再贡献帧间抖动。
         const tPrev = ((switchIdx - 1) / N) * T;
         const tCurr = (switchIdx / N) * T;
         let tLo = tPrev;
         let tHi = tCurr;
-        for (let iter = 0; iter < 15; iter++) {
+        for (let iter = 0; iter < 64 && (tHi - tLo) > 1e-6; iter++) {
             const tMid = (tLo + tHi) / 2;
+            if (!(tMid > tLo && tMid < tHi)) break;   // 浮点分辨率耗尽，提前收敛
             const rPos = keplerPositionAtTime(kepler, host.gm, tMid, kepler.omega);
             const hpMid = bodyFuturePos(host, stepStartTime + tMid);
             const absPos = { x: hpMid.x + rPos.x, y: hpMid.y + rPos.y };
@@ -544,17 +554,18 @@ export function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, 
         }
         const switchTime = stepStartTime + tHi;
 
-        // 精确切换点位置
-        const rPosSwitch = keplerPositionAtTime(kepler, host.gm, tHi, kepler.omega);
-        const hostPosSwitch = bodyFuturePos(host, switchTime);
-        const switchAbsPos = { x: hostPosSwitch.x + rPosSwitch.x, y: hostPosSwitch.y + rPosSwitch.y };
-
-        // 数值微分求飞船绝对速度（先算，供探针判定与换帧用）
-        const dt2 = 0.001;
-        const rPos2 = keplerPositionAtTime(kepler, host.gm, tHi + dt2, kepler.omega);
-        const hostPos2 = bodyFuturePos(host, switchTime + dt2);
-        const absPos2 = { x: hostPos2.x + rPos2.x, y: hostPos2.y + rPos2.y };
-        const absVel = { x: (absPos2.x - switchAbsPos.x) / dt2, y: (absPos2.y - switchAbsPos.y) / dt2 };
+        // 精确切换点位置与绝对速度：位置用 keplerPositionAtTime（与轨道采样同源），
+        // 速度用 keplerToState 解析式 + 宿主解析速度（弃用 1ms 绝对坐标差商，见 bodyFutureVel 注释）
+        const relStateSwitch = keplerToState(kepler, host.gm, tHi);
+        const hostStateSwitch = bodyFutureState(host, switchTime);
+        const switchAbsPos = {
+            x: hostStateSwitch.pos.x + relStateSwitch.pos.x,
+            y: hostStateSwitch.pos.y + relStateSwitch.pos.y
+        };
+        const absVel = {
+            x: hostStateSwitch.vel.x + relStateSwitch.vel.x,
+            y: hostStateSwitch.vel.y + relStateSwitch.vel.y
+        };
 
         // 安全校验：探针取运动方向前 1s 位置确认新宿主（进入子天体方向，
         // 避免切换点在子天体 SOI 边界上被浮点误判回宿主导致校验失败）
@@ -610,8 +621,9 @@ export function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, 
 
     // 在交点处切换参考系 → 递归
     const intersectionTime = stepStartTime + deltaT;
-    const hostPosEnd = bodyFuturePos(host, intersectionTime);
-    const hostVelEnd = bodyFutureVel(host, intersectionTime);
+    const hostStateEnd = bodyFutureState(host, intersectionTime);
+    const hostPosEnd = hostStateEnd.pos;
+    const hostVelEnd = hostStateEnd.vel;
 
     const nextAbsPos = {
         x: hostPosEnd.x + intersection.pos.x,
@@ -773,13 +785,14 @@ export function timeToNextSOISwitch(ship, host) {
         return null;
     }
 
-    // 3) 二分精化切换时刻（与 patchedStep 同口径）
+    // 3) 二分精化切换时刻（与 patchedStep 同口径：按 1e-6 s 时间容差收敛，上限 64 次防死循环）
     const tPrev = ((switchIdx - 1) / N) * T;
     const tCurr = (switchIdx / N) * T;
     let tLo = tPrev;
     let tHi = tCurr;
-    for (let iter = 0; iter < 15; iter++) {
+    for (let iter = 0; iter < 64 && (tHi - tLo) > 1e-6; iter++) {
         const tMid = (tLo + tHi) / 2;
+        if (!(tMid > tLo && tMid < tHi)) break;   // 浮点分辨率耗尽，提前收敛
         const rPos = keplerPositionAtTime(kepler, gm, tMid, kepler.omega);
         const hpMid = bodyFuturePos(host, startTime + tMid);
         const absPos = { x: hpMid.x + rPos.x, y: hpMid.y + rPos.y };
@@ -792,15 +805,12 @@ export function timeToNextSOISwitch(ship, host) {
     }
     const switchT = tHi;
 
-    // 4) 探针校验（同 patchedStep）：切换点 +1s 后确认确属新宿主（防浮点假阳性）
-    const dt2 = 0.001;
-    const rPos = keplerPositionAtTime(kepler, gm, switchT, kepler.omega);
-    const rPos2 = keplerPositionAtTime(kepler, gm, switchT + dt2, kepler.omega);
-    const hp1 = bodyFuturePos(host, startTime + switchT);
-    const hp2 = bodyFuturePos(host, startTime + switchT + dt2);
-    const absPos = { x: hp1.x + rPos.x, y: hp1.y + rPos.y };
-    const absPos2 = { x: hp2.x + rPos2.x, y: hp2.y + rPos2.y };
-    const absVel = { x: (absPos2.x - absPos.x) / dt2, y: (absPos2.y - absPos.y) / dt2 };
+    // 4) 探针校验（同 patchedStep）：切换点 +1s 后确认确属新宿主（防浮点假阳性）。
+    // 切换点速度用解析式（相对速度 keplerToState + 宿主解析速度），同 patchedStep 口径
+    const relState = keplerToState(kepler, gm, switchT);
+    const hostState = bodyFutureState(host, startTime + switchT);
+    const absPos = { x: hostState.pos.x + relState.pos.x, y: hostState.pos.y + relState.pos.y };
+    const absVel = { x: hostState.vel.x + relState.vel.x, y: hostState.vel.y + relState.vel.y };
     const probePos = { x: absPos.x + absVel.x, y: absPos.y + absVel.y };
     const verifiedHost = getSOIHostAtTime(probePos, startTime + switchT + 1);
     if (!verifiedHost || verifiedHost.name === host.name) {
@@ -860,7 +870,12 @@ export function predictTrajectoryPatched(ship, maxSegments = 5) {
 
     if (!host) return segments;  // predictTrajectoryPatched
 
-    patchedStep(absPos, velRel, host, startTime, 0, maxSegments, segments);
+    // 首段起点相对位置：宿主与 ship.pos 参考系一致时直接传高精度值（避免绝对坐标量化）；
+    // resolvePredictionState 换宿主时 ship.pos 仍是旧宿主坐标，此时不传（走原口径重建）
+    const relPosHint = (host.name === ship.currentSOI)
+        ? { x: ship.pos.x, y: ship.pos.y }
+        : null;
+    patchedStep(absPos, velRel, host, startTime, 0, maxSegments, segments, relPosHint);
     return segments;
 }
 
@@ -881,8 +896,9 @@ export function integrateThrustArc(relPos, relVel, gm, host, thrustAccel, burnDu
     for (let i = 1; i <= maxSteps; i++) {
         const r = Math.sqrt(rp.x * rp.x + rp.y * rp.y);
         const ga = (r > 0.001) ? gm / (r * r) : 0;
-        rv.x += (-ga * rp.x / Math.max(r, 0.001) + thrustAccel.x) * dt;
-        rv.y += (-ga * rp.y / Math.max(r, 0.001) + thrustAccel.y) * dt;
+        // 推力分量字段按全项目约定取 {ax, ay}（与 integrator.js / physicsUpdate.js 及本文件兜底字面量一致）
+        rv.x += (-ga * rp.x / Math.max(r, 0.001) + thrustAccel.ax) * dt;
+        rv.y += (-ga * rp.y / Math.max(r, 0.001) + thrustAccel.ay) * dt;
         rp.x += rv.x * dt;
         rp.y += rv.y * dt;
         if (i % 3 === 0) {
@@ -970,8 +986,12 @@ export function predictTrajectoryBurned(ship, burnEnabled) {
         };
         patchedStep(postBurnAbsPos, result.finalRelVel, host, burnEndTime, 0, 5, segments);
     } else {
-        // 模式 A：跳过燃烧段，直接走 patchedStep（等价 predictTrajectoryPatched）
-        patchedStep(absPos, velRel, host, startTime, 0, 5, segments);
+        // 模式 A：跳过燃烧段，直接走 patchedStep（等价 predictTrajectoryPatched）；
+        // 首段起点相对位置同 predictTrajectoryPatched 传高精度值（避免绝对坐标量化，见 patchedStep 注释）
+        const relPosHint = (host.name === ship.currentSOI)
+            ? { x: ship.pos.x, y: ship.pos.y }
+            : null;
+        patchedStep(absPos, velRel, host, startTime, 0, 5, segments, relPosHint);
     }
 
     return segments;
