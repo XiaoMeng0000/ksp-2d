@@ -2,6 +2,7 @@
 
 // 程序化特效模块 — 封装径向渐变光晕等 Canvas 2D 绘制函数
 // 纯渲染工具，不含业务逻辑，供 renderer.js 调用
+// （0.3.x 追加 drawTintedIcon：天体图标模板染色，见文件末尾）
 
 /**
  * 绘制恒星光晕（多层径向渐变 additive 叠加）
@@ -136,4 +137,91 @@ export function drawPlanetRing(ctx, cx, cy, baseRadius, layer = {}) {
             ctx.fill();
         }
     }
+}
+
+// ===== 天体图标模板染色（0.3.x 天体图标缩放保护）=====
+// 与 sasUI._tintImage 的关键差异：那块实现复用「单块离屏画布、每帧覆写」，
+// 同帧只能存在一种颜色；而本场景是十几颗天体同帧、颜色各异 ——
+// 若共用一块画布，drawImage 贴出的是最后一次染色结果，会导致全体串色。
+// 故按 (颜色, 尺寸, 合成方式) 各自持有离屏画布并跨帧缓存。
+//
+// 合成方式（tintMode，由 BODY_ICON_CONFIG 提供）：
+//   'multiply'  —— 正片叠底（默认）：保留模板的明暗层次，可承载投影/渐变
+//                   白底 × 天体色 = 天体色本身；暗部 × 天体色 = 同色系暗部
+//                   🔴 要求模板本体为**白色**（彩色底会与天体色相乘产生色偏）
+//   'source-in' —— 覆盖式染色：把模板所有不透明像素整体换成天体色
+//                   （只看 alpha、丢弃全部颜色信息 → 模板内的明暗/阴影会被抹平）
+const _iconTintCache = new Map();   // `${color}|${size}|${mode}` → 染色后的离屏画布
+const _ICON_TINT_CACHE_MAX = 64;    // 有界缓存（键基数 = 天体数 × 尺寸档，正常远小于此值）
+const ICON_SUPERSAMPLE = 2;         // 超采样倍率：按 2 倍尺寸染色，贴出时缩小 → 边缘更锐利
+
+/**
+ * 取「模板图 → 指定颜色」的染色画布（带缓存）。
+ * @param {CanvasImageSource} img - 单色模板（SVG/PNG 均可）；multiply 模式要求白色本体
+ * @param {string} color - 目标颜色（hex，如 '#4488ff'）
+ * @param {number} size - 目标输出边长（画布物理像素）
+ * @param {string} [tintMode] - 合成方式：'multiply'（默认）| 'source-in'
+ * @returns {HTMLCanvasElement} 染色后的离屏画布
+ */
+function tintedIconCanvas(img, color, size, tintMode) {
+    const mode = tintMode === 'source-in' ? 'source-in' : 'multiply';
+    const sizePx = Math.max(1, Math.round(size));
+    const key = color + '|' + sizePx + '|' + mode;
+    const cached = _iconTintCache.get(key);
+    if (cached) return cached;
+
+    const px = sizePx * ICON_SUPERSAMPLE;
+    const off = document.createElement('canvas');
+    off.width = px;
+    off.height = px;
+    const octx = off.getContext('2d');
+    octx.clearRect(0, 0, px, px);
+    octx.drawImage(img, 0, 0, px, px);
+    octx.globalCompositeOperation = mode;
+    octx.fillStyle = color;
+    octx.fillRect(0, 0, px, px);
+    if (mode === 'multiply') {
+        // ⚠️ 必须补这一道：multiply 在「图形之外」算的是 白色 × 目标色 = 白色，
+        // 且会把 alpha 抬到不透明 —— 整块方形画布被填白，图标变成白方块。
+        // 用模板自身的 alpha 剪回图形轮廓（destination-in 保留交集 alpha）。
+        octx.globalCompositeOperation = 'destination-in';
+        octx.drawImage(img, 0, 0, px, px);
+    }
+    octx.globalCompositeOperation = 'source-over';
+
+    // 有界缓存：超限时清空（条目极小且键基数稳定，无需 LRU）
+    if (_iconTintCache.size >= _ICON_TINT_CACHE_MAX) _iconTintCache.clear();
+    _iconTintCache.set(key, off);
+    return off;
+}
+
+/**
+ * 绘制天体图标（模板染色 + 居中贴入）。
+ * 模板未就绪（未加载/加载失败）时回退为同色的实心圆，保证画面不空白。
+ * @param {CanvasRenderingContext2D} ctx - 画布上下文
+ * @param {number} cx, cy - 图标中心的屏幕坐标
+ * @param {number} radius - 图标屏幕半径
+ * @param {CanvasImageSource|null} img - 图标模板图（null = 未就绪 → 走纯色圆兜底）
+ * @param {string} color - 天体代表色（hex）
+ * @param {number} alpha - 透明度（0~1）；<=0 时不绘制
+ * @param {string} [tintMode] - 合成方式：'multiply'（默认）| 'source-in'
+ */
+export function drawTintedIcon(ctx, cx, cy, radius, img, color, alpha, tintMode) {
+    if (!(alpha > 0) || !(radius > 0.01)) return;
+
+    if (!img || !img.width) {
+        // 兜底：代表色实心圆
+        ctx.globalAlpha = alpha;
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.fillStyle = color || '#cfcfcf';
+        ctx.fill();
+        ctx.globalAlpha = 1.0;
+        return;
+    }
+
+    const tinted = tintedIconCanvas(img, color || '#cfcfcf', radius * 2, tintMode);
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(tinted, cx - radius, cy - radius, radius * 2, radius * 2);
+    ctx.globalAlpha = 1.0;
 }

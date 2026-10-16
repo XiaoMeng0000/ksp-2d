@@ -26,6 +26,11 @@ export const textureConfig = {
     // 通用设施兜底图（轨道地图上无专属图时的设施绘制用）
     facility: 'assets/images/facilities/facility.png',
 
+    // 行星/卫星通用图标（0.3.x 天体图标缩放保护）：
+    // 天体屏幕半径过小时交叉淡入为此图标，颜色由渲染层按天体代表色染色。
+    // 属「一对多」共享资源（所有行星/卫星共用），故归集中表而非某颗天体的配置。
+    icon_planet: 'assets/images/celestial/planet_icon.svg',
+
     // esc界面图标
     icon_continue: 'assets/images/ui/icon_escMenu/icon_continue.svg',
     icon_save: 'assets/images/ui/icon_escMenu/icon_save.svg',
