@@ -73,6 +73,13 @@ export function walkToTime(segments, absTime) {
 //   虚拟段（仅当燃料耗尽早于达成，预测专用）：a = F/mDry 恒值续烧到达成 Δv。
 // 半隐式欧拉 dt（与 integrateThrustArc 同款），SOI 半径上限退出；
 // 返回终点状态 / 轨迹点（含 ghost 标记）/ 燃料耗尽点 / 实际燃烧时长。
+//
+// 收口约定（"燃烧时长 0.05 s 网格量化"修复）：末步用**部分步长**收口到目标 Δv，
+// 使 burnDuration 随输入连续变化（不再落在 burnDt 整数倍的网格上）。
+// 量化曾导致：所需时长随质量连续下降、每 ~4.8 s 掉一档 → 终点 Δv/Δr 单帧跳变
+// （Δv 0.4976 m/s → 机动线末端 ~6.4 万 km 台阶）。
+// 说明：两段式都为"按推进剂消耗的火箭方程"口径（applied = c·ln(mWet/m) / ghost 段 a·t），
+// 则该口径的增量与步长严格成正比 → 末步比例 f = 剩余 Δv / 本步 Δv 即为精确解。
 export function planBurnArc(relPos, relVel, host, params, startTime) {
     const cfg = MANEUVER_CONFIG;
     const dt = cfg.burnDt;
@@ -129,22 +136,56 @@ export function planBurnArc(relPos, relVel, host, params, startTime) {
         const ay = dirY * aMag;
         const r = Math.sqrt(rp.x * rp.x + rp.y * rp.y);
         const ga = (r > 0.001 && gm > 0) ? gm / (r * r) : 0;
-        rv.x += (-ga * rp.x / Math.max(r, 0.001) + ax) * dt;
-        rv.y += (-ga * rp.y / Math.max(r, 0.001) + ay) * dt;
-        rp.x += rv.x * dt;
-        rp.y += rv.y * dt;
-        t += dt;
-        i++;
-
-        // 达成量：真实段按推进剂消耗的火箭方程口径；虚拟段按 a·dt 累计
-        if (phase === 'real') {
-            m = Math.max(mDry, m - mdot * dt);
-            applied = c * Math.log(mWet / m);
-        } else {
-            applied += aMag * dt;
+        const remDv = dvTarget - applied;
+        const stepDv = aMag * dt;
+        // 末步收口（关键）：整步 Δv 会超出目标 → 只走"恰好达成"的那一小段，且**解析求解**步长：
+        //   真实段 m(t) = m − ṁ·sub ⇒ applied(sub) = applied + c·ln(m/(m − ṁ·sub))
+        //                                          ⇒ sub = (m/ṁ)(1 − e^(−remDv/c))   ← 用**当前**质量 m
+        //   虚拟段 a 恒定 ⇒ sub = remDv / a
+        // （用 mWet 代替 m 会让解析时长系统性偏长 +2.2e-4 s、末端物理 Δv 超目标 +2.25e-3 m/s。）
+        // 解出的 sub 满足 applied(sub) ≡ dvTarget，故 burnDuration 是输入的连续函数、不再量化到
+        // burnDt 网格，appliedDv 也精确落在目标上（原先末步整步会过冲，且过冲量随质量跳变）。
+        // 注意：绝不用"整步 Δv = aMag·dt"当收口上界 —— 半隐式欧拉在整步内用起点加速度，
+        // 首次进入该分支时整步 Δv 可能**小于** remDv（f 略 >1）；此时仍按解析式收口，
+        // 若 remDv ≥ 整步 Δv 才退回整步（f 钳到 1）。
+        let sub = dt;
+        if (remDv <= 0) break;                                     // 已达成 → 收口退出（防御）
+        if (stepDv > 0 && remDv < stepDv) {
+            const exact = (phase === 'real')
+                ? (m - mDry) / mdot                                // 到干质量的剩余可烧时长（燃料上限）
+                : Infinity;
+            const frac = (phase === 'real')
+                ? (m / mdot) * (1 - Math.exp(-remDv / c))
+                : remDv / aMag;
+            const capped = Math.min(exact, frac, dt - 1e-12);
+            if (capped > 0) sub = capped;
         }
 
+        rv.x += (-ga * rp.x / Math.max(r, 0.001) + ax) * sub;
+        rv.y += (-ga * rp.y / Math.max(r, 0.001) + ay) * sub;
+        rp.x += rv.x * sub;
+        rp.y += rv.y * sub;
+        t += sub;
+
+        // 达成量（按实际步长累计）
+        if (phase === 'real') {
+            m = Math.max(mDry, m - mdot * sub);
+            applied = c * Math.log(mWet / m);
+            // 末步（部分步长）以解析目标值收口：订正"1 − ṁ·sub/mWet"的浮点损耗（实测 ~1.3e-6 m/s），
+            // 但不得虚报 —— 真实段被 mDry 截断（燃料恰好在本步耗尽）时保持原值，
+            // 由下一轮循环记录耗尽点并转入虚拟段续烧（语义与原来完全一致）。
+            if (sub < dt) applied = Math.min(applied, dvTarget) >= dvTarget - 1e-6 ? dvTarget : applied;
+        } else {
+            applied += aMag * sub;
+            if (applied > dvTarget) applied = dvTarget;          // 恒速段无截断风险，收口到目标
+        }
+        i++;
+
         // 点存储节流：默认每 3 步一点；点数逼近上限后降频，防超长燃烧撑爆段点数组
+        // 注意：判档必须用**整数步计数 i**，不能用浮点累加时间 t —— t += dt 之后
+        // `t % 3 === 0` 恒不命中（60 步后 t = 2.9999999999999973），会让点数从 671 掉到 2 点，
+        // 导致 real/ghost 分色子段失效、弧上命中退化成弦。末步（部分步长）的终点由循环后的
+        // 收尾 push 补齐，循环内无需额外判档。
         if (i % 3 === 0 && (result.relPoints.length <= 900 || i % 60 === 0)) {
             result.relPoints.push({ x: rp.x, y: rp.y, t, ghost: phase === 'ghost' });
         }

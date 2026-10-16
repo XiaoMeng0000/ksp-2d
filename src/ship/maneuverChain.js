@@ -163,22 +163,33 @@ function resolveChain(ship, fingerprint) {
                 if (st) {
                     reprojectNodeToState(node, st);
                     node._rev = (node._rev | 0) + 1;
+                    // 快照重投影 = 节点被移到"本帧链（含前序燃烧）"的新点上 → 质量快照随
+                    // 投影一并刷新为**链式投影值**（multinode 语义：节点时刻可见的剩余质量）。
+                    // 注意：这里刷新的前提是链本身变了（上游编辑 / 前序执行 / 快照缺失）；
+                    // 链不变时（②）不再改写 —— 见下。
+                    node.massWet = massLeft;
+                    node.massFuel = fuelLeft;
                 }
             } catch (err) {
                 // 链瞬时缺失（模式切换过渡帧 / 节点时刻超出链跨度）→ 保留原快照，本帧不重试
             }
             // 记录依赖：无论成功与否都写入，避免每帧重复尝试
             node._deps = { predId, predRev };
-            if (!hasNodeSnapshot(node)) {
-                node.massWet = massLeft;
-                node.massFuel = fuelLeft;
-            }
         }
 
-        // ② 链式质量投影（前序燃烧后的剩余质量）
-        if (Math.abs((node.massWet || 0) - massLeft) > 0.01) {
+        // ② 链式质量投影（前序燃烧后的剩余质量）—— **只在无有效快照时初始化**
+        // node.massWet/massFuel 是"节点时刻质量快照"（computePlan 优先读它算 dvMax /
+        // 燃烧时长 / 虚拟段）。原先每帧用飞船**当前**质量覆盖：燃烧期质量以 ṁ 下降 →
+        // 计划 m(t) 曲线每帧变化 → 燃烧终点速度每帧漂移（实测机动线末端 217 km/帧），
+        // 与 maneuverPrediction 的"优先用快照"注释自相矛盾。
+        // 现在的刷新时机只有两个：① 快照重投影（链变化时，见上）；② 此处兜底 —— 节点
+        // 从未有过有效质量快照（旧存档 / 外部裸建节点）时初始化一次。
+        // 链未变化时（燃烧期每帧都属此情形）不再改写 → 计划缓存键稳定、末端静止。
+        if (!isFinite(node.massWet) || node.massWet <= 0) {
             node.massWet = massLeft;
             node.massFuel = fuelLeft;
+        } else if (!isFinite(node.massFuel) || node.massFuel < 0) {
+            node.massFuel = Math.max(0, Math.min(fuelLeft, node.massWet));
         }
 
         // ③ 计算该节点计划（按节点缓存 + 分帧预算）
