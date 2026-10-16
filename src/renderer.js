@@ -1,5 +1,5 @@
 'use strict';
-import { camera, worldToScreen, getZoomLimits } from './camera.js';
+import { camera, worldToScreen } from './camera.js';
 import { celestialBodies, getAbsolutePosition } from './physics/physics.js';
 import { predictTrajectoryPatched, predictTrajectoryBurned, bodyFuturePos, getCachedTime } from './physics/orbitalPrediction.js';
 import { getOrbitalInfo, stateToKepler, findSOIExitTime, timeToHyperPeriapsis } from './physics/orbitalMechanics.js';
@@ -369,8 +369,6 @@ function render(ctx, canvas, activeShip, options = {}) {
     const parentByName = new Map(celestialBodies.map(b => [b.name, b]));
     // 天体图标模板（未就绪时为 null → drawTintedIcon 走代表色纯色圆兜底）
     const bodyIconTex = textureManager.get(BODY_ICON_CONFIG.textureKey);
-    // 本帧的视图放大上限：用于推导每个天体「最多能长到多大」（决定其图标锁定尺寸）
-    const zoomMax = getZoomLimits().max;
     // 全局图标淡入起点（锁定值的 fadeBegin/lockRadius 倍，等比例口径）
     const R_fadeGlobal = BODY_ICON_CONFIG.fadeBegin > BODY_ICON_CONFIG.lockRadius
         ? BODY_ICON_CONFIG.fadeBegin
@@ -456,15 +454,18 @@ function render(ctx, canvas, activeShip, options = {}) {
             const sepU = bodySeparationU(body, canvas, parentByName);
 
             if (physScreenR <= R_fadeGlobal && R_lock > 0) {
-                // 进入图标模式 —— 图标一旦出现，尺寸必须「锁死不再变」。
+                // 进入图标模式 —— 图标一旦出现，尺寸必须「锁死不再变」，且**与视图无关**。
                 //
-                // 每个天体用自己的尺寸上限当锁（R_lockBody）：
-                //   · 上限 ≥ lockRadius（全部真实星球，含最小的 Gilly）→ 锁 lockRadius
-                //   · 上限 < lockRadius（仅测试星系那几颗 displayRadius 只有几十的调试天体）
-                //     → 锁自身上限，图标与本体同大且固定，不会出现「图标比本体还大」
-                // 上限 = displayRadius × 当前视图的放大上限（闭式，无需记忆历史最大值）
-                const R_maxBody = body.displayRadius * zoomMax;
-                const R_lockBody = Math.min(R_lock, R_maxBody);
+                // 每个天体用自己的半径当上限（R_lockBody）：
+                //   · displayRadius ≥ lockRadius（全部真实星球，含最小的 Gilly）→ 锁 lockRadius
+                //   · displayRadius < lockRadius（仅测试星系那几颗 displayRadius 只有几十的调试天体）
+                //     → 锁自身半径，图标与本体同大且固定，不会出现「图标比本体还大」
+                //
+                // ⚠️ 上限只能用「天体自身半径」，**不能乘视图的放大上限**（曾用
+                //    displayRadius × getZoomLimits().max，导致机动视图切换聚焦天体时
+                //    上限被改写 → 远景天体图标半径塌成亚像素 → drawTintedIcon 的
+                //    radius>0.01 守卫直接跳过绘制，表现为「上一个星球的图标消失」）。
+                const R_lockBody = Math.min(R_lock, body.displayRadius);
                 // 过渡窗口 [R_fadeBody, R_lockBody]：等比例于全局口径，跨天体一致
                 const R_fadeBody = R_lockBody * (cfgIcon.fadeBegin / R_lock);
                 const t = lodBlendT(physScreenR, R_fadeBody, R_lockBody);   // 0→1 easeInOut
