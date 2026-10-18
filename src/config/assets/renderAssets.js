@@ -24,25 +24,113 @@ export const ASSET_FAMILIES = {
         "kind": "image",
         "projection": "equirect",
         "ratio": 2,
+        "repeat": false,
         "suffix": ".albedo.png",
         "tier": "w×h（实际像素，见条目）"
+    },
+    "detail": {
+        "kind": "image",
+        "projection": "tile",
+        "ratio": 1,
+        "repeat": true,
+        "suffix": ".detail.png",
+        "tier": "w×h（实际像素，见条目）"
+    },
+    "biome": {
+        "kind": "image",
+        "projection": "equirect",
+        "ratio": 2,
+        "repeat": false,
+        "suffix": ".biome.png",
+        "tier": "w×h（实际像素，见条目）"
+    },
+    "biomeStyles": {
+        "kind": "data",
+        "note": "逐群系细节风格（detailStrength/detailScale/material），由资产包导入"
     }
 };
 
 /**
  * 按天体挂资产条目。
- * image family 条目：`{ path, w, h, sha256, tier }`
- * data  family 条目：`{ params, provenance }`
+ * image family 条目：`{ path, projection, ratio, w, h, sha256, tier }`
+ * data  family 条目：`{ params, provenance }`（如 biomeStyles）
  */
 export const RENDER_ASSETS = {
     "kerbin": {
         "families": {
             "albedo": {
+                // ⚠️ 2026-10-17 组长授权手改：kerbin albedo 升 4096 档（tier 接线未做，下次工具导入会覆盖）
                 "path": "assets/images/celestial/kerbolar/render/kerbin.albedo.png",
+                "projection": "equirect",
+                "ratio": 2,
+                "w": 4096,
+                "h": 2048,
+                "sha256": "sha256:586518e2b89d17c19bd01410df636b0a06bdb9812a10abaea90b0d177b3ace87",
+                "tier": "4096×2048"
+            },
+            "detail": {
+                "path": "assets/images/celestial/kerbolar/render/kerbin.detail.png",
+                "projection": "tile",
+                "ratio": 1,
+                "w": 512,
+                "h": 512,
+                "sha256": "sha256:e19d9de5329d7114e25d623057f5bfe67fc675e884e3bac30e64ee9257a4fffc",
+                "tier": "512×512"
+            },
+            "biome": {
+                "path": "assets/images/celestial/kerbolar/render/kerbin.biome.png",
+                "projection": "equirect",
+                "ratio": 2,
                 "w": 2048,
                 "h": 1024,
-                "sha256": "sha256:ea02fd8b7aaa5f501529922b188944a1abd53d77f6876679c56a935f49918035",
+                "sha256": "sha256:2ba774395b4748363374fb1177bf7a52a16eaeb59899a4635efbcd4abe6ea34f",
                 "tier": "2048×1024"
+            },
+            "biomeStyles": {
+                "params": {
+                    "biomes": [
+                        {
+                            "detailStrength": 0,
+                            "detailScale": 1,
+                            "material": {
+                                "f0": 0.08,
+                                "rough": 0.44,
+                                "waveDeg": 0.5,
+                                "waveScale": 4
+                            }
+                        },
+                        {
+                            "detailStrength": 0,
+                            "detailScale": 1,
+                            "material": {
+                                "f0": 0.08,
+                                "rough": 0.47,
+                                "waveDeg": 0.5,
+                                "waveScale": 4
+                            }
+                        },
+                        {
+                            "detailStrength": 1,
+                            "detailScale": 1
+                        },
+                        {
+                            "detailStrength": 1,
+                            "detailScale": 1
+                        },
+                        {
+                            "detailStrength": 1,
+                            "detailScale": 1
+                        },
+                        {
+                            "detailStrength": 1,
+                            "detailScale": 1
+                        }
+                    ]
+                },
+                "provenance": [
+                    "data/planet-src/kerbin/palette-map.json",
+                    "data/planet-src/kerbin/biome-styles.json"
+                ]
             }
         }
     },
@@ -50,15 +138,85 @@ export const RENDER_ASSETS = {
         "families": {
             "albedo": {
                 "path": "assets/images/celestial/kerbolar/render/mun.albedo.png",
+                "projection": "equirect",
+                "ratio": 2,
                 "w": 2048,
                 "h": 1024,
                 "sha256": "sha256:99d575969dedf6e73b71d0c742b07d648dd01a092bb55ff4f9bd403100f0c26b",
                 "tier": "2048×1024"
+            },
+            "detail": {
+                "path": "assets/images/celestial/kerbolar/render/mun.detail.png",
+                "projection": "tile",
+                "ratio": 1,
+                "w": 512,
+                "h": 512,
+                "sha256": "sha256:807903968ca04f1a9336c1d6023150dd9b78d6bb3b6b5870abfbd13edb389b3c",
+                "tier": "512×512"
+            },
+            "biome": {
+                "path": "assets/images/celestial/kerbolar/render/mun.biome.png",
+                "projection": "equirect",
+                "ratio": 2,
+                "w": 2048,
+                "h": 1024,
+                "sha256": "sha256:2158f2935d1d7c7167f9524757908f1976bfb821bf0b65d3ae9613eb0515474b",
+                "tier": "2048×1024"
+            },
+            "biomeStyles": {
+                "params": {
+                    "biomes": [
+                        {
+                            "detailStrength": 0.96,
+                            "detailScale": 1.35
+                        },
+                        {
+                            "detailStrength": 1.28,
+                            "detailScale": 1
+                        },
+                        {
+                            "detailStrength": 1.728,
+                            "detailScale": 0.72
+                        },
+                        {
+                            "detailStrength": 0.704,
+                            "detailScale": 1.5
+                        }
+                    ]
+                },
+                "provenance": [
+                    "data/planet-src/mun/palette-map.json",
+                    "data/planet-src/mun/biome-styles.json"
+                ]
             }
         }
     },
     "jool": {
-        "families": {}
+        "families": {
+            "biome": {
+                "path": "assets/images/celestial/kerbolar/render/jool.biome.png",
+                "projection": "equirect",
+                "ratio": 2,
+                "w": 64,
+                "h": 32,
+                "sha256": "sha256:08ad7b237c4bbb0f46a761b87e6f0b8942cf205c92c70cfedeb344c6fd8f18d4",
+                "tier": "64×32"
+            },
+            "biomeStyles": {
+                "params": {
+                    "biomes": [
+                        {
+                            "detailStrength": 0,
+                            "detailScale": 1
+                        }
+                    ]
+                },
+                "provenance": [
+                    "data/planet-src/jool/palette-map.json",
+                    "data/planet-src/jool/biome-styles.json"
+                ]
+            }
+        }
     }
 };
 
@@ -71,6 +229,11 @@ export const RENDER_ASSETS_MISSING = [
         "bodyId": "jool",
         "family": "albedo",
         "reason": "本批没有该天体的 albedo 源（只有 biome 图）⇒ **缺**，未生成（不伪造）"
+    },
+    {
+        "bodyId": "jool",
+        "family": "detail",
+        "reason": "无源文件"
     }
 ];
 

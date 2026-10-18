@@ -4,6 +4,7 @@ import { sceneManager } from '../sceneManager.js';
 import { textureManager } from '../graphics/textureManager.js';
 import { eventBus, Events } from '../eventBus.js';
 import { renderableManager } from '../graphics/renderable.js';
+import { menuPlanetLayer } from '../graphics/menuPlanetLayer.js';
 import { MENUS } from '../config/ui/menuConfig.js';
 import { LINKS_ICONS } from '../config/ui/menuConfig.js'; // 1. 导入数据
 import { VERSION_TEXT } from '../config/meta/version.js';
@@ -22,14 +23,18 @@ let _container = null;      // 主菜单 DOM 容器
 let _onKeyDown = null;
 let _texturesReadyHandler = null;
 let _callbacks = {};
-let _menuBgMode = 'stars';          // 菜单背景模式缓存（进场景读一次，渲染路径不再读存储）
+let _menuBgMode = 'style2';         // 菜单样式缓存（style1=纯星空 / style2=带星球；进场景读一次）
 let _settingsClosedHandler = null;
 
-// 读取菜单背景模式 —— 存储键取 settingsConfig 的定义（配置集中，不硬编码字面量）
+// 读取菜单样式 —— 存储键取 settingsConfig 的定义（配置集中，不硬编码字面量）
+// 旧值 stars/image（以及任何未知值）一律落到 style2；style1 为显式 opt-in
 function _readMenuBgMode() {
     const row = (SETTINGS_ROWS.display || []).find(r => r.group === 'menuBg');
-    if (!row) return 'stars';
-    return localStorage.getItem(row.storageKey) || row.defaultValue;
+    if (!row) return 'style2';
+    const raw = localStorage.getItem(row.storageKey);
+    const legacy = row.legacyValues && row.legacyValues[raw];
+    const value = legacy || raw || row.defaultValue;
+    return value === 'style1' ? 'style1' : 'style2';
 }
 
 // 生成背景星空
@@ -221,7 +226,7 @@ function _buildMenuDOM() {
     }
     // ================================================
 
-    // 版本号（右下角）
+    // 版本号（右上角：背景图右下为巨球）
     const version = document.createElement('div');
     version.className = 'mm-version';
     version.textContent = VERSION_TEXT;
@@ -265,15 +270,24 @@ function registerMenuScene(options) {
             _currentMenu = 'main';
             _generateStars();
 
-            // 菜单背景模式：进场景读一次并缓存（渲染路径不再触碰 localStorage）
+            // 菜单样式：进场景读一次并缓存（渲染路径不再触碰 localStorage）
             _menuBgMode = _readMenuBgMode();
+            // style2 才初始化星球层；style1 保持原版纯星空，不创建 WebGL 资源
+            if (_menuBgMode === 'style2') menuPlanetLayer.enter(_canvas);
 
             // 设置面板化后可在主菜单内直接改背景（不切场景），故在设置面板关闭时刷新缓存；
             // 复用 uiManager 既有的 UI_PANEL_CLOSED 事件，不新增事件、不轮询
             // 守卫：enter 可能被重复调用（场景重入/显式调用），避免重复订阅导致 exit 只注销得掉最后一个
             if (!_settingsClosedHandler) {
                 _settingsClosedHandler = ({ panelId }) => {
-                    if (panelId === 'settings') _menuBgMode = _readMenuBgMode();
+                    if (panelId !== 'settings') return;
+                    const next = _readMenuBgMode();
+                    if (next === 'style2' && _menuBgMode !== 'style2') {
+                        menuPlanetLayer.enter(_canvas);
+                    } else if (next === 'style1' && _menuBgMode === 'style2') {
+                        menuPlanetLayer.exit();
+                    }
+                    _menuBgMode = next;
                 };
                 eventBus.on(Events.UI_PANEL_CLOSED, _settingsClosedHandler);
             }
@@ -300,20 +314,18 @@ function registerMenuScene(options) {
             }
         },
 
-        update() {
-            // 无业务逻辑
+        update(dt) {
+            // 仅 style2 更新星球层（style1 = 原版纯星空）
+            if (_menuBgMode === 'style2') {
+                menuPlanetLayer.update(dt);
+            }
         },
 
         render(ctx) {
-            if (_menuBgMode === 'image') {
-                const bg = textureManager.get('menu_bg');
-                if (bg) {
-                    ctx.drawImage(bg, 0, 0, _canvas.width, _canvas.height);
-                } else {
-                    _drawStars(ctx);
-                }
-            } else {
-                _drawStars(ctx);
+            // 两种样式都先画星空；style2 再叠加星球层（唯一的合成调用点）
+            _drawStars(ctx);
+            if (_menuBgMode === 'style2') {
+                menuPlanetLayer.render(ctx);
             }
         },
 
@@ -337,6 +349,7 @@ function registerMenuScene(options) {
             if (_canvas) {
                 _canvas.style.cursor = '';
             }
+            menuPlanetLayer.exit();
         }
     });
 }

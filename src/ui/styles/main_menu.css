@@ -59,11 +59,12 @@
     background: #3B3F8D;
 }
 
-/* ---- 版本号（右下角） ---- */
+/* ---- 版本号（右上角：背景图右下为巨球，版本号移到右上避让） ---- */
 .mm-version {
     position: absolute;
+    top: 20px;
     right: 20px;
-    bottom: 20px;
+    bottom: auto;
     color: rgba(255, 255, 255, 0.3);
     font-size: 11px;
 }
