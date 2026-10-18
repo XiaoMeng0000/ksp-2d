@@ -113,10 +113,25 @@ function importImageFamily(labDir, bodyId, famName, fam, opts) {
             + '（manifest 说有、实际没有）⇒ 拒绝导入');
     }
     const size = readPngSize(srcPath);
-    // ① 2:1（实测，不信 manifest）
-    if (size.w !== size.h * 2) {
-        throw new Error(bodyId + '.' + famName + '：实测 ' + size.w + '×' + size.h
-            + ' 不是 2:1 ⇒ **拒收**（等距圆柱投影要求 2:1）');
+    // ① 按 projection 分层校验（实测，不信 manifest；**不做全局 2:1**）
+    if (fam.projection === 'equirect') {
+        if (size.w !== size.h * 2) {
+            throw new Error(bodyId + '.' + famName + '：实测 ' + size.w + '×' + size.h
+                + ' 不是 2:1 ⇒ **拒收**（projection=equirect 要求 w=2h）');
+        }
+    } else if (fam.projection === 'tile') {
+        if (size.w !== size.h) {
+            throw new Error(bodyId + '.' + famName + '：实测 ' + size.w + '×' + size.h
+                + ' 不是 1:1 ⇒ **拒收**（projection=tile 要求 w=h）');
+        }
+    } else {
+        throw new Error(bodyId + '.' + famName + '：未知 projection '
+            + JSON.stringify(fam.projection) + '（只认 equirect / tile）');
+    }
+    const expectedRatio = fam.projection === 'equirect' ? 2 : 1;
+    if (fam.ratio !== expectedRatio) {
+        throw new Error(bodyId + '.' + famName + '：ratio 与 projection 不符（'
+            + fam.ratio + ' vs 期望 ' + expectedRatio + '）⇒ 拒收');
     }
     // ② sha256 与源字节一致
     const actualSha = sha256File(srcPath);
@@ -146,6 +161,8 @@ function importImageFamily(labDir, bodyId, famName, fam, opts) {
     return {
         entry: {
             path: relPath,
+            projection: fam.projection,
+            ratio: fam.ratio,
             w: size.w,
             h: size.h,
             sha256: actualSha,
@@ -185,8 +202,8 @@ function renderConfig(state, noTimestamp) {
     L.push('');
     L.push('/**');
     L.push(' * 按天体挂资产条目。');
-    L.push(' * image family 条目：`{ path, w, h, sha256, tier }`');
-    L.push(' * data  family 条目：`{ params, provenance }`');
+    L.push(' * image family 条目：`{ path, projection, ratio, w, h, sha256, tier }`');
+    L.push(' * data  family 条目：`{ params, provenance }`（如 biomeStyles）');
     L.push(' */');
     L.push('export const RENDER_ASSETS = ' + JSON.stringify(state.bodies, null, 4) + ';');
     L.push('');
@@ -245,6 +262,7 @@ function cmdImport(args) {
                         kind: 'image',
                         projection: fam.projection,
                         ratio: fam.ratio,
+                        repeat: fam.repeat === true,
                         suffix: '.' + famName + '.png',
                         tier: 'w×h（实际像素，见条目）',
                     };
@@ -252,6 +270,22 @@ function cmdImport(args) {
                 const r = importImageFamily(dir, bodyId, famName, fam, args);
                 state.bodies[bodyId].families[famName] = r.entry;
                 plans.push(r.relPath + (args.dryRun ? '（dry-run 未写）' : ''));
+            } else if (famName === 'biomeStyles') {
+                // ★ 画质输入（W7）：biomeStyles 是 data family，但**不是几何形状** ——
+                //    主游戏需要它来逐群系给 detailStrength / detailScale / material。
+                const biomes = fam.params && fam.params.biomes;
+                if (!Array.isArray(biomes) || !biomes.length) {
+                    throw new Error(bodyId + '.biomeStyles：params.biomes 不是非空数组 ⇒ 拒绝导入');
+                }
+                state.families[famName] = {
+                    kind: 'data',
+                    note: '逐群系细节风格（detailStrength/detailScale/material），由资产包导入',
+                };
+                state.bodies[bodyId].families[famName] = {
+                    params: fam.params,
+                    provenance: fam.source || null,
+                };
+                plans.push('配置 data family ' + bodyId + '.biomeStyles（' + biomes.length + ' 群系）');
             } else {
                 // ★ 资产/形状分离：data family（shape 等**几何参数**）**不导入本配置** ——
                 //    形状的唯一真源是手写的 src/config/world/bodyRenderShape.js。
@@ -320,6 +354,16 @@ function cmdVerify() {
         const missingFams = [];
         famNames.forEach((f) => {
             const e = fams[f];
+            if (e && e.params) {
+                // data family（biomeStyles）：没有文件，校验逐群系数据形状
+                if (f === 'biomeStyles') {
+                    const biomes = e.params.biomes;
+                    if (!Array.isArray(biomes) || !biomes.length) {
+                        missingFams.push({ family: f, reason: 'params.biomes 不是非空数组' });
+                    }
+                }
+                return;
+            }
             if (!e || !e.path) {
                 missingFams.push({ family: f, reason: '条目无 path' });
                 return;

@@ -32,17 +32,20 @@ export const SETTINGS_CATEGORIES = [
 //   options         分段选项；option.labelKey 引用 strings.js，缺省时用 option.label 字面量（如 KSP1/KSP2）
 //   control         'slider' = 滑条控件（0~100 显示，存储 0~1）；缺省 = 分段按钮组
 //   sectionLabelKey 可选：行级分组标题（同分类内多分组用，如"音乐"之后接"音量"）
+//   legacyValues    可选：旧存储值 → 新值映射（仅用于读取时归一化，不写回）
 //   afterChange     可选：切换后回调（main.js 注入前不在此处引用音频）
 export const SETTINGS_ROWS = {
     display: [
         {
             group: 'menuBg',
-            labelKey: 'settings.menuBg',
+            labelKey: 'settings.menuStyle',
             storageKey: 'ksp2d.menuBg',
-            defaultValue: 'stars',
+            defaultValue: 'style2',
+            // 旧版 stars/image 一律归一到 style2；style1 为显式 opt-in
+            legacyValues: { stars: 'style2', image: 'style2' },
             options: [
-                { value: 'stars', labelKey: 'settings.bgStars' },
-                { value: 'image', labelKey: 'settings.bgImage' },
+                { value: 'style1', labelKey: 'settings.menuStyle1' },
+                { value: 'style2', labelKey: 'settings.menuStyle2' },
             ]
         }
     ],

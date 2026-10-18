@@ -15,7 +15,6 @@
 
 export const textureConfig = {
     title: 'assets/images/menu/title.png',
-    menu_bg: 'assets/images/menu/background.png',
     project_logo: 'assets/images/menu/ev.png',
 
     // 主菜单链接栏图标

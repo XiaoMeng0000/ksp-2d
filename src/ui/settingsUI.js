@@ -46,9 +46,12 @@ function findRow(group) {
     return null;
 }
 
-// 读取设置行的当前值（storageKey → defaultValue）
+// 读取设置行的当前值（storageKey → defaultValue；legacyValues 在读取时归一化）
 function getRowValue(row) {
-    return localStorage.getItem(row.storageKey) || row.defaultValue;
+    const raw = localStorage.getItem(row.storageKey);
+    if (!raw) return row.defaultValue;
+    if (row.legacyValues && row.legacyValues[raw]) return row.legacyValues[raw];
+    return raw;
 }
 
 // 分段按钮组 — 生成 HTML（option.labelKey 引用 strings.js，缺省用 option.label 字面量）
