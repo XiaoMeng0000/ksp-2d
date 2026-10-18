@@ -164,12 +164,28 @@ export function createUniformBlock(gl, shader, blockName, bindingPoint) {
         return null;
     }
     gl.uniformBlockBinding(shader.program, index, bindingPoint);
+    const buffer = gl.createBuffer();
+    // ★ 创建即分配存储并 bindBufferBase（2026-10-17 修「首帧云消失」）★
+    //   块只要在着色器里被引用（哪怕读取位于 uGgEnabled=0 的死分支内）就是 **active**，
+    //   而 GL 在 draw 时会校验**所有** active 块：绑定缺失或缓冲小于声明尺寸 ⇒
+    //   整个 draw 收 INVALID_OPERATION 被静默拒绝。此前 buffer 0 字节且未绑定，
+    //   云程序在首次 uploadUniformBlock（气态巨星装配）之前**每帧都画不出来** ——
+    //   症状即「第一次进菜单永远没云，切一次 jool 大气再切回来才有」。
+    //   全零存储对 uGgEnabled=0 的 Kerbin 路径逐位无影响；GG 路径仍有
+    //   「ggOn && !ggTables ⇒ 显式抛错」把着，不会拿全零表静默出图。
+    const declaredBytes = gl.getActiveUniformBlockParameter(shader.program, index, gl.UNIFORM_BLOCK_DATA_SIZE);
+    if (Number.isFinite(declaredBytes) && declaredBytes > 0) {
+        gl.bindBuffer(gl.UNIFORM_BUFFER, buffer);
+        gl.bufferData(gl.UNIFORM_BUFFER, declaredBytes, gl.DYNAMIC_DRAW);
+        gl.bindBuffer(gl.UNIFORM_BUFFER, null);
+    }
+    gl.bindBufferBase(gl.UNIFORM_BUFFER, bindingPoint, buffer);
     return {
         name: blockName,
         index,
         bindingPoint,
-        buffer: gl.createBuffer(),
-        byteLength: 0,
+        buffer,
+        byteLength: declaredBytes,
     };
 }
 

@@ -1,4 +1,4 @@
-# VENDORED — 渲染层 vendored 来源记录
+﻿# VENDORED — 渲染层 vendored 来源记录
 
 - 来源仓库：`D:\ksp-renderlab`（渲染层产地）
 - 来源 commit：`3c4a848`（完整 `3c4a8487a9ee1409b8a13168c179ee3df1fce411`）
@@ -28,7 +28,11 @@
 | src/glCore/context.js | b3ac56cb6494e91d |
 | src/glCore/matrix.js | 5ae34698f6078e9c |
 | src/glCore/mesh.js | 52fae66ec4e97244 |
-| src/glCore/shader.js | aab0761807ae1cc0 |
+| src/glCore/shader.js | d1413c81cd2531fd |
 | src/glCore/texture.js | cb0637881ceeb4b0 |
 | src/geometry/irregularMesh.js | 815c49db23e653b6 |
 | src/geometry/sphereMesh.js | c11f1a9df6f705dd |
+
+## 增补记录
+
+- 2026-10-17：`src/glCore/shader.js` 单独 re-sync，含「首帧云消失」修复（createUniformBlock 创建即按声明尺寸分配 UBO 存储并绑定——修云层首次绘制被 GL INVALID_OPERATION 静默拒绝）。来源为实验室工作树（基线 `56857f7`，修复当时尚未提交，组长提交实验室后可回填 commit）；游戏副本仅首行引号规范化，其余逐字节一致（sha16 `d1413c81cd2531fd` 为引号规范化后口径）。
