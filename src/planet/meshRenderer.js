@@ -32,6 +32,7 @@ import { buildSphereGeometry, buildFullscreenGeometry } from '../geometry/sphere
 import { buildIrregularGeometry } from '../geometry/irregularMesh.js';
 import { createAtmosphereLayer, ATMOSPHERE_PRESETS } from './atmosphereLayer.js';
 import { createCloudLayer, CLOUD_PRESETS, CLOUD_SHELL_SEGMENTS, CLOUD_SHELL_RINGS } from './cloudLayer.js';
+import { CLOUD_SHADOW_VERT, CLOUD_SHADOW_FRAG } from './shaders/cloudShaders.js';
 import { buildCloudCdf, cloudBirthMean, zoneNormalizer, ZONE_POINTS, DEFAULT_ZONE_PROFILE } from './cloudRecipe.js';
 import { solveGasGiantRecipe } from './gasGiantCloudRecipe.js';
 import { RENDER_PARAM_EXTRA_KEYS } from '../config/renderParamKeys.js';
@@ -370,6 +371,8 @@ export function createPlanetRenderer(gl, options) {
         // ★ 纬向气候带：控制点表 + 归一化因子（与 CDF 同一次缓存）★
         cloudZoneProfile: null,
         cloudZoneNorm: 1,
+        // 云影图（512×256 等距柱状，懒创建）。null = 还没烘焙过 ⇒ 地表不着影。
+        cloudShadowTex: null,
         // 云的时间（秒）。由 render(dt) 累加；measurePlanet() 会**冻结到指定值**
         // —— 理由与 waveTime 完全相同（见那里的说明），但云多了一个能力：
         // 可以把时间冻结到**任意**值，而不只是 0，这样才能出"相隔 t 的两张图"的形变对照。
@@ -478,6 +481,28 @@ void main() {
         attributeLocations: {
             POSITION: unprojectProgram.attribs.aPosition,
             TEXCOORD: unprojectProgram.attribs.aTexCoord,
+        },
+    });
+
+    // ★★ 第三卷：云影烘焙（总监 2026-10-23 只批了**这一个**新增 target）★★
+    //   512×256 等距柱状小图，每帧一次（关闭时不创建、不绘制）。
+    //   ⚠️ 网格必须为本程序单独建一份：createProgram 不固定 attribute location
+    //      （与 cloudLayer.js 里那条注释同一个理由，§13.21 的静默依赖）。
+    //   ⚠️ 该图是**数据**（shade 原值），必须 srgb:false，否则会被硬件再编一次 sRGB。
+    const CLOUD_SHADOW_W = 512;
+    const CLOUD_SHADOW_H = 256;
+    const cloudShadowProgram = createProgram(gl, {
+        name: 'cloudShadow',
+        vertex: CLOUD_SHADOW_VERT,
+        fragment: CLOUD_SHADOW_FRAG,
+    });
+    const cloudShadowMesh = createMesh(gl, {
+        layout: fullscreenData.layout,
+        vertices: fullscreenData.vertices,
+        mode: gl.TRIANGLES,
+        attributeLocations: {
+            POSITION: cloudShadowProgram.attribs.aPosition,
+            TEXCOORD: cloudShadowProgram.attribs.aTexCoord,
         },
     });
 
@@ -699,6 +724,25 @@ void main() {
             matCacheKey = ovrKey;
         }
         const mat = matCache;
+        // ---- ★ 第三卷：云影的三项前置量（默认全关 ⇒ 不参与任何算式）----
+        //   ① 开关：云影烤了图 + 云开着 + 参数打开，三者同时成立才算开
+        //   ② 云壳半径（视差偏移量）：与云的 altitude 同源，缺省 1.004
+        //   ③ 本地太阳方向：世界 → 网格本地（模型矩阵 3×3 = 旋转·等比缩放，
+        //      等比缩放在归一化后消失 ⇒ 直接用 M3 的转置乘，再归一化）
+        const cloudsP = p.clouds || {};
+        const cloudShadowOn = !!cloudsP.shadowEnabled && !!state.cloudShadowTex && !!p.cloudEnabled;
+        const cloudShadowStrength = Math.max(0, Math.min(1,
+            cloudsP.shadowStrength === undefined ? 0.7 : cloudsP.shadowStrength));
+        const cloudShadowAlt = cloudsP.altitude === undefined ? 1.004 : cloudsP.altitude;
+        let sunDirLocal = p.sunDir || [0, 0, -1];
+        {
+            const v = p.sunDir || [0, 0, -1];
+            const lx = model[0] * v[0] + model[1] * v[1] + model[2] * v[2];
+            const ly = model[4] * v[0] + model[5] * v[1] + model[6] * v[2];
+            const lz = model[8] * v[0] + model[9] * v[1] + model[10] * v[2];
+            const n = Math.hypot(lx, ly, lz) || 1;
+            sunDirLocal = [lx / n, ly / n, lz / n];
+        }
         // 太阳视半径（弧度）。见 src/planet/sun.js。
         // ⚠️ 收的是**度**（面板口径），这里转弧度 —— 转换只此一处。
         const sunAngularRadius = solveSunAngularRadius(
@@ -796,6 +840,16 @@ void main() {
             uNormalMap: { texture: 4 },
             uNormalStrength: state.normalMap ? p.normalStrength : 0,
             uBiomeRelief: state.normalMap ? state.normalMap.relief : IDENTITY_RELIEF,
+            // ---- ★ 第三卷：云影（默认关 ⇒ uCloudShadowOn = 0，逐像素等于加它之前）----
+            //   需要的三样：影图（上一帧烘的）、强度、云壳半径（决定视差偏移量）、
+            //   以及**本地坐标系里的太阳方向**（用模型矩阵的旋转部分转置得到）。
+            uCloudShadowOn: cloudShadowOn ? 1 : 0,
+            uCloudShadowTex: { texture: 5 },
+            uCloudShadowStrength: cloudShadowStrength,
+            uCloudShadowAlt: cloudShadowAlt,
+            uSunDirLocal: sunDirLocal,
+            // 视差系数（1 = 真实；0 = 影子落在云正下方 —— 只用于量"错位幅度"的对照）
+            uCloudShadowParallax: cloudsP.shadowParallax === undefined ? 1 : cloudsP.shadowParallax,
         });
         bindTexture(gl, state.albedo, 0);
         if (detail) {
@@ -807,6 +861,9 @@ void main() {
         }
         if (state.normalMap) {
             bindTexture(gl, state.normalMap.texture, 4);
+        }
+        if (cloudShadowOn && state.cloudShadowTex) {
+            bindTexture(gl, state.cloudShadowTex, 5);
         }
         drawMesh(gl, state.mesh);
         state.stats.drawCalls += 1;
@@ -921,6 +978,13 @@ void main() {
         }
         const altitude = clouds.altitude === undefined ? 1.010 : clouds.altitude;
         const model = buildModel(options.planetRadius * altitude);
+        // ★ 第三卷：云影图（默认关 ⇒ 不创建 target、不绘制）★
+        //   放在这里是因为它依赖 CDF 与气候带表（上面刚确保就绪），
+        //   而地表（drawSphere）在本帧**之前**已经画过了 —— 所以影图晚一帧生效。
+        //   ⚠️ 冻结时间的量测路径下这是稳定的（warmup 之后每帧同一张图）。
+        if (clouds.shadowEnabled === true) {
+            bakeCloudShadow(clouds, options);
+        }
         // ---- ★ 气态巨星装配：判别字段 `model` 决定走哪条 α/颜色来源 ★ ----
         //   与 CDF 同一个模式：**配方变化时**才上传常量表（91×3），逐帧只写标量。
         //   ⚠️ 切回普通天体时必须显式清掉，否则上一帧的 uGgEnabled = 1 会留下来，
@@ -1034,6 +1098,79 @@ void main() {
         });
         gl.disable(gl.BLEND);
         gl.enable(gl.DEPTH_TEST);
+        state.stats.drawCalls += 1;
+    }
+
+    /**
+     * ★ 第三卷：烘焙云影图（512×256 等距柱状）★
+     *
+     * 口径：**每个 texel = 一个经纬格**，算"竖直穿过各层云壳的光学厚度之和 τ"，
+     *       输出 shade = 1 − exp(−τ)。这张图**与太阳方向无关** —— 太阳方向在地表
+     *       采样时才进入（地表点沿太阳方向穿到云壳上的交点去查它），"影与云错位"
+     *       就是那个视差造成的。
+     *
+     * ⚠️ 只在 `cloudShadowEnabled` 打开时调用（默认关 ⇒ 连 target 都不创建）。
+     * ⚠️ 用**独立网格**（cloudShadowMesh），不能借 fullscreenMesh ——
+     *    那份 VAO 绑定的是 unprojectProgram 的属性位置。
+     *
+     * @param {object} clouds 云参数（与 drawClouds 同一个对象）
+     * @param {object} options { cloudTime }
+     */
+    function bakeCloudShadow(clouds, options) {
+        const t = target('cloudShadow', CLOUD_SHADOW_W, CLOUD_SHADOW_H, { srgb: false, filter: gl.LINEAR });
+        state.cloudShadowTex = t;
+        // ⚠️⚠️ 必须保存/恢复 **framebuffer 与 viewport** ⚠️⚠️
+        //   调用方（measurePlanet / render）在**离屏 target** 上画，且不会在每层之前重设
+        //   framebuffer —— 所以烘焙完若把它绑回 null，**后面的云层与大气会画到画布上**，
+        //   离屏图里只剩球体（症状：落盘图是"一颗没有云、没有大气、颜色发生的球"，
+        //   而且开关差异图看起来像"整个半球被压暗"）。viewport 不恢复的后果同理（云画进角落）。
+        const prevFramebuffer = gl.getParameter(gl.FRAMEBUFFER_BINDING);
+        const prevViewport = gl.getParameter(gl.VIEWPORT);
+        // 覆盖率口径与云层一致：多壳时用"每层覆盖率"（并集守恒），单壳时用原 coverage
+        const nShells = clouds.shells === undefined ? 1 : clouds.shells;
+        const covComp = clouds.shellCoverageComp === undefined ? 0 : clouds.shellCoverageComp;
+        const covUnion = nShells > 1 ? 1 - Math.pow(1 - clouds.coverage, 1 / nShells) : clouds.coverage;
+        const covPerShell = clouds.coverage + (covUnion - clouds.coverage) * Math.max(0, Math.min(1, covComp));
+        gl.bindFramebuffer(gl.FRAMEBUFFER, t.framebuffer);
+        gl.viewport(0, 0, CLOUD_SHADOW_W, CLOUD_SHADOW_H);
+        gl.disable(gl.SCISSOR_TEST);
+        gl.disable(gl.BLEND);
+        gl.disable(gl.DEPTH_TEST);
+        setUniforms(gl, cloudShadowProgram, {
+            uMapSize: [CLOUD_SHADOW_W, CLOUD_SHADOW_H],
+            uFieldP0: [clouds.scale, clouds.lacunarity, clouds.gain, clouds.cascade],
+            uFieldP1: [clouds.warp, clouds.warpDetail, clouds.warpDetailScale, clouds.bandStretch],
+            uFieldP2: [
+                clouds.ridge,
+                clouds.octaves,
+                clouds.birthScale === undefined ? 2 : clouds.birthScale,
+                clouds.windShearMax === undefined ? 0 : clouds.windShearMax,
+            ],
+            uFieldP3: [
+                clouds.windSpeed || 0,
+                clouds.windShear || 0,
+                clouds.evolveRate || 0,
+                clouds.birthAmount || 0,
+            ],
+            uFieldSeed: clouds.seed,
+            uCloudTime: options.cloudTime === undefined ? state.cloudTime : options.cloudTime,
+            uCoverage: clouds.coverage,
+            uShellCoverage: covPerShell,
+            uSoftness: clouds.softness === undefined ? 0.001 : clouds.softness,
+            uShells: nShells,
+            uShellShift: clouds.shellShift === undefined ? 0 : clouds.shellShift,
+            uInnerOctaves: clouds.innerOctaves === undefined ? 3 : clouds.innerOctaves,
+            uBirthMean: cloudBirthMean(clouds, options.cloudTime === undefined ? state.cloudTime : options.cloudTime),
+            uCloudCdf: state.cloudCdf.lut,
+            uCloudLogMin: state.cloudCdf.logMin,
+            uCloudLogSpan: Math.max(1e-9, state.cloudCdf.logMax - state.cloudCdf.logMin),
+            uZoneProfile: state.cloudZoneProfile,
+            uZoneStrength: clouds.zoneStrength === undefined ? 0 : clouds.zoneStrength,
+            uZoneNorm: state.cloudZoneNorm === undefined ? 1 : state.cloudZoneNorm,
+        });
+        drawMesh(gl, cloudShadowMesh);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, prevFramebuffer);
+        gl.viewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
         state.stats.drawCalls += 1;
     }
 
@@ -1749,6 +1886,23 @@ void main() {
         /** 诊断用：当前是否挂载了细节层 */
         hasDetail() {
             return !!(state.detail && state.detail.enabled);
+        },
+
+        /**
+         * ★ 第三卷诊断：把云影图（512×256 等距柱状）读回来 ★
+         *
+         * 用途：验收时"影从哪来"必须能回到这张图上核对（shade = 1 − exp(−τ)），
+         * 而不是只看地表的亮度差。未烘焙（云影关闭）时返回 null。
+         * @returns {{width:number, height:number, pixels:Uint8Array}|null}
+         */
+        readCloudShadow() {
+            if (!state.cloudShadowTex) {
+                return null;
+            }
+            gl.bindFramebuffer(gl.FRAMEBUFFER, state.cloudShadowTex.framebuffer);
+            const pixels = readPixelsTopDown(gl, CLOUD_SHADOW_W, CLOUD_SHADOW_H);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            return { width: CLOUD_SHADOW_W, height: CLOUD_SHADOW_H, pixels };
         },
 
         /** 释放全部 GPU 资源 */

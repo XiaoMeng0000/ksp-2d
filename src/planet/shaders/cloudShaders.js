@@ -108,9 +108,43 @@ uniform float uSoftness;
 // 云缘过渡宽度的**屏幕空间下限**（像素）。见下面的 Beer–Lambert 段：
 // 光有 softness 不够，坡道会被'b 的屏幕梯度'压成亚像素级 ⇒ 用这一项兜底。
 uniform float uEdgePx;
+// ★ 第二卷 A 的两个云缘旋钮 —— **默认值都不改变画面** ★
+//   uEdgeRel  相对口径：过渡宽度里"随盘半径伸缩"的份额（× 屏幕盘半径，像素）
+//             0 = 只用 uEdgePx 的绝对口径（= 本卷之前的行为）
+//   uEdgeKnee 云缘"薄边"：近缘按 τ 渐薄（对比度软压缩）
+//             0 = 关闭（逐像素等于本卷之前的行为）
+uniform float uEdgeRel;
+uniform float uEdgeKnee;
 // ★ 体积感两项（见下面的 B/A 段）★ 0 = 关，逐像素退化成"平面贴纸"（零变化通路）
 uniform float uSelfShadow;   // B 方向自阴影强度（∂b/∂s 的系数）
 uniform float uHeightShade;  // A 高度反照率强度（|∂b/∂s| 的系数）
+// ★ 体积感的**差分步长**（弧度）—— 第二卷 A · Q1 ★
+//   本卷之前是硬编码常量 0.05（≈2.9°），而 slope 的结构自由度天然 ≥ 该步长
+//   ⇒ 云内 0.3~3° 没有亮度层次。参数化后可在面板上扫。
+//   ⚠️ 0.05 是**历史值**：默认档必须逐像素不变（见下面 B/A 段的实现说明）。
+uniform float uSlopeEps;
+// ★★ 第三卷：多层壳（默认 1 壳 = 逐像素等于第二卷的行为）★★
+//   uShells       壳数 1~3；1 = **整段多壳分支不执行**（零回归通路）
+//   uShellGap     相邻壳的半径差（占星径比例）；壳 k 的半径 = 1 − gap·k
+//   uShellDim     内层亮度衰减（光穿过上面几层后变暗；1 = 不衰减）
+//   uInnerOctaves 内层倍频数（"内层降倍频"）：比外层少 ⇒ 内层偏糊、但便宜
+//   ⚠️ 为什么"内层降倍频"是零成本的：倍频数只是 cfSampleField 的一个参数
+//      （P2.y），共享内核一字不用改 —— 传一个临时 vec4 进去即可。
+uniform float uShells;
+uniform float uShellGap;
+uniform float uShellDim;
+uniform float uInnerOctaves;
+// ★★ 第三卷 A：每壳**独立场**（总监裁决：不同高度的云是不同的云）★★
+//   uShellShift    内层壳的经度偏移（u 的比例，壳 k 偏移 k·本项）。
+//                  **没动 seed、没动 CDF**，只是把同一张场在经度上挪开 ——
+//                  场的统计性质与覆盖率语义因此**逐层不变**（CDF 是全局单调重映射）。
+//                  0 = 退回"同一个场"（也就是已被几何否决的那一档，留作对照组）。
+//   uShellCoverage 多壳时**每层**的覆盖率。CPU 侧按并集守恒算：
+//                  单层 c 满足 1−(1−c)^N = 目标覆盖率 ⇒ c = 1−(1−目标)^(1/N)。
+//                  为什么必须补偿：各层是独立的云 ⇒ 并集必然变大（0.16 → 0.41，N=3）。
+//                  ⚠️ 壳数 = 1 时不读这一项（走 uCoverage ⇒ 逐像素不变）。
+uniform float uShellShift;
+uniform float uShellCoverage;
 uniform float uOpacity;
 // 光照：与本体共用同一个太阳方向（**不做大气那处 z 取反**）
 uniform vec3 uSunDir;
@@ -282,11 +316,40 @@ void main() {
         float vbias = ggVortexApply(vLocalDir, b, vmask);
         albedoUse = ggCloudTop(vLocalDir, b, vmask, vbias, int(uFieldSeed + 0.5));
     } else {
-        float covEff = uCoverage * cfZoneAt(vTexCoord.y);
+        // ★ 多壳时的覆盖率：外层也降到"每层覆盖率"（并集守恒，见 uShellCoverage 的说明）★
+        //   ⚠️ 壳数 = 1 时这个选择恰好给出 uCoverage ⇒ 与第二卷**逐位相同**（纯选择，无算术变化）。
+        float covBase = uShells > 1.5 ? uShellCoverage : uCoverage;
+        float covEff = covBase * cfZoneAt(vTexCoord.y);
         float grad = max(fwidth(b), 1e-6);
-        float width = max(uSoftness, uEdgePx * grad);
+        // ★★ 过渡宽度 = 绝对口径（像素） + 相对口径（× 盘半径）★★
+        //   uEdgeRel = 0 时 edgePxEff 恰好等于 uEdgePx（加 0.0 是精确无操作）
+        //   ⇒ 走的是与本卷之前**逐像素相同**的那几行。
+        //   为什么要相对口径：uEdgePx 是屏幕空间常数 ⇒ 盘半径越小，过渡相对盘面越宽，
+        //   w/R 随档位单调垮（实测 P0/P1/P2 跨度 3.56×）。真实云的边缘没有这个屏幕口径。
+        //   ★ 屏幕盘半径怎么拿（不需要额外 uniform）★
+        //     正交投影下，世界坐标对屏幕像素的导数是常量向量（模长 1/zoom），
+        //     而 vLocalDir 是模型空间单位球方向 ⇒ |∂dir/∂像素| = 1/(zoom·模型缩放) = 1/R_px。
+        //     它与旋转、模型缩放、球网格分段都无关（三角形内是仿射插值，导数是精确的）。
+        //   ⚠️ dFdx 放在 uEdgeRel 的**一致分支**里（条件量是 uniform，与 uGgEnabled 同一约定）。
+        float edgePxEff = uEdgePx;
+        if (uEdgeRel > 1e-9) {
+            float rpx = 1.0 / max(length(dFdx(vLocalDir)), 1e-6);
+            edgePxEff = uEdgePx + uEdgeRel * rpx;
+        }
+        float width = max(uSoftness, edgePxEff * grad);
         float tau = 0.6931472 + (covEff - b) / max(width, 1e-6);
         cloud = tau > 0.0 ? 1.0 - exp(-tau) : 0.0;
+        // ---- ★ 云缘"薄边"：近缘渐薄（对比度软压缩）★ ----
+        //   为什么需要它：α 的 10%→90% 过渡宽度已经达标（0.90× 参照），
+        //   但"平台到平台"的幅度（云缘对比度）由**最大不透明度**钉死 ⇒
+        //   刀切感来自"边缘一上来就跳到满不透明"，不是宽度。
+        //   物理对应：云顶高度向边缘下降 ⇒ 光学厚度随之下降 ⇒ 云缘是**渐薄**的。
+        //   形状取 exp(-τ/10)：τ 越小（越靠外）压得越狠，τ 大了才恢复满不透明。
+        //   τ 的尺度是"过渡宽度"本身（1 τ ≈ 1 个 10→90% 跨度的 0.45）⇒ 与分辨率无关。
+        //   0 = 关闭（走不到这里，逐像素等于本卷之前的行为）。
+        if (uEdgeKnee > 0.0) {
+            cloud = cloud * (1.0 - uEdgeKnee * exp(-max(tau, 0.0) * 0.1));
+        }
     }
 
     // ---- ★★ B 自阴影 + A 高度反照率：体积感的分水岭 ★★ ----
@@ -311,7 +374,6 @@ void main() {
     //   **宏观坡面**而不是噪声（顺带防走样）。
     float slope = 0.0;
     if (uSelfShadow > 0.0 || uHeightShade > 0.0) {
-        const float EPS = 0.05;
         // ⚠️ 本段在「直射光」那一段**之前**（要先用 slope 才能算 shade），
         //    所以不能引用那里的 L —— 自己取一次。实测踩过：用 L 会编译失败。
         vec3 Lsun = normalize(uSunDir);
@@ -325,14 +387,48 @@ void main() {
             float la = (uv.y - 0.5) * 3.14159265358979;
             vec3 east = vec3(cos(th), 0.0, -sin(th));
             vec3 north = vec3(-sin(la) * sin(th), cos(la), -sin(la) * cos(th));
-            // 1 弧度东移 ⇒ Δu = 1/(2π)；1 弧度北移 ⇒ Δv = 1/π
-            vec2 stepUv = vec2(dot(sHat, east) * EPS / 6.28318530717959,
-                               dot(sHat, north) * EPS / 3.14159265358979);
             int sd = int(uFieldSeed + 0.5);
-            float bSun = cfFieldToB(cfSampleField(uv + stepUv, uCloudTime,
-                                  uFieldP0, uFieldP1, uFieldP2, uFieldP3, sd))
-                       + cfBirthDelta(uv + stepUv, uCloudTime, uFieldP2, uFieldP3, uBirthPhase, sd);
-            slope = (clamp(bSun, 0.0, 1.0) - b) / EPS;
+            // ★★ 差分步长：两条路径（第二卷 A · Q1）★★
+            //   为什么要分两条：**除以编译期常量**与**除以 runtime uniform** 是两条不同的
+            //   代码生成路径，舍入可以差 1 ulp。8 bit 上这不是理论问题 —— 实测确实会翻像素。
+            //   默认档必须逐像素不变，所以默认档保留**与改动前逐字相同**的常量路径
+            //   （本卷之前就是这一行 const float EPS = 0.05），只有真调了滑块才走参数路径。
+            //   ⚠️ 曾想用"乘一个比例再除以同一个比例"省掉重复 —— 那会引入一次额外舍入，行不通。
+            //
+            //   ★★★ 0.05 在 GLSL 里出现了三处，它们**必须同步** ★★★
+            //     (a) 下面这行的默认档判定：abs(uSlopeEps - 0.05) < 1e-7
+            //     (b) 默认档的 const float EPS = 0.05
+            //     (c) 参数档的回落 epsP = uSlopeEps > 0.0 ? uSlopeEps : 0.05
+            //   GLSL 不能 import JS 常量 ⇒ 这三个数**无法**从
+            //   src/config/cloudOptionalDefaults.js 的 CLOUD_OPTIONAL_DEFAULTS.slopeEps 推出来。
+            //   改那个默认值时必须**同时**改这三处；只改 JS 的后果是：JS 传进来的默认值
+            //   不再等于这里的 0.05 ⇒ abs(uSlopeEps - 0.05) 判定失败 ⇒ 默认档**静默改走
+            //   uniform 路径** ⇒ 1 ulp 差异让"默认值逐像素零回归"失效（画面看不出，判据会红）。
+            if (abs(uSlopeEps - 0.05) < 1e-7) {
+                // ---- 默认档：历史常量路径（零回归）----
+                // ⚠️ 这个 0.05 与上面的判定、下面的回落必须同值（见上面的三处同步说明）
+                const float EPS = 0.05;
+                // 1 弧度东移 ⇒ Δu = 1/(2π)；1 弧度北移 ⇒ Δv = 1/π
+                vec2 stepUv = vec2(dot(sHat, east) * EPS / 6.28318530717959,
+                                   dot(sHat, north) * EPS / 3.14159265358979);
+                float bSun = cfFieldToB(cfSampleField(uv + stepUv, uCloudTime,
+                                      uFieldP0, uFieldP1, uFieldP2, uFieldP3, sd))
+                           + cfBirthDelta(uv + stepUv, uCloudTime, uFieldP2, uFieldP3, uBirthPhase, sd);
+                slope = (clamp(bSun, 0.0, 1.0) - b) / EPS;
+            } else {
+                // ---- 参数档：步长由面板给（0.05 → 0.005，把云内 0.2~3° 的层次放出来）----
+                //   步长越小，slope 越能反映细坡面；小到接近场的可分辨下限（约 0.008 rad）
+                //   会开始撒噪点 ⇒ 判据是"细节带抬起来，同时 0.09~0.2° 不许过冲"。
+                //   ⚠️ 这里的 0.05 是**第三处**同值硬编码（另两处见上面"三处必须同步"）。
+                //      uSlopeEps 不可能为 0（面板下限 0.005），这一支只是防 0/负 的兜底。
+                float epsP = uSlopeEps > 0.0 ? uSlopeEps : 0.05;
+                vec2 stepUvP = vec2(dot(sHat, east) * epsP / 6.28318530717959,
+                                    dot(sHat, north) * epsP / 3.14159265358979);
+                float bSunP = cfFieldToB(cfSampleField(uv + stepUvP, uCloudTime,
+                                       uFieldP0, uFieldP1, uFieldP2, uFieldP3, sd))
+                            + cfBirthDelta(uv + stepUvP, uCloudTime, uFieldP2, uFieldP3, uBirthPhase, sd);
+                slope = (clamp(bSunP, 0.0, 1.0) - b) / epsP;
+            }
         }
     }
     // B：方向自阴影 —— 乘 uDiffuse（见上）
@@ -395,6 +491,174 @@ void main() {
     vec3 lit = albedoUse * heightAlb * uSunColor
              * (ambientUse + uDiffuse * ndl * sunTint * selfShade);
 
-    fragColor = vec4(lit, cloud * uOpacity);
+    // =======================================================================
+    //  ★★ 第三卷：多层壳（uShells > 1 才执行）★★
+    // =======================================================================
+    //   为什么要多壳：第二卷 A 的 Q1 已证否 —— 单层 2D 遮罩把 slope 的差分步长
+    //   一路放到 0.005（天花板），云内 0.2~3° 的"我们/参照"也只从 0.471 抬到 0.589，
+    //   而且长出来的是"浮雕/刮丝"（高频硬边），不是层次。根因是云内亮度只有一个标量来源
+    //   （沿太阳切向的一阶差分），且被两处钳位钉死。**层次只能来自"不同高度的云各自吃光、
+    //   互相遮蔽"** —— 也就是这里的多壳。
+    //
+    //   几何：正交投影下每像素的视线方向恒定，vLocalDir 就是外层壳（半径 1）上的点。
+    //         同一像素与半径 r 的壳求交 ⇒ 该壳上的点 = (x, y, ±sqrt(r² − ρ²))
+    //         （ρ² = x²+y² 取自 vLocalDir.xy；符号跟外层同侧）⇒ 归一化就是壳样本方向。
+    //   着色：外层照旧（含自阴影/高度反照率的 slope）；内层**不再算 slope**
+    //         （那是每层一次额外场求值，成本红线不允许），改为整体乘 uShellDim
+    //         —— 物理对应"光穿过上面几层后变暗"。
+    //   合成：自前向后 Beer–Lambert：A = Σ T_k·a_k，T_{k+1} = T_k·(1−a_k)。
+    //         ⚠️ 输出仍是**非预乘**（不改混合模式）：颜色取加权平均、alpha 取 A。
+    //         ⇒ 只有多壳分支里有这一除法；uShells = 1 时一行都不执行。
+    //   ⚠️ fwidth 必须在**一致控制流**里求值：这里的循环上界是常量 3、break 条件只看
+    //      uShells（uniform）⇒ 整条 draw 的分支一致（与既有 uGgEnabled 分支同一约定）。
+    vec3 outColor = lit;
+    float outAlpha = cloud * uOpacity;
+    if (uShells > 1.5) {
+        float rho2 = dot(vLocalDir.xy, vLocalDir.xy);
+        int sd3 = int(uFieldSeed + 0.5);
+        float T = 1.0 - cloud;
+        float aSum = cloud;
+        vec3 cSum = lit * cloud;
+        // 内层倍频数：只改传入 cfSampleField 的那个 vec4 的 y 分量 ⇒ 共享内核零改动
+        vec4 P2i = vec4(uFieldP2.x, uInnerOctaves, uFieldP2.z, uFieldP2.w);
+        for (int k = 1; k < 3; k++) {
+            if (float(k) >= uShells) {
+                break;
+            }
+            float r = 1.0 - uShellGap * float(k);
+            float zz = sqrt(max(r * r - rho2, 0.0));
+            vec3 dirK = normalize(vec3(vLocalDir.xy, sign(vLocalDir.z) * zz));
+            // 方向 → 经纬：与共享内核 cfUvToDirection 的**逆映射**（内核不动，这里写逆）
+            //   cfUvToDirection: (cos(lat)·sin(theta), sin(lat), cos(lat)·cos(theta))
+            float latK = asin(clamp(dirK.y, -1.0, 1.0));
+            float thetaK = atan(dirK.x, dirK.z);
+            vec2 uvK = vec2(thetaK / TWO_PI + 0.5, latK / 3.14159265358979 + 0.5);
+            // ★ A：每壳独立场 = 经度固定偏移（壳 k 偏 k·uShellShift）★
+            //   为什么用经度偏移而不是换 seed：seed 会改 b 的分布（CDF 是按配方 seed 烘的）
+            //   ⇒ 覆盖率语义每层都会偏；同一张场挪经度则**统计性质完全不变**。
+            //   ⚠️ 只挪经度、不挪纬度：云的纬向带结构在各高度应当对齐（物理上如此）。
+            if (abs(uShellShift) > 1e-6) {
+                uvK.x = fract(uvK.x + uShellShift * float(k));
+            }
+            float fk = cfSampleField(uvK, uCloudTime, uFieldP0, uFieldP1, P2i, uFieldP3, sd3);
+            float bk = clamp(cfFieldToB(fk)
+                       + cfBirthDelta(uvK, uCloudTime, uFieldP2, uFieldP3, uBirthPhase, sd3)
+                       - uBirthMean, 0.0, 1.0);
+            float covK = uShellCoverage * cfZoneAt(uvK.y);
+            float gradK = max(fwidth(bk), 1e-6);
+            float wpxK = uEdgePx;
+            if (uEdgeRel > 1e-9) {
+                wpxK = uEdgePx + uEdgeRel * (1.0 / max(length(dFdx(vLocalDir)), 1e-6));
+            }
+            float widthK = max(uSoftness, wpxK * gradK);
+            float tauK = 0.6931472 + (covK - bk) / max(widthK, 1e-6);
+            float aK = tauK > 0.0 ? 1.0 - exp(-tauK) : 0.0;
+            if (uEdgeKnee > 0.0) {
+                aK = aK * (1.0 - uEdgeKnee * exp(-max(tauK, 0.0) * 0.1));
+            }
+            // 壳外（ρ > r）：该壳与视线不相交 ⇒ 这一层不存在
+            if (rho2 >= r * r) {
+                aK = 0.0;
+            }
+            vec3 cK = lit * uShellDim;
+            cSum += T * aK * cK;
+            aSum += T * aK;
+            T *= (1.0 - aK);
+        }
+        // 颜色 = 加权平均（A→0 时该像素不受云影响，直接给 lit，避免除零）
+        if (aSum > 1e-4) {
+            outColor = cSum / aSum;
+        }
+        outAlpha = aSum * uOpacity;
+    }
+
+    fragColor = vec4(outColor, outAlpha);
+}
+`;
+
+// ===========================================================================
+//  ★★ 第三卷：云影烘焙（512×256 等距柱状小图）★★
+// ===========================================================================
+// 顶点：全屏三角形（与 meshRenderer 的 fullscreenMesh 共用同一份几何与属性名）。
+//
+// 片元：**每个 texel 就是一个经纬格**，算"竖直穿过各层云壳的光学厚度之和 τ"：
+//        shade = 1 − exp(−τ) 写进 R 通道（G/B 同值，便于肉眼直接看这张图本身）。
+//
+// ⚠️ 这张图**与太阳方向无关**（一列云的光学厚度是纯几何量）。
+//    太阳方向在**地表采样时**才进入：地表点沿太阳方向穿到云壳上的交点去查这张图
+//    ⇒ "影与云错位"就来自这个视差：太阳低时偏移大、正午时影子几乎落在云正下方。
+// ⚠️ 与云层着色器共用同一套 uniform 名（uFieldP0.. / uZoneProfile / uShells / uShellShift …），
+//    装配层两处传同一份值 ⇒ 不会漂成"两张不同的场"。
+// ⚠️ 本段也在 JS 模板字符串里 ⇒ 注释里绝不能出现反引号。
+export const CLOUD_SHADOW_VERT = `#version 300 es
+precision highp float;
+
+in vec2 aPosition;
+in vec2 aTexCoord;
+
+out vec2 vUv;
+
+void main() {
+    vUv = aTexCoord;
+    gl_Position = vec4(aPosition, 0.0, 1.0);
+}
+`;
+
+export const CLOUD_SHADOW_FRAG = `#version 300 es
+precision highp float;
+
+in vec2 vUv;
+out vec4 fragColor;
+
+uniform vec2 uMapSize;
+
+// ---- 云场参数（与云层着色器**同名同源**）----
+uniform vec4 uFieldP0;
+uniform vec4 uFieldP1;
+uniform vec4 uFieldP2;
+uniform vec4 uFieldP3;
+uniform float uFieldSeed;
+uniform float uCloudTime;
+
+// ---- 阈值 / 覆盖率 / 壳 ----
+uniform float uCoverage;
+uniform float uShellCoverage;
+uniform float uSoftness;
+uniform float uShells;
+uniform float uShellShift;
+uniform float uInnerOctaves;
+
+${cloudFieldGLSL(CLOUD_CDF_SIZE)}
+
+void main() {
+    // ★ 用 gl_FragCoord 而不是插值 uv ★
+    //   这样纹理的 (0,0) 与"写进 (0,0) 的 texel"严格对应（GL 纹理原点在左下），
+    //   地表侧采样时不必再猜一次上下翻转。y = 0 对应 v = 0（南极，与 cfUvToDirection 一致）。
+    vec2 suv = gl_FragCoord.xy / uMapSize;
+    int sd = int(uFieldSeed + 0.5);
+    int n = int(uShells + 0.5);
+    float tauSum = 0.0;
+    for (int k = 0; k < 3; k++) {
+        if (k >= n) {
+            break;
+        }
+        // 与云层同一条口径：壳 k 的经度偏移 +（内层）降倍频
+        vec2 uvK = vec2(fract(suv.x + uShellShift * float(k)), suv.y);
+        vec4 P2k = uFieldP2;
+        if (k > 0) {
+            P2k.y = uInnerOctaves;
+        }
+        float f = cfSampleField(uvK, uCloudTime, uFieldP0, uFieldP1, P2k, uFieldP3, sd);
+        float b = clamp(cfFieldToB(f)
+                  + cfBirthDelta(uvK, uCloudTime, uFieldP2, uFieldP3, uBirthPhase, sd)
+                  - uBirthMean, 0.0, 1.0);
+        float cov = (n > 1 ? uShellCoverage : uCoverage) * cfZoneAt(uvK.y);
+        // τ 与云层着色器同一个式子（ln2 + (cov − b)/softness）；
+        // 这张图不需要屏幕空间的边缘宽度（uEdgePx 是像素量，在这里没有意义）
+        float tau = 0.6931472 + (cov - b) / max(uSoftness, 1e-6);
+        tauSum += max(tau, 0.0);
+    }
+    float shade = 1.0 - exp(-tauSum);
+    fragColor = vec4(shade, shade, shade, 1.0);
 }
 `;

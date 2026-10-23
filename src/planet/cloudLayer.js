@@ -31,6 +31,10 @@ import { buildSphereGeometry } from '../geometry/sphereMesh.js';
 import { CLOUD_VERT, CLOUD_FRAG } from './shaders/cloudShaders.js';
 import { GG_GLSL_VORTEX_MAX } from './shaders/gasGiantCloudGLSL.js';
 import { CLOUD_RECIPES } from './cloudRecipe.js';
+// ★ 第二卷 A 的三个可选参数默认值：**唯一真源在 src/config/**（2026-10-23 迁移）★
+//   这里只 import 使用（补缺合并 + uniform 回落），**不再本地定义、也不再对外转发** ——
+//   调用方一律直引 src/config/cloudOptionalDefaults.js；定义留两份必然漂移（§13.30 同一课）。
+import { CLOUD_OPTIONAL_DEFAULTS } from '../config/cloudOptionalDefaults.js';
 
 /**
  * 云壳球面网格的分段数 —— **不跟随星球本体**（`segmentCount` / `ringCount`）。
@@ -55,12 +59,19 @@ export const CLOUD_SHELL_RINGS = 64;
  *
  * ⚠️ 唯一真源是 cloudRecipe.js 的 `CLOUD_RECIPES` —— 本表由它展开，不另存一份数值。
  *    这里保留导出只是为了与 ATMOSPHERE_PRESETS 的形状对齐（调用方按 id 取用）。
+ *    可选参数（CLOUD_OPTIONAL_DEFAULTS）在配方没有该字段时补进去 —— 只补缺，不覆盖。
  */
 export const CLOUD_PRESETS = (function buildPresets() {
     const out = {};
     Object.keys(CLOUD_RECIPES).forEach((id) => {
         const r = CLOUD_RECIPES[id];
-        out[id] = Object.assign({}, r.field, r.render);
+        const merged = Object.assign({}, r.field, r.render);
+        Object.keys(CLOUD_OPTIONAL_DEFAULTS).forEach((k) => {
+            if (merged[k] === undefined) {
+                merged[k] = CLOUD_OPTIONAL_DEFAULTS[k];
+            }
+        });
+        out[id] = merged;
     });
     return out;
 })();
@@ -334,6 +345,19 @@ export function createCloudLayer(gl, options) {
                     + '请先调 cloudLayer.setGasGiant(solveGasGiantRecipe(...))。'
                     + '（不静默降级：降级后的画面仍然像行星，肉眼分辨不出来）');
             }
+            // ★ 第三卷 A：多壳的**覆盖率补偿**（并集守恒）★
+            //   各层是独立的云 ⇒ 并集 = 1−(1−c)^N 必然大于单层 c（0.16 → 0.41，N=3）。
+            //   为了让"总量仍等于 coverage"（总监定 0.16）：
+            //       每层 c' = 1 − (1 − coverage)^(1/N)
+            //   ⚠️ 只在 shells > 1 时用；shells = 1 时着色器读 uCoverage，逐像素不变。
+            //   comp ∈ [0,1] 只是量测用的混合（0 = 不补偿，1 = 全补偿）。
+            const nShells = p.shells === undefined ? CLOUD_OPTIONAL_DEFAULTS.shells : p.shells;
+            const covComp = p.shellCoverageComp === undefined
+                ? CLOUD_OPTIONAL_DEFAULTS.shellCoverageComp : p.shellCoverageComp;
+            const covUnion = nShells > 1
+                ? 1 - Math.pow(1 - p.coverage, 1 / nShells)
+                : p.coverage;
+            const covPerShell = p.coverage + (covUnion - p.coverage) * Math.max(0, Math.min(1, covComp));
             const uniforms = {
                 uViewProj: desc.viewProj,
                 uModel: desc.model,
@@ -341,6 +365,24 @@ export function createCloudLayer(gl, options) {
                 uCoverage: p.coverage,
                 uSoftness: p.softness === undefined ? 0.001 : p.softness,
                 uEdgePx: p.edgePx === undefined ? 4 : p.edgePx,
+                // ★ 第二卷 A 的可选参数（默认值 = 不改变画面，见 CLOUD_OPTIONAL_DEFAULTS）★
+                //   edgeRel  相对盘半径的过渡宽度（× 屏幕盘半径）
+                //   edgeKnee 云缘"薄边"强度（对比度软压缩）
+                //   slopeEps 自阴影/高度反照率的差分步长（弧度）
+                uEdgeRel: p.edgeRel === undefined ? CLOUD_OPTIONAL_DEFAULTS.edgeRel : p.edgeRel,
+                uEdgeKnee: p.edgeKnee === undefined ? CLOUD_OPTIONAL_DEFAULTS.edgeKnee : p.edgeKnee,
+                uSlopeEps: p.slopeEps === undefined ? CLOUD_OPTIONAL_DEFAULTS.slopeEps : p.slopeEps,
+                // ★ 第三卷：多层壳（默认 1 壳 ⇒ 着色器里整段不执行 ⇒ 逐像素等于第二卷）★
+                //   每个壳一次 cfSampleField（同一份共享内核）；内层用更少的倍频数
+                //   （倍频数只是 cfSampleField 的参数 ⇒ 共享内核零改动）。
+                uShells: p.shells === undefined ? CLOUD_OPTIONAL_DEFAULTS.shells : p.shells,
+                uShellGap: p.shellGap === undefined ? CLOUD_OPTIONAL_DEFAULTS.shellGap : p.shellGap,
+                uShellDim: p.shellDim === undefined ? CLOUD_OPTIONAL_DEFAULTS.shellDim : p.shellDim,
+                uInnerOctaves: p.innerOctaves === undefined
+                    ? CLOUD_OPTIONAL_DEFAULTS.innerOctaves : p.innerOctaves,
+                // ★ 第三卷 A：每壳独立场的经度偏移 + 多壳每层覆盖率（并集守恒）★
+                uShellShift: p.shellShift === undefined ? CLOUD_OPTIONAL_DEFAULTS.shellShift : p.shellShift,
+                uShellCoverage: covPerShell,
                 uSelfShadow: p.selfShadow === undefined ? 0 : p.selfShadow,
                 uHeightShade: p.heightShade === undefined ? 0 : p.heightShade,
                 uOpacity: p.opacity,

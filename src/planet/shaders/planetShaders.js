@@ -187,6 +187,22 @@ uniform float uAtmoScatterOd;
 uniform float uGlintBlurK;      // 被散射的比例 = 1 − exp(−K · τ_sca · airMass)
 uniform float uGlintHaloWidth;  // 光晕叶瓣的宽度倍数（相对锐利叶瓣）
 
+// ---- ★ 第三卷：云影（512×256 等距柱状图，默认关）★ ----
+//   uCloudShadowOn      0 = 关闭（**逐像素等于加这个特性之前**）
+//   uCloudShadowTex     云影图：R = shade = 1 − exp(−τ_total)（竖直穿过各层云壳的光学厚度）
+//   uCloudShadowStrength 影的强度（0 = 无影，1 = 完全遮挡直射光）
+//   uCloudShadowAlt     云壳半径（R/Rp，与 clouds.altitude 同值）—— 视差偏移量由它决定
+//   uSunDirLocal        太阳方向在**网格本地坐标系**里（与 vTexCoord 的经纬参数化同一个系）
+//                       CPU 侧用模型矩阵的旋转部分转置得到（见 meshRenderer 的注释）
+uniform float uCloudShadowOn;
+uniform sampler2D uCloudShadowTex;
+uniform float uCloudShadowStrength;
+uniform float uCloudShadowAlt;
+uniform vec3 uSunDirLocal;
+// 视差系数：1 = 真实（按太阳方向穿到云壳的交点查图，影子与云错位），
+// 0 = 影子直接落在云正下方（**只用于量"错位幅度"的对照**：两帧之差就是视差位移）。
+uniform float uCloudShadowParallax;
+
 // ---- 编辑预览：特征场（由 CPU 用 tools/shapeOps.mjs 烘焙后上传）----
 // R = albedo 增量（0.5 为中性），G = 高度增量（0.5 为中性）
 // 为什么走纹理而不是在着色器里求值：预览必须与烘焙**共用同一份形状函数**
@@ -776,8 +792,38 @@ void main() {
         float noV = clamp(dot(normalize(vNormal), vec3(0.0, 0.0, -1.0)), 0.0, 1.0);
         ambientUse = uAmbient * mix(1.0, smoothstep(0.0, uNightLimbFadeWidth, noV), uNightLimbFade);
     }
+    // ---- ★ 第三卷：云影 ★ ----
+    //   把"这个地点上方有没有云"折成直射光的遮蔽系数 cloudShade。
+    //
+    //   ★ 为什么影子会与云**错位** ★
+    //     地表点 P 沿太阳方向的射线穿到云壳（半径 uCloudShadowAlt）上的交点 P' 才是
+    //     "遮住这个地点的云"。求交是解析的：t = −μ + sqrt(μ² + r² − 1)，μ = P·L。
+    //     太阳越低（μ 小）t 越大 ⇒ 影子越往背光侧偏；正午（μ≈1）t≈0 ⇒ 影子在云正下方。
+    //
+    //   ★ 夜面为什么不会有影（物理负对照）★
+    //     这一项**只乘在直射光项**上（uDiffuse·ndl·sunTint）。夜面 ndl = 0、
+    //     sunTint 也被 step(0, cosZ) 归零 ⇒ 影子在夜面**数学上不可能出现**。
+    //     （如果把它误乘到 ambientUse 上，夜面就会浮出影 —— 这条判据能失败。）
+    float cloudShade = 1.0;
+    if (uCloudShadowOn > 0.5) {
+        // 地表点方向（与 cloudFieldGLSL 的 cfUvToDirection 同式：v=0 为南极）
+        float lat = (vTexCoord.y - 0.5) * 3.14159265358979;
+        float th = (vTexCoord.x - 0.5) * 6.28318530717959;
+        vec3 dir = vec3(cos(lat) * sin(th), sin(lat), cos(lat) * cos(th));
+        float mu = dot(dir, uSunDirLocal);
+        float r = max(uCloudShadowAlt, 1.0);
+        float tHit = -mu + sqrt(max(mu * mu + r * r - 1.0, 0.0));
+        // 视差系数（1 = 真实；0 = 影子落在云正下方，只用于对照量测）
+        tHit = max(tHit, 0.0) * uCloudShadowParallax;
+        vec3 p2 = normalize(dir + tHit * uSunDirLocal);
+        float lat2 = asin(clamp(p2.y, -1.0, 1.0));
+        float th2 = atan(p2.x, p2.z);
+        vec2 uv2 = vec2(fract(th2 / 6.28318530717959 + 0.5), lat2 / 3.14159265358979 + 0.5);
+        float shade = texture(uCloudShadowTex, uv2).r;
+        cloudShade = 1.0 - uCloudShadowStrength * shade;
+    }
     vec3 lit = albedo * (uSunColor
-        * (ambientUse + uDiffuse * ndl * sunTint * (1.0 - mF0)));
+        * (ambientUse + uDiffuse * ndl * sunTint * cloudShade * (1.0 - mF0)));
 
     // ---- 镜面项 ----
     //
