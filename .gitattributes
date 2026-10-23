@@ -1,0 +1,16 @@
+# 渲染层 vendored 文件：字节保真（禁止换行转换）
+#
+# 为什么：本仓 core.autocrlf=true，且原先没有 .gitattributes。若不声明 -text，
+# 全新 clone/checkout 时 git 会把 LF 转成 CRLF ⇒ src/planet/VENDORED.md 里记录的
+# sha16、以及"与实验室（D:\ksp-renderlab）逐字节一致"这条自证当场失效
+# （工作树看着对、克隆出来不对，属最难查的一类"检查通过了但没检查真东西"）。
+#
+# ⚠️ 只声明 vendored 路径。**不要**写成 `* text=auto eol=lf` —— 那会在下次检出时
+# 重写全仓换行，属可见回归。
+# ⚠️ 新增 vendored 路径（例如 src/config/ 下的单文件）必须同步登记到这里，
+# 否则它的 sha16 又会在克隆时失配。
+
+src/planet/**                          -text
+src/glCore/**                          -text
+src/geometry/**                        -text
+src/config/cloudOptionalDefaults.js    -text
