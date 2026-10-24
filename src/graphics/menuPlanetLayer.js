@@ -6,7 +6,8 @@
 //   · 首进建一次（单槽初始化成本高，不能每进一次菜单重建）；
 //   · exit 只停渲染并 releaseTargets，保留渲染器/贴图/上下文供重进复用，不 dispose。
 //
-// 生命周期：enter(mainCanvas) / update(dt) / render(ctx) / exit()。
+// 生命周期：prepare(mainCanvas, reporter) / enter(mainCanvas) / update(dt) / render(ctx) / exit()
+//   prepare = 可选异步准备阶段（场景加载界面消费其阶段进度），enter = 正式激活渲染。
 
 import { createGLContext } from '../glCore/context.js';
 import { createPlanetRenderer } from '../planet/meshRenderer.js';
@@ -14,6 +15,7 @@ import { RENDER_ASSETS, RENDER_ASSETS_MISSING } from '../config/assets/renderAss
 import { toCircumscribedScreenR } from '../config/world/bodyRenderShape.js';
 import { MENU_PLANET_CONFIG } from '../config/ui/menuPlanetConfig.js';
 import { BIOME_RELIEF, resolveBiomeReliefArray } from '../config/biomeRelief.js';
+import { MENU_PLANET_STAGES, MENU_PLANET_STAGE_TOTAL } from '../config/ui/sceneLoadingConfig.js';
 
 const LOG_TAG = '[MenuPlanet]';
 
@@ -28,18 +30,15 @@ let _albedoReady = false;
 let _sizeKey = '';
 let _spinDeg = 0;
 let _lastDt = 0;
-let _detailRequested = false;   // 细节层只请求一次（失败也不反复刷屏）
-let _normalRequested = false;   // 法线图只请求一次（失败也不反复刷屏）
+let _detailSettled = false;     // 细节层只准备一次（失败也不反复刷屏）
+let _normalSettled = false;     // 法线图只准备一次（失败也不反复刷屏）
+let _preparePromise = null;     // 进行中的准备任务（并发调用复用同一份）
 const _warned = new Set();
 
 // 细节层参数（来自实验室 kerbin biome-styles.json 的 detail 配置；主游戏侧固定接线）
 const DETAIL_TILES = 6;
 const DETAIL_WARP_AMOUNT = 0.30;
 const DETAIL_COARSE_WEIGHT = 0.45;
-
-// 法线图路径（卡2，主游戏侧固定接线，同 DETAIL_* 约定）：不进 RENDER_ASSETS 校验链；
-// 渲染器在没挂图时会把起伏强度强制归零，缺文件只告警一次、菜单星球照常。
-const NORMAL_MAP_PATH = 'assets/images/celestial/kerbolar/render/kerbin.normal.png';
 
 // 失效路径非静默，但同一原因只告警一次，避免逐帧刷屏
 function _warnOnce(reason) {
@@ -50,6 +49,24 @@ function _warnOnce(reason) {
 
 function _errorText(e) {
     return (e && e.message) ? e.message : String(e);
+}
+
+// 主画布缓冲尺寸（设备像素）
+function _canvasSize() {
+    return {
+        w: Math.max(1, _mainCanvas.width | 0),
+        h: Math.max(1, _mainCanvas.height | 0)
+    };
+}
+
+// 单图加载（Promise 化；失败 reject，由调用方降级）
+function _loadImage(path) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('图片加载失败：' + path));
+        img.src = path;
+    });
 }
 
 // 上下文丢失统一入口：事件与渲染前检查都走这里，保证同一原因只告警一次
@@ -75,35 +92,8 @@ function _findAlbedoPath(bodyId) {
     return family.path;
 }
 
-function _loadAlbedo(path) {
-    const bodyId = MENU_PLANET_CONFIG.bodyId;
-    const img = new Image();
-    img.onload = () => {
-        if (!_renderer || _contextLost || _failed) return;
-        if (img.naturalWidth !== img.naturalHeight * 2) {
-            _warnOnce('资产非 2:1 等距柱状：bodyId=' + bodyId + ' family=albedo path=' + path);
-        }
-        try {
-            // 顺序硬性：setAlbedo → setPlanet（含 anisotropy）→ setDetail
-            _renderer.setAlbedo(img, Object.assign({}, MENU_PLANET_CONFIG.albedoTexture));
-            _albedoReady = true;
-            _applyPlanetParams(Math.max(1, _mainCanvas.width | 0), Math.max(1, _mainCanvas.height | 0));
-            _loadDetail();
-            _loadNormalMap();
-        } catch (e) {
-            _warnOnce('albedo 上传失败（bodyId=' + bodyId + ' family=albedo path=' + path + '）：' + _errorText(e));
-        }
-    };
-    img.onerror = () => {
-        _warnOnce('贴图加载失败，菜单星球层停用：bodyId=' + bodyId + ' family=albedo path=' + path);
-    };
-    img.src = path;
-}
-
-// 细节层（detail + biome + biomeStyles）：缺任何一项都显式告警，不静默降级
-function _loadDetail() {
-    if (_detailRequested || !_renderer || _contextLost || _failed) return;
-    _detailRequested = true;
+// 细节层资产校验（detail + biome + biomeStyles）：缺任何一项都显式告警，返回 null
+function _resolveDetailSources() {
     const bodyId = MENU_PLANET_CONFIG.bodyId;
     const families = (RENDER_ASSETS[bodyId] && RENDER_ASSETS[bodyId].families) || {};
     const detailEntry = families.detail;
@@ -114,67 +104,66 @@ function _loadDetail() {
     if (!detailEntry || !detailEntry.path) {
         _warnOnce('缺 detail 资产，细节层停用：bodyId=' + bodyId
             + ' family=detail（RENDER_ASSETS 无该条目或 path）');
-        return;
+        return null;
     }
     if (!biomeEntry || !biomeEntry.path) {
         _warnOnce('缺 biome 资产，细节层停用：bodyId=' + bodyId
             + ' family=biome（RENDER_ASSETS 无该条目或 path）');
-        return;
+        return null;
     }
     if (!Array.isArray(styles) || !styles.length) {
         _warnOnce('缺 biomeStyles 数据，细节层停用：bodyId=' + bodyId
             + ' family=biomeStyles（RENDER_ASSETS 无 params.biomes）');
-        return;
+        return null;
     }
     if (detailEntry.projection !== 'tile') {
         _warnOnce('detail projection 不符，细节层停用：bodyId=' + bodyId
             + ' family=detail projection=' + detailEntry.projection + '（要求 tile）');
-        return;
+        return null;
     }
     if (biomeEntry.projection !== 'equirect') {
         _warnOnce('biome projection 不符，细节层停用：bodyId=' + bodyId
             + ' family=biome projection=' + biomeEntry.projection + '（要求 equirect）');
+        return null;
+    }
+    return { detailEntry, biomeEntry, styles };
+}
+
+// albedo 上传：顺序硬性 setAlbedo → setPlanet（含 anisotropy）→ setDetail
+function _uploadAlbedo(img, path) {
+    const bodyId = MENU_PLANET_CONFIG.bodyId;
+    if (img.naturalWidth !== img.naturalHeight * 2) {
+        _warnOnce('资产非 2:1 等距柱状：bodyId=' + bodyId + ' family=albedo path=' + path);
+    }
+    _renderer.setAlbedo(img, Object.assign({}, MENU_PLANET_CONFIG.albedoTexture));
+    _albedoReady = true;
+    const size = _canvasSize();
+    _applyPlanetParams(size.w, size.h);
+}
+
+// 细节层上传（先做运行期尺寸校验，不符则整层降级）
+function _uploadDetail(detailImage, biomeImage, styles) {
+    const bodyId = MENU_PLANET_CONFIG.bodyId;
+    if (detailImage.naturalWidth !== detailImage.naturalHeight) {
+        _warnOnce('detail 运行期尺寸不符，细节层停用：bodyId=' + bodyId
+            + ' family=detail 实测 ' + detailImage.naturalWidth + '×' + detailImage.naturalHeight
+            + '（projection=tile 要求 1:1）');
         return;
     }
-
-    const load = (path, famName) => new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = () => reject(new Error('加载失败：bodyId=' + bodyId + ' family=' + famName + ' path=' + path));
-        img.src = path;
+    if (biomeImage.naturalWidth !== biomeImage.naturalHeight * 2) {
+        _warnOnce('biome 运行期尺寸不符，细节层停用：bodyId=' + bodyId
+            + ' family=biome 实测 ' + biomeImage.naturalWidth + '×' + biomeImage.naturalHeight
+            + '（projection=equirect 要求 2:1）');
+        return;
+    }
+    _renderer.setDetail({
+        detailImage,
+        biomeImage,
+        biomeStyles: styles,
+        tiles: DETAIL_TILES,
+        warpAmount: DETAIL_WARP_AMOUNT,
+        coarseWeight: DETAIL_COARSE_WEIGHT,
     });
-
-    Promise.all([load(detailEntry.path, 'detail'), load(biomeEntry.path, 'biome')])
-        .then(([detailImage, biomeImage]) => {
-            if (!_renderer || _contextLost || _failed) return;
-            if (detailImage.naturalWidth !== detailImage.naturalHeight) {
-                _warnOnce('detail 运行期尺寸不符，细节层停用：bodyId=' + bodyId
-                    + ' family=detail 实测 ' + detailImage.naturalWidth + '×' + detailImage.naturalHeight
-                    + '（projection=tile 要求 1:1）');
-                return;
-            }
-            if (biomeImage.naturalWidth !== biomeImage.naturalHeight * 2) {
-                _warnOnce('biome 运行期尺寸不符，细节层停用：bodyId=' + bodyId
-                    + ' family=biome 实测 ' + biomeImage.naturalWidth + '×' + biomeImage.naturalHeight
-                    + '（projection=equirect 要求 2:1）');
-                return;
-            }
-            try {
-                _renderer.setDetail({
-                    detailImage,
-                    biomeImage,
-                    biomeStyles: styles,
-                    tiles: DETAIL_TILES,
-                    warpAmount: DETAIL_WARP_AMOUNT,
-                    coarseWeight: DETAIL_COARSE_WEIGHT,
-                });
-            } catch (e) {
-                _warnOnce('细节层上传失败（bodyId=' + bodyId + '）：' + _errorText(e));
-            }
-        })
-        .catch((e) => {
-            _warnOnce('细节层加载失败，菜单照常：' + _errorText(e));
-        });
 }
 
 // 逐群系起伏强度数组：来自 src/config/biomeRelief.js（海洋/滨海 = 0，水面不长山）；
@@ -184,28 +173,6 @@ function _biomeReliefArray() {
     const table = BIOME_RELIEF[MENU_PLANET_CONFIG.bodyId];
     const count = table ? Object.keys(table).length : 0;
     return resolveBiomeReliefArray(MENU_PLANET_CONFIG.bodyId, count);
-}
-
-// 地形法线图（卡2）：必须在 setAlbedo / setPlanet 之后挂图（setNormalMap 按 params.anisotropy
-// 建纹理）；relief 传逐群系强度数组（src/config/biomeRelief.js，海洋/滨海 = 0），
-// 全局旋钮 normalStrength 走 setPlanet 白名单参数（见 _applyPlanetParams）；
-// 生效强度 = normalStrength × relief[群系下标]。纹理选项用渲染器缺省（与 albedo 同约定）。
-function _loadNormalMap() {
-    if (_normalRequested || !_renderer || _contextLost || _failed) return;
-    _normalRequested = true;
-    const img = new Image();
-    img.onload = () => {
-        if (!_renderer || _contextLost || _failed) return;
-        try {
-            _renderer.setNormalMap(img, { relief: _biomeReliefArray() });
-        } catch (e) {
-            _warnOnce('法线图上传失败，地表起伏停用：' + _errorText(e));
-        }
-    };
-    img.onerror = () => {
-        _warnOnce('法线图加载失败，地表起伏停用：path=' + NORMAL_MAP_PATH);
-    };
-    img.src = NORMAL_MAP_PATH;
 }
 
 // 尺寸 / 盘心 / 光照参数：全部来自配置，按外接球语义传像素半径
@@ -248,17 +215,16 @@ function _applyPlanetParams(w, h) {
 // 主画布缓冲尺寸变化：先释放旧尺寸离屏目标（避免滞留），再 resize，再重算半径/盘心
 function _applySize() {
     if (!_mainCanvas || !_renderer) return;
-    const w = Math.max(1, _mainCanvas.width | 0);
-    const h = Math.max(1, _mainCanvas.height | 0);
-    const key = w + 'x' + h;
+    const size = _canvasSize();
+    const key = size.w + 'x' + size.h;
     if (key === _sizeKey) return;
     _sizeKey = key;
     _renderer.releaseTargets();
-    _glCanvas.width = w;
-    _glCanvas.height = h;
-    _renderer.resize(w, h, 1);
-    // setAlbedo 之后才接 setPlanet（顺序硬性）；未就绪时只 resize，等 albedo onload 再补
-    if (_albedoReady) _applyPlanetParams(w, h);
+    _glCanvas.width = size.w;
+    _glCanvas.height = size.h;
+    _renderer.resize(size.w, size.h, 1);
+    // setAlbedo 之后才接 setPlanet（顺序硬性）；未就绪时只 resize，等 albedo 上传后再补
+    if (_albedoReady) _applyPlanetParams(size.w, size.h);
 }
 
 function _createRenderer() {
@@ -266,19 +232,18 @@ function _createRenderer() {
     const albedoPath = _findAlbedoPath(bodyId);
     if (!albedoPath) {
         _failed = true;
-        return;
+        return false;
     }
-    const w = Math.max(1, _mainCanvas.width | 0);
-    const h = Math.max(1, _mainCanvas.height | 0);
+    const size = _canvasSize();
     _glCanvas = document.createElement('canvas');
-    _glCanvas.width = w;
-    _glCanvas.height = h;
+    _glCanvas.width = size.w;
+    _glCanvas.height = size.h;
     try {
         _gl = createGLContext(_glCanvas, { alpha: true });
     } catch (e) {
         _failed = true;
         _warnOnce('WebGL2 不可用，菜单星球层停用：' + _errorText(e));
-        return;
+        return false;
     }
     _glCanvas.addEventListener('webglcontextlost', _markContextLost);
     try {
@@ -287,25 +252,164 @@ function _createRenderer() {
     } catch (e) {
         _failed = true;
         _warnOnce('渲染器创建失败，菜单星球层停用：' + _errorText(e));
-        return;
+        return false;
     }
     try {
         _applySize();
     } catch (e) {
         _failed = true;
         _warnOnce('菜单星球参数应用失败：' + _errorText(e));
-        return;
+        return false;
     }
     _ready = true;
-    _loadAlbedo(albedoPath);
+    return true;
+}
+
+// 场景准备：加载/上传全部已配置渲染层（成功或明确降级都结算），并逐阶段上报进度
+async function _runPrepare(mainCanvas, reporter) {
+    if (!mainCanvas) return;
+    _mainCanvas = mainCanvas;
+    const report = (typeof reporter === 'function') ? reporter : (() => {});
+
+    // 阶段按配置权重结算；总权重含「首帧」槽位（由 SceneManager 结算）⇒ 最高上报 0.95
+    const stageById = {};
+    for (const stage of MENU_PLANET_STAGES) stageById[stage.id] = stage;
+    const settled = new Set();
+    let settledWeight = 0;
+    const settle = (id) => {
+        if (settled.has(id)) return;
+        const stage = stageById[id];
+        if (!stage) return;
+        settled.add(id);
+        settledWeight += stage.weight;
+        report(Math.min(0.95, settledWeight / MENU_PLANET_STAGE_TOTAL), stage.label);
+    };
+    // 剩余阶段全部结算：保证加载界面不会停在半途（失败即降级）
+    const settleRest = () => {
+        for (const stage of MENU_PLANET_STAGES) {
+            if (stage.id === 'firstFrame') continue;
+            settle(stage.id);
+        }
+    };
+
+    // ① WebGL 上下文 / 渲染器（含着色器编译与网格构建，同步不可拆分）
+    if (_failed || _contextLost) {
+        settleRest();
+        return;
+    }
+    if (!_renderer) _createRenderer();
+    if (!_renderer || !_ready || _failed || _contextLost) {
+        settleRest();
+        return;
+    }
+    settle('webgl');
+
+    // ② albedo：加载 → 上传
+    if (_albedoReady) {
+        settle('albedoLoad');
+        settle('albedoUpload');
+    } else {
+        const albedoPath = _findAlbedoPath(MENU_PLANET_CONFIG.bodyId);
+        let albedoImg = null;
+        if (albedoPath) {
+            try {
+                albedoImg = await _loadImage(albedoPath);
+            } catch (e) {
+                _warnOnce('贴图加载失败，菜单星球层停用：' + _errorText(e));
+            }
+        }
+        settle('albedoLoad');
+        if (albedoImg) {
+            try {
+                _uploadAlbedo(albedoImg, albedoPath);
+            } catch (e) {
+                _warnOnce('albedo 上传失败（bodyId=' + MENU_PLANET_CONFIG.bodyId + '）：' + _errorText(e));
+            }
+        }
+        settle('albedoUpload');
+        // 无 albedo 就没有可见主体：剩余层不再加载，直接结算（菜单走纯星空降级）
+        if (!_albedoReady) {
+            settleRest();
+            return;
+        }
+    }
+
+    // ③ detail + biome：加载 → 上传
+    if (_detailSettled) {
+        settle('detailLoad');
+        settle('detailUpload');
+    } else {
+        const sources = _resolveDetailSources();
+        let detailImage = null;
+        let biomeImage = null;
+        if (sources) {
+            try {
+                const images = await Promise.all([
+                    _loadImage(sources.detailEntry.path),
+                    _loadImage(sources.biomeEntry.path)
+                ]);
+                detailImage = images[0];
+                biomeImage = images[1];
+            } catch (e) {
+                _warnOnce('细节层加载失败，菜单照常：' + _errorText(e));
+            }
+        }
+        settle('detailLoad');
+        if (sources && detailImage && biomeImage) {
+            try {
+                _uploadDetail(detailImage, biomeImage, sources.styles);
+            } catch (e) {
+                _warnOnce('细节层上传失败（bodyId=' + MENU_PLANET_CONFIG.bodyId + '）：' + _errorText(e));
+            }
+        }
+        _detailSettled = true;
+        settle('detailUpload');
+    }
+
+    // ④ normal：加载 → 上传（必须在 setAlbedo / setPlanet 之后挂图）
+    if (_normalSettled) {
+        settle('normal');
+    } else {
+        const normalPath = MENU_PLANET_CONFIG.normalMapPath;
+        let normalImg = null;
+        if (normalPath) {
+            try {
+                normalImg = await _loadImage(normalPath);
+            } catch (e) {
+                _warnOnce('法线图加载失败，地表起伏停用：path=' + normalPath);
+            }
+        }
+        if (normalImg) {
+            try {
+                _renderer.setNormalMap(normalImg, { relief: _biomeReliefArray() });
+            } catch (e) {
+                _warnOnce('法线图上传失败，地表起伏停用：' + _errorText(e));
+            }
+        }
+        _normalSettled = true;
+        settle('normal');
+    }
+}
+
+// 准备入口（幂等：并发调用复用同一份任务）
+function prepare(mainCanvas, reporter) {
+    if (_preparePromise) return _preparePromise;
+    _preparePromise = _runPrepare(mainCanvas, reporter).finally(() => {
+        _preparePromise = null;
+    });
+    return _preparePromise;
 }
 
 function enter(mainCanvas) {
     if (!mainCanvas) return;
     _mainCanvas = mainCanvas;
     if (_failed || _contextLost) return;
-    if (!_renderer) _createRenderer();
-    if (!_renderer || !_ready) return;
+    if (!_renderer) {
+        // 未经过 prepare 的激活路径（如菜单设置内 style1 → style2）：
+        // 沿用旧行为，异步补载、不阻塞当前帧
+        void prepare(mainCanvas, null);
+        return;
+    }
     // 重进菜单时主画布可能已 resize：清 key 强制重算尺寸与相机（旧目标已在 exit 释放）
     _sizeKey = '';
     try {
@@ -354,6 +458,7 @@ function exit() {
 }
 
 export const menuPlanetLayer = {
+    prepare,
     enter,
     update,
     render,

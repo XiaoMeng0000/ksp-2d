@@ -15,6 +15,10 @@ export const Events = {
     PHYSICS_TICK: 'physics:tick',         // 物理循环完成一步积分后广播
     SCENE_READY: 'scene:ready',           // 场景 enter 回调完成后广播
     SCENE_CHANGED: 'scene:changed',        // 场景切换时广播（from → to）
+    // 场景级加载界面事件（重场景进入时的遮罩 + 阶段进度，见 sceneManager.switchToAsync）
+    SCENE_LOADING_STARTED: 'scene:loadingStarted',    // 加载层应显示，payload: { from, to }
+    SCENE_LOADING_PROGRESS: 'scene:loadingProgress',  // 阶段进度，payload: { from, to, progress: 0~1, stage: 文案 key|null }
+    SCENE_LOADING_FINISHED: 'scene:loadingFinished',  // 加载层应隐藏，payload: { from, to }
     // 纹理系统事件
     TEXTURES_READY: 'textures:ready',         // 所有纹理加载完成
     TEXTURE_PROGRESS: 'texture:progress',     // 单张纹理加载完成或失败时广播

@@ -31,7 +31,7 @@ function registerGalaxiesScene() {
     let escHandler = null;
 
     function _close() {
-        sceneManager.switchTo('menu');
+        sceneManager.switchToAsync('menu');
     }
 
     // 半径格式化：米 → km 整数

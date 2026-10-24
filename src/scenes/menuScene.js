@@ -76,7 +76,7 @@ function _executeAction(action) {
         }
     } else if (action.startsWith('scene:')) {
         const sceneId = action.slice(6);
-        sceneManager.switchTo(sceneId);
+        sceneManager.switchToAsync(sceneId);
     } else if (action.startsWith('callback:')) {
         const callbackName = action.slice(9);
         if (_callbacks[callbackName]) {
@@ -265,6 +265,18 @@ function registerMenuScene(options) {
     };
 
     sceneManager.registerScene('menu', {
+        // 场景级加载（SceneManager.switchToAsync）：仅 style2 有 WebGL 星球层需要准备；
+        // style1 是纯星空，不显示加载界面
+        shouldLoad() {
+            return _readMenuBgMode() === 'style2';
+        },
+
+        // 准备阶段：WebGL 上下文 / albedo / detail / 法线图全部结算后返回（失败即降级结算）
+        prepare(data, reporter) {
+            _canvas = document.getElementById('canvas');
+            return menuPlanetLayer.prepare(_canvas, reporter);
+        },
+
         enter() {
             _canvas = document.getElementById('canvas');
             _currentMenu = 'main';

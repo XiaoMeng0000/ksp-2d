@@ -450,9 +450,9 @@ class SaveManager {
         if ('points' in playerState) delete playerState.points;
         gameState.setState({ player: playerState });
 
-        // 切换到存档时的场景
+        // 切换到存档时的场景（异步入口：目标场景若声明 prepare 会走加载界面）
         if (checkpoint.currentScene) {
-            sceneManager.switchTo(checkpoint.currentScene);
+            sceneManager.switchToAsync(checkpoint.currentScene);
         }
 
         // 0.2.5：读档后时间加速归 1x（取消进行中的定点加速目标，防止旧目标/高倍率在新时间线继续推进）

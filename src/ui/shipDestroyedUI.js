@@ -147,7 +147,7 @@ function showDestroyedPanel(data) {
     trackingBtn.addEventListener('click', () => {
         closePanel();
         if (sceneManager.getCurrentScene() !== 'tracking') {
-            sceneManager.switchTo('tracking');
+            sceneManager.switchToAsync('tracking');
         }
     });
 

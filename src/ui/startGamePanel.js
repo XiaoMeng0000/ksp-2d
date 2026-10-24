@@ -309,7 +309,7 @@ function loadSelectedGame() {
     // 读档成功后才落世界 ID —— loadCheckpoint 内部经 setState 全量替换状态，先写会被覆盖
     gameState.setState({ worldId: _selectedWorldId });
     closeStartGamePanel();
-    sceneManager.switchTo('flight');
+    sceneManager.switchToAsync('flight');
 }
 
 // 删除选中战役（二次确认）

@@ -52,8 +52,11 @@ export const MENU_PLANET_CONFIG = {
 
     // 地表起伏（卡2）：法线图强度，1.0 = 该天体 p95 坡度 45° 的归一口径；
     // 实际生效强度 = normalStrength × 逐群系 relief（relief 来自 src/config/biomeRelief.js，海洋/滨海 = 0），
-    // 且仅当 menuPlanetLayer 成功挂上 kerbin.normal.png 后生效（渲染器无图强制 0）。
+    // 且仅当 menuPlanetLayer 成功挂上 normalMapPath 后生效（渲染器无图强制 0）。
     normalStrength: 1.0,
+
+    // 地形法线图（不进 RENDER_ASSETS 校验链；缺文件只告警一次，菜单照常）
+    normalMapPath: 'assets/images/celestial/kerbolar/render/kerbin.normal.png',
 
     // albedo 纹理选项（资产原样上传，不重编码/缩放；等距柱状 2:1）
     albedoTexture: {

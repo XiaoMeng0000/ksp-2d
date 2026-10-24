@@ -12,7 +12,7 @@ function registerLicenseScene() {
     let escHandler = null;
 
     function _close() {
-        sceneManager.switchTo('menu');
+        sceneManager.switchToAsync('menu');
     }
 
     function _renderContent(contentEl) {

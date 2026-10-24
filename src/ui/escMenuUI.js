@@ -342,7 +342,7 @@ function openTrackingStation() {
         return;
     }
     hideEscMenu();
-    sceneManager.switchTo('tracking');
+    sceneManager.switchToAsync('tracking');
 }
 
 // 回到飞行器（无飞船时阻止）
@@ -352,7 +352,7 @@ function backToFlight() {
         return;
     }
     hideEscMenu();
-    sceneManager.switchTo('flight');
+    sceneManager.switchToAsync('flight');
 }
 
 // 存档（在当前世界创建检查点）
@@ -397,7 +397,7 @@ function loadGame() {
             window.showNotification(t('archive.loaded'), 'success');
             hideEscMenu();
             if (sceneManager.getCurrentScene() === 'menu') {
-                sceneManager.switchTo('flight');
+                sceneManager.switchToAsync('flight');
             }
             refreshDebugPanel();
         } else {
@@ -428,12 +428,12 @@ function quitToMenu() {
                 window.showNotification(t('archive.savedCheckpoint'), 'success');
             }
             hideEscMenu();
-            sceneManager.switchTo('menu');
+            sceneManager.switchToAsync('menu');
         },
         () => {
             // 用户选择「退出」（不保存）
             hideEscMenu();
-            sceneManager.switchTo('menu');
+            sceneManager.switchToAsync('menu');
         },
         t('esc.saveAndQuit'),  // 确认按钮文字
         t('esc.quitDirect')    // 取消按钮文字

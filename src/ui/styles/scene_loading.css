@@ -1,0 +1,98 @@
+/* ============================================================
+   scene_loading.css — 场景级加载界面（sceneLoadingUI.js）
+   覆盖：重场景进入时的遮罩 + 背景 + 阶段进度条
+   背景图与兜底色由配置（sceneLoadingConfig.js）写入内联，
+   本文件只负责布局与视觉；背景按 cover 等比例铺满，绝不拉伸。
+   ============================================================ */
+
+#sceneLoadingScreen {
+    /* 绿色占位主题（正式美术落地后可只改这几项） */
+    --sl-bar: #B8FFD0;
+    --sl-track: rgba(0, 0, 0, 0.45);
+    --sl-panel-bg: rgba(0, 0, 0, 0.55);
+    --sl-title: #FFFFFF;
+    --sl-text: #D7F5E1;
+
+    position: fixed;
+    inset: 0;
+    /* 高于全部游戏 HUD / 面板（最高 10010），低于启动加载画面（99999） */
+    z-index: 10020;
+    display: none;
+    /* 卡片贴屏幕下方居中（宽度见 .scene-loading-panel） */
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 5vh;
+    box-sizing: border-box;
+    font-family: var(--font-mono, monospace);
+    cursor: wait;
+    /* 淡出时长由配置 sceneLoadingConfig.fadeOutMs 写入内联 transition-duration */
+    opacity: 1;
+    transition: opacity 0.28s ease;
+}
+
+/* 显示态：由 JS 切换 class（不做 style.display 内联） */
+#sceneLoadingScreen.is-visible {
+    display: flex;
+}
+
+/* 淡出态：透明后由 JS 移除 is-visible；期间不再拦截鼠标 */
+#sceneLoadingScreen.is-hiding {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* 背景层：16:9 图片等比例铺满，允许裁边、不变形；纯色兜底来自配置 */
+.scene-loading-bg {
+    position: absolute;
+    inset: 0;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: cover;
+}
+
+/* 加载面板：贴底的深色玻璃条，占屏宽 3/4，保证进度与文案可读 */
+.scene-loading-panel {
+    position: relative;
+    width: 75vw;
+    padding: 14px 22px 12px 22px;
+    background: var(--sl-panel-bg);
+    border: 1px solid var(--theme-menu-border, #5A5FCF);
+    border-radius: 5px;
+    box-sizing: border-box;
+}
+
+.scene-loading-title {
+    color: var(--sl-title);
+    font-size: 13px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+}
+
+.scene-loading-stage {
+    color: var(--sl-text);
+    font-size: 12px;
+    min-height: 18px;
+    margin-bottom: 10px;
+}
+
+.scene-loading-track {
+    height: 8px;
+    background: var(--sl-track);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.scene-loading-bar {
+    height: 100%;
+    width: 0%;
+    background: var(--sl-bar);
+    transition: width 0.15s ease;
+}
+
+.scene-loading-percent {
+    margin-top: 8px;
+    color: var(--sl-text);
+    font-size: 11px;
+    text-align: right;
+}

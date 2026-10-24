@@ -461,6 +461,18 @@ const STRINGS = {
     'splash.text': '本游戏为个人学习项目，不用于商业用途',
     'splash.studio': '【逃逸速度】',
 
+    // ---------- 场景级加载界面（重场景进入时的遮罩 + 阶段进度） ----------
+    'loading.title': '// 场景加载',
+    'loading.preparing': '正在准备场景…',
+    'loading.done': '准备完成',
+    'loading.stage.webgl': '初始化 WebGL 渲染器',
+    'loading.stage.albedoLoad': '加载星球贴图',
+    'loading.stage.albedoUpload': '上传星球贴图',
+    'loading.stage.detailLoad': '加载地表细节层',
+    'loading.stage.detailUpload': '上传地表细节层',
+    'loading.stage.normal': '加载地形法线图',
+    'loading.stage.firstFrame': '绘制场景首帧',
+
     // ---------- 设施部署(飞行场景) ----------
     'deploy.noModule': '未挂载建设集成模块',
     'deploy.needStableOrbit': '必须在稳定轨道上才能部署设施',

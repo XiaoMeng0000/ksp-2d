@@ -351,7 +351,7 @@ trackingInfo.addEventListener('click', (e) => {
             }
             // 切换到飞行场景（设施也走这里，飞行场景会处理聚焦）
             if (typeof sceneManager !== 'undefined') {
-                sceneManager.switchTo('flight');
+                sceneManager.switchToAsync('flight');
             }
             break;
         }

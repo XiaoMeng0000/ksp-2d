@@ -22,10 +22,12 @@ function _skipSplash() {
     _hasSkipped = true;
     _cleanup();
     // 0.2.8：公告面板化后启动链直达主菜单；仅启动路径自动打开公告面板
-    sceneManager.switchTo('menu');
-    if (typeof window.openAnnouncement === 'function') {
-        window.openAnnouncement();
-    }
+    // 场景级加载：主菜单的 WebGL 准备完成、场景真正进入后再打开公告面板
+    sceneManager.switchToAsync('menu').then((ok) => {
+        if (ok && typeof window.openAnnouncement === 'function') {
+            window.openAnnouncement();
+        }
+    });
 }
 
 function _cleanup() {
@@ -68,10 +70,12 @@ function _advancePhase() {
     } else if (_phase === 'blackScreen') {
         // 0.2.8：公告面板化后启动链直达主菜单；仅启动路径自动打开公告面板
         //（其他场景返回主菜单不经此路径 → 不自动打开）
-        sceneManager.switchTo('menu');
-        if (typeof window.openAnnouncement === 'function') {
-            window.openAnnouncement();
-        }
+        // 场景级加载：主菜单 WebGL 准备完成、场景真正进入后再打开公告面板
+        sceneManager.switchToAsync('menu').then((ok) => {
+            if (ok && typeof window.openAnnouncement === 'function') {
+                window.openAnnouncement();
+            }
+        });
     }
 }
 

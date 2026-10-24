@@ -58,6 +58,8 @@ import { registerMenuScene } from './src/scenes/menuScene.js';
 import { registerCreditsScene } from './src/scenes/creditsScene.js';
 import { registerLicenseScene } from './src/scenes/licenseScene.js';
 import { registerGalaxiesScene } from './src/scenes/galaxiesScene.js';
+// 场景级加载界面（重场景进入时的遮罩 + 阶段进度；与启动加载画面无关）
+import { initSceneLoadingUI } from './src/ui/sceneLoadingUI.js';
 
 // 音频系统 - 底层引擎与决策层（import 即完成事件订阅）
 import { audioCore } from './src/audio/audioCore.js';
@@ -119,6 +121,9 @@ resize();
 
 // 天体渲染配置（数据驱动）— 在任何场景渲染前注册到 RenderableManager
 registerBodyRenderables();
+
+// 场景级加载界面：必须在首次场景切换前初始化（只建一次订阅，DOM 首次显示时创建）
+initSceneLoadingUI();
 
 // SceneManager - 注册 splash / menu / encyclopedia / credits 场景（公告已面板化）
 registerSplashScene();
@@ -419,7 +424,7 @@ window.applyNewGameCreation = function(name, starSystems) {
     const worldId = saveManager.createWorld(name, systemIds);
     if (worldId) {
         gameState.setState({ worldId });
-        sceneManager.switchTo('flight');
+        sceneManager.switchToAsync('flight');
         window.showNotification(t('newgame.success'), 'success');
     } else {
         // 失败（名称冲突 / 存储写入失败）— 具体原因通知已在 createWorld 内部弹出，
