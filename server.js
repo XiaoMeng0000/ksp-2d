@@ -47,6 +47,9 @@ const server = http.createServer((req, res) => {
     });
 });
 
-server.listen(3000, () => {
-    console.log('Server running on http://localhost:3000/');
+// 端口可用 PORT 环境变量覆盖（默认 3000）：本机 3000 被占用时用 PORT=3100 node server.js
+const PORT = Number(process.env.PORT) || 3000;
+
+server.listen(PORT, () => {
+    console.log('Server running on http://localhost:' + PORT + '/');
 });

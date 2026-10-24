@@ -22,9 +22,10 @@ export const SCENE_LOADING_CONFIG = {
     // 加载完成后淡出时长（毫秒）：先淡出到透明，再从文档流中隐藏
     fadeOutMs: 280,
 
-    // 加载背景海报（正式美术）；缺图时由 fallbackColor 兜底，不会出现白屏
+    // 加载背景海报（正式美术）；启动阶段预载，缺图/未就绪时由 fallbackColor 兜底。
+    // 兜底色取海报主色调（深蓝），避免极端情况下出现与大色调不协调的过渡色。
     backgroundPath: 'assets/images/ui/loading/scene-loading-background.jpg',
-    fallbackColor: '#123B2A',
+    fallbackColor: '#1B3166',
 
     // 显示加载层后先等待的帧数：确保加载层已绘制，再执行可能阻塞主线程的准备
     waitFrames: 2,
