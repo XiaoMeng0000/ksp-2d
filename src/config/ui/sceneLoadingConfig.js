@@ -7,8 +7,8 @@
 // 不含：游戏启动阶段的纹理 / 音频 / 字体加载（见 main.js 的启动加载画面）。
 //
 // 约定：
-// 1. 背景图按 16:9（1920×1080）准备；显示时等比例铺满（cover），允许裁边、不拉伸。
-//    当前为纯色占位图，正式美术完成后只替换本文件路径与图片文件，不改加载流程。
+// 1. 背景图为正式海报（1920×1154，约 5:3）；显示时等比例铺满（cover），允许裁边、不拉伸。
+//    换图只替换本文件路径与图片文件，不改加载流程。
 // 2. 阶段权重合计 100；其中 firstFrame 槽位由 SceneManager 在目标场景首帧后结算，
 //    因此场景自身的 prepare 阶段最高只上报 0.95。
 // 3. 进度是「阶段进度」，不是下载字节百分比：WebGL 上下文创建 / 着色器编译 /
@@ -22,8 +22,8 @@ export const SCENE_LOADING_CONFIG = {
     // 加载完成后淡出时长（毫秒）：先淡出到透明，再从文档流中隐藏
     fadeOutMs: 280,
 
-    // 16:9 纯色占位背景；缺图时由 fallbackColor 兜底，不会出现白屏
-    backgroundPath: 'assets/images/ui/loading/scene-loading-placeholder.png',
+    // 加载背景海报（正式美术）；缺图时由 fallbackColor 兜底，不会出现白屏
+    backgroundPath: 'assets/images/ui/loading/scene-loading-background.jpg',
     fallbackColor: '#123B2A',
 
     // 显示加载层后先等待的帧数：确保加载层已绘制，再执行可能阻塞主线程的准备
