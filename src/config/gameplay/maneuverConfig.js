@@ -56,5 +56,20 @@ export const MANEUVER_CONFIG = {
     // 多节点（0.2.6）：每帧最多重算的计划数。
     // 节点数量不设上限，编辑前序节点会让其下游全部重投影 → 若一帧内全部重算会卡顿；
     // 超出预算的节点本帧沿用上一帧的计划（下一帧继续追赶），视觉上仅晚一帧。
-    planRecomputeBudget: 3
+    planRecomputeBudget: 3,
+
+    // ===== 链上最近点解析（折线粗筛 + 真实曲线精化，0.2.6）=====
+    // 折线只用于粗筛，最终位置/速度/时刻一律取自真实曲线 P(t) 的同一次求值。
+    // 精化只做"粗筛最靠前"的若干条候选边（拖拽逐帧调用的成本护栏）
+    nearestRefineCandidates: 3,
+    // 精化窗口半宽 = max(段跨度 × 比例, 最小秒数)；窗口在边界取到极小值 → 按倍数扩展
+    nearestRefineWindowFrac: 0.15,
+    nearestRefineWindowMinSeconds: 5,
+    // 窗口扩展次数上限（采样点 t 不可全信时的兜底：向段首/段尾扩展）
+    nearestRefineMaxExpand: 2,
+    // 窗口内均匀采样点数（先定位局部极小所在子区间，再做黄金分割 → 兼顾非单峰曲线）
+    nearestRefineScanSamples: 8,
+    // 黄金分割迭代上限（硬上限 40）与时间收敛容差（秒）
+    nearestRefineMaxIters: 40,
+    nearestRefineTimeTol: 1e-6
 };

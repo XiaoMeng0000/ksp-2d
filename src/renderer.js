@@ -1144,6 +1144,13 @@ function splitBurnSubPaths(points) {
  * anchorBody, relX, relY } 或 null——relX/relY 为"相对宿主中心的轨道坐标"（轨道形状
  * 在宿主参考系固定），冻结后供菜单锚点随宿主/轨道线移动：世界坐标 = 宿主当前时刻
  * 位置 + 轨道坐标（点始终在轨道线上、不沿轨道滑动）。
+ *
+ * 职责边界（0.2.6 命中改造）：本函数只服务**悬停高亮 / Tooltip 的几何定位**，只认
+ * 当前轨道链（_lastOrbitSegments，与绘制同源），且只在弦上做线性插值 —— 它是"画面上
+ * 那个高亮点在哪"，**不是**机动节点的状态来源。建点 / 拖节点需要的 relPos/relVel/
+ * anchorBody/time 一律由领域层 resolveNearestPointOnChain 在真实曲线 P(t) 上单次求值，
+ * 调用方必须把命中的那组 segments 一并传入（跨链命中不得再回落到本函数，否则段下标
+ * 会与另一条链错配）。
  * @param {Object} hit - { segIndex, pointIndex, segT }（findNearestOrbitPoint 产出）
  * @param {HTMLCanvasElement} canvas
  */
@@ -1511,6 +1518,9 @@ function applyLabelAvoidance(markers) {
  * 参数 t 与屏幕空间完全等价，故此处只做"像素阈值 → 世界阈值"换算与屏幕量补全。
  * 命中点附带插值时间（段内秒偏移，绝对时刻 = seg.anchorTime + timeOffset）。
  * 悬停/右键共用本函数。
+ * 注意（0.2.6）：这是**折线弦上的粗筛**（选哪条链 / 是否够近），不是机动节点状态来源
+ * —— timeOffset 是弦上的线性插值时间，节点快照必须改由领域层 resolveNearestPointOnChain
+ * 在真实曲线 P(t) 上求最近时刻后原子写入（否则位置与速度会来自不同时刻）。
  * @param {Array} segments - 预测段（本帧活动飞船基础链 / 机动后链）
  * @param {Object} mouseWorld - { x, y } 鼠标世界坐标（screenToWorld 产出）
  * @param {number} thresholdPx - 悬停判定阈值（屏幕像素）

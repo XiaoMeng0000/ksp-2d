@@ -14,10 +14,10 @@ import { t } from '../config/ui/strings.js';
 import { flightView } from '../flightView.js';
 import { maneuverSystem } from '../ship/maneuverSystem.js';
 import { shipSystem } from '../ship/shipSystem.js';
-import { getChainNodes, getBaseChain, getSelectedPrediction } from '../ship/maneuverChain.js';
+import { getChainNodes, getBaseChain, getSelectedPrediction, resolveNearestPointOnChain } from '../ship/maneuverChain.js';
 import { celestialBodies, getSOIHost, getAbsolutePosition } from '../physics/physics.js';
 import { getOrbitalDirectionAngles } from '../physics/orbitalMechanics.js';
-import { walkToTime, getNodeOrbitPeriod } from '../physics/maneuverPrediction.js';
+import { getNodeOrbitPeriod } from '../physics/maneuverPrediction.js';
 import { getCachedTime, bodyFuturePos } from '../physics/orbitalPrediction.js';
 import { computeDeltaV } from '../resources/resourceSystem.js';
 import { formatTCountdown } from '../utils/format.js';
@@ -357,7 +357,7 @@ function onInsetHover(e) {
             const near = nearestOrbitPointInInset([tip], p, host, 24);
             if (near) {
                 cursor = 'pointer';
-                hover = { x: p.x, y: p.y, absTime: near.absTime };
+                hover = { x: p.x, y: p.y, absTime: near.time };
             }
         }
     }
@@ -435,14 +435,13 @@ function onInsetClick(e) {
         return;
     }
     // 快照取自链尾那条链（链式规划：新节点自动承接上一节点的机动后状态）
-    const st = walkToTime(near.segs, near.absTime);
-    if (!st) return;
+    // 位置/速度/宿主/时刻由解析器一次求值给出 —— 不再"取时刻后再 walkToTime 补速度"
     openNodeMenu(e.clientX, e.clientY, {
-        absTime: near.absTime,
-        relX: st.relPos.x,
-        relY: st.relPos.y,
-        relVel: st.relVel,
-        anchorBody: st.host.name
+        absTime: near.time,
+        relX: near.relPos.x,
+        relY: near.relPos.y,
+        relVel: near.relVel,
+        anchorBody: near.anchorBody
     }, ship);
 }
 
@@ -450,6 +449,7 @@ function onInsetClick(e) {
 function onInsetPointerDown(e) {
     _dragMoved = false;
     if (!_hit || !_insetCanvas) return;
+    const ship = getShip();
     const p = toInsetLocal(e);
     const pred = getSelectedPrediction();
     const axes = pred && pred.plan ? pred.plan.axes : null;
@@ -470,7 +470,7 @@ function onInsetPointerDown(e) {
     // 节点标记：命中的那个即成为选中目标并开始拖动（多节点 0.2.6；手柄仍只属于选中节点）
     const hitNode = (_hit.nodes || []).find(n => Math.hypot(p.x - n.x, p.y - n.y) <= MANEUVER_CONFIG.nodeHitRadius);
     if (hitNode) {
-        if (!hitNode.selected) {
+        if (!hitNode.selected && ship) {
             maneuverSystem.setSelectedNode(ship, hitNode.id);
         }
         _drag = { mode: 'node', nodeId: hitNode.id };
@@ -505,15 +505,14 @@ function onInsetPointerMove(e) {
         const p = toInsetLocal(e);
         const near = nearestOrbitPointInInset(chains, p, hostBody);
         if (!near) return;
-        const st = walkToTime(near.segs, near.absTime);
-        if (!st) return;
         // 拖动的是被按下的那个节点（多节点），新状态取自光标所在链
+        // （位置/速度/宿主/时刻同一次求值 → 节点快照原子写入）
         maneuverSystem.updateNodeTime(ship, {
-            time: near.absTime,
-            relX: st.relPos.x,
-            relY: st.relPos.y,
-            anchorBody: st.host.name,
-            velRel: st.relVel
+            time: near.time,
+            relX: near.relPos.x,
+            relY: near.relPos.y,
+            anchorBody: near.anchorBody,
+            velRel: near.relVel
         }, nodeId);
     }
 }
@@ -591,61 +590,54 @@ function chainForNode(nodeId) {
     return null;
 }
 
+// 放大图内最近轨道点（含到达时刻）：只沿**宿主系**段搜索（换系段的坐标不属于本地轨道，
+// 参与搜索会把节点吸附到错误时刻）
+// 折线粗筛 + 真实曲线精化：放大图投影是等比的（scale + 平移 + Y 翻转），故把像素阈值
+// 换算成世界长度、指针位置换算成世界坐标后交给领域层解析器 —— 位置/速度/时刻/宿主
+// 来自同一次求值，建点与拖节点共用同一入口（不再在弦上插值出"位置对、速度错"的快照）。
+// 本帧可用链（多节点 0.2.6）：基础链（当前轨道）+ 各节点的机动后链。
 function nearestOrbitPointInInset(chains, p, host, thresholdPx) {
-    if (!_hit || !_hit.geom || !isFinite(_hit.geom.scale)) return null;
+    if (!_hit || !_hit.geom || !isFinite(_hit.geom.scale) || !(_hit.geom.scale > 0)) return null;
     const g = _hit.geom;
+    const hostPos = host ? bodyFuturePos(host, getCachedTime()) : { x: 0, y: 0 };
+    // 放大图局部坐标 → 宿主系相对坐标 → 世界坐标（与轨道线的段锚定口径一致）
+    const worldPoint = {
+        x: (p.x - g.cx) / g.scale + hostPos.x,
+        y: (g.cy - p.y) / g.scale + hostPos.y
+    };
+    const thresholdWorld = (thresholdPx || 30) / g.scale;
+
     let best = null;
-    let bestD2 = (thresholdPx || 30) * (thresholdPx || 30);   // 命中阈值（CSS px，默认与主视图一致）
     for (const entry of (chains || [])) {
         const segs = entry.segs || entry;
         const ownerId = entry.ownerId !== undefined ? entry.ownerId : null;
+        const hostSegs = [];
         for (const seg of segs) {
             const anchorName = seg.anchorBody || seg.segSoiName;
             if (anchorName && host && anchorName !== host.name) continue;
-            const pts = seg.relPoints;
-            if (!pts || pts.length < 2) continue;
-            for (let i = 1; i < pts.length; i++) {
-                const a = insetPoint(pts[i - 1], g);
-                const b = insetPoint(pts[i], g);
-                const hit = distToSegmentSq(p.x, p.y, a.x, a.y, b.x, b.y);
-                if (hit.d2 < bestD2) {
-                    bestD2 = hit.d2;
-                    const t0 = pts[i - 1].t;
-                    const t1 = pts[i].t;
-                    const tLocal = (t0 !== undefined && t1 !== undefined)
-                        ? t0 + (t1 - t0) * hit.t
-                        : null;
-                    best = {
-                        absTime: (tLocal !== null && isFinite(seg.anchorTime))
-                            ? seg.anchorTime + tLocal
-                            : null,
-                        segs,
-                        ownerId
-                    };
-                }
-            }
+            hostSegs.push(seg);
         }
+        if (hostSegs.length === 0) continue;
+        const near = resolveNearestPointOnChain(hostSegs, worldPoint, thresholdWorld);
+        if (!near || (best && near.distWorld >= best.distWorld)) continue;
+        best = {
+            time: near.time,
+            relPos: near.relPos,
+            relVel: near.relVel,
+            anchorBody: near.anchorBody,
+            host: near.host,
+            segmentIndex: near.segmentIndex,
+            distWorld: near.distWorld,
+            exact: near.exact,
+            segs,
+            ownerId
+        };
     }
-    return (best && best.absTime !== null) ? best : null;
+    return best;
 }
 
 function insetPoint(relPt, g) {
     return { x: g.cx + relPt.x * g.scale, y: g.cy - relPt.y * g.scale };
-}
-
-function distToSegmentSq(px, py, ax, ay, bx, by) {
-    const vx = bx - ax;
-    const vy = by - ay;
-    const wx = px - ax;
-    const wy = py - ay;
-    const len2 = vx * vx + vy * vy;
-    let t = len2 > 1e-9 ? (wx * vx + wy * vy) / len2 : 0;
-    t = Math.max(0, Math.min(1, t));
-    const cx = ax + vx * t;
-    const cy = ay + vy * t;
-    const dx = px - cx;
-    const dy = py - cy;
-    return { d2: dx * dx + dy * dy, t };
 }
 
 // ===== 每帧更新 =====

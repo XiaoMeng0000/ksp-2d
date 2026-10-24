@@ -6,14 +6,14 @@ import { eventBus, Events } from '../eventBus.js';
 import { updateShipPhysics } from '../physics/physicsUpdate.js';
 import { updateCelestialBodies, getSOIHost, getAbsolutePosition, getRelativePosition, convertVelocityFrame, celestialBodies } from '../physics/physics.js';
 import { stateToKepler } from '../physics/orbitalMechanics.js';
-import { getTimeToNextSOISwitch } from '../physics/orbitalPrediction.js';
+import { getTimeToNextSOISwitch, bodyFuturePos, getCachedTime } from '../physics/orbitalPrediction.js';
 import { render, renderFlightHud, getLastOrbitSegments, getLastOrbitMarkers, setOrbitHoverState, findNearestOrbitPoint, resolveOrbitHit } from '../renderer.js';
 import { showOrbitContextMenu, updateOrbitContextMenu } from '../ui/orbitContextMenu.js';
 import { updateManeuverUI, hideManeuverUI, isManeuverDragging, collapseManeuverEditing } from '../ui/maneuverUI.js';
 import { updateManeuverViewPanel, hideManeuverViewPanel } from '../ui/maneuverViewPanel.js';
 import { maneuverSystem } from '../ship/maneuverSystem.js';
 // 机动数据一律取自**领域层**（渲染层不再充当 maneuver 数据总线；轨道线/屏幕空间产物仍走 renderer 通道）
-import { updateManeuverChain, getChainNodes, getNextPendingPrediction, getSelectedPrediction } from '../ship/maneuverChain.js';
+import { updateManeuverChain, getChainNodes, getNextPendingPrediction, getSelectedPrediction, resolveNearestPointOnChain } from '../ship/maneuverChain.js';
 import { flightView } from '../flightView.js';
 import { formatDuration } from '../utils/format.js';
 import { sceneManager } from '../sceneManager.js';
@@ -540,34 +540,34 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                             }
                         }
                         if (hit) {
-                            const cur = resolveOrbitHit(hit, _canvas);
-                            const seg = hitSegs[hit.segmentIndex];
-                            const absTime = (hit.timeOffset !== null && isFinite(seg.anchorTime))
-                                ? seg.anchorTime + hit.timeOffset
-                                : null;
-                            // 链尾节点建点需要该链上的速度快照 → 预先解析并随菜单数据下发
-                            let velRel = null;
-                            try {
-                                const st = absTime !== null ? walkToTime(hitSegs, absTime) : null;
-                                if (st && st.relVel) velRel = st.relVel;
-                            } catch (err) { /* 链瞬时缺失 → 退化显示 */ }
-                            // 命中非链尾链（旧链）时禁止建点：交由菜单提示（严格线性链口径）
-                            const isTipChain = (hitSegs === segments && !tail) || (tail && hitSegs !== segments);
-                            showOrbitContextMenu(e.clientX, e.clientY, {
-                                worldX: cur ? cur.worldX : hit.worldX,
-                                worldY: cur ? cur.worldY : hit.worldY,
-                                soiName: hit.segSoiName,
-                                absTime,
-                                tToNext: cur ? cur.tToNext : hit.timeOffset,
-                                // 轨道坐标锚定（点随轨道线/宿主移动，不滑不离线）：
-                                // 世界坐标 = 宿主当前时刻位置 + 冻结的轨道相对坐标
-                                anchorBody: cur ? cur.anchorBody : null,
-                                relX: cur ? cur.relX : null,
-                                relY: cur ? cur.relY : null,
-                                velRel,
-                                canCreate: isTipChain
-                            }, _canvas);
-                            return;
+                            // 命中点状态由领域层一次性解析（粗筛已由 findNearestOrbitPoint 完成）：
+                            // 位置/速度/宿主/时刻来自同一次真实曲线求值，且必须用**真正命中的那组
+                            // segments** —— 命中链尾机动后链时若仍按基础链的段下标取段，就会拼出
+                            // 位置与速度不同时刻的混合快照（实测可得到完全无关的轨道根数）。
+                            const near = resolveNearestPointOnChain(
+                                hitSegs, mouseWorld, 12 / (camera.zoom > 0 ? camera.zoom : 1));
+                            if (near) {
+                                const nowT = getCachedTime();
+                                const hostPos = near.host ? bodyFuturePos(near.host, nowT) : { x: 0, y: 0 };
+                                const velRel = near.relVel;
+                                // 命中非链尾链（旧链）时禁止建点：交由菜单提示（严格线性链口径）
+                                const isTipChain = (hitSegs === segments && !tail) || (tail && hitSegs !== segments);
+                                showOrbitContextMenu(e.clientX, e.clientY, {
+                                    worldX: near.relPos.x + hostPos.x,
+                                    worldY: near.relPos.y + hostPos.y,
+                                    soiName: near.anchorBody,
+                                    absTime: near.time,
+                                    tToNext: Math.max(0, near.time - nowT),
+                                    // 轨道坐标锚定（点随轨道线/宿主移动，不滑不离线）：
+                                    // 世界坐标 = 宿主当前时刻位置 + 冻结的轨道相对坐标
+                                    anchorBody: near.anchorBody,
+                                    relX: near.relPos.x,
+                                    relY: near.relPos.y,
+                                    velRel,
+                                    canCreate: isTipChain
+                                }, _canvas);
+                                return;
+                            }
                         }
                     }
                     // 0.2.5 打磨：点击空白（未命中设施/SAS/轨道线）→ 收起机动节点编辑

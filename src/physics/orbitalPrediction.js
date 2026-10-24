@@ -345,13 +345,30 @@ export function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, 
 
         // 采样绘制（运动坐标插值 → 映射回真实真近点角，双曲线兼容 keplerPositionAtTheta）
         // 段点存相对锚点坐标（宿主在 stepStartTime 的位置）
+        // 采样点时间标签 t：θm 均匀采样，t 由双曲开普勒方程给出（t=(M−M0)/n，M=e·sinhF−F）。
+        // 旧实现写 t=frac·deltaT，把"真近点角均匀"当成"时间均匀"→ 点坐标正确但时间标签错误
+        // （Eve 双曲线近点段实测偏差达 8182 s，逐点反算位置偏差达 1e7 m 级）。
+        // θm 单调增 → M 单调增，双曲线分支 |θm|<θ∞<π，无 2π 回绕，可直接逐点求差；
+        // 各点按 ΔM_total 归一化到 deltaT：末点严格等于段终点时间（deltaT 含 0.01 s 下限钳位，
+        // 此时 (M−M0)/n 会略早于段终点），首点恰为 0。
         const N = Math.max(20, Math.min(Math.floor(deltaTheta / Math.PI * 100), 500));
+        const kHyp = Math.sqrt((kepler.e - 1) / (kepler.e + 1));
+        const hypMeanAnomaly = (thetaM) => {
+            // tanh(F/2)=√((e−1)/(e+1))·tan(θm/2)；clamp 防 θm 贴近渐近线时 atanh(±1)=±∞
+            const tanhHalf = Math.max(-(1 - 1e-12), Math.min(1 - 1e-12, kHyp * Math.tan(thetaM / 2)));
+            const F = 2 * Math.atanh(tanhHalf);
+            return kepler.e * Math.sinh(F) - F;
+        };
+        const M0 = hypMeanAnomaly(theta0m);
+        const MTotal = hypMeanAnomaly(theta0m + deltaTheta) - M0;
         const points = [];
         for (let i = 0; i <= N; i++) {
             const frac = i / N;
-            const th = dir * (theta0m + frac * deltaTheta);
+            const thetaM = theta0m + frac * deltaTheta;
+            const th = dir * thetaM;
             const rP = keplerPositionAtTheta({ a: kepler.a, e: kepler.e, omega: kepler.omega }, host.gm, th);
-            points.push({ x: rP.x, y: rP.y, t: frac * deltaT });
+            const tFrac = i === 0 ? 0 : (i === N ? 1 : (MTotal > 0 ? (hypMeanAnomaly(thetaM) - M0) / MTotal : frac));
+            points.push({ x: rP.x, y: rP.y, t: tFrac * deltaT });
         }
         segments.push(makeSegment(points, host, stepStartTime, depth, segStartState));
 
@@ -610,12 +627,39 @@ export function patchedStep(posAbs, velRel, host, stepStartTime, depth, maxSeg, 
     const deltaT = Math.max(deltaM / n, 0.01);
 
     const N = Math.max(20, Math.floor(deltaTheta / Math.PI * 100));
+    // 采样点时间标签 t：θm 均匀采样，t 由真实椭圆开普勒方程给出（t=(M−M0)/n，M=E−e·sinE）。
+    // 旧实现写 t=frac·deltaT（"真近点角均匀"当成"时间均匀"），点坐标正确但时间标签错误。
+    // E 用半角 atan2 形式反解（与 getOrbitalInfo / ellipseSampleByE 同口径，象限安全）。
+    // θm 跨 2π 时该反解在 θm=2π 处有整数倍 2π 的分支跳变，逐点直减 M−M0 会把后段点算成
+    // 负时间 → 改为按相邻点增量 ΔM=(M_i−M_{i−1}) mod 2π 累加（单步真实增量 < π，取模即真增量）。
+    // 各点按 ΔM 总量归一化到 deltaT：末点严格等于段终点时间（与下游递归切换时刻一致）。
+    // （findSOIIntersection 已保证交点 θm ∈ (θ0m, θ0m+2π)，回绕仅为防御性处理）
+    const TWO_PI = 2 * Math.PI;
+    const sqM = Math.sqrt(1 - kepler.e);
+    const sqP = Math.sqrt(1 + kepler.e);
+    const ellipseMeanAnomaly = (thetaM) => {
+        const E = 2 * Math.atan2(sqM * Math.sin(thetaM / 2), sqP * Math.cos(thetaM / 2));
+        return E - kepler.e * Math.sin(E);
+    };
+    const mRel = new Array(N + 1);
+    mRel[0] = 0;
+    let mPrev = ellipseMeanAnomaly(theta0m);
+    let mTotal = 0;
+    for (let i = 1; i <= N; i++) {
+        const m = ellipseMeanAnomaly(theta0m + (i / N) * deltaTheta);
+        let dM = m - mPrev;
+        dM -= TWO_PI * Math.floor(dM / TWO_PI);
+        mTotal += dM;
+        mRel[i] = mTotal;
+        mPrev = m;
+    }
     const points = [];
     for (let i = 0; i <= N; i++) {
         const frac = i / N;
         const th = dir * (theta0m + frac * deltaTheta);
         const rP = keplerPositionAtTheta({ a: kepler.a, e: kepler.e, omega: kepler.omega }, host.gm, th);
-        points.push({ x: rP.x, y: rP.y, t: frac * deltaT });
+        const tFrac = i === 0 ? 0 : (mTotal > 0 ? mRel[i] / mTotal : frac);
+        points.push({ x: rP.x, y: rP.y, t: tFrac * deltaT });
     }
     segments.push(makeSegment(points, host, stepStartTime, depth, segStartState));
 

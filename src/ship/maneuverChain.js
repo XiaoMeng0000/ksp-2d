@@ -22,6 +22,8 @@ import { predictTrajectoryPatched, predictTrajectoryBurned, bodyFuturePos, getCa
 import {
     predictManeuverTrajectories,
     walkToTime,
+    segmentStateAtTime,
+    prepareSegmentState,
     computeNodeAxes,
     syncComponentsFromDeltaV,
     rebuildDeltaVFromComponents
@@ -367,5 +369,250 @@ export function findNearestChainPoint(segments, worldPoint, thresholdWorld) {
 
     if (!best) return null;
     best.distWorld = Math.sqrt(bestDistSq);
+    return best;
+}
+
+// ===== 链上最近点（真实曲线最近时刻，0.2.6）=====
+// 折线只做粗筛（distToSegmentSq 找候选段与候选时刻），最终在候选段的**真实曲线 P(t)**
+// 上求距鼠标最近的时刻：窗口内均匀采样定位局部极小 → 黄金分割收敛 → 端点比较。
+// 返回的 relPos/relVel/anchorBody/time 全部来自同一次求值 —— 节点快照原子性的来源
+// （旧实现的"弦上插值位置 + walkToTime 速度"混写会造出自相矛盾的轨道根数）。
+// 解析段（有 startState 且根数有效）走 kepler 传播；非解析段（径向直线 / RK4 兜底）
+// 退回采样点插值并标 exact:false —— 不伪装成精确。
+
+// 段采样点的时间跨度（秒）：取"最大有限 t"作为包围上界。
+// 采样点 t 不能全信（预测层采样标签历史上曾错位），故它只当包围上界用，
+// 精化窗口在边界取到极小值时向外扩展（见 resolveNearestPointOnChain）。
+function segmentSpan(seg) {
+    const pts = seg.relPoints;
+    let span = 0;
+    for (const p of pts) {
+        if (isFinite(p.t) && p.t > span) span = p.t;
+    }
+    return span;
+}
+
+// 窗口内取真实曲线上的最近时刻：均匀采样定位局部极小所在子区间 → 黄金分割 → 端点比较
+function refineWindow(distSqAt, lo, hi, cfg) {
+    const n = Math.max(2, cfg.nearestRefineScanSamples | 0);
+    const ts = [];
+    const fs = [];
+    for (let i = 0; i <= n; i++) {
+        const t = lo + (hi - lo) * (i / n);
+        ts.push(t);
+        fs.push(distSqAt(t));
+    }
+    let bi = 0;
+    for (let i = 1; i <= n; i++) {
+        if (fs[i] < fs[bi]) bi = i;
+    }
+    let bestT = ts[bi];
+    let bestF = fs[bi];
+
+    const tol = cfg.nearestRefineTimeTol;
+    const a = ts[Math.max(0, bi - 1)];
+    const b = ts[Math.min(n, bi + 1)];
+    if (b - a > tol) {
+        const r = goldenSectionMin(distSqAt, a, b, cfg.nearestRefineMaxIters | 0, tol);
+        if (r.f < bestF) {
+            bestT = r.t;
+            bestF = r.f;
+        }
+    }
+    // 端点比较：极小值落在窗口边界时由外层扩展窗口再试（采样点 t 不可信的兜底）
+    if (fs[0] < bestF) {
+        bestT = ts[0];
+        bestF = fs[0];
+    }
+    if (fs[n] < bestF) {
+        bestT = ts[n];
+        bestF = fs[n];
+    }
+    return { t: bestT, f: bestF };
+}
+
+// 黄金分割求单峰区间内的极小值（迭代上限硬约束，防死循环）
+function goldenSectionMin(f, lo, hi, maxIters, tol) {
+    const g = 0.6180339887498949;          // 1/φ
+    let a = lo;
+    let b = hi;
+    let c = b - g * (b - a);
+    let d = a + g * (b - a);
+    let fc = f(c);
+    let fd = f(d);
+    for (let i = 0; i < maxIters && (b - a) > tol; i++) {
+        if (fc < fd) {
+            b = d;
+            d = c;
+            fd = fc;
+            c = b - g * (b - a);
+            fc = f(c);
+        } else {
+            a = c;
+            c = d;
+            fc = fd;
+            d = a + g * (b - a);
+            fd = f(d);
+        }
+    }
+    // 收敛区间中点 vs 两端点：取最优（区间内已按单峰假设收缩，端点仍需参与比较）
+    const mid = (a + b) / 2;
+    let bestT = mid;
+    let bestF = f(mid);
+    for (const t of [a, b, lo, hi]) {
+        const fv = f(t);
+        if (fv < bestF) {
+            bestT = t;
+            bestF = fv;
+        }
+    }
+    return { t: bestT, f: bestF };
+}
+
+/**
+ * 在预测链中找距指定世界点最近的真实轨道点（折线粗筛 + 真实曲线精化）。
+ * 位置/速度/宿主/时刻来自同一次求值，调用方应把四个字段整体写入节点（原子写入）。
+ * @param {Array} segments - 预测段（relPoints + anchorBody / anchorTime / startState）
+ * @param {Object} worldPoint - { x, y } 世界坐标（绝对坐标，与渲染层轨道线同锚定口径）
+ * @param {number} thresholdWorld - 命中阈值（世界长度；调用方把像素阈值除以每像素世界长度）
+ * @returns {Object|null} {
+ *   time,        // 命中点的绝对游戏时刻（与 relPos/relVel 同一求值）
+ *   relPos, relVel,   // 该时刻相对宿主的位置/速度（节点快照字段来源）
+ *   anchorBody,  // 该时刻宿主名
+ *   host,        // 宿主天体对象（缺失 → null，深空段）
+ *   segmentIndex,// 命中的段下标（**相对传入的 segments**，调用方不得再换用别的链取段）
+ *   distWorld,   // 鼠标到真实曲线最近点的世界距离
+ *   exact        // true = 解析传播求值；false = 非解析段采样点插值（降级）
+ * }
+ */
+export function resolveNearestPointOnChain(segments, worldPoint, thresholdWorld) {
+    const cfg = MANEUVER_CONFIG;
+    if (!segments || segments.length === 0 || !worldPoint
+        || !isFinite(worldPoint.x) || !isFinite(worldPoint.y)
+        || !(thresholdWorld > 0)) {
+        return null;
+    }
+
+    // ① 粗筛：折线弦（只在阈值内的边参与，候选边自带段锚点局部坐标）
+    const thresholdSq = thresholdWorld * thresholdWorld;
+    const candidates = [];
+    for (let si = 0; si < segments.length; si++) {
+        const seg = segments[si];
+        if (!seg || !seg.relPoints || seg.relPoints.length < 2) continue;
+        const anchor = segmentAnchor(seg);
+        const lx = worldPoint.x - anchor.x;
+        const ly = worldPoint.y - anchor.y;
+        let prev = seg.relPoints[0];
+        for (let pi = 1; pi < seg.relPoints.length; pi++) {
+            const rp = seg.relPoints[pi];
+            const hit = distToSegmentSq(lx, ly, prev.x, prev.y, rp.x, rp.y);
+            if (hit.distSq <= thresholdSq) {
+                candidates.push({ si, pi: pi - 1, segT: hit.t, distSq: hit.distSq, lx, ly });
+            }
+            prev = rp;
+        }
+    }
+    if (candidates.length === 0) return null;
+
+    // ② 候选排序：同段只精化最近的一条边，最多 nearestRefineCandidates 段（每帧成本护栏）
+    candidates.sort((p, q) => p.distSq - q.distSq);
+    const maxCand = Math.max(1, cfg.nearestRefineCandidates | 0);
+    const picked = [];
+    const seenSeg = new Set();
+    for (const c of candidates) {
+        if (seenSeg.has(c.si)) continue;
+        seenSeg.add(c.si);
+        picked.push(c);
+        if (picked.length >= maxCand) break;
+    }
+
+    // ③ 逐候选在真实曲线上精化，取世界距离最小者
+    let best = null;
+    for (const cand of picked) {
+        const seg = segments[cand.si];
+        const span = segmentSpan(seg);
+        const prep = prepareSegmentState(seg);
+        let tLocal = null;
+        let exact = false;
+
+        if (prep && span > 0) {
+            // 候选时刻：优先用采样点 t 插值；t 缺失/越界时按边序号比例（采样点 t 不可信的兜底）
+            const pts = seg.relPoints;
+            const p0 = pts[cand.pi];
+            const p1 = pts[cand.pi + 1];
+            const tSample = (isFinite(p0.t) && isFinite(p1.t))
+                ? p0.t + (p1.t - p0.t) * cand.segT
+                : null;
+            const tHit = (tSample !== null && tSample >= 0 && tSample <= span)
+                ? tSample
+                : span * ((cand.pi + cand.segT) / (pts.length - 1));
+
+            // 距离函数：段内局部秒 → 鼠标到 P(t) 的世界距离平方（与折线同一锚定口径）
+            const distSqAt = (t) => {
+                const st = segmentStateAtTime(seg, seg.anchorTime + t, prep);
+                if (!st || !st.relPos) return Infinity;
+                const dx = cand.lx - st.relPos.x;
+                const dy = cand.ly - st.relPos.y;
+                return dx * dx + dy * dy;
+            };
+
+            // 有界搜索：窗口半宽 = max(段跨度×比例, 最小秒数)；极小值贴窗边 → 扩展窗口再试
+            const halfBase = Math.max(cfg.nearestRefineWindowMinSeconds,
+                span * cfg.nearestRefineWindowFrac);
+            const maxExpand = Math.max(0, cfg.nearestRefineMaxExpand | 0);
+            let win = null;
+            for (let expand = 0; expand <= maxExpand; expand++) {
+                const half = halfBase * Math.pow(2, expand);
+                const lo = Math.max(0, Math.min(span, tHit - half));
+                const hi = Math.min(span, Math.max(0, tHit + half));
+                if (hi - lo < 1e-12) {
+                    // 段跨度已退化到零：只在候选时刻单点求值（无窗口可搜）
+                    win = { t: tHit, f: distSqAt(tHit) };
+                    break;
+                }
+                const r = refineWindow(distSqAt, lo, hi, cfg);
+                if (!win || r.f < win.f) win = r;
+                const atEdge = (r.t <= lo + 1e-9) || (r.t >= hi - 1e-9);
+                if (!atEdge) break;                       // 极小值在窗口内侧 → 收敛
+            }
+            if (!win) continue;
+            tLocal = win.t;
+            exact = true;
+        } else {
+            // 非解析段 / 无可用跨度：退回采样点插值（exact:false，不伪装精确）
+            const pts = seg.relPoints;
+            const p0 = pts[cand.pi];
+            const p1 = pts[cand.pi + 1];
+            const tSample = (isFinite(p0.t) && isFinite(p1.t))
+                ? p0.t + (p1.t - p0.t) * cand.segT
+                : null;
+            if (tSample === null || !isFinite(tSample)) continue;
+            tLocal = tSample;
+            exact = false;
+        }
+
+        const absTime = seg.anchorTime + tLocal;
+        const st = segmentStateAtTime(seg, absTime, prep);
+        if (!st || !st.relPos || !st.relVel) continue;
+        if (!isFinite(st.relPos.x) || !isFinite(st.relPos.y)
+            || !isFinite(st.relVel.x) || !isFinite(st.relVel.y)) {
+            continue;
+        }
+        const distWorld = Math.hypot(cand.lx - st.relPos.x, cand.ly - st.relPos.y);
+        // 精化后跑出阈值外 = 鼠标其实不在曲线上（弦比曲线更贴近鼠标的假命中）→ 丢弃
+        if (!(distWorld <= thresholdWorld)) continue;
+        if (!best || distWorld < best.distWorld) {
+            best = {
+                time: absTime,
+                relPos: st.relPos,
+                relVel: st.relVel,
+                anchorBody: seg.anchorBody || seg.soiName || null,
+                host: st.host || null,
+                segmentIndex: cand.si,
+                distWorld,
+                exact
+            };
+        }
+    }
     return best;
 }

@@ -11,9 +11,71 @@ import { celestialBodies } from './physics.js';
 import { getTotalMass, getFuelAmount, G0 } from '../resources/resourceSystem.js';
 import { MANEUVER_CONFIG } from '../config/gameplay/maneuverConfig.js';
 
+// 段的解析传播预备量（一次算好，供 segmentStateAtTime 多次求值复用）：
+// 有起始状态快照且宿主引力场有效 → { kepler, body, t0 }；否则 null（非解析段）。
+// 单独暴露给"真实曲线精化"用：黄金分割每轮都要取状态，重复 stateToKepler 是纯浪费。
+export function prepareSegmentState(seg) {
+    if (!seg) return null;
+    const st = seg.startState;
+    if (!st || !st.relPos || !st.relVel) return null;
+    const body = celestialBodies.find(b => b.name === seg.anchorBody);
+    if (!body || !(body.gm > 0)) return null;
+    const kepler = stateToKepler(st.relPos, st.relVel, body.gm);
+    if (!kepler) return null;
+    const t0 = isFinite(st.time) ? st.time : seg.anchorTime;
+    if (!isFinite(t0)) return null;
+    return { kepler, body, t0 };
+}
+
+// 按段取状态（纯函数）：seg 内 absTime 时刻 → { relPos, relVel, host, time, kepler } / null。
+// 这是"时刻 → 状态"的唯一求值来源（walkToTime 与最近点精化都复用它），
+// 因此 relPos 与 relVel 必然来自**同一个 absTime**——节点快照原子性的来源。
+//   · 解析 kepler 推进优先（kepler 非 null）
+//   · 无 kepler 段（径向直线 / RK4 兜底）→ 采样点插值 + 差分速度，kepler = null
+// pre（可选）：prepareSegmentState 的结果，传入则跳过重复的根数计算（语义完全一致）。
+export function segmentStateAtTime(seg, absTime, pre = null) {
+    if (!seg || !isFinite(absTime)) return null;
+    const pts = seg.relPoints;
+    if (!pts || pts.length < 2 || !isFinite(seg.anchorTime)) return null;
+
+    const prep = pre || prepareSegmentState(seg);
+    if (prep) {
+        const tLocal = Math.max(0, absTime - prep.t0);
+        const { pos, vel } = keplerToState(prep.kepler, prep.body.gm, tLocal);
+        return { relPos: pos, relVel: vel, host: prep.body, time: absTime, kepler: prep.kepler };
+    }
+
+    // 采样点插值兜底（径向直线段 / RK4 病态段）
+    const body = celestialBodies.find(b => b.name === seg.anchorBody);
+    const st = seg.startState;
+    const tLocal = Math.max(0, absTime - seg.anchorTime);
+    let p0 = pts[0];
+    let p1 = pts[pts.length - 1];
+    for (let i = 1; i < pts.length; i++) {
+        if (pts[i].t >= tLocal) {
+            p0 = pts[i - 1];
+            p1 = pts[i];
+            break;
+        }
+    }
+    const span = p1.t - p0.t;
+    const f = span > 1e-9 ? Math.max(0, Math.min(1, (tLocal - p0.t) / span)) : 0;
+    const relPos = { x: p0.x + (p1.x - p0.x) * f, y: p0.y + (p1.y - p0.y) * f };
+    let relVel;
+    if (span > 1e-9) {
+        relVel = { x: (p1.x - p0.x) / span, y: (p1.y - p0.y) / span };
+    } else if (st && st.relVel) {
+        relVel = { x: st.relVel.x, y: st.relVel.y };
+    } else {
+        relVel = { x: 0, y: 0 };
+    }
+    return { relPos, relVel, host: body, time: absTime, kepler: null };
+}
+
 // 沿预测链时间寻址：返回 absTime 时刻飞船的 { relPos, relVel, host, time, kepler }
 // 命中段的解析 kepler 优先（keplerToState 解析推进），无 kepler 段（径向直线 / RK4
 // 兜底）用段点插值 + 差分速度。absTime 落在链外 / 链为空 → null。
+// 段内求值统一转交 segmentStateAtTime（单一来源），本函数只负责"按时间挑段"。
 export function walkToTime(segments, absTime) {
     if (!segments || segments.length === 0 || !isFinite(absTime)) return null;
 
@@ -28,42 +90,8 @@ export function walkToTime(segments, absTime) {
         const segEnd = isFinite(lastT) ? segStart + lastT : null;
         if (segEnd !== null && absTime > segEnd + 1e-6) continue;
 
-        const body = celestialBodies.find(b => b.name === seg.anchorBody);
-        const st = seg.startState;
-
-        // 解析 kepler 推进优先（有起始状态快照且有有效引力场）
-        if (st && st.relPos && st.relVel && body && body.gm > 0) {
-            const kepler = stateToKepler(st.relPos, st.relVel, body.gm);
-            if (kepler) {
-                const tLocal = Math.max(0, absTime - st.time);
-                const { pos, vel } = keplerToState(kepler, body.gm, tLocal);
-                return { relPos: pos, relVel: vel, host: body, time: absTime, kepler };
-            }
-        }
-
-        // 采样点插值兜底（径向直线段 / RK4 病态段）
-        const tLocal = Math.max(0, absTime - segStart);
-        let p0 = pts[0];
-        let p1 = pts[pts.length - 1];
-        for (let i = 1; i < pts.length; i++) {
-            if (pts[i].t >= tLocal) {
-                p0 = pts[i - 1];
-                p1 = pts[i];
-                break;
-            }
-        }
-        const span = p1.t - p0.t;
-        const f = span > 1e-9 ? Math.max(0, Math.min(1, (tLocal - p0.t) / span)) : 0;
-        const relPos = { x: p0.x + (p1.x - p0.x) * f, y: p0.y + (p1.y - p0.y) * f };
-        let relVel;
-        if (span > 1e-9) {
-            relVel = { x: (p1.x - p0.x) / span, y: (p1.y - p0.y) / span };
-        } else if (st && st.relVel) {
-            relVel = { x: st.relVel.x, y: st.relVel.y };
-        } else {
-            relVel = { x: 0, y: 0 };
-        }
-        return { relPos, relVel, host: body, time: absTime, kepler: null };
+        const st = segmentStateAtTime(seg, absTime);
+        if (st) return st;
     }
     return null;
 }

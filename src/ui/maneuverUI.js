@@ -16,11 +16,10 @@ import {
     getBaseChain,
     getChainSelectedId,
     getSelectedPrediction,
-    findNearestChainPoint
+    resolveNearestPointOnChain
 } from '../ship/maneuverChain.js';
 import { camera, screenToWorld, cssToCanvas, canvasToCss, worldToScreen } from '../camera.js';
 import { getCachedTime, bodyFuturePos } from '../physics/orbitalPrediction.js';
-import { walkToTime } from '../physics/maneuverPrediction.js';
 import { celestialBodies } from '../physics/physics.js';
 import { flightView } from '../flightView.js';
 import { computeDeltaV } from '../resources/resourceSystem.js';
@@ -299,24 +298,24 @@ function nodeIconCss(node, plan, canvas, now) {
 }
 
 // 屏幕像素阈值 → 世界长度阈值（世界→屏幕为等比相似变换，缩放系数 = camera.zoom），
-// 供领域层 findNearestChainPoint 使用（拖拽命中口径与渲染层悬停一致，均为屏幕像素）
+// 供领域层 resolveNearestPointOnChain 使用（拖拽命中口径与渲染层悬停一致，均为屏幕像素）
 function pxToWorldThreshold(px) {
     return (camera.zoom > 0) ? (px / camera.zoom) : 0;
 }
 
-// 在**指定链**上解析命中点的轨道坐标与速度快照（resolveOrbitHit 只认当前轨道链，故此处自行换算）
+// 命中结果 → 节点快照字段（原子写入用）：解析器返回的 time/relPos/relVel/anchorBody
+// 来自**同一次**真实曲线求值，这里只做字段改名（chain 参与下标合法性校验，
+// 保证传进来的命中结果确实属于这条链）
 function resolveHitOnChain(chain, hit) {
     if (!chain || !hit) return null;
-    const seg = chain[hit.segmentIndex];
-    if (!seg || !seg.relPoints || seg.relPoints.length < 2) return null;
-    const pi = Math.max(0, Math.min(hit.pointIndex !== undefined ? hit.pointIndex : 0, seg.relPoints.length - 2));
-    const p0 = seg.relPoints[pi];
-    const p1 = seg.relPoints[pi + 1];
-    const t = (hit.segT !== undefined) ? Math.max(0, Math.min(1, hit.segT)) : 0;
+    if (!(hit.segmentIndex >= 0) || hit.segmentIndex >= chain.length) return null;
+    if (!hit.relPos || !hit.relVel || !isFinite(hit.time)) return null;
     return {
-        relX: p0.x + (p1.x - p0.x) * t,
-        relY: p0.y + (p1.y - p0.y) * t,
-        anchorBody: seg.anchorBody || seg.segSoiName || null
+        time: hit.time,
+        relX: hit.relPos.x,
+        relY: hit.relPos.y,
+        anchorBody: hit.anchorBody,
+        velRel: hit.relVel
     };
 }
 
@@ -422,22 +421,17 @@ function onDragMove(e) {
         const canvasPt = cssToCanvas(e.clientX - rect.left, e.clientY - rect.top, _canvas);
         const world = screenToWorld(canvasPt.x, canvasPt.y, _canvas);
         if (chain && chain.length > 0) {
-            const hit = findNearestChainPoint(chain, world, pxToWorldThreshold(30));
-            if (hit && hit.timeOffset !== null && hit.timeOffset !== undefined) {
-                const seg = chain[hit.segmentIndex];
-                const absTime = seg.anchorTime + hit.timeOffset;
-                const cur = resolveHitOnChain(chain, hit);
-                let velRel = null;
-                try {
-                    const st = walkToTime(chain, absTime);
-                    if (st && st.relVel) velRel = st.relVel;
-                } catch (err) { /* 瞬时缺失 → 跳过速度快照 */ }
+            // 折线只做粗筛，最终在真实曲线 P(t) 上求最近时刻：位置/速度/宿主/时刻同源，
+            // 一次性写入节点（旧实现"弦上插值位置 + walkToTime 速度"会混出无关轨道根数）
+            const hit = resolveNearestPointOnChain(chain, world, pxToWorldThreshold(30));
+            const cur = resolveHitOnChain(chain, hit);
+            if (cur) {
                 maneuverSystem.updateNodeTime(ship, {
-                    time: absTime,
-                    relX: cur ? cur.relX : null,
-                    relY: cur ? cur.relY : null,
-                    anchorBody: cur ? cur.anchorBody : null,
-                    velRel
+                    time: cur.time,
+                    relX: cur.relX,
+                    relY: cur.relY,
+                    anchorBody: cur.anchorBody,
+                    velRel: cur.velRel
                 }, nodeId || undefined);
             }
         }
