@@ -14,3 +14,5 @@ src/planet/**                          -text
 src/glCore/**                          -text
 src/geometry/**                        -text
 src/config/cloudOptionalDefaults.js    -text
+src/star/**                            -text
+src/config/starRenderPresets.js        -text

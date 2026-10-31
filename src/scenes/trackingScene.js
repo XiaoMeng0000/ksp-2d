@@ -9,6 +9,7 @@ import { updateShipPhysics } from '../physics/physicsUpdate.js';
 import { updateCelestialBodies, getAbsolutePosition, celestialBodies } from '../physics/physics.js';
 import { getTimeToNextSOISwitch } from '../physics/orbitalPrediction.js';
 import { render } from '../renderer.js';
+import { STAR_LAYER_CONFIG } from '../config/gameplay/starLayerConfig.js';
 import { eventBus, Events } from '../eventBus.js';
 import { gameState } from '../gameState.js';
 import { timeWarp } from '../timeWarp.js';
@@ -21,6 +22,7 @@ import { clearOrbitLabels } from '../ui/orbitLabels.js';
 let trackingFocusPos = null;
 let trackingSelectedId = null;
 let trackingFrameCount = 0;
+let _lastFrameDt = 0;   // 真实帧间隔（秒），供 WebGL 恒星层推进动画（不随时间加速）
 
 // 导航栏 Tab 状态：'all' = 完整层级树，'vessels' = 航天器与聚落平铺
 let trackingNavTab = 'all';
@@ -385,6 +387,7 @@ export function registerTrackingScene({ getTime, setTime, canvas }) {
             clearOrbitLabels();
         },
         update: (dt) => {
+            _lastFrameDt = dt;
             const activeShip = shipSystem.getActiveShip();
             const activeId = activeShip ? activeShip.id : null;
             const allShips = shipSystem.getAllShips();
@@ -498,7 +501,9 @@ export function registerTrackingScene({ getTime, setTime, canvas }) {
                 facilities: renderFacilities,
                 // 0.2.5（H4）：渲染层不直连业务模块，飞船列表由场景层注入
                 ships: shipSystem.getAllShips(),
-                selectedFacilityId: selectedFacId
+                selectedFacilityId: selectedFacId,
+                // WebGL 恒星层：按配置开关；动画用真实帧间隔（不随时间加速）
+                starLayer: { enabled: STAR_LAYER_CONFIG.scenes.trackingScene === true, dt: _lastFrameDt }
             });
         }
     });

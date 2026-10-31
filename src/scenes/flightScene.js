@@ -8,6 +8,7 @@ import { updateCelestialBodies, getSOIHost, getAbsolutePosition, getRelativePosi
 import { stateToKepler } from '../physics/orbitalMechanics.js';
 import { getTimeToNextSOISwitch, bodyFuturePos, getCachedTime } from '../physics/orbitalPrediction.js';
 import { render, renderFlightHud, getLastOrbitSegments, getLastOrbitMarkers, setOrbitHoverState, findNearestOrbitPoint, resolveOrbitHit } from '../renderer.js';
+import { STAR_LAYER_CONFIG } from '../config/gameplay/starLayerConfig.js';
 import { showOrbitContextMenu, updateOrbitContextMenu } from '../ui/orbitContextMenu.js';
 import { updateManeuverUI, hideManeuverUI, isManeuverDragging, collapseManeuverEditing } from '../ui/maneuverUI.js';
 import { updateManeuverViewPanel, hideManeuverViewPanel } from '../ui/maneuverViewPanel.js';
@@ -1124,7 +1125,9 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 facilities: renderFacilities,
                 // 0.2.5（H4）：渲染层不直连业务模块，飞船列表由场景层注入
                 ships: shipSystem.getAllShips(),
-                selectedFacilityId: _activeFacilityId
+                selectedFacilityId: _activeFacilityId,
+                // WebGL 恒星层：按配置开关；动画用真实帧间隔（不随时间加速）
+                starLayer: { enabled: STAR_LAYER_CONFIG.scenes.flightScene === true, dt: _lastDt }
             });
 
             // 0.2.4 提交4：每帧驱动轨道悬停检测（渲染循环兜底：圆点必跟手；

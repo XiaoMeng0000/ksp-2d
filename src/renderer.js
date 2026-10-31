@@ -18,6 +18,7 @@ import { getShipBodyTexture } from './config/entities/shipTemplates.js';
 import { renderableManager } from './graphics/renderable.js';
 import { textureManager } from './graphics/textureManager.js';
 import { drawStarGlow, drawStarBall, drawPlanetRing, drawTintedIcon } from './graphics/programEffects.js';
+import { starLayer } from './graphics/starLayer.js';
 import { lodBlendT, lerpLog } from './graphics/lod.js';
 import { STARFIELD_CONFIG } from './config/gameplay/starfieldConfig.js';
 import { flightView } from './flightView.js';
@@ -353,7 +354,9 @@ function render(ctx, canvas, activeShip, options = {}) {
         visibility = { ships: false, facilities: false, bodyOrbits: true },
         facilities = [],
         ships = [],
-        selectedFacilityId = null
+        selectedFacilityId = null,
+        // WebGL 恒星层：场景层按 STAR_LAYER_CONFIG 决定是否开启，并传入真实帧间隔（秒）
+        starLayer: starLayerOpts = null
     } = options;
     // 供标记层消费本次可见性（SOI 切换标签开关等；模块级状态，与悬停通道同风格）
     _lastVisibility = visibility;
@@ -395,8 +398,13 @@ function render(ctx, canvas, activeShip, options = {}) {
         // 图形驱动器：按 textureKey 渲染多层贴图/程序效果（星球贴图/恒星光晕），未配置或未加载时回退纯色圆
         const config = renderableManager.get(body.textureKey);
         let textured = false;
+        // WebGL 恒星层（唯一合成调用点）：返回 false 时（场景未开启 / WebGL 不可用 / 上下文丢失）走下方 Canvas2D
+        const starByWebGL = !!(config && config.starPreset && starLayerOpts && starLayerOpts.enabled
+            && starLayer.draw(ctx, config.starPreset, screen.x, screen.y, drawRadius, starLayerOpts.dt));
 
-        if (config && config.modes) {
+        if (starByWebGL) {
+            textured = true;
+        } else if (config && config.modes) {
             // LOD 分级渲染（恒星用）
             const { modes, nearScreenR, farScreenR } = config;
             const nearLayers = modes.near?.layers || [];

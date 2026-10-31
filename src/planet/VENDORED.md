@@ -64,3 +64,17 @@
   内层 `innerOctaves=1`）+ **云影默认开**（`shadowEnabled=true`、`shadowStrength=0.7`、512×256 等距柱状图）。
   ⇒ 主菜单星球会**自动**吃到新默认（`menuPlanetConfig.js` 的 `Object.assign({}, CLOUD_PRESETS.kerbin, …)`），
   这是预期，**不要去改 menuPlanetConfig 保旧观感**。
+
+- 2026-10（**恒星渲染器首次 vendored**）：新增 4 个文件（来源 commit：`5e11b25`，完整 `5e11b25f33238b692812fe88b5f851c52c89c79b`；字节自证仍以下表 sha16 为准）。
+  拷贝范围扩为 `src/star/**` + 单文件 `src/config/starRenderPresets.js`（已登记进 `.gitattributes` 的 `-text`）。
+  仅首行引号规范化，其余与实验室逐字节一致（已逐文件比对）。`src/star/starRenderer.js` 依赖的 `src/glCore/shader.js` 与实验室正文一致。
+
+  | 文件 | sha16 |
+  | --- | --- |
+  | src/star/starModel.js | 1c613f4d1b44ba93 |
+  | src/star/starRenderer.js | 30f2afa2227e4876 |
+  | src/star/shaders/starShaders.js | 1d66a9d00b482ca9 |
+  | src/config/starRenderPresets.js | fab2fec77896d977 |
+
+  接入层（非镜像，可改）：`src/graphics/starLayer.js`、`src/config/gameplay/starLayerConfig.js`；
+  调用点：`src/renderer.js` 恒星分支一处（`starLayer.draw` 返回 false 时回落原 Canvas2D 恒星）。

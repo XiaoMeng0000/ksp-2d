@@ -71,7 +71,10 @@ export const bodyRenderableConfigs = {
             }
         },
         nearScreenR: 200,  // 近景档阈值（>= 此值用 near 模式）
-        farScreenR: 100    // 远景档阈值（<= 此值用 far 模式）
+        farScreenR: 100,   // 远景档阈值（<= 此值用 far 模式）
+        // WebGL 恒星预设（src/config/starRenderPresets.js 的键）：场景开启恒星层且 WebGL 可用时，
+        // 整颗恒星改由 graphics/starLayer.js 绘制；不可用时回落上面的 near/far 两档
+        starPreset: 'kerbol'
     }
 };
 
