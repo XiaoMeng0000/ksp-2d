@@ -74,4 +74,10 @@ export const textureConfig = {
 
     // 存档管理 UI
     ui_trash_can: 'assets/images/ui/trash_can.png',
+
+    // 最新消息弹窗配图（0.3.0 内置图库；内容仓库只写 imageKey，图片随本体发布，不再走网络）
+    // 语义：release 新版本发布 / progress 制作组刚做好或正在做 / issue 开发遇到问题
+    news_release: 'assets/images/news/release.jpg',
+    news_progress: 'assets/images/news/progress.jpg',
+    news_issue: 'assets/images/news/issue.jpg',
 };

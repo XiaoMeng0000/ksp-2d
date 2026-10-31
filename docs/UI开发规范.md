@@ -92,7 +92,7 @@ src/
 |----------|------|--------------------|
 | `main_menu.css` | 主菜单 | `#mainMenuContainer` / `.mm-*` |
 | `dialogs.css` | 通知 / 存档管理面板（0.2.4 对话框组件迁入 ksp2_panels.css） | `.ui-notification*` / `#archiveManagerPanel` |
-| `ksp2_panels.css` | KSP2 覆盖式面板（以下均在 0.2.4 落地）：设置页 / 开始游戏面板 / 通用对话框组件 / 游戏百科（面板化）/ 公告栏（面板化，复用 .enc-* 结构）/ 工具栏页面面板（多实例 `.tkp-page`，飞行工具内容页）；本文件由 settings.css + start_game.css 合并而来，并迁入 uiComponents 对话框样式 | `#settings*` / `.settings-*` / `#startGamePanel` / `.sgp-*` / `#newCampaignDialog` / `.nc-*` / `.ui-dialog*` / `.ui-list*` / `.ui-input` / `#encyclopediaPanel` / `#infoScenePanel` / `.enc-*` / `.tkp-page` |
+| `ksp2_panels.css` | KSP2 覆盖式面板（以下均在 0.2.4 落地）：设置页 / 开始游戏面板 / 通用对话框组件 / 游戏百科（面板化）/ 公告栏（面板化，复用 .enc-* 结构）/ 工具栏页面面板（多实例 `.tkp-page`，飞行工具内容页）；0.3.0 新增最新消息弹窗 | `#settings*` / `.settings-*` / `#startGamePanel` / `.sgp-*` / `#newCampaignDialog` / `.nc-*` / `.ui-dialog*` / `.ui-list*` / `.ui-input` / `#encyclopediaPanel` / `#infoScenePanel` / `.enc-*` / `.tkp-page` / `#latestNewsPanel` / `.ln-*` |
 | `tracking.css` | 追踪站 | `#tracking*` / `.tracking-*` |
 | `flight.css` | 飞行 HUD | `#leftToolbar` / `#timeWarp*` / `#sasBottomButtons` / `#visibilityPanel`(工具栏页面面板样式在 ksp2_panels.css `.tkp-page`) |
 | `ship_builder.css` | 飞船建造 | `#shipBuilderPanel` / `.builder-*` |
@@ -135,6 +135,7 @@ src/
 | `window.openSettings / startNewGame / continueGame / openLoadMenu / openArchiveManager / openFeedback` | main.js 入口 |
 | `window.openEncyclopedia` | 百科面板入口(0.2.4 由 scene 面板化,encyclopediaUI.js 注册为 uiManager 面板) |
 | `window.openAnnouncement` | 公告面板入口(0.2.4 由 scene 面板化,announcementUI.js;启动进主菜单自动打开) |
+| `window.openLatestNews` | 最新消息弹窗入口(0.3.0,latestNewsUI.js;启动进主菜单自动弹出,内容来自在线仓库) |
 | `window.openShipBuilder / openFacilityDeployPanel` | 面板入口(flightUI 调用) |
 | `window.renderToolbarIcons / showDockPrompt / hideDockPrompt` | flightScene ↔ flightUI |
 | `window.updateTrackingInfo / hideTrackingInfo` | trackingScene ↔ trackingUI |

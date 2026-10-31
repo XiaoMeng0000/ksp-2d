@@ -180,10 +180,18 @@ box-shadow: 0 0 0 2px #000;   /* 紫框外 2px 黑框 */
 - 顶部 `// 标题`(`--accent` 蓝)+ 装饰线;正文左对齐流(license)或双列格网(credits 角色右对齐/名字左对齐,节标题 `--warn` 橙);
 - 左下角标准返回按钮(Esc 可关)。
 
+### 3.13 最新消息面板(0.3.0 弹窗)
+
+- 小窗口:`min(520px, 88vw)`,壳 `--theme-bg` + 1px `--theme-menu-border` 紫描边,圆角 5px;
+- 结构:紫头条(`// 最新消息`)→ 二级背景卡(`--theme-panel-deep`),卡内为 **内置配图(宽度铺满、高度按原图自适应,max-height 320px)** + 正文 `--text-main` 行高 1.8 → 底部操作行;
+- 底部:左「今日内不再显示」(`--text-dim`,11px,勾选框 `accent-color: --theme-btn-selected`),右 `[去公告查看] [我知道了！]`(26px 高,主按钮 `--theme-btn-selected`);
+- 动效:自屏幕上方滑入居中(`translateY(-140%) → 0`,0.35s `cubic-bezier(0.16,1,0.3,1)`),关闭沿原轨迹滑回;遮罩 `rgba(0,0,0,0.5)` 淡入(刻意不加 `backdrop-filter`,主菜单背景为实时 WebGL,模糊会掉帧);
+- 层级:z-index 2100(高于场景/ESC 面板 2000,低于对话框与通知);
+- 配图:三张内置图(`assets/images/news/`),按通知类型 `type` 取用;缺失/未知则折叠图片区,点遮罩不关闭,仅按钮/Esc 可关。
+
 ---
 
 ## 四、层级速查
-
 | 层级 | 用什么 |
 |------|--------|
 | 最外层壳 / 面板 | `--theme-bg` + 紫描边(`--theme-menu-border`) |

@@ -3,6 +3,7 @@
 import { uiManager } from './uiManager.js';
 import { ANNOUNCEMENTS } from '../config/ui/announcementConfig.js';
 import { t } from '../config/ui/strings.js';
+import { getLatestNews } from '../news/latestNewsClient.js';
 
 // 游戏公告（0.2.8 面板化：由 scene 改为 uiManager 覆盖式面板，参照百科面板化先例）
 // - 视觉复用 ksp2_panels.css 的 .enc-*（#infoScenePanel 选择器即公告面板，保留原 id）
@@ -23,6 +24,19 @@ document.body.appendChild(container);
 // 渲染左侧版本导航（选中项高亮；点击切换右侧内容）
 function _renderNav(navEl) {
     navEl.innerHTML = '';
+
+    // 0.3.0：导航顶部固定一条「最新消息」（在线内容，独立面板；有内容时才出现）
+    // 与 latestNewsUI 用 uiManager 互相切换，避免两个 UI 模块互相 import 形成循环依赖
+    if (getLatestNews()) {
+        const newsItem = document.createElement('div');
+        newsItem.textContent = t('news.entry');
+        newsItem.className = 'enc-nav-item';
+        newsItem.addEventListener('click', () => {
+            uiManager.hidePanel('announcement');
+            uiManager.showPanel('latestNews');
+        });
+        navEl.appendChild(newsItem);
+    }
 
     for (let i = 0; i < ANNOUNCEMENTS.length; i++) {
         const item = document.createElement('div');

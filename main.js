@@ -31,6 +31,10 @@ import { openSettings as openSettingsUI } from './src/ui/settingsUI.js';
 import { openEncyclopedia as openEncyclopediaUI } from './src/ui/encyclopediaUI.js';
 // 0.2.8 游戏公告 — 同模式面板化（启动进主菜单自动打开 / 额外内容入口）
 import { openAnnouncement as openAnnouncementUI } from './src/ui/announcementUI.js';
+// 0.3.0 最新消息 — 在线内容弹窗（import 即完成 uiManager 注册）
+import { openLatestNews as openLatestNewsUI } from './src/ui/latestNewsUI.js';
+// 0.3.0 最新消息数据源 — 启动加载阶段拉取（双源回退 + 缓存降级）
+import { loadLatestNews } from './src/news/latestNewsClient.js';
 import './src/ui/facilityDeployUI.js';
 // UI 点击音效采集（document 捕获阶段委托，import 即生效）
 import './src/ui/uiClickSfx.js';
@@ -174,6 +178,21 @@ const _loadState = {
     fonts: fontManager.isReady()
 };
 
+// === 最新消息（0.3.0）：启动即拉取，与三路资源加载并行 ===
+// 不参与 _loadState、不阻塞进入游戏：成功则主菜单弹出最新消息，失败则退回自动打开公告。
+// 快路径（三路已就绪跳过加载画面）同样需要这次拉取，因此放在分支之前无条件启动。
+loadLatestNews().then((result) => {
+    // 只在实际显示加载画面时补一条日志（快路径下加载画面不显示）
+    if (loadingScreen.style.display !== 'flex') return;
+    const ok = !!(result && result.ok && result.news);
+    const sourceName = result && result.source ? '（' + result.source + '）' : '';
+    const line = document.createElement('div');
+    line.textContent = (ok ? '[OK] ' : '[FAIL] ') + t(ok ? 'news.load.ok' : 'news.load.fail') + sourceName;
+    line.className = ok ? 'loading-log-ok' : 'loading-log-fail';
+    loadingLogContent.appendChild(line);
+    loadingLogBox.scrollTop = loadingLogBox.scrollHeight;
+});
+
 // 三路加载全部完成 → 隐藏加载画面并进入 splash
 function _finishLoading() {
     if (_loadState.textures && _loadState.audio && _loadState.fonts) {
@@ -315,6 +334,11 @@ window.openEncyclopedia = function() {
 // 0.2.6：入口由"额外内容"子菜单提升为一级菜单项（见 menuConfig.MAIN_MENU），启动自动打开保持
 window.openAnnouncement = function() {
     openAnnouncementUI();
+};
+
+// 0.3.0 最新消息入口（启动进主菜单自动弹出 / 公告面板左侧导航；面板由 latestNewsUI 注册）
+window.openLatestNews = function() {
+    openLatestNewsUI();
 };
 
 // 层级存档 - 当前世界 ID 由 GameState.worldId 持有（0.2.5 整改：原 window.currentWorldId 全局）

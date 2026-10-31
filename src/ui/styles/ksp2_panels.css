@@ -1933,3 +1933,173 @@
     width: 2px;
     background: var(--toolbar-border);
 }
+
+/* ============================================================
+   最新消息面板（0.3.0）
+   latestNewsUI.js —— 启动进主菜单自动弹出 / 公告面板左侧导航「最新消息」入口
+   内容来自在线仓库（src/news/latestNewsClient.js），视觉遵循 UI面板视觉风格规范：
+     壳 --theme-bg + 紫描边(--theme-menu-border)
+     紫头条 --theme-btn-selected
+     内容二级背景卡 --theme-panel-deep（无边框）
+   动效：自屏幕上方滑入居中；关闭沿原轨迹滑回上方（JS 只切 .ln-in 类）
+   层级：2100（高于场景/ESC 面板 2000，低于对话框与通知 10000+）
+   ============================================================ */
+
+#latestNewsPanel {
+    position: fixed;
+    inset: 0;
+    z-index: 2100;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0);
+    transition: background 0.3s ease;
+    font-family: var(--font-mono);
+}
+
+/* 遮罩淡入（与面板滑入同步） */
+#latestNewsPanel.ln-in {
+    background: rgba(0, 0, 0, 0.5);
+}
+
+/* 面板本体：小窗口，初始位于屏幕上方，.ln-in 时滑到居中 */
+#latestNewsPanel .ln-window {
+    width: min(520px, 88vw);
+    background: var(--theme-bg);
+    border: 1px solid var(--theme-menu-border);
+    border-radius: 5px;
+    box-sizing: border-box;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transform: translateY(-140%);
+    transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#latestNewsPanel.ln-in .ln-window {
+    transform: translateY(0);
+}
+
+/* 紫头条：面板标题 */
+#latestNewsPanel .ln-topbar {
+    padding: 8px 14px;
+    background: var(--theme-btn-selected);
+}
+
+#latestNewsPanel .ln-title {
+    color: var(--text-bright);
+    font-family: var(--font-mono-bold);
+    font-weight: normal;
+    font-size: 13px;
+    letter-spacing: 1px;
+}
+
+#latestNewsPanel .ln-title::before {
+    content: '// ';
+    opacity: 0.7;
+}
+
+/* 内容区：二级背景卡 */
+#latestNewsPanel .ln-body {
+    padding: 14px;
+    box-sizing: border-box;
+}
+
+#latestNewsPanel .ln-card {
+    background: var(--theme-panel-deep);
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+/* 图片：宽度铺满、高度按原图自适应（三种内置图比例不同：16:9 / 3:2，均不裁切）
+   max-height 兜底，防长图把面板撑过高 */
+#latestNewsPanel .ln-image-box {
+    width: 100%;
+    background: var(--theme-panel);
+    overflow: hidden;
+    line-height: 0;
+}
+
+#latestNewsPanel .ln-image {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 320px;
+    object-fit: contain;
+}
+
+/* 正文：超长时区内滚动，面板高度不变 */
+#latestNewsPanel .ln-text {
+    padding: 12px 14px;
+    max-height: 168px;
+    overflow-y: auto;
+    box-sizing: border-box;
+}
+
+#latestNewsPanel .ln-text p {
+    margin: 0 0 6px 0;
+    color: var(--text-main);
+    font-size: 12.5px;
+    line-height: 1.8;
+}
+
+#latestNewsPanel .ln-text p:last-child {
+    margin-bottom: 0;
+}
+
+/* 空行段落只留间距，不占高度 */
+#latestNewsPanel .ln-text p:empty {
+    height: 6px;
+    margin-bottom: 0;
+}
+
+/* 底部：左「今日内不再显示」，右两个按钮 */
+#latestNewsPanel .ln-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 14px 14px 14px;
+}
+
+#latestNewsPanel .ln-dismiss {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-dim);
+    font-size: 11px;
+    cursor: pointer;
+    user-select: none;
+}
+
+#latestNewsPanel .ln-dismiss input {
+    margin: 0;
+    cursor: pointer;
+    accent-color: var(--theme-btn-selected);
+}
+
+#latestNewsPanel .ln-actions {
+    display: flex;
+    gap: 8px;
+}
+
+#latestNewsPanel .ln-btn {
+    height: 26px;
+    padding: 0 12px;
+    box-sizing: border-box;
+    background: var(--theme-btn-bg);
+    color: var(--text-bright);
+    border: 1px solid var(--border-light);
+    border-radius: 5px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+#latestNewsPanel .ln-btn:hover {
+    border-color: var(--theme-border-hover);
+}
+
+#latestNewsPanel .ln-btn-primary {
+    background: var(--theme-btn-selected);
+}

@@ -457,6 +457,16 @@ const STRINGS = {
     // 公告内容数据移至 src/config/announcementConfig.js（多版本公告）
     'info.title': '游戏公告',
 
+    // ---------- 最新消息（0.3.0 在线内容弹窗） ----------
+    // 内容来自独立 GitHub 仓库（数据源见 src/config/ui/latestNewsConfig.js，编写规范见 docs/最新消息编写规范.md）
+    'news.title': '最新消息',
+    'news.entry': '最新消息',
+    'news.btn.announcement': '去公告查看',
+    'news.btn.ok': '我知道了！',
+    'news.dismissToday': '今日内不再显示',
+    'news.load.ok': '最新消息',
+    'news.load.fail': '最新消息（未获取）',
+
     // ---------- 启动画面 ----------
     'splash.text': '本游戏为个人学习项目，不用于商业用途',
     'splash.studio': '【逃逸速度】',
