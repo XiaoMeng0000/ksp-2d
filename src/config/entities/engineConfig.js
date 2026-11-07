@@ -6,6 +6,8 @@
 
 export const ENGINE_TYPES = [
     { id: 'chemical', props: [{ id: 'hydrogen', ratio: 1 }, { id: 'oxygen', ratio: 8 }], stage: 'now' },
+    // 甲烷/液氧（KSP2 methalox 资产对应配方）：CH4 + 2O2 → 质量比 1:4
+    { id: 'methalox', props: [{ id: 'methane', ratio: 1 }, { id: 'oxygen', ratio: 4 }], stage: 'now' },
     { id: 'metallicH', props: [{ id: 'metallicHydrogen', ratio: 1 }], stage: 'later' },
     { id: 'fusion', props: [{ id: 'deuterium', ratio: 1 }, { id: 'helium3', ratio: 1 }], stage: 'later' },
     { id: 'nswr', props: [{ id: 'nuclearSaltWater', ratio: 1 }], stage: 'later' },

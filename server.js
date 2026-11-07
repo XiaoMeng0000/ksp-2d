@@ -16,6 +16,9 @@ const MIME_TYPES = {
     '.ogg': 'audio/ogg',
     '.mp3': 'audio/mpeg',
     '.wav': 'audio/wav',
+    // KSP2 部件 3D 资产（fetch 按文本/二进制读取，显式声明便于排错与缓存判断）
+    '.obj': 'text/plain; charset=utf-8',
+    '.mtl': 'text/plain; charset=utf-8',
 };
 
 const server = http.createServer((req, res) => {

@@ -71,6 +71,41 @@ class TextureManager {
         return this._textures.get(key) || null;
     }
 
+    /**
+     * 懒加载一张纹理（3D 模型贴图等按需资产，不进启动预加载清单）。
+     * 缓存 key 统一加 'lazy:' 前缀，不干扰启动阶段的总数/完成数统计。
+     * @param {string} url 纹理路径
+     * @returns {Promise<HTMLImageElement|null>}
+     */
+    loadLazy(url) {
+        if (!url) return Promise.resolve(null);
+        const key = 'lazy:' + url;
+        const cached = this._textures.get(key);
+        if (cached) return Promise.resolve(cached);
+        if (this._lazyPending && this._lazyPending.has(key)) {
+            return this._lazyPending.get(key);
+        }
+        if (!this._lazyPending) this._lazyPending = new Map();
+
+        const promise = new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+                this._textures.set(key, img);
+                this._lazyPending.delete(key);
+                resolve(img);
+            };
+            img.onerror = () => {
+                console.warn('[TextureManager] 懒加载纹理失败: ' + url);
+                this._lazyPending.delete(key);
+                resolve(null);
+            };
+            img.src = url;
+        });
+
+        this._lazyPending.set(key, promise);
+        return promise;
+    }
+
     isReady() {
         return this._ready;
     }

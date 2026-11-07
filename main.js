@@ -62,6 +62,10 @@ import { registerMenuScene } from './src/scenes/menuScene.js';
 import { registerCreditsScene } from './src/scenes/creditsScene.js';
 import { registerLicenseScene } from './src/scenes/licenseScene.js';
 import { registerGalaxiesScene } from './src/scenes/galaxiesScene.js';
+import { registerPartLabScene } from './src/partlab/partLabScene.js';
+import { probeKsp2AssetsAvailable } from './src/config/entities/ksp2PartTypes.js';
+import { pruneUnavailableKsp2Parts } from './src/config/entities/partTypes.js';
+import { prunePresetsWithMissingParts } from './src/config/entities/shipPresets.js';
 // 场景级加载界面（重场景进入时的遮罩 + 阶段进度；与启动加载画面无关）
 import { initSceneLoadingUI } from './src/ui/sceneLoadingUI.js';
 
@@ -142,6 +146,22 @@ registerMenuScene({
 registerCreditsScene();
 registerLicenseScene();
 registerGalaxiesScene();
+registerPartLabScene({ canvas });
+
+// KSP2 官方资产不入库（见 .gitignore）：本地未导入时剔除相关部件与预设，
+// 避免部件装配车间出现「点得动但看不见」的死格子 / 空船。
+// 资产存在时此探测直接返回 true，行为不变。
+probeKsp2AssetsAvailable().then((available) => {
+    if (available) return;
+    const removedParts = pruneUnavailableKsp2Parts();
+    const removedPresets = prunePresetsWithMissingParts();
+    if (removedParts > 0) {
+        console.log(
+            `[PartLab] 未检测到本地 KSP2 资产包，已隐藏 ${removedParts} 个部件、${removedPresets} 套预设` +
+            '（可用 node tools/importKsp2Parts.mjs --preset core 导入）'
+        );
+    }
+});
 
 // 注册飞行场景（注入 main.js 持有的模块级依赖）
 registerFlightScene({

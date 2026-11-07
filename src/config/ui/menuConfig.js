@@ -4,6 +4,8 @@
 const MAIN_MENU = [
     // 0.2.5：开始游戏不再进入子菜单，直接打开左侧"开始游戏"综合面板
     { id: 'startGame',    label: '开始游戏',  action: 'callback:openStartGamePanel' },
+    // 0.3.0：3D 部件装配车间（主菜单测试入口）
+    { id: 'partlabMain',  label: '部件装配车间', action: 'scene:partlab' },
     // 0.2.7：百科由 scene 改为覆盖式面板（不切场景/不中断 BGM），入口协议与设置一致
     { id: 'encyclopedia', label: '百科',  action: 'callback:openEncyclopedia' },
     { id: 'extra',        label: '额外内容',  action: 'submenu:extra' },
@@ -15,6 +17,7 @@ const MAIN_MENU = [
 // 二级菜单（额外内容子菜单）
 // 0.2.6：游戏公告已提升为一级入口，此处不再重复提供
 const EXTRA_MENU = [
+    { id: 'partlab',  label: '部件装配车间', action: 'scene:partlab' },
     { id: 'galaxies', label: '已加载星系',  action: 'scene:galaxies' },
     { id: 'credits',  label: '制作人员',  action: 'scene:credits' },
     { id: 'license',  label: '版权声明',  action: 'scene:license' },
