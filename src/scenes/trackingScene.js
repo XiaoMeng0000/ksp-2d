@@ -9,7 +9,6 @@ import { updateShipPhysics } from '../physics/physicsUpdate.js';
 import { updateCelestialBodies, getAbsolutePosition, celestialBodies } from '../physics/physics.js';
 import { getTimeToNextSOISwitch } from '../physics/orbitalPrediction.js';
 import { render } from '../renderer.js';
-import { STAR_LAYER_CONFIG } from '../config/gameplay/starLayerConfig.js';
 import { eventBus, Events } from '../eventBus.js';
 import { gameState } from '../gameState.js';
 import { timeWarp } from '../timeWarp.js';
@@ -501,9 +500,7 @@ export function registerTrackingScene({ getTime, setTime, canvas }) {
                 facilities: renderFacilities,
                 // 0.2.5（H4）：渲染层不直连业务模块，飞船列表由场景层注入
                 ships: shipSystem.getAllShips(),
-                selectedFacilityId: selectedFacId,
-                // WebGL 恒星层：按配置开关；动画用真实帧间隔（不随时间加速）
-                starLayer: { enabled: STAR_LAYER_CONFIG.scenes.trackingScene === true, dt: _lastFrameDt }
+                selectedFacilityId: selectedFacId
             });
         }
     });

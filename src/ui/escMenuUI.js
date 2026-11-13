@@ -6,7 +6,6 @@ import { createDialog, createConfirmDialog, renderIconHtml } from './uiComponent
 import { sceneManager } from '../sceneManager.js';
 import { saveManager } from '../saveManager.js';
 import { gameState } from '../gameState.js';
-import { toggleDebugPanel, refreshDebugPanel } from './debugUI.js';
 import { t } from '../config/ui/strings.js';
 import { ESC_ACTIONS, ESC_SECTIONS } from '../config/ui/escMenuConfig.js';
 import { VERSION_TEXT } from '../config/meta/version.js';
@@ -326,11 +325,6 @@ window.addEventListener('keydown', (e) => {
     if (_cachedShipData && _cachedShipData.controlsLocked) {
         return;
     }
-    // F1 调试面板
-    if (e.key === 'F1') {
-        e.preventDefault();
-        toggleDebugPanel();
-    }
 });
 
 // ---- 动作实现（自 menuUI.js 迁移） ----
@@ -399,7 +393,6 @@ function loadGame() {
             if (sceneManager.getCurrentScene() === 'menu') {
                 sceneManager.switchToAsync('flight');
             }
-            refreshDebugPanel();
         } else {
             window.showNotification(t('archive.loadFailed'), 'error');
         }

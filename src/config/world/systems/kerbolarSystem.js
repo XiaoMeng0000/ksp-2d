@@ -3,15 +3,21 @@
 import { CelestialBody } from '../../../physics/celestialBody.js';
 
 // ========== Kerbolar 系(家园星系) ==========
-// 天体驱动器 6.5 步
-// Kerbol 系天体数据 — 真实 KSP 尺度
+// 尝鲜版裁剪(见 docs/尝鲜版方案.md 第三节):只保留 Kerbin 系与 Duna 系,共 6 个天体
+//   恒星 Kerbol / 行星 Kerbin(家园)+ 卫星 Mun、Minmus / 行星 Duna + 卫星 Ike
+// 已移除:Moho、Eve、Gilly、Dres、Jool、Laythe、Vall、Tylo、Bop、Pol、Eeloo
+//
+// 尝鲜版不加载任何天体贴图(texture 字段一律为 null),渲染层走代表色纯色圆盘;
+// 恒星 Kerbol 由 bodyRenderables 的程序光晕层绘制。
+// textureKey 保留:渲染例外表(程序层)与天体图标染色仍按它查表。
+//
 // homeworld 星系:恒星固定在全局坐标原点 (0,0)
 // distance/bearingDeg 仅在本星系不作为 homeworld 时使用(未来多 homeworld 候选预留)
 
 export const meta = {
     id: 'kerbolar',
     name: 'Kerbolar 系',
-    description: 'Kerbolar 系是一个由恒星 Kerbol 主导的行星系统，以其独特的天体多样性和物理特性而闻名。从炽热的恒星核心到遥远的外围行星，这个星系展现了宇宙演化的壮丽画卷。每一颗天体都拥有独特的环境特征——从浓厚的大气层到真空的岩石表面，从巨大的引力场到微弱的引力束缚。对于坎巴拉太空计划而言，这个星系既是实验室也是游乐场，充满了探索的挑战与机遇。',
+    description: 'Kerbolar 系的家园部分:恒星 Kerbol,以及 Kerbin 与 Duna 两个行星系。尝鲜版只开放这一片区域,Moho、Eve、Dres、Jool 与 Eeloo 等天体在完整版中开放。',
     enabled: true,
     placeholder: false,
     distance: 0,
@@ -31,61 +37,7 @@ export const bodies = [
         color: '#ffcc44',
         position: { x: 0, y: 0 },
         textureKey: 'kerbol',
-        texture: 'assets/images/celestial/kerbolar/kerbol.png'
-    }),
-    new CelestialBody({
-        name: 'Moho',
-        type: 'planet',
-        musicType: 'rocky',
-        gm: 1.68609378654509e11,
-        soiRadius: 9646663,
-        radius: 250000,
-        atmosphereHeight: 0,
-        hasAtmosphere: false,
-        color: '#fcb64c',
-        orbitParent: 'Kerbol',
-        orbitA: 5263138304,
-        orbitE: 0.2,
-        orbitOmega: Math.PI / 12,  // 15°（官方近点幅角，转弧度）
-        orbitTheta0: 3.14,
-        textureKey: 'moho',
-        texture: 'assets/images/celestial/kerbolar/moho.png'
-    }),
-    new CelestialBody({
-        name: 'Eve',
-        type: 'planet',
-        musicType: 'eve',
-        gm: 8.17173022921085e12,
-        soiRadius: 85109365,
-        radius: 700000,
-        atmosphereHeight: 90000,
-        hasAtmosphere: true,
-        color: '#9b42f5',
-        orbitParent: 'Kerbol',
-        orbitA: 9832684544,
-        orbitE: 0.01,
-        orbitOmega: 0,
-        orbitTheta0: 3.14,
-        textureKey: 'eve',
-        texture: 'assets/images/celestial/kerbolar/eve.png'
-    }),
-    new CelestialBody({
-        name: 'Gilly',
-        type: 'moon',
-        musicType: 'rocky',
-        gm: 8.28944981471635e6,
-        soiRadius: 126123.27,
-        radius: 13000,
-        atmosphereHeight: 0,
-        hasAtmosphere: false,
-        color: '#f5d5b3',
-        orbitParent: 'Eve',
-        orbitA: 31500000,
-        orbitE: 0.55,
-        orbitOmega: Math.PI / 18,  // 10°（官方近点幅角，转弧度）
-        orbitTheta0: 0.9,
-        textureKey: 'gilly',
-        texture: 'assets/images/celestial/kerbolar/gilly.png'
+        texture: null
     }),
     new CelestialBody({
         name: 'Kerbin',
@@ -106,7 +58,7 @@ export const bodies = [
         defaultOrbitAltitude: 300000,
         presetOrbits: { low: 80000, mid: 250000, high: 600000 },
         textureKey: 'kerbin',
-        texture: 'assets/images/celestial/kerbolar/kerbin.png'
+        texture: null
     }),
     new CelestialBody({
         name: 'Mun',
@@ -124,7 +76,7 @@ export const bodies = [
         orbitOmega: 0,
         orbitTheta0: 1.7,
         textureKey: 'mun',
-        texture: 'assets/images/celestial/kerbolar/mun.png'
+        texture: null
     }),
     new CelestialBody({
         name: 'Minmus',
@@ -139,10 +91,10 @@ export const bodies = [
         orbitParent: 'Kerbin',
         orbitA: 47000000,
         orbitE: 0,
-        orbitOmega: Math.PI * 38 / 180,  // 保留官方近点幅角数据 38°（0.2.5：单位统一为弧度，原裸度数 38 会在设 e>0 时被当作 38rad）
+        orbitOmega: Math.PI * 38 / 180,  // 保留官方近点幅角数据 38°（单位统一为弧度）
         orbitTheta0: 0.9,  // 官方初始平近点角
         textureKey: 'minmus',
-        texture: 'assets/images/celestial/kerbolar/minmus.png'
+        texture: null
     }),
     new CelestialBody({
         name: 'Duna',
@@ -160,7 +112,7 @@ export const bodies = [
         orbitOmega: 0,
         orbitTheta0: 3.14,
         textureKey: 'duna',
-        texture: 'assets/images/celestial/kerbolar/duna.png'
+        texture: null
     }),
     new CelestialBody({
         name: 'Ike',
@@ -178,150 +130,6 @@ export const bodies = [
         orbitOmega: 0,
         orbitTheta0: 1.7,
         textureKey: 'ike',
-        texture: 'assets/images/celestial/kerbolar/ike.png'
-    }),
-    new CelestialBody({
-        name: 'Dres',
-        type: 'planet',
-        musicType: 'rocky',
-        gm: 2.1484489e10,
-        soiRadius: 32832840,
-        radius: 138000,
-        atmosphereHeight: 0,
-        hasAtmosphere: false,
-        color: '#b5ad94',
-        orbitParent: 'Kerbol',
-        orbitA: 40839348203,
-        orbitE: 0.145,
-        orbitOmega: Math.PI / 2,  // 90°（官方近点幅角，转弧度）
-        orbitTheta0: 3.14,
-        textureKey: 'dres',
-        texture: 'assets/images/celestial/kerbolar/dres.png'
-    }),
-    new CelestialBody({
-        name: 'Jool',
-        type: 'planet',
-        musicType: 'gas',
-        gm: 2.82528e14,
-        soiRadius: 2455985200,
-        radius: 6000000,
-        atmosphereHeight: 200000,
-        hasAtmosphere: true,
-        color: '#3fc144',
-        orbitParent: 'Kerbol',
-        orbitA: 68773560320,
-        orbitE: 0.05,
-        orbitOmega: 0,
-        orbitTheta0: 0.1,
-        textureKey: 'jool',
-        texture: 'assets/images/celestial/kerbolar/jool.png'
-    }),
-    new CelestialBody({
-        name: 'Laythe',
-        type: 'moon',
-        musicType: 'terrestrial',
-        gm: 1.962e12,
-        soiRadius: 3723645.8,
-        radius: 500000,
-        atmosphereHeight: 50000,
-        hasAtmosphere: true,
-        color: '#2e86de',
-        orbitParent: 'Jool',
-        orbitA: 27184000,
-        orbitE: 0,
-        orbitOmega: 0,
-        orbitTheta0: 0.9,
-        textureKey: 'laythe',
-        texture: 'assets/images/celestial/kerbolar/laythe.png'
-    }),
-    new CelestialBody({
-        name: 'Vall',
-        type: 'moon',
-        musicType: 'ice',
-        gm: 2.074815e11,
-        soiRadius: 2406401.4,
-        radius: 300000,
-        atmosphereHeight: 0,
-        hasAtmosphere: false,
-        color: '#c0c8d0',
-        orbitParent: 'Jool',
-        orbitA: 43152000,
-        orbitE: 0,
-        orbitOmega: 0,
-        orbitTheta0: 0.9,
-        textureKey: 'vall',
-        texture: 'assets/images/celestial/kerbolar/vall.png'
-    }),
-    new CelestialBody({
-        name: 'Tylo',
-        type: 'moon',
-        musicType: 'rocky',
-        gm: 2.82528e12,
-        soiRadius: 10856518,
-        radius: 600000,
-        atmosphereHeight: 0,
-        hasAtmosphere: false,
-        color: '#a89080',
-        orbitParent: 'Jool',
-        orbitA: 68500000,
-        orbitE: 0,
-        orbitOmega: 0,
-        orbitTheta0: 0.9,
-        textureKey: 'tylo',
-        texture: 'assets/images/celestial/kerbolar/tylo.png'
-    }),
-    new CelestialBody({
-        name: 'Bop',
-        type: 'moon',
-        musicType: 'rocky',
-        gm: 2.4868349e9,
-        soiRadius: 1221060.9,
-        radius: 65000,
-        atmosphereHeight: 0,
-        hasAtmosphere: false,
-        color: '#9a6b3f',
-        orbitParent: 'Jool',
-        orbitA: 128500000,
-        orbitE: 0.235,
-        orbitOmega: Math.PI * 25 / 180,  // 25°（官方近点幅角，转弧度）
-        orbitTheta0: 0.9,
-        textureKey: 'bop',
-        texture: 'assets/images/celestial/kerbolar/bop.png'
-    }),
-    new CelestialBody({
-        name: 'Pol',
-        type: 'moon',
-        musicType: 'rocky',
-        gm: 7.2170208e8,
-        soiRadius: 1042138.9,
-        radius: 44000,
-        atmosphereHeight: 0,
-        hasAtmosphere: false,
-        color: '#b35a8e',
-        orbitParent: 'Jool',
-        orbitA: 179890000,
-        orbitE: 0.171,
-        orbitOmega: Math.PI * 15 / 180,  // 15°（官方近点幅角，转弧度）
-        orbitTheta0: 0.9,
-        textureKey: 'pol',
-        texture: 'assets/images/celestial/kerbolar/pol.png'
-    }),
-    new CelestialBody({
-        name: 'Eeloo',
-        type: 'planet',
-        musicType: 'ice',
-        gm: 7.4410815e10,
-        soiRadius: 119082940,
-        radius: 210000,
-        atmosphereHeight: 0,
-        hasAtmosphere: false,
-        color: '#d2dfe8',
-        orbitParent: 'Kerbol',
-        orbitA: 90118820000,
-        orbitE: 0.26,
-        orbitOmega: Math.PI * 260 / 180,  // 260°（官方近点幅角，转弧度）
-        orbitTheta0: 3.14,
-        textureKey: 'eeloo',
-        texture: 'assets/images/celestial/kerbolar/eeloo.png'
+        texture: null
     })
 ];

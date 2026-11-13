@@ -18,8 +18,6 @@ import { getShipBodyTexture } from './config/entities/shipTemplates.js';
 import { renderableManager } from './graphics/renderable.js';
 import { textureManager } from './graphics/textureManager.js';
 import { drawStarGlow, drawStarBall, drawPlanetRing, drawTintedIcon } from './graphics/programEffects.js';
-import { starLayer } from './graphics/starLayer.js';
-import { lodBlendT, lerpLog } from './graphics/lod.js';
 import { STARFIELD_CONFIG } from './config/gameplay/starfieldConfig.js';
 import { flightView } from './flightView.js';
 import { t } from './config/ui/strings.js';
@@ -117,6 +115,22 @@ const ORBIT_BRIGHT_COLORS = [
 // 机动预测线（燃烧后段）颜色池（0.2.5 打磨）：品红/粉/紫系，
 // 与普通轨道线 ORBIT_BRIGHT_COLORS 完全错开（无同值项）；
 // 当前 SOI 段 = 已定稿粉色（MANEUVER_CONFIG.postBurnColor），其余按 SOI 名哈希取池
+// ===== LOD 共享数学（原 graphics/lod.js，尝鲜版内联）=====
+// 归一化混合进度 + easeInOut 缓动：恒星 near/far 过渡与天体图标交叉淡入共用
+function lodBlendT(value, from, to) {
+    const span = from - to;
+    if (!(span > 0)) return value <= to ? 1 : 0;
+    const t = (from - value) / span;
+    const c = t < 0 ? 0 : (t > 1 ? 1 : t);
+    return c < 0.5 ? 2 * c * c : 1 - Math.pow(-2 * c + 2, 2) / 2;
+}
+
+// 对数插值：跨尺度参数平滑过渡（线性插值在大倍率差时前快后慢）
+function lerpLog(from, to, s) {
+    if (!(from > 0) || !(to > 0)) return from;
+    return from * Math.pow(to / from, s);
+}
+
 const MANEUVER_BRIGHT_COLORS = [
     'rgba(255, 96, 190, 0.95)',
     'rgba(200, 96, 255, 0.95)',
@@ -354,9 +368,7 @@ function render(ctx, canvas, activeShip, options = {}) {
         visibility = { ships: false, facilities: false, bodyOrbits: true },
         facilities = [],
         ships = [],
-        selectedFacilityId = null,
-        // WebGL 恒星层：场景层按 STAR_LAYER_CONFIG 决定是否开启，并传入真实帧间隔（秒）
-        starLayer: starLayerOpts = null
+        selectedFacilityId = null
     } = options;
     // 供标记层消费本次可见性（SOI 切换标签开关等；模块级状态，与悬停通道同风格）
     _lastVisibility = visibility;
@@ -398,13 +410,8 @@ function render(ctx, canvas, activeShip, options = {}) {
         // 图形驱动器：按 textureKey 渲染多层贴图/程序效果（星球贴图/恒星光晕），未配置或未加载时回退纯色圆
         const config = renderableManager.get(body.textureKey);
         let textured = false;
-        // WebGL 恒星层（唯一合成调用点）：返回 false 时（场景未开启 / WebGL 不可用 / 上下文丢失）走下方 Canvas2D
-        const starByWebGL = !!(config && config.starPreset && starLayerOpts && starLayerOpts.enabled
-            && starLayer.draw(ctx, config.starPreset, screen.x, screen.y, drawRadius, starLayerOpts.dt));
-
-        if (starByWebGL) {
-            textured = true;
-        } else if (config && config.modes) {
+        // 尝鲜版：WebGL 恒星层已移除，恒星由下方 Canvas2D 程序光晕（modes 档位）绘制
+        if (config && config.modes) {
             // LOD 分级渲染（恒星用）
             const { modes, nearScreenR, farScreenR } = config;
             const nearLayers = modes.near?.layers || [];

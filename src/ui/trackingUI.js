@@ -9,12 +9,8 @@ import { facilitySystem } from '../facility/facilitySystem.js';
 import { shipSystem } from '../ship/shipSystem.js';
 import { sceneManager } from '../sceneManager.js';
 import { computeDeltaV, getTotalMass } from '../resources/resourceSystem.js';
-import { getVisibleBodyResources } from '../resources/scanSystem.js';
-import { getResourceType } from '../config/entities/resourceTypes.js';
-import { isScansEnabled } from '../resources/modeRules.js';
 import { t } from '../config/ui/strings.js';
 import { celestialBodies } from '../physics/physics.js';
-import { ENCYCLOPEDIA } from '../config/ui/encyclopediaConfig.js';
 import { getTexturePath } from '../config/assets/assetManifest.js';
 import { buildTrackingTree, focusTrackingNode, renderTrackingNav, setTrackingNavTab } from '../scenes/trackingScene.js';
 import { formatGameTime } from '../utils/format.js';
@@ -63,14 +59,6 @@ function formatMassSci(kg) {
     const exp = Math.floor(Math.log10(kg));
     const mant = (kg / Math.pow(10, exp)).toFixed(2);
     return `${mant} × 10<sup>${exp}</sup> kg`;
-}
-
-// 追踪站 0.2.5 - 百科"天体档案"按天体名查询介绍文本
-function getSynopsis(bodyName) {
-    const cat = ENCYCLOPEDIA.find(c => c.category === '天体档案');
-    if (!cat) return null;
-    const entry = cat.entries.find(e => e.title === bodyName);
-    return entry ? entry.content : null;
 }
 
 // 追踪站 - 渲染辅助：两列 key-value 数据网格
@@ -250,12 +238,7 @@ function renderBodySections(node) {
         `<button class="tracking-control-btn" data-action="focus-node">${t('tracking.focus')}</button>` +
         `</div>`;
 
-    // 天体档案（百科"天体档案"栏目现成介绍文本）
-    const synopsis = getSynopsis(body.name);
-    const synopsisHtml = synopsis
-        ? `<div class="tracking-synopsis">${synopsis}</div>`
-        : `<div class="tracking-synopsis-empty">${t('tracking.noSynopsis')}</div>`;
-    html += renderSection('synopsis', t('tracking.secSynopsis'), synopsisHtml);
+    // 尝鲜版：百科已移除，不再展示天体档案介绍（完整版在 main 分支）
 
     // 轨道参数（恒星无环绕天体，跳过）
     if (body.orbitParent && body.orbitA > 0) {
@@ -291,32 +274,6 @@ function renderBodySections(node) {
         { label: t('tracking.atmosphere'), value: body.hasAtmosphere ? t('tracking.atmHeight', { h: formatDistance(body.atmosphereHeight) }) : t('tracking.atmNone') }
     ]);
     html += renderSection('physical', t('tracking.secPhysical'), physicalGrid);
-
-    // 资源丰度（sandbox 直接可见；career 按扫描等级过滤）
-    const visible = getVisibleBodyResources(node.name);
-    let resHtml = '';
-    const entries = Object.entries(visible);
-    if (entries.length === 0) {
-        resHtml = `<div class="tracking-list-empty">${t('tracking.noResources')}</div>`;
-    } else {
-        for (const [resId, info] of entries) {
-            const def = getResourceType(resId);
-            const name = def ? def.name : resId;
-            const pct = Math.round((info.abundance ?? 0) * 100);
-            resHtml += `<div class="tracking-res-row">` +
-                `<span class="tracking-res-name">${name}</span>` +
-                `<span class="tracking-res-bar"><span class="tracking-res-fill" style="width:${pct}%"></span></span>` +
-                `<span class="tracking-res-pct">${pct}%</span>` +
-                `</div>`;
-        }
-    }
-    html += renderSection('resources', t('tracking.secResources'), resHtml);
-
-    // career 模式显示扫描状态注脚
-    if (!isScansEnabled()) {
-        const scanned = gameState.getState().player.scannedBodies?.[node.name]?.tiersScanned || 0;
-        html += `<div class="tracking-scan-note">${t('tracking.scanStatus', { tier: scanned })}</div>`;
-    }
 
     return html;
 }

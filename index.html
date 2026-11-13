@@ -3,20 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <link rel="icon" href="favicon.ico">
-    <!-- 尝鲜版档位：`?profile=lite` 时给 <html> 挂 lite-fonts 类，
-         由 root.css 把字体变量切到系统等宽栈（不请求任何本地 ttf）。
-         必须放在样式之前执行，避免首屏用本地字体渲染一帧后再切换。 -->
-    <script>
-        (function () {
-            try {
-                if (new URLSearchParams(window.location.search).get('profile') === 'lite') {
-                    document.documentElement.classList.add('lite-fonts');
-                }
-            } catch (e) {
-                // 老浏览器不支持 URLSearchParams：保持全量字体，不做降级处理
-            }
-        })();
-    </script>
     <link rel="stylesheet" href="src/ui/styles/root.css">
     <link rel="stylesheet" href="src/ui/styles/theme.css">
     <link rel="stylesheet" href="src/ui/styles/scene_loading.css">

@@ -10,15 +10,10 @@ import { getModuleDef, getCapabilityToolbar } from '../config/entities/moduleTyp
 import { textureManager } from '../graphics/textureManager.js';
 import { renderIconHtml, renderFuelBarsHtml, showModuleSelectorPopup, createDialog, createInputDialog } from './uiComponents.js';
 import { showTooltip, hideTooltip } from './uiTooltip.js';
-import {
-    getCargoCapacity, getCargoUsed, getCargoAmount, hasCargoHold,
-    getStorageAmount, transferStorageToCargo, transferCargoToStorage,
-    transferBetweenFacilities, STORAGE_RESOURCE_IDS
-} from '../resources/cargoSystem.js';
-import {
-    getShipScanTier, getScanProgress, startScan, cancelScan,
-    getScanDuration, getVisibleBodyResources, GAME_DAY_SECONDS
-} from '../resources/scanSystem.js';
+// 尝鲜版：飞船货仓与星球扫描已移除（见 docs/尝鲜版方案.md），
+// 设施存储 / 补给仍保留（船坞建造与加注依赖 cargoSystem 的设施侧接口）
+import { getStorageAmount } from '../resources/cargoSystem.js';
+import { STORAGE_RESOURCE_IDS } from '../resources/cargoSystem.js';
 import { getResourceType } from '../config/entities/resourceTypes.js';
 import { celestialBodies } from '../physics/physics.js';
 import { t } from '../config/ui/strings.js';
@@ -93,10 +88,9 @@ function closePanel(panelId) {
 }
 
 // 工具栏能力图标 → 面板 id 映射(0.2.4 图标点击切换语义:图标与其面板 1:1)
+// 尝鲜版：货仓 / 扫描能力已移除，只剩部署设施入口（完整版功能，点击提示下载完整版）
 const CAPABILITY_PANEL = {
-    deploy_facility: 'facilityDeploy',
-    cargo_hold: 'cargo',
-    scan_resources: 'scan'
+    deploy_facility: 'facilityDeploy'
 };
 
 // 统一工具栏 — 动态图标渲染（0.2.7 KSP2 重构：竖排标题 + 裸图标行 + 状态竖条选中态）
@@ -174,13 +168,8 @@ export function renderToolbarIcons(mode, data) {
             if (!tb) continue;
             const onClick = () => {
                 if (def.capability === 'deploy_facility') {
+                    // 尝鲜版不提供设施部署：请求事件已无人订阅，后续由完整版提示弹窗接管
                     eventBus.emit(Events.FACILITY_DEPLOY_REQUESTED);
-                } else if (def.capability === 'cargo_hold') {
-                    const ship = shipSystem.getActiveShip();
-                    if (ship) openPage('cargo', t('cargo.title'), buildShipCargoContent(ship));
-                } else if (def.capability === 'scan_resources') {
-                    const ship = shipSystem.getActiveShip();
-                    if (ship) openPage('scan', t('scan.menuTitle'), buildScanContent(ship));
                 }
             };
             createIcon(tb.icon, t(tb.labelKey), onClick, tb.iconTexture, tb.iconId, CAPABILITY_PANEL[def.capability] || null);
@@ -215,7 +204,8 @@ window.renderToolbarIcons = renderToolbarIcons;
 
 // ========== 工具栏页面面板（0.2.4 重构：每个内容页独立浮层,可并存/拖动/错位） ==========
 // 打开(或刷新)一个工具栏页面面板:页面对应独立 .tkp-page 浮层,互不覆盖 —
-// 货仓/扫描/指令舱/对接枢纽/补给站/实验室/仓储/模块管理/货仓调拨可同时打开
+// 指令舱 / 对接枢纽 / 补给站 / 仓储 / 模块管理可同时打开
+// （尝鲜版：货仓 / 扫描 / 货仓调拨页面随对应系统移除）
 function openPage(pageId, title, html) {
     const page = getPage(pageId);
     page.titleEl.textContent = title;
@@ -282,125 +272,6 @@ function storageGroupedHtml(resIds, getSlot, opts = {}) {
     return html;
 }
 
-// 飞船货仓面板内容（飞行工具栏入口）— 仅显示 ship.cargo，不含自带燃料
-// 0.2.7 分区布局：容量区 + 货物清单区（按类别分组，参考图行样式）
-function buildShipCargoContent(ship) {
-    const cap = getCargoCapacity(ship);
-    const used = getCargoUsed(ship);
-
-    // 分区一：货仓容量（共享池进度条）
-    let html = '<div class="tkp-section">' + t('cargo.sectionCapacity') + '</div>'
-        + '<div class="tkp-card-sm">' + storageRowHtml('—', used, cap) + '</div>';
-
-    // 分区二：货物清单（按类别分组）
-    html += '<div class="tkp-section">' + t('cargo.sectionCargo') + '</div>';
-    const cargoEntries = Object.entries(ship.cargo || {}).filter(([, slot]) => slot && slot.amount > 0);
-    if (cargoEntries.length === 0) {
-        html += '<div class="tkp-card-sm"><div class="tkp-hint" style="margin:0;">' + t('cargo.empty') + '</div></div>';
-    } else {
-        html += '<div class="tkp-card-sm">'
-            + storageGroupedHtml(
-                cargoEntries.map(([resId]) => resId),
-                (resId) => {
-                    const slot = ship.cargo[resId];
-                    return slot || { amount: 0, capacity: 0 };
-                })
-            + '</div>';
-    }
-    // 明确提示：自带燃料（燃料罐）不在货仓
-    html += '<div class="tkp-hint-muted">' + t('cargo.fuelNote') + '</div>';
-    return html;
-}
-
-// 扫描菜单内容（0.2.0 阶段6；0.2.7 分区布局整改：目标卡 + 资源行 + 操作区）
-function buildScanContent(ship) {
-    const bodyId = ship.currentSOI;
-    const body = celestialBodies.find(b => b.name === bodyId);
-
-    // 深空无宿主 → 卡片内提示
-    if (!bodyId || !body) {
-        return '<div class="tkp-section">' + t('scan.targetSection') + '</div>'
-            + '<div class="tkp-card"><div class="tkp-hint" style="margin:0;">' + t('scan.deepSpace') + '</div></div>';
-    }
-
-    const tier = getShipScanTier(ship);
-    // 0.3.0：天体贴图路径就近声明在天体配置里，直接取用（不再拼 '_surface' 约定后缀）
-    const bodyTexture = body.texture || null;
-
-    // 分区一：扫描目标大卡片（左图右文，对齐参考图 IdentityCard）
-    let html = '<div class="tkp-section">' + t('scan.targetSection') + '</div>'
-        + '<div class="tkp-card">'
-        + '<div class="tkp-card-main">'
-        + '<div class="tkp-card-icon">' + renderIconHtml(bodyTexture, '🪐', 72) + '</div>'
-        + '<div class="tkp-card-info">'
-        + '<div class="tkp-card-title">' + body.name + '</div>'
-        + '<div class="tkp-sub">' + t('scan.scannerTier', { tier: tier }) + '</div>'
-        + '<div class="tkp-desc">' + t('scan.cardDesc') + '</div>'
-        + '</div>'
-        + '</div>'
-        + '</div>';
-
-    // 分区二：资源丰度列表（扫描等级内可见的资源，+++++ 条 + 百分比）
-    // 行列表放入次级卡片（二级背景），与目标卡形成层级
-    html += '<div class="tkp-section">' + t('scan.resourcesSection') + '</div>';
-    const visible = getVisibleBodyResources(bodyId);
-    const entries = Object.entries(visible);
-    if (entries.length === 0) {
-        html += '<div class="tkp-card-sm"><div class="tkp-hint" style="margin:0;">' + t('scan.noResources') + '</div></div>';
-    } else {
-        html += '<div class="tkp-card-sm"><div class="tkp-rows">';
-        for (const [resId, info] of entries) {
-            const def = getResourceType(resId);
-            const name = def ? def.name : resId;
-            const pct = Math.round((info.abundance ?? 0) * 100);
-            const barLen = Math.max(0, Math.round(pct / 10));   // 每 10% 一个 +
-            const bar = '+'.repeat(barLen);
-            // 资源绿 #8c8：纯状态色、无对应变量，按规范允许内联例外（与旧实现一致）
-            html += '<div class="tkp-row">'
-                + '<span class="tkp-row-label">' + name + '</span>'
-                + '<span style="flex:1;color:#8c8;font-family:var(--font-mono-bold);font-size:11px;'
-                + 'letter-spacing:1px;white-space:nowrap;overflow:hidden;">' + bar + '</span>'
-                + '<span class="tkp-row-value" style="width:44px;color:#8c8;text-align:right;">' + pct + '%</span>'
-                + '</div>';
-        }
-        html += '</div>';   // 关闭 .tkp-rows
-        html += '</div>';   // 关闭 .tkp-card-sm
-    }
-
-    // 扫描状态区：进行中显示进度条 + 取消；否则显示开始扫描按钮
-    const progress = getScanProgress(bodyId);
-    if (progress && progress.scanning) {
-        const pct = progress.scanDuration > 0
-            ? Math.min(100, progress.progress / progress.scanDuration * 100)
-            : 0;
-        const daysLeft = Math.max(0, (progress.scanDuration - progress.progress) / GAME_DAY_SECONDS);
-        html += '<div id="scanProgressSection" data-body-id="' + bodyId + '" class="tkp-progress-wrap">'
-            + '<div class="tkp-progress-head">'
-            + '<span>' + t('scan.inProgress', { tier: progress.scanTier }) + '</span>'
-            + '<span id="scanProgressText">' + pct.toFixed(1) + '% · ' + t('scan.daysLeft', { d: daysLeft.toFixed(2) }) + '</span>'
-            + '</div>'
-            + '<div class="tkp-progress">'
-            + '<div id="scanProgressBar" class="tkp-progress-bar" style="width:' + pct + '%;"></div>'
-            + '</div>'
-            + '</div>'
-            + '<div class="tkp-actions">'
-            + '<button data-action="cancel-scan" class="tkp-btn">' + t('scan.cancel') + '</button>'
-            + '</div>';
-    } else {
-        const knownTier = gameState.getState().player.scannedBodies?.[bodyId]?.tiersScanned || 0;
-        const duration = getScanDuration(bodyId, tier);
-        const durationDays = duration / GAME_DAY_SECONDS;
-        html += '<div class="tkp-actions">'
-            + '<button data-action="start-scan" class="tkp-btn-primary">' + t('scan.startBtn', { d: durationDays.toFixed(1) }) + '</button>'
-            + '</div>';
-        // 已扫等级提示（可继续用更高级扫描仪深扫）
-        if (knownTier > 0) {
-            html += '<div class="tkp-hint-muted">' + t('scan.knownTier', { tier: knownTier }) + '</div>';
-        }
-    }
-    return html;
-}
-
 // 设施货物表（指令舱入口）— 全资源 amount/capacity + 行内调拨按钮
 // 0.2.7 参考图样式：全量列表（含 0 量暗行），按资源类别分组
 function buildFacilityStorageContent(facility) {
@@ -409,58 +280,9 @@ function buildFacilityStorageContent(facility) {
     html += '<div class="tkp-card-sm">'
         + storageGroupedHtml(
             STORAGE_RESOURCE_IDS,
-            (resId) => (facility.storage && facility.storage[resId]) || { amount: 0, capacity: 0 },
-            {
-                right: (resId) => '<button data-action="transfer-out" data-res-id="' + resId + '" class="tkp-btn" style="flex:none;height:20px;padding:0 8px;font-size:10px;">' + t('facility.transfer') + '</button>'
-            })
+            (resId) => (facility.storage && facility.storage[resId]) || { amount: 0, capacity: 0 })
         + '</div>';
     return html;
-}
-
-// 设施间调拨流程：行内调拨按钮 → 选目标设施 → 输入数量 → 转移
-function startFacilityTransfer(fromFacility, resId) {
-    const others = facilitySystem.getAllFacilities().filter(f => f.id !== fromFacility.id);
-    if (others.length === 0) {
-        window.showNotification(t('facility.noOtherFacilities'), 'warning');
-        return;
-    }
-    // 临时 dialog：直接调用 uiComponents 导出的对话框（0.2.5 整改：原经 window.__createDialog）
-    createDialog(
-        t('facility.transferTarget'),
-        others.map(f => ({ id: f.id, name: f.name })),
-        (toFacilityId) => {
-            const toFacility = facilitySystem.getFacility(toFacilityId);
-            if (!toFacility) return;
-            const available = getStorageAmount(fromFacility, resId);
-            createInputDialog(
-                t('facility.transferAmount', {
-                    name: getResourceType(resId)?.name || resId,
-                    from: fromFacility.name,
-                    to: toFacility.name,
-                    max: Math.floor(available)
-                }),
-                '',
-                String(Math.floor(available)),
-                (valStr) => {
-                    const amount = parseFloat(valStr);
-                    if (isNaN(amount) || amount <= 0) {
-                        window.showNotification(t('build.invalidNumber'), 'error');
-                        return;
-                    }
-                    const moved = transferBetweenFacilities(fromFacility, toFacility, resId, amount);
-                    if (moved > 0) {
-                        facilitySystem.persistFacility(fromFacility);
-                        facilitySystem.persistFacility(toFacility);
-                        window.showNotification(t('cargo.transferred', { n: Math.floor(moved) }), 'success');
-                    } else {
-                        window.showNotification(t('cargo.transferFailed'), 'error');
-                    }
-                    // 刷新货物表面板
-                    openPage('storage', t('facility.storage'), buildFacilityStorageContent(fromFacility));
-                }
-            );
-        }
-    );
 }
 
 // 模块管理面板（对接枢纽入口）— 槽位列表，空槽安装 / 已装卸载
@@ -522,90 +344,6 @@ function showFacilityModuleSelector(facility, shipId, anchorEl) {
             openPage('moduleManage', t('dock.moduleManage'), buildModuleManageContent(facilitySystem.getFacility(facility.id), shipId));
         }
     });
-}
-
-// 货仓调拨面板（对接枢纽入口，需飞船有货运模块）— 船舱 ↔ 设施存储 双向
-// 0.2.7 v2 分组卡样式：与设施仓储/货仓同款（分类卡+紫头顶条+条外文字+折叠），行尾 →← 按钮
-function buildCargoTransferContent(facility, shipId) {
-    const ship = facility.dockedShips.find(s => s.id === shipId);
-    if (!ship) return '<div class="tkp-card"><div class="tkp-hint" style="margin:0;">' + t('facility.unknownCompartment') + '</div></div>';
-
-    const cap = getCargoCapacity(ship);
-    const used = getCargoUsed(ship);
-
-    // 限定显示资源：任一侧有量 或 设施有容量槽（参考仓储全量语义，但过滤无槽项的 0/0 死行）
-    const transferResIds = STORAGE_RESOURCE_IDS.filter((resId) => {
-        const slot = facility.storage && facility.storage[resId];
-        return getCargoAmount(ship, resId) > 0 || (slot && (slot.amount > 0 || slot.capacity > 0));
-    });
-
-    let html = '<div class="tkp-section">' + t('cargo.transferSection') + '</div>'
-        + '<div class="tkp-hint-muted" style="text-align:left;margin:0 0 8px;">'
-        + t('dock.cargoShip', { name: ship.displayName || ship.id }) + ' · '
-        + t('cargo.capacityShort') + ' ' + Math.floor(used) + '/' + Math.floor(cap)
-        + '</div>';
-
-    if (transferResIds.length === 0) {
-        html += '<div class="tkp-card-sm"><div class="tkp-hint" style="margin:0;">' + t('cargo.empty') + '</div></div>';
-    } else {
-        html += '<div class="tkp-card-sm">'
-            + storageGroupedHtml(
-                transferResIds,
-                (resId) => {
-                    const slot = facility.storage && facility.storage[resId];
-                    return slot || { amount: 0, capacity: 0 };
-                },
-                {
-                    amountWidth: 110,
-                    // 双值：设施 → 船（条显示设施侧容量）
-                    value: (resId) => t('cargo.facToShip', {
-                        fac: Math.floor((facility.storage && facility.storage[resId]) ? facility.storage[resId].amount : 0),
-                        ship: Math.floor(getCargoAmount(ship, resId))
-                    }),
-                    right: (resId) => '<button data-action="load-cargo" data-ship-id="' + shipId + '" data-res-id="' + resId + '" class="tkp-btn">→</button>'
-                        + '<button data-action="unload-cargo" data-ship-id="' + shipId + '" data-res-id="' + resId + '" class="tkp-btn">←</button>'
-                })
-            + '</div>';
-    }
-    html += '<div class="tkp-hint-muted">' + t('cargo.fuelNote') + '</div>';
-    return html;
-}
-
-// 调拨数量输入（船↔设施共用；dir: 'load' 设施→船 | 'unload' 船→设施）
-function promptTransferAmount(facility, shipId, resId, dir) {
-    const ship = facility.dockedShips.find(s => s.id === shipId);
-    if (!ship) return;
-    const max = dir === 'load'
-        ? getStorageAmount(facility, resId)
-        : getCargoAmount(ship, resId);
-    if (max <= 0) return;
-    const def = getResourceType(resId);
-    createInputDialog(
-        t(dir === 'load' ? 'cargo.loadAmount' : 'cargo.unloadAmount', {
-            name: def ? def.name : resId, max: Math.floor(max)
-        }),
-        '',
-        String(Math.floor(max)),
-        (valStr) => {
-            const amount = parseFloat(valStr);
-            if (isNaN(amount) || amount <= 0) {
-                window.showNotification(t('build.invalidNumber'), 'error');
-                return;
-            }
-            const moved = dir === 'load'
-                ? transferStorageToCargo(facility, ship, resId, amount)
-                : transferCargoToStorage(ship, facility, resId, amount);
-            if (moved > 0) {
-                facilitySystem.persistFacility(facility);
-                window.showNotification(t('cargo.transferred', { n: Math.floor(moved) }), 'success');
-            } else {
-                window.showNotification(t('cargo.transferFailed'), 'error');
-            }
-            const updated = facilitySystem.getFacility(facility.id);
-            _currentFacility = updated;
-            openPage('cargoTransfer', t('dock.cargoHold'), buildCargoTransferContent(updated, shipId));
-        }
-    );
 }
 
 // ========== 舱室内容渲染 ==========
@@ -701,14 +439,12 @@ function buildDockHubContent(facility) {
                 + '<div style="display:flex;flex-direction:column;gap:4px;">' + renderFuelBarsHtml(ship) + '</div>'
                 + '<div style="font-size:10px;color:var(--text-dim);">' + t('dock.modulesCount', { n: ship.modules?.length || 0 }) + '</div>';
             if (!activeShip) {
-                // 0.2.0 阶段5：切换控制改为模块管理 + 起飞；有货运模块的船追加货仓调拨入口
+                // 0.2.0 阶段5：切换控制改为模块管理 + 起飞
+                // （尝鲜版：货仓调拨入口随货仓系统移除）
                 html += '<div style="display:flex;gap:6px;margin-top:2px;">'
                     + '<button data-action="module-manage" data-ship-id="' + ship.id + '" class="tkp-btn" style="flex:1;height:24px;padding:0;font-size:11px;">' + t('dock.moduleManage') + '</button>'
                     + '<button data-action="undock-ship" data-ship-id="' + ship.id + '" class="tkp-btn" style="flex:1;height:24px;padding:0;font-size:11px;color:#8f8;border-color:#484;">' + t('dock.takeoff') + '</button>'
                     + '</div>';
-                if (hasCargoHold(ship)) {
-                    html += '<button data-action="cargo-transfer" data-ship-id="' + ship.id + '" class="tkp-btn" style="height:24px;padding:0;font-size:11px;color:#8c8;border-color:#484;">' + t('dock.cargoHold') + '</button>';
-                }
             }
             html += '</div>';
         }
@@ -761,33 +497,6 @@ function buildSupplyTerminalContent(facility) {
     }
     return html;
 }
-
-// 扫描菜单进度实时刷新（0.2.0 阶段6）：扫描页面可见且进度区存在时，每 500ms 重算进度条
-setInterval(() => {
-    const page = _pages['scan'];
-    if (!page || page.el.style.display === 'none') return;
-    const section = page.contentEl.querySelector('#scanProgressSection');
-    if (!section) return;
-    const bodyId = section.dataset.bodyId;
-    if (!bodyId) return;
-    const p = getScanProgress(bodyId);
-    // 扫描结束/取消（scanning=false）：重新渲染菜单，进度条区切回"开始扫描"按钮
-    // （原实现只 return，导致完成后进度条残留、按钮不变回）
-    if (p && !p.scanning) {
-        const ship = gameState.getActiveShip();
-        if (ship) openPage('scan', t('scan.menuTitle'), buildScanContent(ship));
-        return;
-    }
-    if (!p || !p.scanning) return;
-    const pct = p.scanDuration > 0 ? Math.min(100, p.progress / p.scanDuration * 100) : 0;
-    const bar = page.contentEl.querySelector('#scanProgressBar');
-    const text = page.contentEl.querySelector('#scanProgressText');
-    if (bar) bar.style.width = pct + '%';
-    if (text) {
-        const daysLeft = Math.max(0, (p.scanDuration - p.progress) / GAME_DAY_SECONDS);
-        text.textContent = pct.toFixed(1) + '% · ' + t('scan.daysLeft', { d: daysLeft.toFixed(2) });
-    }
-}, 500);
 
 // 调试挂载：当前受控设施（0.2.0 阶段5 引入的全局辅助；现已无生产消费方 ——
 // shipBuilderUI 改读 gameState.getActiveFacility()，保留仅供控制台调试）
@@ -945,9 +654,6 @@ function onPageContentClick(e) {
     } else if (action === 'open-storage') {
         // 0.2.0 阶段5：指令舱 → 设施货物表(独立仓储页面,与指令舱并存)
         if (_currentFacility) openPage('storage', t('facility.storage'), buildFacilityStorageContent(_currentFacility));
-    } else if (action === 'transfer-out') {
-        // 0.2.0 阶段5：设施间资源调拨（货物表行内按钮）
-        if (_currentFacility && resId) startFacilityTransfer(_currentFacility, resId);
     } else if (action === 'module-manage') {
         // 0.2.0 阶段5：对接枢纽 → 模块管理(独立页面,与对接枢纽并存)
         if (_currentFacility) openPage('moduleManage', t('dock.moduleManage'), buildModuleManageContent(_currentFacility, shipId));
@@ -961,30 +667,6 @@ function onPageContentClick(e) {
             window.showNotification(t('dock.moduleRemoved'), 'info');
             openPage('moduleManage', t('dock.moduleManage'), buildModuleManageContent(updated, shipId));
         }
-    } else if (action === 'cargo-transfer') {
-        // 0.2.0 阶段5：对接枢纽 → 货仓调拨（船舱 ↔ 设施存储,独立页面与对接枢纽并存）
-        if (_currentFacility) openPage('cargoTransfer', t('dock.cargoHold'), buildCargoTransferContent(_currentFacility, shipId));
-    } else if (action === 'load-cargo') {
-        if (_currentFacility) promptTransferAmount(_currentFacility, shipId, resId, 'load');
-    } else if (action === 'unload-cargo') {
-        if (_currentFacility) promptTransferAmount(_currentFacility, shipId, resId, 'unload');
-    } else if (action === 'start-scan') {
-        // 0.2.0 阶段6：开始扫描（失败分支通知提示，含"资源已知"）
-        const ship = shipSystem.getActiveShip();
-        if (ship && ship.currentSOI) {
-            const result = startScan(ship, ship.currentSOI);
-            if (!result.ok) {
-                window.showNotification(
-                    t('scan.reason.' + result.reason, { name: ship.currentSOI, tier: getShipScanTier(ship) }),
-                    'warning'
-                );
-            }
-            openPage('scan', t('scan.menuTitle'), buildScanContent(ship));
-        }
-    } else if (action === 'cancel-scan') {
-        const ship = shipSystem.getActiveShip();
-        cancelScan();
-        if (ship) openPage('scan', t('scan.menuTitle'), buildScanContent(ship));
     } else if (action === 'toggle-res-group') {
         // 0.2.7 资源分类折叠（DOM class 切换，折叠后仅剩紫色顶头）
         const card = btn.closest('.tkp-res-group-card');

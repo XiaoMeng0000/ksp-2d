@@ -1,20 +1,15 @@
 'use strict';
 
-// 天体渲染配置（0.3.0）— 默认规则 + 例外表
+// 天体渲染配置（尝鲜版）— 只有程序绘制层
 //
-// 默认规则：天体配置（systems/*.js）里声明了 texture → 自动注册一层表面贴图（zIndex 0），
-//           无需在本文件登记。新增普通天体因此只需改天体配置 + 放图，本文件零改动。
-// 例外表：只登记无法由默认规则推导的特殊渲染配置，key 为 celestialBody.textureKey（渲染查找键）
-//   - dres  ：表面贴图 + 程序星环（4 条环带）
-//   - kerbol：near / far 两档 LOD 分级（远景档不含贴图，整档由程序光晕构成）
-//
-// 注意：例外表内的贴图路径与其天体配置中的 texture 同值 —— 这是刻意的显式声明
-//       （LOD 阈值 / 星环参数属于渲染层专属配置，不宜下沉到物理数据层）；
-//       若调整 Dres / Kerbol 的贴图路径，需一并修改此处。
+// ⚠️ 尝鲜版不加载任何天体贴图（assets/images/celestial 下的 PNG 已移除），因此：
+//   · 行星 / 卫星一律不注册渲染层 → 渲染层按天体代表色绘制纯色圆盘（含图标缩放保护）；
+//   · 只有恒星 Kerbol 登记例外配置：near / far 两档 LOD，全部由程序光晕构成。
+//   · 完整版的贴图层与 dres 程序星环配置在 `main` 分支维护。
 //
 // layer 字段：
-//   texture: string       // 贴图路径（贴图层用）
-//   program: string       // 程序效果名称（如 'star_glow'，与 texture 二选一）
+//   texture: string       // 贴图路径（尝鲜版不出现）
+//   program: string       // 程序效果名称（'star_ball' / 'star_glow' / 'planet_ring'）
 //   alpha: number         // 0~1 透明度
 //   scale: number         // 相对缩放倍率（光晕放大层用，默认 1）
 //   color: string         // 程序效果的颜色参数（hex 格式）
@@ -22,45 +17,20 @@
 
 import { renderableManager } from './renderable.js';
 import { solarSystemData } from '../config/world/starSystemIndex.js';
-import { LITE_PROFILE } from '../config/assets/liteProfile.js';
 
 export const bodyRenderableConfigs = {
-    // Dres：表面贴图 + 程序星环（2D 俯视为正圆环带，多细分分层）
-    // 参考 KSP2 官方效果：环带更暗、更薄、离天体更远，整体呈深灰半透明并带细密分层。
-    dres: {
-        layers: [
-            { texture: 'assets/images/celestial/kerbolar/dres.png', zIndex: 0 },
-            {
-                program: 'planet_ring',
-                color: '#9d9d9d',
-                alpha: 0.55,
-                zIndex: 1,
-                bands: [
-                    // 内侧主环带：内缘距表面 400km（半径比 (138000+400000)/138000 ≈ 3.90）
-                    { inner: 3.90, outer: 3.97, alpha: 0.80 },
-                    // 紧邻第二环带（缝隙 0.004，几乎贴合）
-                    { inner: 3.974, outer: 4.04, alpha: 0.55 },
-                    // 外侧主环带
-                    { inner: 4.044, outer: 4.11, alpha: 0.68 },
-                    // 最外侧稀薄晕：feather 1.0 = 渐变覆盖全带，向外自然消散且不产生额外暗缝
-                    { inner: 4.114, outer: 4.18, alpha: 0.20, feather: 1.0 }
-                ]
-            }
-        ]
-    },
-
-    // Kerbol：LOD 分级渲染
+    // Kerbol：LOD 分级渲染（两档均无贴图，纯程序光晕）
     // nearScreenR / farScreenR 定义两档的阈值（像素），中间为过渡区
     kerbol: {
         modes: {
-            // 近景档（屏幕半径 >= 200px）：表面清晰 + 弱橙黄光晕（小范围，避免遮挡内行星）
+            // 近景档（屏幕半径 >= 200px）：代表色圆盘 + 弱橙黄光晕（小范围，避免遮挡内行星）
             near: {
                 layers: [
-                    { texture: 'assets/images/celestial/kerbolar/kerbol.png', alpha: 1.0, zIndex: 0 },
-                    { program: 'star_glow', color: '#ffaa33', alpha: 0.15, scale: 1.15, zIndex: 1 }
+                    { program: 'star_ball', color: '#ffcc44', alpha: 1.0, scale: 1.0, zIndex: 0 },
+                    { program: 'star_glow', color: '#ffaa33', alpha: 0.35, scale: 1.15, zIndex: 1 }
                 ]
             },
-            // 远景档（屏幕半径 <= 100px）：贴图被同尺寸纯色白色光球替代 + 多层柔光晕
+            // 远景档（屏幕半径 <= 100px）：亮白光球 + 多层柔光晕
             far: {
                 layers: [
                     { program: 'star_ball', color: '#ffffff', alpha: 1.0, scale: 1.0, zIndex: 0 },
@@ -72,66 +42,23 @@ export const bodyRenderableConfigs = {
             }
         },
         nearScreenR: 200,  // 近景档阈值（>= 此值用 near 模式）
-        farScreenR: 100,   // 远景档阈值（<= 此值用 far 模式）
-        // WebGL 恒星预设（src/config/starRenderPresets.js 的键）：场景开启恒星层且 WebGL 可用时，
-        // 整颗恒星改由 graphics/starLayer.js 绘制；不可用时回落上面的 near/far 两档
-        starPreset: 'kerbol'
+        farScreenR: 100    // 远景档阈值（<= 此值用 far 模式）
     }
 };
 
-// 尝鲜版档位：把配置里的贴图层整体剥离，只留程序绘制层
-//   - 恒星分档（modes）：优先取不含贴图的 far 档（star_ball + 多层光晕），视觉上仍是发光恒星
-//   - 单档（layers）：剥掉 texture 层后若还有程序层则保留（如程序星环），否则返回 null
-function _toLiteConfig(override) {
-    const stripTexture = (layers) => (layers || []).filter((layer) => !layer.texture);
-
-    if (override.modes) {
-        const far = override.modes.far;
-        const pick = (far && far.layers) ? far : override.modes.near;
-        const layers = stripTexture(pick && pick.layers);
-        return layers.length ? { layers } : null;
-    }
-    if (override.layers) {
-        const layers = stripTexture(override.layers);
-        return layers.length ? { layers } : null;
-    }
-    return null;
-}
-
 // 将配置注册进 RenderableManager（main.js 启动时调用一次）
-// 遍历全量星系静态数据（starSystemRegistry 的超集）而非当前激活集，
-// 保证后续切换到任意星系组合时，其天体渲染层已注册就绪
+// 遍历全部天体静态数据，只登记例外表里的天体；其余天体不注册 → 渲染层走代表色纯色兜底
 export function registerBodyRenderables() {
     let registered = 0;
 
     for (const body of solarSystemData) {
         const key = body.textureKey;
         if (!key) continue;
-
         const override = bodyRenderableConfigs[key];
-
-        // 尝鲜版档位：只注册程序层；默认规则（只画贴图）的天体不注册 → 渲染层走代表色纯色兜底
-        if (LITE_PROFILE.enabled) {
-            if (!override) continue;
-            const liteConfig = _toLiteConfig(override);
-            if (!liteConfig) continue;
-            renderableManager.register(key, liteConfig);
-            registered++;
-            continue;
-        }
-
-        if (override) {
-            renderableManager.register(key, override);
-            registered++;
-        } else if (body.texture) {
-            // 默认规则：声明了贴图就画一层
-            renderableManager.register(key, {
-                layers: [{ texture: body.texture, zIndex: 0 }]
-            });
-            registered++;
-        }
-        // 既无例外配置也无贴图的占位天体（如测试星系）→ 不注册，渲染层走代表色纯色兜底
+        if (!override) continue;
+        renderableManager.register(key, override);
+        registered++;
     }
 
-    console.log(`[BodyRenderables] 已注册 ${registered} 个天体渲染配置` + (LITE_PROFILE.enabled ? '（尝鲜版档位：无贴图）' : ''));
+    console.log(`[BodyRenderables] 已注册 ${registered} 个天体渲染配置（尝鲜版：无贴图，仅程序层）`);
 }

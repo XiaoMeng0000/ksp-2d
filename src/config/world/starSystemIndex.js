@@ -1,31 +1,21 @@
 'use strict';
 
+// 星系索引（尝鲜版：单星系）
+//
+// ⚠️ 尝鲜版只开放 `kerbolar` 星系的 6 个天体（Kerbin 系 + Duna 系）。
+//    多星系组合、星系选择与星系查看场景在完整版（`main` 分支）维护。
+//
+// 对外 API 形状与多星系版本保持一致（名字与返回结构不变），内部退化为单星系实现：
+// 这样 saveManager / physics / 场景层的调用面无需改动，未来恢复多星系只改本文件。
+
 import { meta as kerbolarMeta, bodies as kerbolarBodies } from './systems/kerbolarSystem.js';
-import { meta as testbolarMeta, bodies as testbolarBodies } from './systems/testSystem.js';
-import { meta as debdebTestMeta, bodies as debdebTestBodies } from './systems/debdebTestSystem.js';
-import { meta as debdebMeta, bodies as debdebBodies } from './systems/debdebSystem.js';
-import { meta as tuunMeta, bodies as tuunBodies } from './systems/tuunSystem.js';
 
-// ========== 星系总配置(数据驱动) ==========
-// 所有星系在此注册;新增星系步骤:
-//   1. 在 src/config/systems/ 下新建 <id>System.js,导出 { meta, bodies }
-//   2. 在本文件 starSystemRegistry 中登记
-// 约定:
-//   - meta.id 为星系唯一标识(存档绑定,一经发布不可变更)
-//   - placeholder: true 表示占位星系(仅展示,无真实天体数据,不可选择加载)
-//   - distance/bearingDeg 描述星系相对 homeworld 原点的方位(光年/度)
-//   - 恒星(无 orbitParent 的天体)位置固定;homeworld 星系恒星固定在 (0,0)
-
-// 光年换算常数:1 光年 = 9.4607304725808e15 米
+// 光年换算常数:1 光年 = 9.4607304725808e15 米（保留给完整版的多星系方位计算）
 export const LIGHT_YEAR_METERS = 9.4607304725808e15;
 
-// 星系注册表(注册顺序即展示顺序)
+// 星系注册表（尝鲜版只有家园星系）
 export const starSystemRegistry = [
-    { meta: kerbolarMeta, bodies: kerbolarBodies },
-    { meta: testbolarMeta, bodies: testbolarBodies },
-    { meta: debdebTestMeta, bodies: debdebTestBodies },
-    { meta: debdebMeta, bodies: debdebBodies },
-    { meta: tuunMeta, bodies: tuunBodies }
+    { meta: kerbolarMeta, bodies: kerbolarBodies }
 ];
 
 // 按 id 查询星系
@@ -33,7 +23,7 @@ export function getSystemById(id) {
     return starSystemRegistry.find(s => s.meta.id === id) || null;
 }
 
-// 按星系 id 查询天体数组(直接引用;占位星系为空数组)
+// 按星系 id 查询天体数组(直接引用)
 export function getSystemBodiesById(id) {
     const system = getSystemById(id);
     return system ? system.bodies : [];
@@ -50,7 +40,7 @@ export function getHomeworldSystemId(ids) {
     return (ids || []).find(id => isHomeworldSystem(id)) || null;
 }
 
-// 默认组合:仅第一个 homeworld 星系(与历史行为等价)
+// 默认组合:仅第一个 homeworld 星系
 export function getDefaultSystemIds() {
     const homeworld = starSystemRegistry.find(s => isHomeworldSystem(s.meta.id));
     return homeworld ? [homeworld.meta.id] : [];
@@ -69,7 +59,7 @@ export function computeSystemPosition(meta, homeworldId) {
     };
 }
 
-// 取星系根恒星(无 orbitParent 的天体;占位星系无恒星返回 null)
+// 取星系根恒星(无 orbitParent 的天体)
 export function getStarBody(id) {
     const system = getSystemById(id);
     if (!system) return null;
@@ -83,7 +73,6 @@ export function validateSystemSelection(ids) {
     if (!Array.isArray(ids) || ids.length === 0) {
         return { ok: false, reason: 'empty' };
     }
-    // 重复 id 检测(重复星系会导致天体重复克隆)
     if (new Set(ids).size !== ids.length) {
         return { ok: false, reason: 'duplicate' };
     }
@@ -129,7 +118,7 @@ export function validateSystemSelection(ids) {
 }
 
 // ========== 兼容旧名聚合导出 ==========
-// starSystemMeta:solarSystem.js 旧导出名,星系查看面板使用
+// starSystemMeta:星系查看面板使用的元信息数组（尝鲜版无该场景，保留导出形状）
 export const starSystemMeta = starSystemRegistry.map(s => s.meta);
 // solarSystemData:全部星系天体聚合(physics.js 启动默认集合)
 export const solarSystemData = starSystemRegistry.flatMap(s => s.bodies);

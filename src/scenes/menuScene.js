@@ -4,12 +4,9 @@ import { sceneManager } from '../sceneManager.js';
 import { textureManager } from '../graphics/textureManager.js';
 import { eventBus, Events } from '../eventBus.js';
 import { renderableManager } from '../graphics/renderable.js';
-import { menuPlanetLayer } from '../graphics/menuPlanetLayer.js';
 import { MENUS } from '../config/ui/menuConfig.js';
 import { LINKS_ICONS } from '../config/ui/menuConfig.js'; // 1. 导入数据
 import { VERSION_TEXT } from '../config/meta/version.js';
-import { SETTINGS_ROWS } from '../config/gameplay/settingsConfig.js';
-import { LITE_PROFILE } from '../config/assets/liteProfile.js';
 
 // 主菜单 — DOM 版（阶段 3：Canvas→DOM）
 // - 数据驱动：menuConfig.js 的 MENUS 定义各菜单按钮（label/action）
@@ -24,21 +21,6 @@ let _container = null;      // 主菜单 DOM 容器
 let _onKeyDown = null;
 let _texturesReadyHandler = null;
 let _callbacks = {};
-let _menuBgMode = 'style2';         // 菜单样式缓存（style1=纯星空 / style2=带星球；进场景读一次）
-let _settingsClosedHandler = null;
-
-// 读取菜单样式 —— 存储键取 settingsConfig 的定义（配置集中，不硬编码字面量）
-// 旧值 stars/image（以及任何未知值）一律落到 style2；style1 为显式 opt-in
-function _readMenuBgMode() {
-    // 尝鲜版档位：强制纯星空（不加载 WebGL 星球与高清贴图）
-    if (LITE_PROFILE.menuStyle) return LITE_PROFILE.menuStyle;
-    const row = (SETTINGS_ROWS.display || []).find(r => r.group === 'menuBg');
-    if (!row) return 'style2';
-    const raw = localStorage.getItem(row.storageKey);
-    const legacy = row.legacyValues && row.legacyValues[raw];
-    const value = legacy || raw || row.defaultValue;
-    return value === 'style1' ? 'style1' : 'style2';
-}
 
 // 生成背景星空
 function _generateStars() {
@@ -268,44 +250,20 @@ function registerMenuScene(options) {
     };
 
     sceneManager.registerScene('menu', {
-        // 场景级加载（SceneManager.switchToAsync）：仅 style2 有 WebGL 星球层需要准备；
-        // style1 是纯星空，不显示加载界面
+        // 尝鲜版：菜单背景只有纯星空（WebGL 星球层已移除），无需场景级加载
         shouldLoad() {
-            return _readMenuBgMode() === 'style2';
+            return false;
         },
 
-        // 准备阶段：WebGL 上下文 / albedo / detail / 法线图全部结算后返回（失败即降级结算）
-        prepare(data, reporter) {
+        prepare() {
             _canvas = document.getElementById('canvas');
-            return menuPlanetLayer.prepare(_canvas, reporter);
+            return Promise.resolve();
         },
 
         enter() {
             _canvas = document.getElementById('canvas');
             _currentMenu = 'main';
             _generateStars();
-
-            // 菜单样式：进场景读一次并缓存（渲染路径不再触碰 localStorage）
-            _menuBgMode = _readMenuBgMode();
-            // style2 才初始化星球层；style1 保持原版纯星空，不创建 WebGL 资源
-            if (_menuBgMode === 'style2') menuPlanetLayer.enter(_canvas);
-
-            // 设置面板化后可在主菜单内直接改背景（不切场景），故在设置面板关闭时刷新缓存；
-            // 复用 uiManager 既有的 UI_PANEL_CLOSED 事件，不新增事件、不轮询
-            // 守卫：enter 可能被重复调用（场景重入/显式调用），避免重复订阅导致 exit 只注销得掉最后一个
-            if (!_settingsClosedHandler) {
-                _settingsClosedHandler = ({ panelId }) => {
-                    if (panelId !== 'settings') return;
-                    const next = _readMenuBgMode();
-                    if (next === 'style2' && _menuBgMode !== 'style2') {
-                        menuPlanetLayer.enter(_canvas);
-                    } else if (next === 'style1' && _menuBgMode === 'style2') {
-                        menuPlanetLayer.exit();
-                    }
-                    _menuBgMode = next;
-                };
-                eventBus.on(Events.UI_PANEL_CLOSED, _settingsClosedHandler);
-            }
 
             _container = _buildMenuDOM();
             _renderMenuButtons('main');
@@ -329,29 +287,18 @@ function registerMenuScene(options) {
             }
         },
 
-        update(dt) {
-            // 仅 style2 更新星球层（style1 = 原版纯星空）
-            if (_menuBgMode === 'style2') {
-                menuPlanetLayer.update(dt);
-            }
+        update() {
+            // 尝鲜版菜单背景为纯星空，无额外图层需要推进
         },
 
         render(ctx) {
-            // 两种样式都先画星空；style2 再叠加星球层（唯一的合成调用点）
             _drawStars(ctx);
-            if (_menuBgMode === 'style2') {
-                menuPlanetLayer.render(ctx);
-            }
         },
 
         exit() {
             if (_onKeyDown) {
                 document.removeEventListener('keydown', _onKeyDown);
                 _onKeyDown = null;
-            }
-            if (_settingsClosedHandler) {
-                eventBus.off(Events.UI_PANEL_CLOSED, _settingsClosedHandler);
-                _settingsClosedHandler = null;
             }
             if (_texturesReadyHandler) {
                 eventBus.off(Events.TEXTURES_READY, _texturesReadyHandler);
@@ -364,7 +311,6 @@ function registerMenuScene(options) {
             if (_canvas) {
                 _canvas.style.cursor = '';
             }
-            menuPlanetLayer.exit();
         }
     });
 }

@@ -42,6 +42,7 @@ if (typeof window !== 'undefined') {
 // 背景图写入（仅在预载完成后调用，避免遮罩首帧露出兜底色）
 function _applyBackgroundImage() {
     if (!_bgEl || !_bgReady) return;
+    if (!SCENE_LOADING_CONFIG.backgroundPath) return;   // 未配海报 → 保留兜底纯色
     _bgEl.style.backgroundImage = 'url("' + SCENE_LOADING_CONFIG.backgroundPath + '")';
 }
 
@@ -50,6 +51,7 @@ function _applyBackgroundImage() {
 // 遮罩头一两帧只能显示兜底色（表现为「先绿一下再变成海报」）。
 function _preloadBackground() {
     if (_bgPreload || typeof Image === 'undefined') return;
+    if (!SCENE_LOADING_CONFIG.backgroundPath) return;   // 未配海报 → 不预载
     const img = new Image();
     _bgPreload = img;
     img.onload = () => {

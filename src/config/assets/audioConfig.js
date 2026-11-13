@@ -10,34 +10,38 @@ import { LITE_PROFILE } from './liteProfile.js';
 export const MUSIC_VOLUME = 0.75;
 
 // 音乐映射表：场景音乐标识 → { loop, variants | byBodyType }
-// variants 为同一场景可选配的音乐变体（如菜单可切换 KSP1 / KSP2 两首）
-// byBodyType 为按宿主天体音乐分类选曲（飞行场景使用，key 与 CelestialBody.musicType 对应）
+// ⚠️ 尝鲜版（本分支）只带 2 首曲子（menu1 + flight_terrestrial，共 9.36MB），
+//    其余曲目文件已移除：所有天体分类都映射到同一首通用飞行曲，追踪站也复用它。
+//    完整版按天体分类各配专属曲目的映射表在 `main` 分支维护。
+const FLIGHT_BGM = 'assets/audio/bgm/flight_terrestrial.ogg';
+
 export const musicMap = {
     menu: {
         loop: true,
+        // 设置里的 KSP1 / KSP2 两个变体都指向 menu1（menu2 已随完整版资源移除）
         variants: {
             ksp1: { path: 'assets/audio/bgm/menu1.ogg' },
-            ksp2: { path: 'assets/audio/bgm/menu2.ogg' }
+            ksp2: { path: 'assets/audio/bgm/menu1.ogg' }
         }
     },
-    // 飞行场景音乐：按宿主天体音乐分类选曲
+    // 飞行场景音乐：按宿主天体音乐分类选曲（尝鲜版全部指向同一首）
     flight: {
         loop: true,
         byBodyType: {
-            terrestrial: 'assets/audio/bgm/flight_terrestrial.ogg',
-            mun: 'assets/audio/bgm/flight_mun.ogg',
-            star: 'assets/audio/bgm/flight_star.ogg',
-            rocky: 'assets/audio/bgm/flight_rocky.ogg',
-            eve: 'assets/audio/bgm/flight_eve.ogg',
-            duna: 'assets/audio/bgm/flight_duna.ogg',
-            gas: 'assets/audio/bgm/flight_gas.ogg',
-            ice: 'assets/audio/bgm/flight_ice.ogg'
+            terrestrial: FLIGHT_BGM,
+            mun: FLIGHT_BGM,
+            star: FLIGHT_BGM,
+            rocky: FLIGHT_BGM,
+            eve: FLIGHT_BGM,
+            duna: FLIGHT_BGM,
+            gas: FLIGHT_BGM,
+            ice: FLIGHT_BGM
         }
     },
-    // 追踪站场景音乐
+    // 追踪站场景音乐（尝鲜版复用飞行通用曲）
     tracking: {
         loop: true,
-        path: 'assets/audio/bgm/tracking.ogg'
+        path: FLIGHT_BGM
     }
 };
 
@@ -253,21 +257,7 @@ export function buildAudioManifest() {
         }
     }
 
-    // 尝鲜版档位：音乐清单收缩到白名单（未列入的曲目从清单剔除，不会再被请求）
-    // 追踪站复用飞行通用曲 —— 只改清单里的路径，不改 musicMap 的语义
-    if (LITE_PROFILE.musicWhitelist) {
-        const keep = LITE_PROFILE.musicWhitelist;
-        const flightPath = manifest['music:flight_terrestrial'];
-        for (const key of Object.keys(manifest)) {
-            if (key.indexOf('music:') === 0 && keep.indexOf(key) < 0) {
-                delete manifest[key];
-            }
-        }
-        if (flightPath && manifest['music:tracking']) {
-            manifest['music:tracking'] = flightPath;
-        }
-    }
-
+    // 尝鲜版档位不需要额外白名单：musicMap 本身已收缩到 2 首（见文件顶部说明）
     return manifest;
 }
 

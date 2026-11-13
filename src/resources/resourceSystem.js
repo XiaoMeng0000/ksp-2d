@@ -6,7 +6,6 @@
 
 import { gameState } from '../gameState.js';
 import { isResourceFree } from './modeRules.js';
-import { getCargoUsed } from './cargoSystem.js';
 import { getSlot, addSlotAmount, drainSlotAmount } from './resourceSlot.js';
 
 // 获取资源槽（{amount, capacity}），不存在返回 null
@@ -51,7 +50,8 @@ export function drainResource(holder, resourceId, amount) {
     return drainSlotAmount(slot, amount);
 }
 
-// 获取飞船总质量（干质量 + 全部推进剂存量 + 货仓货物；兼容旧 fuel 字段）
+// 获取飞船总质量（干质量 + 全部推进剂存量；兼容旧 fuel 字段）
+// 尝鲜版：飞船货仓已移除，货物质量项不再计入（完整版在 main 分支）
 export function getTotalMass(ship) {
     if (!ship) return 0;
     let fuelMass = 0;
@@ -64,9 +64,7 @@ export function getTotalMass(ship) {
         // 迁移期兼容：无 resources 时回退旧 fuel 字段
         fuelMass = ship.fuel;
     }
-    // 0.2.0 阶段5：货仓货物计入总质量（影响推力加速度与 ΔV）
-    const cargoMass = getCargoUsed(ship);
-    return (ship.dryMass || 0) + fuelMass + cargoMass;
+    return (ship.dryMass || 0) + fuelMass;
 }
 
 // 获取推进剂总存量（迁移期兼容：有 resources 时汇总，否则回退旧 fuel 字段）
@@ -133,12 +131,11 @@ export const G0 = 9.81;
 
 // 计算飞船当前可用的 ΔV（KSP 方式：从当前状态烧到燃料耗尽）
 // ΔV = isp × g0 × ln(当前总质量 / 燃料耗尽后质量)
-// 0.2.0 阶段5：货物不参与燃烧，末质量 = 干质量 + 货仓货物（载荷越重 ΔV 越低）
-// 注意：多推进剂引擎下"先耗尽的那种燃料"决定实际 ΔV，双燃料按引擎配方精算在阶段 2 实现
+// 尝鲜版：无货仓载荷，末质量即干质量
 export function computeDeltaV(ship) {
     if (!ship || !ship.isp) return 0;
     const currentMass = getTotalMass(ship);
-    const endMass = (ship.dryMass || 0) + getCargoUsed(ship);
+    const endMass = ship.dryMass || 0;
     if (endMass <= 0 || currentMass <= endMass) return 0;
     return ship.isp * G0 * Math.log(currentMass / endMass);
 }

@@ -3,32 +3,9 @@
    所有 UI 样式从此处引用 CSS 变量,禁止在各 JS 文件中硬编码色值/字体
    ============================================================ */
 
-/* 字体引用
-   font-display: swap — 字体加载期间先用回退字体显示文本（FOIT 修复：
-   加载页使用本字体族且字体本身是加载资源之一，未加 swap 会整段文本不可见） */
-@font-face {
-    font-family: 'JetBrainsMono-Regular';
-    src: url('../../../assets/fonts/JetBrainsMapleMono/JetBrainsMapleMono-Regular.ttf') format('truetype');
-    font-display: swap;
-}
-
-@font-face {
-    font-family: 'JetBrainsMono-Bold';
-    src: url('../../../assets/fonts/JetBrainsMapleMono/JetBrainsMapleMono-Bold.ttf') format('truetype');
-    font-display: swap;
-}
-
-@font-face {
-    font-family: 'PixeledFont';
-    src: url('../../../assets/fonts/Uranus_Pixel.ttf') format('truetype');
-    font-display: swap;
-}
-
-@font-face {
-    font-family: 'doto';
-    src: url('../../../assets/fonts/doto.ttf') format('truetype');
-    font-display: swap;
-}
+/* 字体：尝鲜版不加载本地字体（见 src/config/assets/fontConfig.js 顶部说明），
+   全局统一使用系统等宽字体栈 —— 中文字符由浏览器逐字回落系统字体。
+   完整版的 @font-face 声明与本地字体文件在 `main` 分支维护。 */
 
 :root {
     /* ---- 配色 ---- */
@@ -108,21 +85,7 @@
     --hud-bg: #0d0d0d;
     /* 玩家 HUD 背景（参考图深黑实色） */
 
-    /* ---- 字体变量 ---- */
-    --font-mono: 'JetBrainsMono-Regular', monospace;
-    --font-mono-bold: 'JetBrainsMono-Bold', monospace;
-    --font-pixel: "PixeledFont", monospace;
-    --doto: 'doto', 'JetBrainsMono-Regular', monospace;
-}
-
-/* ============================================================
-   尝鲜版档位（html.lite-fonts）
-   由 index.html 的启动脚本在 `?profile=lite` 时挂到 <html> 上。
-   作用：字体变量整体切到系统等宽栈 —— @font-face 声明的本地字体不会被使用，
-   浏览器因此不会请求任何 ttf（字体文件体积 37.6MB，是尝鲜版首屏最大的一块）。
-   中文由浏览器逐字回落系统字体，属已知取舍（见 docs/尝鲜版方案.md 第十四节）。
-   ============================================================ */
-html.lite-fonts {
+    /* ---- 字体变量（系统等宽栈：与 S1 的 lite-fonts 覆盖一致，现为唯一来源） ---- */
     --font-mono: ui-monospace, "Cascadia Mono", Consolas, "Courier New", monospace;
     --font-mono-bold: ui-monospace, "Cascadia Mono", Consolas, "Courier New", monospace;
     --font-pixel: ui-monospace, "Cascadia Mono", Consolas, "Courier New", monospace;

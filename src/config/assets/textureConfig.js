@@ -15,7 +15,8 @@
 
 export const textureConfig = {
     title: 'assets/images/menu/title.png',
-    project_logo: 'assets/images/menu/ev.png',
+    // 逃逸速度 logo：尝鲜版转为 webp（578KB → 163KB，视觉无损），是唯一做重编码的图片
+    project_logo: 'assets/images/menu/ev.webp',
 
     // 主菜单链接栏图标
     link_qq: 'assets/images/menu/link_icons/icon_qq.png',
@@ -75,9 +76,6 @@ export const textureConfig = {
     // 存档管理 UI
     ui_trash_can: 'assets/images/ui/trash_can.png',
 
-    // 最新消息弹窗配图（0.3.0 内置图库；内容仓库只写 imageKey，图片随本体发布，不再走网络）
-    // 语义：release 新版本发布 / progress 制作组刚做好或正在做 / issue 开发遇到问题
-    news_release: 'assets/images/news/release.jpg',
-    news_progress: 'assets/images/news/progress.jpg',
-    news_issue: 'assets/images/news/issue.jpg',
+    // 尝鲜版说明：新闻配图（news_release / news_progress / news_issue）随「最新消息」功能一起移除，
+    // 完整版的最新消息配图在 `main` 分支维护。
 };

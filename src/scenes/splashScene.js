@@ -4,8 +4,6 @@ import { sceneManager } from '../sceneManager.js';
 import { eventBus, Events } from '../eventBus.js';
 import { textureManager } from '../graphics/textureManager.js';
 import { t } from '../config/ui/strings.js';
-import { resolveStartupNoticeKind } from '../news/latestNewsClient.js';
-import { FEATURE_FLAGS } from '../config/featureFlags.js';
 
 const LOGO_SEQUENCE = [
     { type: 'image', textureKey: 'project_logo', maxWidthRatio: 0.45, fadeIn: 0.8, hold: 1.5, fadeOut: 0.8 },
@@ -20,39 +18,11 @@ let _cleanupListeners = null;
 let _texturesHandler = null;
 let _hasSkipped = false;
 
-// 启动提示（0.3.0）：进主菜单后按数据决定弹什么
-//   news         —— 有在线「最新消息」且今日未勾选不再显示 → 弹最新消息
-//   none         —— 有消息但今日已勾选不再显示 → 什么都不弹
-//   announcement —— 无消息（拉取失败/作者下线）→ 退回自动打开公告（本地打包内容）
-// 决策是异步的：拉取仍在进行时最多再等 MENU_WAIT（覆盖「秒跳 splash」场景）
-function _openStartupNotice() {
-    // 尝鲜版档位：在线内容与公告均未装载 → 不拉最新消息、不自动弹公告
-    if (!FEATURE_FLAGS.latestNews && !FEATURE_FLAGS.announcement) {
-        return Promise.resolve();
-    }
-    return resolveStartupNoticeKind().then((kind) => {
-        if (kind === 'news' && typeof window.openLatestNews === 'function') {
-            window.openLatestNews();
-            return;
-        }
-        if (kind === 'none') {
-            return;
-        }
-        if (typeof window.openAnnouncement === 'function') {
-            window.openAnnouncement();
-        }
-    });
-}
-
 function _skipSplash() {
     _hasSkipped = true;
     _cleanup();
-    // 0.3.0：启动链直达主菜单，主菜单场景真正进入后再弹启动提示
-    sceneManager.switchToAsync('menu').then((ok) => {
-        if (ok) {
-            _openStartupNotice();
-        }
-    });
+    // 尝鲜版：启动链直达主菜单（在线最新消息 / 公告已移除，不再弹启动提示）
+    sceneManager.switchToAsync('menu');
 }
 
 function _cleanup() {
@@ -93,13 +63,8 @@ function _advancePhase() {
             _phase = 'fadeIn';
         }
     } else if (_phase === 'blackScreen') {
-        // 0.3.0：启动链直达主菜单，主菜单场景真正进入后再弹启动提示
-        //（其他场景返回主菜单不经此路径 → 不自动弹）
-        sceneManager.switchToAsync('menu').then((ok) => {
-            if (ok) {
-                _openStartupNotice();
-            }
-        });
+        // 尝鲜版：启动链直达主菜单（其他场景返回主菜单不经此路径）
+        sceneManager.switchToAsync('menu');
     }
 }
 

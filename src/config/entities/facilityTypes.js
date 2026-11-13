@@ -1,14 +1,15 @@
 'use strict';
 
 // 设施系统 — 设施类型配置
+// ⚠️ 尝鲜版只保留「轨道船坞」（开局预置在 Kerbin 轨道上的唯一建造设施）。
+//    补给站 / 科研站与部署新设施功能随完整版保留，本分支不提供。
 
 // 舱室定义（iconTexture: 0.3.0 起资产就近声明，路径相对项目根目录）
 const COMPARTMENT_DEFS = {
     bridge:           { name: '指令舱',     icon: '🎛️', iconTexture: 'assets/images/facilities/compartments/bridge.png' },
     dock_hub:         { name: '对接枢纽',   icon: '🔗', iconTexture: 'assets/images/facilities/compartments/dock_hub.png' },
     supply_terminal:  { name: '补给终端',   icon: '⛽', iconTexture: 'assets/images/facilities/compartments/supply_terminal.png' },
-    assembly_shop:    { name: '装配车间',   icon: '🔧', iconTexture: 'assets/images/facilities/compartments/assembly_shop.png' },
-    laboratory:       { name: '实验室',     icon: '🔬', iconTexture: 'assets/images/facilities/compartments/laboratory.png' }
+    assembly_shop:    { name: '装配车间',   icon: '🔧', iconTexture: 'assets/images/facilities/compartments/assembly_shop.png' }
 };
 
 // 服务名称映射
@@ -24,18 +25,15 @@ const SERVICE_NAMES = {
 
 // 设施分类定义
 const FACILITY_CATEGORIES = [
-    { id: 'infrastructure', name: '基础设施' },
-    { id: 'logistics',      name: '后勤保障' },
-    { id: 'science',        name: '科学研究' }
+    { id: 'infrastructure', name: '基础设施' }
 ];
 
 // 设施类型配置
-// 0.2.0 阶段5 新增字段：
-//   cost:           部署消耗的材料套装数（从部署飞船货仓扣除）
+// 0.2.0 阶段5 字段：
+//   cost:           部署消耗的材料套装数（尝鲜版不提供部署，字段保留给完整版）
 //   storageProfile: 存储配置 { base, modifiers }
-//     base      — 每种资源的基准容量（所有设施类型统一）
+//     base      — 每种资源的基准容量
 //     modifiers — 资源容量倍率表 { resourceId: multiplier }，未列出的资源按 base
-//     例：船坞 materialKits ×5、补给站氢氧 ×5、科研站无加成
 const FACILITY_TYPES = [
     {
         id: 'orbital_dockyard',
@@ -50,34 +48,6 @@ const FACILITY_TYPES = [
         services: ['dock', 'undock', 'refuel', 'refit', 'build_ship', 'switch_control'],
         cost: 100,
         storageProfile: { base: 1000, modifiers: { materialKits: 5 } }
-    },
-    {
-        id: 'supply_station',
-        name: '补给站',
-        category: 'logistics',
-        description: '专用燃料与物资补给节点，为往来飞船提供推进剂加注服务',
-        color: '#44cc88',
-        icon: '⛽',
-        iconTexture: 'assets/images/facilities/compartments/supply_terminal.png',
-        baseDocks: 1,
-        compartments: ['bridge', 'dock_hub', 'supply_terminal'],
-        services: ['dock', 'undock', 'refuel'],
-        cost: 150,
-        storageProfile: { base: 1000, modifiers: { hydrogen: 5, oxygen: 5 } }
-    },
-    {
-        id: 'research_station',
-        name: '科研站',
-        category: 'science',
-        description: '轨道科学实验平台，配备先进实验室，可解锁新型蓝图技术',
-        color: '#cc88ff',
-        icon: '🔬',
-        iconTexture: 'assets/images/facilities/compartments/laboratory.png',
-        baseDocks: 1,
-        compartments: ['bridge', 'dock_hub', 'supply_terminal', 'laboratory'],
-        services: ['dock', 'undock', 'refuel', 'unlock_blueprint'],
-        cost: 200,
-        storageProfile: { base: 1000, modifiers: {} }
     }
 ];
 

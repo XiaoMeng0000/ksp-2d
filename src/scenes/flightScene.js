@@ -8,7 +8,6 @@ import { updateCelestialBodies, getSOIHost, getAbsolutePosition, getRelativePosi
 import { stateToKepler } from '../physics/orbitalMechanics.js';
 import { getTimeToNextSOISwitch, bodyFuturePos, getCachedTime } from '../physics/orbitalPrediction.js';
 import { render, renderFlightHud, getLastOrbitSegments, getLastOrbitMarkers, setOrbitHoverState, findNearestOrbitPoint, resolveOrbitHit } from '../renderer.js';
-import { STAR_LAYER_CONFIG } from '../config/gameplay/starLayerConfig.js';
 import { showOrbitContextMenu, updateOrbitContextMenu } from '../ui/orbitContextMenu.js';
 import { updateManeuverUI, hideManeuverUI, isManeuverDragging, collapseManeuverEditing } from '../ui/maneuverUI.js';
 import { updateManeuverViewPanel, hideManeuverViewPanel } from '../ui/maneuverViewPanel.js';
@@ -27,12 +26,9 @@ import { showTooltip, hideTooltip } from '../ui/uiTooltip.js';
 import { clearOrbitLabels } from '../ui/orbitLabels.js';
 import { facilitySystem } from '../facility/facilitySystem.js';
 import { getModuleDef } from '../config/entities/moduleTypes.js';
-import { getFacilityType } from '../config/entities/facilityTypes.js';
 import { getTotalMass, getResource, drainResource, getFuelAmount, getFuelCapacity } from '../resources/resourceSystem.js';
-import { updateScanProgress } from '../resources/scanSystem.js';
 import { computeManeuverDirection } from '../physics/maneuverPrediction.js';
 import { getEngineType } from '../config/entities/engineConfig.js';
-import { consumeCargo, hasCargoHold, getCargoAmount } from '../resources/cargoSystem.js';
 import { isBalanceEnforced } from '../resources/modeRules.js';
 import { timeWarp } from '../timeWarp.js';
 import { getSOIWarpProtectEnabled } from '../config/gameplay/settingsConfig.js';
@@ -189,96 +185,6 @@ eventBus.on(Events.SHIP_COMMAND, ({ action, params }) => {
                 ship.orbitTime = 0;
                 ship.thrust = { ax: 0, ay: 0 };
             }
-            break;
-        }
-        case 'deployFacility': {
-            const typeId = params?.typeId;
-            if (!typeId) break;
-
-            // 检查是否有建设模块
-            const hasModule = ship.modules?.some(m => {
-                const def = getModuleDef(m.type);
-                return def?.capability === 'deploy_facility';
-            });
-            if (!hasModule) {
-                window.showNotification(t('deploy.noModule'), 'warning');
-                break;
-            }
-
-            // 0.2.0 阶段5：部署设施消耗材料套装（从部署飞船货仓扣除）
-            // 修复：扣费校验前置但实际扣除后移 —— 原实现在所有轨道校验之前扣费，
-            // 校验失败（逃逸轨道/危险区）时材料套装已被扣但设施未部署（资源丢失）
-            // 0.2.0 阶段7：自由模式跳过全部资费检查（货仓+余额均不拦截，无货仓不扣费，
-            // 有货仓扣到 0 为止）；生涯模式严格校验货仓与余额
-            const deployTypeCfg = getFacilityType(typeId);
-            const deployCost = (deployTypeCfg && deployTypeCfg.cost) || 0;
-            if (deployCost > 0 && isBalanceEnforced() && (!hasCargoHold(ship) || getCargoAmount(ship, 'materialKits') < deployCost)) {
-                window.showNotification(t('deploy.noKits'), 'warning');
-                break;
-            }
-
-            // 检查在宿主 SOI 内且在轨
-            if (!ship.currentSOI || ship.mode !== 'on_rails') {
-                window.showNotification(t('deploy.needStableOrbit'), 'warning');
-                break;
-            }
-
-            // 检查是否为稳定轨道（禁止逃逸轨道上部署，防止设施 SOI 切换 Bug）
-            // 双曲线轨道 kepler.a < 0（e>=1 无椭圆解），椭圆/圆轨道 a > 0
-            if (!ship.kepler || ship.kepler.a < 0) {
-                window.showNotification(t('deploy.noEscapeTrajectory'), 'warning');
-                break;
-            }
-
-            // 检查是否处于危险边界内（大气边界 / 表面边界），禁止向危险区域部署设施
-            const hostBody = celestialBodies.find(b => b.name === ship.currentSOI);
-            if (hostBody) {
-                const shipAbs = getAbsolutePosition(ship);
-                const hdx = shipAbs.x - hostBody.position.x;
-                const hdy = shipAbs.y - hostBody.position.y;
-                const shipDist = Math.sqrt(hdx * hdx + hdy * hdy);
-                const hazardBoundary = hostBody.hasAtmosphere && hostBody.atmosphereHeight > 0
-                    ? hostBody.radius + hostBody.atmosphereHeight
-                    : hostBody.radius;
-                if (shipDist < hazardBoundary) {
-                    window.showNotification(t('deploy.dangerZone'), 'warning');
-                    break;
-                }
-            }
-
-            // 创建设施（createFacility 期望绝对世界坐标，需从相对坐标转换）
-            const absPos = getAbsolutePosition(ship);
-            const typeCfg = getFacilityType(typeId);
-            const facilityName = params?.facilityName || (typeCfg ? t('deploy.newName', { name: typeCfg.name }) : t('deploy.newFacility'));
-            const facility = facilitySystem.createFacility(
-                typeId,
-                facilityName,
-                { x: absPos.x, y: absPos.y },
-                { x: ship.vel.x, y: ship.vel.y },
-                ship.currentSOI
-            );
-
-            // 设施创建成功后才真正扣费 + 消耗建设模块（避免失败时资源/模块丢失）
-            if (!facility) {
-                window.showNotification(t('deploy.failed'), 'error');
-                break;
-            }
-            if (deployCost > 0) consumeCargo(ship, 'materialKits', deployCost);
-
-            // 消耗建设模块（移除第一个匹配的）
-            const modIndex = ship.modules.findIndex(m => {
-                const def = getModuleDef(m.type);
-                return def?.capability === 'deploy_facility';
-            });
-            const removed = ship.modules.splice(modIndex, 1)[0];
-            const removedDef = getModuleDef(removed.type);
-            if (removedDef) {
-                ship.dryMass -= removedDef.massBonus;
-                ship.momentOfInertia -= removedDef.momentOfInertiaBonus;
-            }
-            shipSystem.persistShip(ship);
-
-            window.showNotification(t('deploy.success', { name: facilityName }), 'success');
             break;
         }
         case 'deployToBody': {
@@ -825,9 +731,6 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
             updateCelestialBodies(_getCelestialTime());
             eventBus.emit(Events.CELESTIAL_TIME_UPDATED, { time: _getCelestialTime(), dt: simDt });
 
-            // 0.2.0 阶段6：扫描任务推进（随 simDt，时间加速下同步加速）
-            updateScanProgress(simDt);
-
             // 物理推进
             for (const s of allShips) {
                 const isActive = s.id === activeId;
@@ -1125,9 +1028,7 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 facilities: renderFacilities,
                 // 0.2.5（H4）：渲染层不直连业务模块，飞船列表由场景层注入
                 ships: shipSystem.getAllShips(),
-                selectedFacilityId: _activeFacilityId,
-                // WebGL 恒星层：按配置开关；动画用真实帧间隔（不随时间加速）
-                starLayer: { enabled: STAR_LAYER_CONFIG.scenes.flightScene === true, dt: _lastDt }
+                selectedFacilityId: _activeFacilityId
             });
 
             // 0.2.4 提交4：每帧驱动轨道悬停检测（渲染循环兜底：圆点必跟手；
