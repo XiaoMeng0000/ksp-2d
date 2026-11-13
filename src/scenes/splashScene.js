@@ -5,6 +5,7 @@ import { eventBus, Events } from '../eventBus.js';
 import { textureManager } from '../graphics/textureManager.js';
 import { t } from '../config/ui/strings.js';
 import { resolveStartupNoticeKind } from '../news/latestNewsClient.js';
+import { FEATURE_FLAGS } from '../config/featureFlags.js';
 
 const LOGO_SEQUENCE = [
     { type: 'image', textureKey: 'project_logo', maxWidthRatio: 0.45, fadeIn: 0.8, hold: 1.5, fadeOut: 0.8 },
@@ -25,6 +26,10 @@ let _hasSkipped = false;
 //   announcement —— 无消息（拉取失败/作者下线）→ 退回自动打开公告（本地打包内容）
 // 决策是异步的：拉取仍在进行时最多再等 MENU_WAIT（覆盖「秒跳 splash」场景）
 function _openStartupNotice() {
+    // 尝鲜版档位：在线内容与公告均未装载 → 不拉最新消息、不自动弹公告
+    if (!FEATURE_FLAGS.latestNews && !FEATURE_FLAGS.announcement) {
+        return Promise.resolve();
+    }
     return resolveStartupNoticeKind().then((kind) => {
         if (kind === 'news' && typeof window.openLatestNews === 'function') {
             window.openLatestNews();

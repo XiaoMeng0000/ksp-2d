@@ -116,6 +116,20 @@
 }
 
 /* ============================================================
+   尝鲜版档位（html.lite-fonts）
+   由 index.html 的启动脚本在 `?profile=lite` 时挂到 <html> 上。
+   作用：字体变量整体切到系统等宽栈 —— @font-face 声明的本地字体不会被使用，
+   浏览器因此不会请求任何 ttf（字体文件体积 37.6MB，是尝鲜版首屏最大的一块）。
+   中文由浏览器逐字回落系统字体，属已知取舍（见 docs/尝鲜版方案.md 第十四节）。
+   ============================================================ */
+html.lite-fonts {
+    --font-mono: ui-monospace, "Cascadia Mono", Consolas, "Courier New", monospace;
+    --font-mono-bold: ui-monospace, "Cascadia Mono", Consolas, "Courier New", monospace;
+    --font-pixel: ui-monospace, "Cascadia Mono", Consolas, "Courier New", monospace;
+    --doto: ui-monospace, "Cascadia Mono", Consolas, "Courier New", monospace;
+}
+
+/* ============================================================
    全局文本选择策略
    游戏 UI 为界面化操作，禁止鼠标拖拽选中文本；
    输入框 / 文本域 / 可编辑区保留选中与编辑能力（名称输入等）。

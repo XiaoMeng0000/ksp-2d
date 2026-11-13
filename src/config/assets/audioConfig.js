@@ -3,6 +3,8 @@
 // 音频资源配置模块 — 数据驱动，所有音频内容在此声明
 // 目录约定：音乐放 assets/audio/bgm/，音效放 assets/audio/sfx/
 
+import { LITE_PROFILE } from './liteProfile.js';
+
 // 背景音乐总线增益（0~1）：总监定稿全曲目音量 = 默认的 3/4
 // 注意：必须定义在 VOLUME_DEFAULTS 之前（其引用此常量）；设置面板音量调节复用 setMusicVolume 等接口
 export const MUSIC_VOLUME = 0.75;
@@ -250,7 +252,32 @@ export function buildAudioManifest() {
             manifest['sfx:' + key] = entry.path;
         }
     }
+
+    // 尝鲜版档位：音乐清单收缩到白名单（未列入的曲目从清单剔除，不会再被请求）
+    // 追踪站复用飞行通用曲 —— 只改清单里的路径，不改 musicMap 的语义
+    if (LITE_PROFILE.musicWhitelist) {
+        const keep = LITE_PROFILE.musicWhitelist;
+        const flightPath = manifest['music:flight_terrestrial'];
+        for (const key of Object.keys(manifest)) {
+            if (key.indexOf('music:') === 0 && keep.indexOf(key) < 0) {
+                delete manifest[key];
+            }
+        }
+        if (flightPath && manifest['music:tracking']) {
+            manifest['music:tracking'] = flightPath;
+        }
+    }
+
     return manifest;
+}
+
+// 启动预载清单：'all' = 全部音频；'sfx' = 只预载音效（音乐改为进场景时懒加载）
+export function filterStartupAudioIds(manifest) {
+    const ids = Object.keys(manifest);
+    if (LITE_PROFILE.audioStartup !== 'sfx') {
+        return ids;
+    }
+    return ids.filter((id) => id.indexOf('sfx:') === 0);
 }
 
 // 返回指定音效的随机变体资源标识（如 'sfx:soi_change_a'）

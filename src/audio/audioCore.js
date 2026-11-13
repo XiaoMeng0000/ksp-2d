@@ -1,7 +1,7 @@
 'use strict';
 
 import { eventBus, Events } from '../eventBus.js';
-import { buildAudioManifest, MUSIC_VOLUME, getSfxChannel, getStoredVolume } from '../config/assets/audioConfig.js';
+import { buildAudioManifest, filterStartupAudioIds, MUSIC_VOLUME, getSfxChannel, getStoredVolume } from '../config/assets/audioConfig.js';
 
 // 音乐淡入/淡出时长（秒）
 const FADE_DURATION = 0.4;
@@ -21,6 +21,9 @@ class AudioCore {
         this._completed = 0;
         this._ready = false;
         this._pendingPlays = [];     // 按需补载中的待播请求（0.2.5：资产后置/加载失败自愈）
+        this._pendingMusicRequest = null; // 未就绪时收到的音乐请求（就绪后补播）
+        this._musicLoading = new Map();   // 音乐按需加载中的 Promise（防重复请求）
+        this._manifest = null;            // 最近一次音频清单（按需加载查路径用）
 
         // 音量总线：master → { music, sfx → { ui, comms } }
         // 分类音量（设置面板可调）：总 / 音乐 / UI 音效 / 坎巴拉人通讯音
@@ -108,7 +111,11 @@ class AudioCore {
         }
 
         const manifest = buildAudioManifest();
-        this._total = Object.keys(manifest).length;
+        this._manifest = manifest;
+        // 启动预载清单：尝鲜版档位只预载音效，音乐改为进场景时按需加载
+        const startupIds = filterStartupAudioIds(manifest);
+        this._startupIds = startupIds;
+        this._total = startupIds.length;
         this._completed = 0;
         this._ready = false;
 
@@ -119,17 +126,22 @@ class AudioCore {
             return this;
         }
 
-        console.log('[AudioCore] 开始加载 ' + this._total + ' 个音频资源...');
+        console.log('[AudioCore] 开始加载 ' + this._total + ' 个音频资源（清单共 '
+            + Object.keys(manifest).length + ' 个，音乐按需加载）...');
 
-        for (const id in manifest) {
-            this._loadBuffer(id, manifest[id]);
+        for (const id of startupIds) {
+            this._loadBuffer(id, manifest[id], true);
         }
 
         return this;
     }
 
     // 加载并解码单个音频资源
-    async _loadBuffer(id, path) {
+    // isStartup: 是否属于启动预载（只有启动项参与总数/进度统计，按需加载不打乱进度）
+    async _loadBuffer(id, path, isStartup = false) {
+        if (this._buffers.has(id)) {
+            return this._buffers.get(id);
+        }
         try {
             const res = await fetch(path);
             if (!res.ok) {
@@ -138,32 +150,42 @@ class AudioCore {
             const arrayBuffer = await res.arrayBuffer();
             const buffer = await this._ctx.decodeAudioData(arrayBuffer);
             this._buffers.set(id, buffer);
-            this._completed++;
-            console.log('[AudioCore] 已加载: ' + id + ' (' + this._completed + '/' + this._total + ')');
-            eventBus.emit(Events.AUDIO_PROGRESS, {
-                key: id,
-                loaded: this._completed,
-                total: this._total,
-                success: true
-            });
+            if (isStartup) {
+                this._completed++;
+                console.log('[AudioCore] 已加载: ' + id + ' (' + this._completed + '/' + this._total + ')');
+                eventBus.emit(Events.AUDIO_PROGRESS, {
+                    key: id,
+                    loaded: this._completed,
+                    total: this._total,
+                    success: true
+                });
+            } else {
+                console.log('[AudioCore] 按需加载完成: ' + id);
+            }
             // 按需补载成功 → 补播排队中的一次性事件音效（如机动节点到达音）
             const pending = this._pendingPlays.filter(p => p.id === id);
             this._pendingPlays = this._pendingPlays.filter(p => p.id !== id);
             for (const p of pending) {
                 this._playBuffer(id, buffer, p.volume, p.rate);
             }
+            return buffer;
         } catch (e) {
-            this._completed++;
+            if (isStartup) {
+                this._completed++;
+                eventBus.emit(Events.AUDIO_LOAD_ERROR, { key: id, path });
+                eventBus.emit(Events.AUDIO_PROGRESS, {
+                    key: id,
+                    loaded: this._completed,
+                    total: this._total,
+                    success: false
+                });
+            }
             console.error('[AudioCore] 加载失败: ' + id + ' → ' + path, e);
-            eventBus.emit(Events.AUDIO_LOAD_ERROR, { key: id, path });
-            eventBus.emit(Events.AUDIO_PROGRESS, {
-                key: id,
-                loaded: this._completed,
-                total: this._total,
-                success: false
-            });
+            return null;
         } finally {
-            this._checkAllDone();
+            if (isStartup) {
+                this._checkAllDone();
+            }
         }
     }
 
@@ -171,18 +193,27 @@ class AudioCore {
     _checkAllDone() {
         if (this._completed >= this._total) {
             this._ready = true;
-            const loaded = this._buffers.size;
+            // 只统计启动预载项（按需加载已完成项不计入，避免与总数不匹配）
+            const startupIds = this._startupIds || [];
+            const loaded = startupIds.filter((id) => this._buffers.has(id)).length;
             const failed = this._total - loaded;
             console.log('[AudioCore] 全部完成 — 成功: ' + loaded + ', 失败: ' + failed);
             eventBus.emit(Events.AUDIO_READY, { total: this._total, loaded, failed });
+            // 就绪前收到的音乐请求 → 补播
+            if (this._pendingMusicRequest) {
+                const req = this._pendingMusicRequest;
+                this._pendingMusicRequest = null;
+                this.playMusic(req.sceneKey, req.variantKey);
+            }
         }
     }
 
     // 播放音乐：key 变化时先淡出旧曲再淡入新曲，无爆音切换
     // sceneKey 为音乐场景标识（如 'menu'），variantKey 为可选变体（如 'ksp1'/'ksp2'）
+    // 尝鲜版档位下音乐不进启动预载 → 首次进入场景时按需拉取，解码完成后自动开播
     playMusic(sceneKey, variantKey) {
-        if (!this._ctx || !this._ready) {
-            return; // 未就绪时静默跳过
+        if (!this._ctx) {
+            return; // 无 Web Audio 支持，静默跳过
         }
         const id = variantKey
             ? 'music:' + sceneKey + '_' + variantKey
@@ -191,12 +222,44 @@ class AudioCore {
             return; // 同一首音乐不重复切换
         }
 
-        const buffer = this._buffers.get(id);
-        if (!buffer) {
-            console.warn('[AudioCore] 音乐资源未找到: ' + id);
+        // 启动预载尚未就绪：先记住请求，就绪后由 _checkAllDone 补播
+        if (!this._ready) {
+            this._pendingMusicRequest = { sceneKey, variantKey };
             return;
         }
 
+        const buffer = this._buffers.get(id);
+        if (!buffer) {
+            this._loadMusicOnDemand(id);
+            return;
+        }
+
+        this._startMusic(id, buffer);
+    }
+
+    // 音乐按需加载：清单里没有该曲目则告警跳过；解码完成后若仍需要播放则立即开播
+    _loadMusicOnDemand(id) {
+        const path = (this._manifest || buildAudioManifest())[id];
+        if (!path) {
+            console.warn('[AudioCore] 音乐资源未配置: ' + id);
+            return;
+        }
+        if (this._musicLoading.has(id)) {
+            return;
+        }
+        console.log('[AudioCore] 音乐按需加载: ' + id);
+        const promise = this._loadBuffer(id, path, false).then((buffer) => {
+            this._musicLoading.delete(id);
+            if (buffer && this._currentMusicKey !== id) {
+                this._startMusic(id, buffer);
+            }
+            return buffer;
+        });
+        this._musicLoading.set(id, promise);
+    }
+
+    // 实际开始播放（缓冲已就绪路径）
+    _startMusic(id, buffer) {
         // 停止旧曲
         this._stopMusicInternal();
 

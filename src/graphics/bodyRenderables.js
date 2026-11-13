@@ -22,6 +22,7 @@
 
 import { renderableManager } from './renderable.js';
 import { solarSystemData } from '../config/world/starSystemIndex.js';
+import { LITE_PROFILE } from '../config/assets/liteProfile.js';
 
 export const bodyRenderableConfigs = {
     // Dres：表面贴图 + 程序星环（2D 俯视为正圆环带，多细分分层）
@@ -78,6 +79,25 @@ export const bodyRenderableConfigs = {
     }
 };
 
+// 尝鲜版档位：把配置里的贴图层整体剥离，只留程序绘制层
+//   - 恒星分档（modes）：优先取不含贴图的 far 档（star_ball + 多层光晕），视觉上仍是发光恒星
+//   - 单档（layers）：剥掉 texture 层后若还有程序层则保留（如程序星环），否则返回 null
+function _toLiteConfig(override) {
+    const stripTexture = (layers) => (layers || []).filter((layer) => !layer.texture);
+
+    if (override.modes) {
+        const far = override.modes.far;
+        const pick = (far && far.layers) ? far : override.modes.near;
+        const layers = stripTexture(pick && pick.layers);
+        return layers.length ? { layers } : null;
+    }
+    if (override.layers) {
+        const layers = stripTexture(override.layers);
+        return layers.length ? { layers } : null;
+    }
+    return null;
+}
+
 // 将配置注册进 RenderableManager（main.js 启动时调用一次）
 // 遍历全量星系静态数据（starSystemRegistry 的超集）而非当前激活集，
 // 保证后续切换到任意星系组合时，其天体渲染层已注册就绪
@@ -89,6 +109,17 @@ export function registerBodyRenderables() {
         if (!key) continue;
 
         const override = bodyRenderableConfigs[key];
+
+        // 尝鲜版档位：只注册程序层；默认规则（只画贴图）的天体不注册 → 渲染层走代表色纯色兜底
+        if (LITE_PROFILE.enabled) {
+            if (!override) continue;
+            const liteConfig = _toLiteConfig(override);
+            if (!liteConfig) continue;
+            renderableManager.register(key, liteConfig);
+            registered++;
+            continue;
+        }
+
         if (override) {
             renderableManager.register(key, override);
             registered++;
@@ -102,5 +133,5 @@ export function registerBodyRenderables() {
         // 既无例外配置也无贴图的占位天体（如测试星系）→ 不注册，渲染层走代表色纯色兜底
     }
 
-    console.log(`[BodyRenderables] 已注册 ${registered} 个天体渲染配置`);
+    console.log(`[BodyRenderables] 已注册 ${registered} 个天体渲染配置` + (LITE_PROFILE.enabled ? '（尝鲜版档位：无贴图）' : ''));
 }

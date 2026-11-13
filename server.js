@@ -22,8 +22,10 @@ const MIME_TYPES = {
 };
 
 const server = http.createServer((req, res) => {
-    let filePath = '.' + req.url;
-    if (filePath === './') {
+    // 去掉查询串与锚点（`?profile=lite` 这类参数属页面参数，不是文件路径的一部分）
+    const urlPath = String(req.url || '/').split('?')[0].split('#')[0];
+    let filePath = '.' + urlPath;
+    if (filePath === './' || filePath === '.') {
         filePath = './index.html';
     }
 

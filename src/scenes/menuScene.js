@@ -9,6 +9,7 @@ import { MENUS } from '../config/ui/menuConfig.js';
 import { LINKS_ICONS } from '../config/ui/menuConfig.js'; // 1. 导入数据
 import { VERSION_TEXT } from '../config/meta/version.js';
 import { SETTINGS_ROWS } from '../config/gameplay/settingsConfig.js';
+import { LITE_PROFILE } from '../config/assets/liteProfile.js';
 
 // 主菜单 — DOM 版（阶段 3：Canvas→DOM）
 // - 数据驱动：menuConfig.js 的 MENUS 定义各菜单按钮（label/action）
@@ -29,6 +30,8 @@ let _settingsClosedHandler = null;
 // 读取菜单样式 —— 存储键取 settingsConfig 的定义（配置集中，不硬编码字面量）
 // 旧值 stars/image（以及任何未知值）一律落到 style2；style1 为显式 opt-in
 function _readMenuBgMode() {
+    // 尝鲜版档位：强制纯星空（不加载 WebGL 星球与高清贴图）
+    if (LITE_PROFILE.menuStyle) return LITE_PROFILE.menuStyle;
     const row = (SETTINGS_ROWS.display || []).find(r => r.group === 'menuBg');
     if (!row) return 'style2';
     const raw = localStorage.getItem(row.storageKey);
