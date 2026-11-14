@@ -2,7 +2,6 @@
 
 import { eventBus, Events } from '../eventBus.js';
 import { gameState } from '../gameState.js';
-import { getModuleDef } from '../config/entities/moduleTypes.js';
 import { renderIconHtml, createConfirmDialog } from './uiComponents.js';
 import { getFacilityType } from '../config/entities/facilityTypes.js';
 import { facilitySystem } from '../facility/facilitySystem.js';
@@ -166,23 +165,7 @@ function renderShipSections(node) {
         { label: t('tracking.totalMass'), value: totalMass > 0 ? totalMass.toFixed(2) + ' t' : 'N/A' }
     ]);
 
-    // 模块分组
-    const modules = ship.modules || [];
-    let moduleHtml = '';
-    if (modules.length === 0) {
-        moduleHtml = `<div class="tracking-list-empty">${t('tracking.noModules')}</div>`;
-    } else {
-        const counts = {};
-        for (const mod of modules) {
-            counts[mod.type] = (counts[mod.type] || 0) + 1;
-        }
-        for (const [typeId, count] of Object.entries(counts)) {
-            const def = getModuleDef(typeId);
-            if (def) {
-                moduleHtml += `<div class="tracking-module-row">${renderIconHtml(def.iconTexture, def.icon)} ${def.name} ×${count}</div>`;
-            }
-        }
-    }
+    // 尝鲜版：模块管理与安装入口已移除（飞船不再挂模块），模块分组也一并去掉。
 
     // 操作按钮：聚焦 / 控制 / 摧毁
     const btns = `<div class="tracking-btn-grid">` +
@@ -191,8 +174,7 @@ function renderShipSections(node) {
         `<button class="tracking-destroy-btn" data-action="destroy-node">${t('tracking.destroy')}</button>` +
         `</div>`;
 
-    return btns + renderSection('flight', t('tracking.secFlight'), flightGrid)
-        + renderSection('modules', t('tracking.secModules'), moduleHtml);
+    return btns + renderSection('flight', t('tracking.secFlight'), flightGrid);
 }
 
 // 追踪站 - 设施分组（设施信息 / 停靠飞船）

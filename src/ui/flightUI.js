@@ -6,9 +6,8 @@ import { shipSystem } from '../ship/shipSystem.js';
 import { gameState } from '../gameState.js';
 import { facilitySystem } from '../facility/facilitySystem.js';
 import { getFacilityCompartments, getFacilityType, getCompartmentDef } from '../config/entities/facilityTypes.js';
-import { getModuleDef, getCapabilityToolbar } from '../config/entities/moduleTypes.js';
 import { textureManager } from '../graphics/textureManager.js';
-import { renderIconHtml, renderFuelBarsHtml, showModuleSelectorPopup, createDialog, createInputDialog } from './uiComponents.js';
+import { renderIconHtml, renderFuelBarsHtml, createDialog, createInputDialog } from './uiComponents.js';
 import { showTooltip, hideTooltip } from './uiTooltip.js';
 // 尝鲜版：飞船货仓与星球扫描已移除（见 docs/尝鲜版方案.md），
 // 设施存储 / 补给仍保留（船坞建造与加注依赖 cargoSystem 的设施侧接口）
@@ -87,15 +86,9 @@ function closePanel(panelId) {
     }
 }
 
-// 工具栏能力图标 → 面板 id 映射(0.2.4 图标点击切换语义:图标与其面板 1:1)
-// 尝鲜版：货仓 / 扫描能力已移除，只剩部署设施入口（完整版功能，点击提示下载完整版）
-const CAPABILITY_PANEL = {
-    deploy_facility: 'facilityDeploy'
-};
-
 // 统一工具栏 — 动态图标渲染（0.2.7 KSP2 重构：竖排标题 + 裸图标行 + 状态竖条选中态）
 // mode: 'ship' | 'facility' | 'off'
-// data: { modules, shipId } 或 { facilityId } 或 null
+// data: { facilityId } 或 null（尝鲜版：飞船模式已无可用的能力图标）
 export function renderToolbarIcons(mode, data) {
     leftToolbar.innerHTML = '';
     if (mode === 'off' || !data) return;
@@ -154,27 +147,7 @@ export function renderToolbarIcons(mode, data) {
         leftToolbar.appendChild(item);
     };
 
-    if (mode === 'ship') {
-        const seen = new Set();
-        for (const mod of (data.modules || [])) {
-            const def = getModuleDef(mod.type);
-            if (!def || !def.capability) continue;
-            if (seen.has(def.capability)) continue;
-            seen.add(def.capability);
-
-            // 数据驱动收敛：图标/文案由 CAPABILITY_TOOLBAR 查表，行为按 capability 分发
-            // 0.3.0：按钮贴图取 tb.iconTexture（就近声明），iconId 只作 DOM id 用
-            const tb = getCapabilityToolbar(def.capability);
-            if (!tb) continue;
-            const onClick = () => {
-                if (def.capability === 'deploy_facility') {
-                    // 尝鲜版不提供设施部署：请求事件已无人订阅，后续由完整版提示弹窗接管
-                    eventBus.emit(Events.FACILITY_DEPLOY_REQUESTED);
-                }
-            };
-            createIcon(tb.icon, t(tb.labelKey), onClick, tb.iconTexture, tb.iconId, CAPABILITY_PANEL[def.capability] || null);
-        }
-    } else if (mode === 'facility') {
+    if (mode === 'facility') {
         const facility = facilitySystem.getFacility(data.facilityId);
         if (!facility) return;
         _currentFacility = facility;
@@ -285,67 +258,6 @@ function buildFacilityStorageContent(facility) {
     return html;
 }
 
-// 模块管理面板（对接枢纽入口）— 槽位列表，空槽安装 / 已装卸载
-// 0.2.7 分区布局：飞船信息区 + 槽位网格（.tkp-grid）
-function buildModuleManageContent(facility, shipId) {
-    const ship = facility.dockedShips.find(s => s.id === shipId);
-    if (!ship) return '<div class="tkp-card"><div class="tkp-hint" style="margin:0;">' + t('facility.unknownCompartment') + '</div></div>';
-
-    const total = ship.moduleSlots || 0;
-
-    // 分区一：飞船信息（名称 + 槽位数 + 提示）
-    let html = '<div class="tkp-section">' + t('dock.shipSection') + '</div>'
-        + '<div class="tkp-card-sm">'
-        + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">'
-        + '<span style="font-size:13px;color:var(--text-bright);font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (ship.displayName || ship.id) + '</span>'
-        + '<span style="flex-shrink:0;color:var(--text-dim);font-size:10px;">' + t('dock.slotsCount', { n: total }) + '</span>'
-        + '</div>'
-        + '<div class="tkp-hint-muted" style="text-align:left;margin:6px 0 0;">' + t('dock.moduleManageHint') + '</div>'
-        + '</div>';
-
-    if (total === 0) {
-        html += '<div class="tkp-card-sm"><div class="tkp-hint" style="margin:0;">' + t('build.noSlots') + '</div></div>';
-        return html;
-    }
-
-    // 分区二：槽位网格（空槽虚线安装 / 已装模块卡 + 卸载）
-    html += '<div class="tkp-section">' + t('dock.slotsSection') + '</div>'
-        + '<div class="tkp-grid">';
-    for (let i = 0; i < total; i++) {
-        const mod = ship.modules[i];
-        if (mod) {
-            const def = getModuleDef(mod.type);
-            html += '<div class="tkp-slot" style="display:flex;align-items:center;justify-content:space-between;gap:6px;padding:6px 8px;">'
-                + '<span style="font-size:11px;color:var(--text-main);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'
-                + renderIconHtml(def?.iconTexture, def?.icon, 12) + ' ' + (def ? def.name : mod.type) + '</span>'
-                + '<button data-action="uninstall-module" data-ship-id="' + shipId + '" data-mod-id="' + mod.id + '" class="tkp-btn" style="flex:none;height:20px;padding:0 8px;font-size:10px;">' + t('build.uninstall') + '</button>'
-                + '</div>';
-        } else {
-            html += '<button data-action="install-module" data-ship-id="' + shipId + '" data-slot-index="' + i + '" class="tkp-slot-empty">'
-                + t('build.slotIndex', { i: i + 1 }) + ' · ' + t('dock.installModule') + '</button>';
-        }
-    }
-    html += '</div>';
-    return html;
-}
-
-// 模块安装选择弹窗（模块管理面板：空槽点击）— 0.2.7 统一走共享组件 showModuleSelectorPopup
-// 视觉（紫描边外框/分类紫头折叠/无边框行）由 ksp2_panels.css 统一管理
-function showFacilityModuleSelector(facility, shipId, anchorEl) {
-    showModuleSelectorPopup({
-        anchorEl,
-        onSelect: (def) => {
-            const ok = facilitySystem.addModuleToShip(facility.id, shipId, def.id);
-            if (!ok) {
-                window.showNotification(t('economy.insufficientKits'), 'error');
-            } else {
-                window.showNotification(t('dock.moduleInstalled', { name: def.name }), 'success');
-            }
-            openPage('moduleManage', t('dock.moduleManage'), buildModuleManageContent(facilitySystem.getFacility(facility.id), shipId));
-        }
-    });
-}
-
 // ========== 舱室内容渲染 ==========
 function openCompartmentPanel(facility, compartmentId) {
     const compDef = getCompartmentDef(compartmentId);
@@ -361,9 +273,6 @@ function openCompartmentPanel(facility, compartmentId) {
             break;
         case 'supply_terminal':
             html = buildSupplyTerminalContent(facility);
-            break;
-        case 'laboratory':
-            html = '<div class="tkp-card"><div class="tkp-hint" style="margin:0;">' + t('facility.bridgeResearch') + '</div></div>';
             break;
         default:
             html = '<div style="color:var(--text-faint);">' + t('facility.unknownCompartment') + '</div>';
@@ -436,13 +345,10 @@ function buildDockHubContent(facility) {
         for (const ship of dockedShips) {
             html += '<div class="tkp-slot" style="display:flex;flex-direction:column;gap:6px;padding:10px 12px;">'
                 + '<div style="font-size:13px;color:var(--text-mid);font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + renderIconHtml('ship_default_active', '🚀', 12) + ' ' + (ship.displayName || ship.id) + '</div>'
-                + '<div style="display:flex;flex-direction:column;gap:4px;">' + renderFuelBarsHtml(ship) + '</div>'
-                + '<div style="font-size:10px;color:var(--text-dim);">' + t('dock.modulesCount', { n: ship.modules?.length || 0 }) + '</div>';
+                + '<div style="display:flex;flex-direction:column;gap:4px;">' + renderFuelBarsHtml(ship) + '</div>';
             if (!activeShip) {
-                // 0.2.0 阶段5：切换控制改为模块管理 + 起飞
-                // （尝鲜版：货仓调拨入口随货仓系统移除）
+                // 尝鲜版：模块管理与货仓调拨随对应系统移除，只保留「起飞」
                 html += '<div style="display:flex;gap:6px;margin-top:2px;">'
-                    + '<button data-action="module-manage" data-ship-id="' + ship.id + '" class="tkp-btn" style="flex:1;height:24px;padding:0;font-size:11px;">' + t('dock.moduleManage') + '</button>'
                     + '<button data-action="undock-ship" data-ship-id="' + ship.id + '" class="tkp-btn" style="flex:1;height:24px;padding:0;font-size:11px;color:#8f8;border-color:#484;">' + t('dock.takeoff') + '</button>'
                     + '</div>';
             }
@@ -587,9 +493,8 @@ window.showDockPrompt = showDockPrompt;
 window.hideDockPrompt = hideDockPrompt;
 
 // ========== 工具栏页面面板注册表（0.2.4 重构：每个内容页独立 .tkp-page 浮层） ==========
-// 页面 id:货仓 cargo / 扫描 scan / 指令舱 bridge / 对接枢纽 dock_hub /
-// 补给站 supply_terminal / 实验室 laboratory / 仓储 storage /
-// 模块管理 moduleManage / 货仓调拨 cargoTransfer
+// 页面 id:指令舱 bridge / 对接枢纽 dock_hub / 补给站 supply_terminal / 仓储 storage
+// （尝鲜版：货仓 / 扫描 / 货仓调拨 / 模块管理页面随对应系统移除）
 // 每页独立实例:可并存打开、页头可拖动、关闭互不影响(不再共用单容器互斥替换)
 const _pages = {};   // pageId → { el, titleEl, contentEl }
 
@@ -666,19 +571,6 @@ function onPageContentClick(e) {
     } else if (action === 'open-storage') {
         // 0.2.0 阶段5：指令舱 → 设施货物表(独立仓储页面,与指令舱并存)
         if (_currentFacility) openPage('storage', t('facility.storage'), buildFacilityStorageContent(_currentFacility));
-    } else if (action === 'module-manage') {
-        // 0.2.0 阶段5：对接枢纽 → 模块管理(独立页面,与对接枢纽并存)
-        if (_currentFacility) openPage('moduleManage', t('dock.moduleManage'), buildModuleManageContent(_currentFacility, shipId));
-    } else if (action === 'install-module') {
-        if (_currentFacility) showFacilityModuleSelector(_currentFacility, shipId, btn);
-    } else if (action === 'uninstall-module') {
-        if (_currentFacility && btn.dataset.modId) {
-            facilitySystem.removeModuleFromShip(_currentFacility.id, shipId, btn.dataset.modId);
-            const updated = facilitySystem.getFacility(_currentFacility.id);
-            _currentFacility = updated;
-            window.showNotification(t('dock.moduleRemoved'), 'info');
-            openPage('moduleManage', t('dock.moduleManage'), buildModuleManageContent(updated, shipId));
-        }
     } else if (action === 'toggle-res-group') {
         // 0.2.7 资源分类折叠（DOM class 切换，折叠后仅剩紫色顶头）
         const card = btn.closest('.tkp-res-group-card');

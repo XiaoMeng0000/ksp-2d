@@ -25,7 +25,6 @@ import { renderToolbarIcons, showDockPrompt, hideDockPrompt } from '../ui/flight
 import { showTooltip, hideTooltip } from '../ui/uiTooltip.js';
 import { clearOrbitLabels } from '../ui/orbitLabels.js';
 import { facilitySystem } from '../facility/facilitySystem.js';
-import { getModuleDef } from '../config/entities/moduleTypes.js';
 import { getTotalMass, getResource, drainResource, getFuelAmount, getFuelCapacity } from '../resources/resourceSystem.js';
 import { computeManeuverDirection } from '../physics/maneuverPrediction.js';
 import { getEngineType } from '../config/entities/engineConfig.js';

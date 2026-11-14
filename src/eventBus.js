@@ -65,9 +65,6 @@ export const Events = {
     TRACKING_INFO_HIDE: 'tracking:infoHide',   // payload: { silent }
     // 时间加速事件
     TIME_WARP_CHANGED: 'timeWarp:changed',      // 档位/暂停状态变化
-    // 3D 部件装配车间事件（0.3.0）
-    PARTLAB_DESIGN_CHANGED: 'partlab:designChanged',       // payload: { design, physics, canUndo, canRedo }
-    PARTLAB_SELECTION_CHANGED: 'partlab:selectionChanged'  // payload: { partId, part, partType }
 };
 
 // EventBus 单例类

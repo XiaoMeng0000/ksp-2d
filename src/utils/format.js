@@ -4,7 +4,7 @@
 // trackingUI 的原 formatPeriod 与 startGamePanel 的存档元信息展示共用本模块，
 // 避免同类格式化逻辑在多处重复维护。
 
-// 游戏日秒数（与 scanSystem 约定一致：6 小时/日）
+// 游戏日秒数（6 小时/日）
 export const GAME_DAY_SECONDS = 21600;
 
 // Kerbin 年秒数（426 日 × 6 小时/日 × 3600 秒/小时）
