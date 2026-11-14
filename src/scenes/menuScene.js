@@ -7,6 +7,7 @@ import { renderableManager } from '../graphics/renderable.js';
 import { MENUS } from '../config/ui/menuConfig.js';
 import { LINKS_ICONS } from '../config/ui/menuConfig.js'; // 1. 导入数据
 import { VERSION_TEXT } from '../config/meta/version.js';
+import { t } from '../config/ui/strings.js';
 
 // 主菜单 — DOM 版（阶段 3：Canvas→DOM）
 // - 数据驱动：menuConfig.js 的 MENUS 定义各菜单按钮（label/action）
@@ -177,6 +178,12 @@ function _buildMenuDOM() {
     logoText.textContent = 'KSP 2D';
     logoWrap.appendChild(logoImg);
     logoWrap.appendChild(logoText);
+
+    // 版本线标识：标题右下角的黄色小行字样（Minecraft 黄字 splash 风格，纯装饰 / 不拦截点击）
+    const liteBadge = document.createElement('span');
+    liteBadge.className = 'mm-lite-badge';
+    liteBadge.textContent = t('menu.liteBadge');
+    logoWrap.appendChild(liteBadge);
 
     // 导航按钮列
     const nav = document.createElement('nav');

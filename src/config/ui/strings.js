@@ -655,6 +655,7 @@ const STRINGS = {
 
     // ---------- 尝鲜版：一键开玩 / 主菜单 / 补给 ----------
     'menu.fullVersion': '完整版内容',
+    'menu.liteBadge': '轻量版！',
     'newgame.defaultWorldName': '尝鲜战役',
     'quickstart.loaded': '已载入上次存档，继续游戏',
     'dock.promptRefuel': '补给',

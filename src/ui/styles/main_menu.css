@@ -20,9 +20,39 @@
 
 /* ---- Logo（图片优先，未就绪时文字 fallback） ---- */
 .mm-logo {
+    position: relative;          /* 版本线标识（.mm-lite-badge）的定位上下文 */
     max-width: 340px;
     margin-bottom: 40px;         /* 对应原 logo 与按钮间距 +40 */
 }
+
+/* 版本线标识：标题右下角的黄色小行字样（参考 Minecraft 的黄字 splash：亮黄 + 深色描边 + 斜置） */
+.mm-lite-badge {
+    position: absolute;
+    right: -14px;
+    bottom: 2px;
+    transform: rotate(-14deg);
+    transform-origin: right bottom;
+    color: #ffff55;
+    font-family: var(--font-mono-bold);
+    font-size: 18px;
+    letter-spacing: 1px;
+    white-space: nowrap;
+    pointer-events: none;
+    user-select: none;
+    /* 深色描边：四向偏移 + 一层柔和阴影，保证在星空背景上也清晰 */
+    text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.85), -1px -1px 0 rgba(0, 0, 0, 0.85),
+                 1px -1px 0 rgba(0, 0, 0, 0.85), -1px 1px 0 rgba(0, 0, 0, 0.85),
+                 0 0 8px rgba(0, 0, 0, 0.6);
+    animation: mm-lite-badge-pop 900ms ease-out 1 both;
+}
+
+/* 进场弹一下（一次性），此后保持静置，避免长期闪烁分散注意力 */
+@keyframes mm-lite-badge-pop {
+    0%   { opacity: 0; transform: rotate(-14deg) scale(0.6); }
+    55%  { opacity: 1; transform: rotate(-14deg) scale(1.12); }
+    100% { opacity: 1; transform: rotate(-14deg) scale(1); }
+}
+
 .mm-logo img {
     display: none;
     max-width: 340px;
