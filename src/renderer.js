@@ -78,6 +78,43 @@ function bodySeparationU(body, canvas, parentByName) {
     return Math.max(0, Math.min(1, d / sep));
 }
 
+// 计算某天体的图标缩放状态（不依赖 renderable 配置 —— 尝鲜版天体没有贴图，
+// 但缩小时的图标保护必须照常生效，否则远景只剩一个没有最小尺寸的色点）。
+// 返回 { t, sepU, texDrawRadius, radius, iconAlpha }：
+//   t            0→1 交叉淡入进度（0 = 仍按真实屏幕半径绘制，1 = 完全由图标接管）
+//   sepU         与父天体的分离度系数（<1 时整体淡化，缩到全貌只剩主天体）
+//   texDrawRadius 本帧实际绘制半径（图标模式下锁死为 R_lockBody）
+//   radius       图标绘制半径（与 texDrawRadius 同值，交接处无尺寸跳变）
+//   iconAlpha    图标透明度（= t × sepU）
+function resolveBodyIconScale(body, physScreenR, canvas, parentByName) {
+    const cfgIcon = BODY_ICON_CONFIG;
+    const R_lock = cfgIcon.lockRadius;
+    const sepU = bodySeparationU(body, canvas, parentByName);
+    // 全局图标淡入起点（锁定值的 fadeBegin/lockRadius 倍，等比例口径）
+    const R_fadeGlobal = cfgIcon.fadeBegin > R_lock ? cfgIcon.fadeBegin : R_lock * 1.14;
+
+    if (!(physScreenR <= R_fadeGlobal) || !(R_lock > 0)) {
+        return { t: 0, sepU, texDrawRadius: physScreenR, radius: 0, iconAlpha: 0 };
+    }
+
+    // 进入图标模式 —— 图标一旦出现，尺寸必须「锁死不再变」，且与视图无关。
+    //
+    // 每个天体用自己的半径当上限（R_lockBody）：
+    //   · displayRadius ≥ lockRadius（全部真实星球）→ 锁 lockRadius
+    //   · displayRadius < lockRadius（几颗调试天体）→ 锁自身半径，图标与本体重合
+    //
+    // ⚠️ 上限只能用「天体自身半径」，不能乘视图的放大上限（曾用 displayRadius ×
+    //    getZoomLimits().max，导致上限被改写 → 远景图标塌成亚像素 → 图标消失）。
+    const R_lockBody = Math.min(R_lock, body.displayRadius);
+    // 过渡窗口 [R_fadeBody, R_lockBody]：等比例于全局口径，跨天体一致
+    const R_fadeBody = R_lockBody * (cfgIcon.fadeBegin / R_lock);
+    const t = lodBlendT(physScreenR, R_fadeBody, R_lockBody);   // 0→1 easeInOut
+    // 贴图与图标共用半径：过渡带内两者逐帧等大（无跳变），到位后不再随 zoom 变化
+    const rDraw = Math.max(lerpLog(R_fadeBody, R_lockBody, t), R_lockBody);
+
+    return { t, sepU, texDrawRadius: rDraw, radius: rDraw, iconAlpha: t * sepU };
+}
+
 // ===== 轨道交互骨架（0.2.4）：渲染层持有"本帧已绘制的轨道几何"，供交互层读取 =====
 // 交互层（flightScene）通过访问器读取，不与预测引擎直接耦合；
 // hover 状态由交互层写入，渲染层在绘制标记时消费。功能体待后续提交填充。
@@ -384,11 +421,6 @@ function render(ctx, canvas, activeShip, options = {}) {
     const parentByName = new Map(celestialBodies.map(b => [b.name, b]));
     // 天体图标模板（未就绪时为 null → drawTintedIcon 走代表色纯色圆兜底）
     const bodyIconTex = textureManager.get(BODY_ICON_CONFIG.textureKey);
-    // 全局图标淡入起点（锁定值的 fadeBegin/lockRadius 倍，等比例口径）
-    const R_fadeGlobal = BODY_ICON_CONFIG.fadeBegin > BODY_ICON_CONFIG.lockRadius
-        ? BODY_ICON_CONFIG.fadeBegin
-        : BODY_ICON_CONFIG.lockRadius * 1.14;
-
     // 天体轨道线（以天体代表色绘制，右下角👁可开关）
     if (visibility.bodyOrbits !== false) {
         drawBodyOrbits(ctx, canvas, parentByName);
@@ -403,15 +435,16 @@ function render(ctx, canvas, activeShip, options = {}) {
         const drawRadius = physScreenR;
         // 行星实际绘制用半径：图标模式下由贴图/图标插值决定，否则等于 drawRadius
         let texDrawRadius = drawRadius;
-        // 图标模式状态（仅行星/卫星分支写入）：半径 / 透明度
-        let iconRadius = 0;
-        let iconAlpha = 0;
-
         // 图形驱动器：按 textureKey 渲染多层贴图/程序效果（星球贴图/恒星光晕），未配置或未加载时回退纯色圆
         const config = renderableManager.get(body.textureKey);
+        const isStarLod = !!(config && config.modes);
+        // 图标缩放保护：行星/卫星**无论有没有贴图配置**都要参与（尝鲜版没有天体贴图），
+        // 恒星不参与（其光晕随物理尺寸等比缩小）
+        const icon = isStarLod ? null : resolveBodyIconScale(body, physScreenR, canvas, parentByName);
+        if (icon) texDrawRadius = icon.texDrawRadius;
         let textured = false;
         // 尝鲜版：WebGL 恒星层已移除，恒星由下方 Canvas2D 程序光晕（modes 档位）绘制
-        if (config && config.modes) {
+        if (isStarLod) {
             // LOD 分级渲染（恒星用）
             const { modes, nearScreenR, farScreenR } = config;
             const nearLayers = modes.near?.layers || [];
@@ -460,46 +493,19 @@ function render(ctx, canvas, activeShip, options = {}) {
             textured = renderBodyLayers(ctx, screen.x, screen.y, texDrawRadius, layersToRender);
             // 恒星分支不使用分离度淡化，globalAlpha 全程保持 1.0（无需复位）
         } else if (config && config.layers) {
-            // 单模式渲染（行星用，如 Kerbin）。0.3.x：行星的贴图→图标交叉淡入在此分支生效
-            const cfgIcon = BODY_ICON_CONFIG;
-            const R_lock = cfgIcon.lockRadius;
+            // 单模式渲染（行星用，如有贴图的完整版）：贴图 → 图标交叉淡入
+            // 图标几何统一由 resolveBodyIconScale 给出（尝鲜版无贴图时不走本分支，
+            // 但仍由循环末尾的图标叠加生效）
+            const sepU = icon ? icon.sepU : 1;
+            const iconT = icon ? icon.t : 0;
             let layersToDraw = config.layers;
 
-            // 分离度：与父天体图标分不开就渐隐（恒星无父体 → 1）
-            const sepU = bodySeparationU(body, canvas, parentByName);
-
-            if (physScreenR <= R_fadeGlobal && R_lock > 0) {
-                // 进入图标模式 —— 图标一旦出现，尺寸必须「锁死不再变」，且**与视图无关**。
-                //
-                // 每个天体用自己的半径当上限（R_lockBody）：
-                //   · displayRadius ≥ lockRadius（全部真实星球，含最小的 Gilly）→ 锁 lockRadius
-                //   · displayRadius < lockRadius（仅测试星系那几颗 displayRadius 只有几十的调试天体）
-                //     → 锁自身半径，图标与本体同大且固定，不会出现「图标比本体还大」
-                //
-                // ⚠️ 上限只能用「天体自身半径」，**不能乘视图的放大上限**（曾用
-                //    displayRadius × getZoomLimits().max，导致机动视图切换聚焦天体时
-                //    上限被改写 → 远景天体图标半径塌成亚像素 → drawTintedIcon 的
-                //    radius>0.01 守卫直接跳过绘制，表现为「上一个星球的图标消失」）。
-                const R_lockBody = Math.min(R_lock, body.displayRadius);
-                // 过渡窗口 [R_fadeBody, R_lockBody]：等比例于全局口径，跨天体一致
-                const R_fadeBody = R_lockBody * (cfgIcon.fadeBegin / R_lock);
-                const t = lodBlendT(physScreenR, R_fadeBody, R_lockBody);   // 0→1 easeInOut
-                // 贴图与图标共用半径：过渡带内两者逐帧等大（无跳变），
-                // 到达 R_lockBody 后不再随 zoom 变化 → 图标尺寸锁死
-                const rDraw = Math.max(lerpLog(R_fadeBody, R_lockBody, t), R_lockBody);
-                texDrawRadius = rDraw;
-                if (t < 1) {
-                    // 贴图渐隐（未被图标完全接管时仍需绘制；上方 lighten 光晕层不受全局 alpha 影响）
-                    layersToDraw = config.layers.map(l =>
-                        l.program ? l : { ...l, alpha: (l.alpha !== undefined ? l.alpha : 1.0) * (1 - t) });
-                } else {
-                    layersToDraw = [];   // 贴图已完全淡出，跳过绘制
-                }
-                iconAlpha = t * sepU;
-                iconRadius = rDraw;
+            if (iconT < 1) {
+                // 贴图渐隐（未被图标完全接管时仍需绘制；上方 lighten 光晕层不受全局 alpha 影响）
+                layersToDraw = config.layers.map(l =>
+                    l.program ? l : { ...l, alpha: (l.alpha !== undefined ? l.alpha : 1.0) * (1 - iconT) });
             } else {
-                texDrawRadius = physScreenR;
-                iconAlpha = 0;
+                layersToDraw = [];   // 贴图已完全淡出，跳过绘制
             }
 
             // 分离度整体淡化：用 globalAlpha 包裹贴图绘制（图标则由 drawTintedIcon 自带 alpha）
@@ -508,12 +514,14 @@ function render(ctx, canvas, activeShip, options = {}) {
                 textured = renderBodyLayers(ctx, screen.x, screen.y, texDrawRadius, layersToDraw);
             }
             if (sepU < 1) ctx.globalAlpha = 1.0;
+        }
 
-            // 图标叠加（贴图淡出与图标淡入同步，交接处两者半径完全重合 → 无尺寸跳变）
-            if (iconAlpha > 0) {
-                drawTintedIcon(ctx, screen.x, screen.y, iconRadius, bodyIconTex, body.color, iconAlpha, cfgIcon.tintMode);
-                textured = true;
-            }
+        // 图标叠加：行星/卫星缩到一定尺寸后由统一图标接管（与是否有贴图无关）
+        // 贴图淡出与图标淡入同步，交接处两者半径完全重合 → 无尺寸跳变；
+        // 图标纹理未就绪时 drawTintedIcon 内部回退为天体代表色圆（仍带最小尺寸保护）
+        if (icon && icon.iconAlpha > 0) {
+            drawTintedIcon(ctx, screen.x, screen.y, icon.radius, bodyIconTex, body.color, icon.iconAlpha, BODY_ICON_CONFIG.tintMode);
+            textured = true;
         }
 
         if (!textured) {
