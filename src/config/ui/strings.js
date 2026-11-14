@@ -550,6 +550,9 @@ const STRINGS = {
     // 0.2.5 星系组合兼容性(读档校验)
     'save.systemIncompatibleTitle': '无法加载存档',
     'save.systemIncompatible': '该存档的星系配置与当前版本不兼容，无法加载。',
+    // 尝鲜版：存档格式独立（无货仓 / 无扫描 / 单星系），与完整版存档互不兼容
+    'save.versionIncompatibleTitle': '无法加载存档',
+    'save.versionIncompatible': '该存档来自完整版或其他版本的尝鲜版，存档格式不兼容，无法加载。',
     // 0.2.5 存储写入失败可感知(存档/删除/导入共用)
     'save.storageFull': '⚠ 存档写入失败：本地存储空间不足或被浏览器限制，请清理后重试。',
     'timewarp.pausedNotice': '游戏已暂停',

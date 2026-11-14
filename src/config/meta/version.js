@@ -1,21 +1,33 @@
 'use strict';
 
-// 版本号常量 — 0.2.5 提取为共享配置
-// 格式:正式版为主版本号(如 v0.2.6);预发布版追加后缀与构建日期(如 v0.3.0-beta2 (Build 202610) 表示 2026 年 10 月构建)
-// 主菜单（menuScene 右下角）与 ESC 菜单（escMenuUI 底部）共用，避免两处维护漂移
-// 提示:公告栏按版本段比较（忽略 -beta1/-beta2 等后缀与 Build 号），因此 v0.3.0-beta1 的公告条目
-//      仍会被识别为"当前版本"并置顶；发布 beta2 公告时需另加条目（详见 docs/公告编写规范.md 第四章排序规则）。
-export const VERSION_TEXT = 'v0.3.0-beta2 (Build 202610)';
+// 版本号常量
+//
+// 尝鲜版（`lite` 分支）使用**独立于游戏本体的版本号**，避免与 `main` 分支的发布版本冲突：
+//   VERSION_TEXT = 基线游戏版本 + 尝鲜版迭代号 + 构建月份
+//   例：v0.3.0-beta2-lite.1 (Build 202611)
+//     · 基线游戏版本跟随 `main`（rebase 时同步）
+//     · `lite.N` 是尝鲜版自己的迭代号：尝鲜版每次对外发布 +1，与游戏本体版本解耦
+//
+// 主菜单（menuScene 右下角）与 ESC 菜单（escMenuUI 底部）共用 VERSION_TEXT，避免两处漂移。
+
+// ===== 发布版本 =====
+export const GAME_VERSION = 'v0.3.0-beta2';   // 基线游戏版本（与 main 同步）
+export const EDITION = 'lite';                 // 版本线标识：lite = 网页尝鲜版
+export const EDITION_TEXT = '尝鲜版';           // 面向玩家的版本线名称（UI 展示用）
+export const EDITION_VERSION = '1';            // 尝鲜版迭代号
+export const BUILD_STAMP = '202611';           // 构建年月（YYYYMM）
+
+export const VERSION_TEXT = GAME_VERSION + '-' + EDITION + '.' + EDITION_VERSION + ' (Build ' + BUILD_STAMP + ')';
 
 // ===== 数据格式版本 =====
-// 与上面的 VERSION_TEXT 语义分离：VERSION_TEXT 是**面向玩家的发布版本**（界面显示 + 公告排序），
-// 下面两个常量是**数据格式版本**，只写入存档/导出文件，不参与任何界面显示。两者互相独立。
+// 与上面的 VERSION_TEXT 语义分离：VERSION_TEXT 是**面向玩家的发布版本**（界面显示），
+// 下面是**数据格式版本**，只写入存档/导出文件。
 //
 // SAVE_FORMAT_VERSION —— 存档配置格式基线：世界元数据 metadata.configVersion 的写入值。
-//   历史存档中该值为 '0.2.0'（旧代码直接取 state.version）；全项目无分支/判断读取该值
-//   （仅 getWorldList() 原样透出，无消费方），故不做迁移，允许新旧值并存。
-export const SAVE_FORMAT_VERSION = '1.0';
+//   尝鲜版与完整版存档结构不兼容（无货仓 / 无扫描 / 单星系 / 设施只剩船坞），
+//   因此使用独立版本号；读档时版本不一致会被明确拒绝（见 saveManager.loadCheckpoint）。
+export const SAVE_FORMAT_VERSION = 'lite-1.0';
 
 // WORLD_EXPORT_FORMAT_VERSION —— 世界导出文件格式基线：exportWorldToFile 输出 JSON 顶层
-//   version 字段（与 format: 'ksp2d_world_export' 配套；导入侧当前不校验该字段）。
-export const WORLD_EXPORT_FORMAT_VERSION = '1.0';
+//   version 字段（与 format: 'ksp2d_world_export' 配套）。
+export const WORLD_EXPORT_FORMAT_VERSION = 'lite-1.0';

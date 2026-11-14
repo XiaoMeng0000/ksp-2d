@@ -28,7 +28,7 @@ check('设施创建成功且返回规范引用', !!dock && dock === gameState.ge
 dock.storage.materialKits.amount = 99999;
 
 // T4: 船坞建造
-const buildResult = facilitySystem.buildShip(dock.id, 'debug_behemoth', '新造测试船', []);
+const buildResult = facilitySystem.buildShip(dock.id, 'kanxing-1', '新造测试船', []);
 check('buildShip 返回 ok', !!buildResult && buildResult.ok === true);
 const built = buildResult.ship;
 check('新船出生在船坞旁(<20m)', Math.hypot(built.pos.x - dock.pos.x, built.pos.y - dock.pos.y) < 20);
@@ -43,7 +43,7 @@ check('切控制后 activeShip 为新船', gameState.getActiveShip() && gameStat
 
 // T1: SAS 运行时字段在其它实体操作后保持
 built._sasController = { mode: 'stability', lockedHeading: 1.23 };
-const other = shipSystem.createShip('debug_behemoth', '另一艘', []);
+const other = shipSystem.createShip('kanxing-1', '另一艘', []);
 check('其它船创建后活动船不变', gameState.getActiveShip().id === built.id);
 const ctrl = gameState.getShipRef(built.id)._sasController;
 check('SAS 控制器在其它船创建后仍保留(修复前会丢失)', !!ctrl && ctrl.lockedHeading === 1.23);
@@ -63,8 +63,8 @@ shipSystem.persistShip(gameState.getShipRef(other.id));
 check('persistShip 后数组引用不变', gameState.getAllShipsRef() === arrBefore);
 
 // T1: deleteShip 正确清理 active
-const a = shipSystem.createShip('debug_behemoth', 'A', []);
-const b = shipSystem.createShip('debug_behemoth', 'B', []);
+const a = shipSystem.createShip('kanxing-1', 'A', []);
+const b = shipSystem.createShip('kanxing-1', 'B', []);
 gameState.setState({ activeShipId: a.id });
 shipSystem.deleteShip(a.id);
 check('删除活动船后自动切到剩余船(列表第一艘)', gameState.getActiveShip() !== null && gameState.getActiveShip().id !== a.id);

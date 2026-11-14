@@ -132,20 +132,12 @@ class SaveManager {
         }
     }
 
-    // 玩家状态进存档/跨世界前清洗：剥离"进行中"的扫描任务（scanning → false, progress → 0）。
-    // 扫描是实时进行的行为，不随存档持久化；否则 scanning 状态会经 _playerProfile / world.player
-    // 跨世界泄漏，卡死全局"扫描单通道"（startScan 遇任何 scanning=true 即返回 busy）
+    // 玩家状态进存档/跨世界前清洗。
+    // 尝鲜版：扫描系统已移除 → scannedBodies 不再持久化（存档瘦身，避免旧字段随存档蔓延）
     _sanitizePlayerForSave(player) {
-        if (!player) return { scannedBodies: {}, visitedBodies: {}, resources: {} };
+        if (!player) return { visitedBodies: {}, resources: {} };
         const clean = JSON.parse(JSON.stringify(player));
-        if (clean.scannedBodies) {
-            for (const [bodyId, entry] of Object.entries(clean.scannedBodies)) {
-                if (entry && entry.scanning) {
-                    entry.scanning = false;
-                    entry.progress = 0;
-                }
-            }
-        }
+        delete clean.scannedBodies;
         return clean;
     }
 
@@ -358,6 +350,14 @@ class SaveManager {
             return false;
         }
 
+        // 存档格式校验（尝鲜版）：结构与完整版不兼容（无货仓 / 无扫描 / 单星系 / 设施只剩船坞），
+        // 版本不一致时明确拒绝并提示，避免读进来一半后各处字段缺失
+        if (world.metadata.configVersion !== SAVE_FORMAT_VERSION) {
+            console.warn(`[SaveManager] 拒绝加载:存档格式 ${world.metadata.configVersion} 与当前 ${SAVE_FORMAT_VERSION} 不一致`);
+            createInfoDialog(t('save.versionIncompatibleTitle'), t('save.versionIncompatible'), t('common.close'));
+            return false;
+        }
+
         // 星系组合校验:存档绑定的星系必须全部存在于当前配置,否则拒绝加载
         // 旧存档无 starSystems 字段 → 默认 ['kerbolar'](创建于单星系时代,直接可读)
         const savedSystems = world.metadata.starSystems || ['kerbolar'];
@@ -396,8 +396,8 @@ class SaveManager {
         for (const s of allShips) {
             if (s.maneuverNodes === undefined) s.maneuverNodes = [];
             if (s.burnDuration === undefined) s.burnDuration = 120;
-            // 0.2.0 阶段5：货仓默认值（无货运模块时为空池）
-            if (s.cargo === undefined) s.cargo = {};
+            // 尝鲜版：货仓已移除，旧存档残留的 cargo 字段一并清除
+            if (s.cargo !== undefined) delete s.cargo;
             // 0.2.0 迁移：旧 fuel/fuelCapacity（单一标量）→ resources（液氢/液氧，按 1:8 质量拆桶）
             if (!s.resources) {
                 const oldFuel = typeof s.fuel === 'number' ? s.fuel : 0;
@@ -418,10 +418,9 @@ class SaveManager {
             if (!f.storage) initFacilityStorage(f);
         }
 
-        // 0.2.0 迁移：玩家字段（gameMode/scannedBodies/resources）
+        // 0.2.0 迁移：玩家字段（gameMode/visitedBodies/resources；尝鲜版无 scannedBodies）
         const playerState = gameState.getState().player;
         if (!playerState.gameMode) playerState.gameMode = 'sandbox';
-        if (!playerState.scannedBodies) playerState.scannedBodies = {};
         if (!playerState.visitedBodies) playerState.visitedBodies = {};
         if (!playerState.resources) {
             playerState.resources = {
@@ -540,7 +539,9 @@ class SaveManager {
                 name: world.metadata.name,
                 createdAt: world.metadata.createdAt,
                 checkpointCount: world.checkpoints.length,
-                configVersion: world.metadata.configVersion
+                configVersion: world.metadata.configVersion,
+                // 尝鲜版：存档格式与完整版不兼容，UI 可据此置灰或提示
+                compatible: world.metadata.configVersion === SAVE_FORMAT_VERSION
             };
         }).filter(Boolean);
     }

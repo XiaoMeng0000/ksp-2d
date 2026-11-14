@@ -16,8 +16,8 @@ export function getSOIWarpProtectEnabled() {
 }
 
 // 分类定义（enabled=false 时 UI 显示为灰色占位）
+// 尝鲜版：删除「显示」分类（菜单样式依赖已移除的 WebGL 星球层）
 export const SETTINGS_CATEGORIES = [
-    { id: 'display', labelKey: 'settings.tabDisplay', descKey: 'settings.descDisplay', enabled: true },
     { id: 'audio',   labelKey: 'settings.tabAudio',   descKey: 'settings.descAudio',   enabled: true },
     { id: 'control', labelKey: 'settings.tabControl', descKey: 'settings.descControl', enabled: false },
     { id: 'game',    labelKey: 'settings.tabGame',    descKey: 'settings.descGame',    enabled: true },
@@ -35,31 +35,7 @@ export const SETTINGS_CATEGORIES = [
 //   legacyValues    可选：旧存储值 → 新值映射（仅用于读取时归一化，不写回）
 //   afterChange     可选：切换后回调（main.js 注入前不在此处引用音频）
 export const SETTINGS_ROWS = {
-    display: [
-        {
-            group: 'menuBg',
-            labelKey: 'settings.menuStyle',
-            storageKey: 'ksp2d.menuBg',
-            defaultValue: 'style2',
-            // 旧版 stars/image 一律归一到 style2；style1 为显式 opt-in
-            legacyValues: { stars: 'style2', image: 'style2' },
-            options: [
-                { value: 'style1', labelKey: 'settings.menuStyle1' },
-                { value: 'style2', labelKey: 'settings.menuStyle2' },
-            ]
-        }
-    ],
     audio: [
-        {
-            group: 'menuMusic',
-            labelKey: 'settings.menuMusic',
-            storageKey: 'ksp2d.menuMusic',
-            defaultValue: 'ksp2',
-            options: [
-                { value: 'ksp1', label: 'KSP1' },
-                { value: 'ksp2', label: 'KSP2' },
-            ]
-        },
         // 音量通道：总音量 / 音乐 / UI 音效 / 坎巴拉人通讯音（滑条，存储 0~1，显示 0~100%）
         // 默认值与 audioCore 一致（VOLUME_DEFAULTS，音乐 0.75 与 MUSIC_VOLUME 对齐）
         {
@@ -109,8 +85,8 @@ export const SETTINGS_ROWS = {
 };
 
 // 分类 → 分组标题文案 key（未启用分类无分组，跳过）
+// 分类级分组标题（未列出的分类不显示分类头，由行级 sectionLabelKey 提供分组头）
+// 尝鲜版：音频分类只剩音量滑条，分组头由 volMaster 的 sectionLabelKey 提供
 export const SETTINGS_GROUP_LABELS = {
-    display: 'settings.groupMenu',
-    audio: 'settings.groupMusic',
     game: 'settings.groupWarp'
 };

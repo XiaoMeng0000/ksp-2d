@@ -26,7 +26,7 @@ document.body.appendChild(container);
 const navEl = container.querySelector('#settingsNav');
 const contentEl = container.querySelector('#settingsContent');
 
-let _currentCategory = 'display';
+let _currentCategory = SETTINGS_CATEGORIES[0].id;   // 默认选中第一个可用分类
 
 // 音量滑条组 → audioCore 总线应用器（数据驱动：settingsConfig 行 group 在此登记）
 // 'input' 事件即调用，拖动实时生效
@@ -209,7 +209,7 @@ function _renderContent() {
 function _showSettings() {
     // 与 ESC 菜单互斥：从 ESC 菜单进入时关闭 ESC 菜单
     uiManager.hidePanel('esc');
-    _currentCategory = 'display';
+    _currentCategory = SETTINGS_CATEGORIES[0].id;
     container.style.display = 'flex';
     _renderNav();
     _renderContent();

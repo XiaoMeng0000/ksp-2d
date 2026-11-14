@@ -1,79 +1,53 @@
 'use strict';
 // 飞船系统 - 飞船模板配置
 //
-// textures（可选，0.3.0）：船体图两态，资产就近声明在模板里，缺省则用通用兜底图
-// （textureConfig 的 ship_default_active / ship_default_inactive）
-//   textures: {
-//       active:   'assets/images/ships/hulls/xxx_active.png',    // 受控飞船
-//       inactive: 'assets/images/ships/hulls/xxx_inactive.png'   // 非受控飞船
-//   }
-// 只声明单态时另一态复用同一张（见 getShipBodyTexture）。
+// ⚠️ 尝鲜版：只保留 3 艘经过数值设计的预设船（无飞船编辑器，玩家在轨道船坞按预设建造）。
+//   原 debug_behemoth / rex01_genesis_ark 两艘"数值乱填"的调试船已移除 ——
+//   它们会让轨道物理体验直接失真（开局即可飞到任何地方）。
+//
+// 数值口径（ΔV = isp × g0 × ln(m0 / 干质量)，g0 = 9.81）：
+//   ① 入门练习船  干 2000 / 燃料 837  / isp 350 → ΔV≈1200, TWR≈1.40（够入轨与机动，去不了 Mun）
+//   ② 储备坎巴拉K2号 干 2000 / 燃料 2520 / isp 350 → ΔV≈2800, TWR≈1.58（Mun / Minmus 往返）
+//   ③ 杜纳往返船   干 6000 / 燃料 12510 / isp 380 → ΔV≈4200, TWR≈1.42（Duna 系往返）
+//
+// textures（可选）：船体图两态，缺省则用 textureConfig 的通用兜底图。
+
 import { SHIP_CATEGORIES } from './shipCategories.js';
 
 export const SHIP_TEMPLATES = [
-    // ========== 调试专用 ==========
+    // ========== ① 入门练习船（开局默认船） ==========
     {
-        id: 'debug_behemoth',
-        name: '测试巨兽',
-        category: SHIP_CATEGORIES.interplanetary.id,
-        description: '第一次体验这个游戏?担心数值不够用？那就试试这个数值乱填的飞船吧！（仅供测试使用',
-        dryMass: 1.0,
-        // 0.2.0：燃料改为按引擎配方的储罐表（旧 fuelCapacity 废弃）
-        fuelTanks: { hydrogen: 111111, oxygen: 888888 },   // 总容量 999999，按 1:8 拆
-        isp: 9999,
-        // 0.2.0 阶段2：数值校准 — 推力 1e7 使 TWR≈1.0（原 99999 N 过弱几乎无法加速）
-        maxThrust: 10000000,
-        moduleSlots: 30,
-        unlockCondition: '__debug__',
-        // 0.2.0：模板升级体系字段
-        family: 'debug',
-        tier: 1,
-        engineType: 'chemical',
-        cost: 0,
-        scienceCost: 0,
-        // 转动惯量与动量轮扭矩
-        momentOfInertia: 10.0,        // 转动惯量（kg·m²），越大转得越慢
-        reactionWheelTorque: 20.0     // 动量轮最大扭矩（N·m），越大转得越快
-    },
-
-    // ========== 正式飞船 ==========
-    {
-        id: 'rex01_genesis_ark',
-        name: '测试巨兽promax',
-        category: SHIP_CATEGORIES.interplanetary.id,
-        description: '更高的数值！更狠的测试巨兽！！',
-        dryMass: 420000000,
-        // 0.2.0：燃料改为按引擎配方的储罐表（旧 fuelCapacity 废弃）
-        fuelTanks: { hydrogen: 46666667, oxygen: 373333333 },   // 总容量 420000000，按 1:8 拆
-        isp: 200000,
-        // 0.2.0 阶段2：数值校准 — 推力 1e10 使满质量 TWR≈1.21（原 5e9 N 时 TWR≈0.6，无法起飞）
-        maxThrust: 10000000000,
-        moduleSlots: 25,
+        id: 'trainer-1',
+        name: '入门练习船',
+        category: SHIP_CATEGORIES.probe.id,
+        description: '第一次飞?这艘船够你入轨、练习机动节点与轨道转移。ΔV 约 1200 m/s —— 到得了 Mun 附近，但回不来。想走远，去轨道船坞造一艘。',
+        dryMass: 2000,
+        fuelTanks: { hydrogen: 93, oxygen: 744 },   // 总燃料 837 kg（ΔV≈1200 m/s）
+        isp: 350,
+        maxThrust: 39000,                            // TWR≈1.40（满燃料）
+        moduleSlots: 2,
         unlockCondition: 'always',
-        // 0.2.0：模板升级体系字段
-        family: 'genesis',
+        family: 'trainer',
         tier: 1,
         engineType: 'chemical',
-        cost: 9999,
+        cost: 20,
         scienceCost: 0,
-        momentOfInertia: 500000,
-        reactionWheelTorque: 10000
+        momentOfInertia: 400,
+        reactionWheelTorque: 8
     },
 
-    // ========== 正式模板：家族分代体系（0.2.0 阶段2） ==========
-    // 储备坎巴拉K2号 — 探测级首舰（化学引擎），满燃料 ΔV≈2800 m/s，TWR≈1.60，专为 Mun/Minmus 往返设计，ΔV 不足以直飞 Duna
+    // ========== ② 储备坎巴拉K2号（Mun / Minmus 往返） ==========
     {
         id: 'kanxing-1',
         name: '储备坎巴拉K2号',
         category: SHIP_CATEGORIES.probe.id,
-        description: 'K2 火箭的目的，是为了抵达 Mun 或 Minmus，然后安全地回家。',
+        description: 'K2 火箭的目的，是为了抵达 Mun 或 Minmus，然后安全地回家。ΔV 约 2800 m/s、TWR 约 1.6。',
         dryMass: 2000,
-        fuelTanks: { hydrogen: 280, oxygen: 2240 },   // 总燃料 2520 kg，按 1:8 拆（ΔV≈2800 m/s）
+        fuelTanks: { hydrogen: 280, oxygen: 2240 },   // 总燃料 2520 kg（ΔV≈2800 m/s）
         isp: 350,
         maxThrust: 70000,
         moduleSlots: 4,
         unlockCondition: 'always',
-        // 模板升级体系字段
         family: 'kanxing',
         tier: 1,
         engineType: 'chemical',
@@ -83,12 +57,26 @@ export const SHIP_TEMPLATES = [
         reactionWheelTorque: 10
     },
 
-    // ========== 正式模板（占位，后续填充） ==========
-    // { id: 'kanxing-1', name: '坎星号', category: 'probe', momentOfInertia: 10.0, reactionWheelTorque: 20.0, ... },
-    // { id: 'yuanhangzhe', name: '远航者号', category: 'probe', momentOfInertia: 10.0, reactionWheelTorque: 20.0, ... },
-    // { id: 'deep_pioneer', name: '深空先锋号', category: 'deep_space', momentOfInertia: 10.0, reactionWheelTorque: 20.0, ... },
-    // { id: 'daedalus', name: '代达罗斯级', category: 'interplanetary', momentOfInertia: 10.0, reactionWheelTorque: 20.0, ... },
-    // { id: 'hermes', name: '赫尔墨斯号', category: 'interplanetary', momentOfInertia: 10.0, reactionWheelTorque: 20.0, ... },
+    // ========== ③ 杜纳往返船（深空） ==========
+    {
+        id: 'duna_return',
+        name: '杜纳往返船',
+        category: SHIP_CATEGORIES.interplanetary.id,
+        description: '为 Duna 系往返设计的深空船：ΔV 约 4200 m/s、TWR 约 1.42。转移窗口需要时间加速，别急着点油门。',
+        dryMass: 6000,
+        fuelTanks: { hydrogen: 1390, oxygen: 11120 },  // 总燃料 12510 kg（ΔV≈4200 m/s）
+        isp: 380,
+        maxThrust: 258000,
+        moduleSlots: 6,
+        unlockCondition: 'always',
+        family: 'duna',
+        tier: 1,
+        engineType: 'chemical',
+        cost: 120,
+        scienceCost: 0,
+        momentOfInertia: 1500,
+        reactionWheelTorque: 30
+    }
 ];
 
 // 取飞船模板的船体图路径（0.3.0：按 templateId 实时解析，不随建船快照，老存档飞船同样生效）

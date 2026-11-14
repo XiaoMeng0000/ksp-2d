@@ -442,7 +442,8 @@ window.applyNewGameCreation = function(name, starSystems) {
     eventBus.emit(Events.CELESTIAL_TIME_UPDATED, { time: 0, dt: 0 });
 
     // 飞船系统 - 使用 shipSystem 创建飞船实例
-    const newShip = shipSystem.createShip('debug_behemoth', t('newgame.defaultShip'), ['construction_package']);
+    // 尝鲜版开局：入门练习船（ΔV≈1200，够入轨与机动，去不了 Mun —— 引导玩家去船坞造 K2）
+    const newShip = shipSystem.createShip('trainer-1', t('newgame.defaultShip'), []);
     if (!newShip) {
         window.showNotification(t('build.createFailed'), 'error');
         return null;
