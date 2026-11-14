@@ -33,7 +33,8 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          # 22 起为 Actions 当前 LTS；用 20 会被 GitHub 提示 "Node.js 20 is deprecated"（2026-09 起强制 24 运行）
+          node-version: "22"
 
       # 零依赖组装：白名单拷贝 + 体积报告；产物缺失会以非零退出码失败
       - name: 组装发布产物（dist/）
