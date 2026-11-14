@@ -1,6 +1,6 @@
 'use strict';
 
-// 主菜单按钮列表（尝鲜版 6 项）
+// 主菜单按钮列表（尝鲜版 5 项）
 //
 // 尝鲜版主菜单原则：
 //   · 只有「开始游戏」是玩法入口（一键开玩，无前置选择界面）；
@@ -8,13 +8,13 @@
 //   · 玩家可获取信息 / 调整的项（制作人员、版权声明、设置）保留；
 //   · 部件装配车间（3D）、百科、已加载星系、游戏公告等被裁内容的入口全部移除
 //     （其中百科在 ESC 菜单里仍保留入口，点击弹「下载完整版」提示）。
+//   · 不做「退出」：网页端的标签页无法由脚本关闭，留一个点了只会弹提示的按钮没有意义。
 const MAIN_MENU = [
     { id: 'startGame',   label: '开始游戏',   action: 'callback:startGame' },
     { id: 'fullVersion', label: '完整版内容', action: 'callback:openFullVersion' },
     { id: 'credits',     label: '制作人员',   action: 'scene:credits' },
     { id: 'license',     label: '版权声明',   action: 'scene:license' },
-    { id: 'settings',    label: '设置',       action: 'callback:openSettings' },
-    { id: 'quit',        label: '退出',       action: 'callback:quitGame' },
+    { id: 'settings',    label: '设置',       action: 'callback:openSettings' }
 ];
 
 // 主菜单链接栏（icon_key 对应 textureConfig.js 中的纹理 key，由 textureManager 统一加载）

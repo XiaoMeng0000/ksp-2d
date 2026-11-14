@@ -889,6 +889,24 @@
     color: var(--text-bright);
 }
 
+/* ---- 内嵌作用域（尝鲜版对话框复用同一套分级背景样式） ----
+   保留 .tkp-page 的全部后代样式（分区标题 / 分组卡 / 资源行…），
+   但外壳的浮层定位与尺寸交给外层对话框，避免与 .ui-dialog 打架。 */
+.tkp-page.tkp-embed {
+    display: block;
+    position: static;
+    left: auto;
+    top: auto;
+    transform: none;
+    width: auto;
+    max-height: none;
+    overflow: visible;
+    padding: 0;
+    border: none;
+    background: transparent;
+    z-index: auto;
+}
+
 /* ---- 页头（对齐开始游戏面板 .sgp-header） ---- */
 .tkp-page .tkp-header {
     display: flex;

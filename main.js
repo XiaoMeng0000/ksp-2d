@@ -123,14 +123,13 @@ initSceneLoadingUI();
 // 尝鲜版：被裁掉的系统（部件实验室 / 星系场景 / 飞船编辑器 / 部署设施 / 在线内容）
 // 已从仓库移除，这里不再保留动态装载入口；完整版在 main 分支按需装载。
 
-// SceneManager - 注册 splash / menu / credits / license 场景（尝鲜版主菜单只有 6 项，
-// 回调入口见 registerMenuScene 的 4 个键：开始游戏 / 完整版内容 / 设置 / 退出）
+// SceneManager - 注册 splash / menu / credits / license 场景（尝鲜版主菜单 5 项，
+// 回调入口见 registerMenuScene 的 3 个键：开始游戏 / 完整版内容 / 设置；网页端不设「退出」）
 registerSplashScene();
 registerMenuScene({
     startGame: () => window.startQuickGame(),
     openFullVersion: () => window.openFullVersion(),
-    openSettings: () => window.openSettings(),
-    quitGame: () => window.quitGame()
+    openSettings: () => window.openSettings()
 });
 registerCreditsScene();
 registerLicenseScene();
@@ -312,14 +311,6 @@ window.openFullVersion = function() {
 // 尝鲜版：百科已移除，入口保留但改为「请下载完整版」提示
 window.openEncyclopedia = function() {
     eventBus.emit(Events.TEASER_REQUESTED, { featureId: 'encyclopedia' });
-};
-
-// 退出（网页端无法关闭非脚本打开的标签页）：尝试关闭并给出提示，不做破坏性操作
-window.quitGame = function() {
-    try { window.close(); } catch (e) { /* 浏览器拒绝关闭，忽略 */ }
-    if (typeof window.showNotification === 'function') {
-        window.showNotification(t('menu.quitHint'), 'info', 4000);
-    }
 };
 
 // 一键开玩：有可用存档 → 直接续上次进度；没有 → 新建默认世界（入门练习船 + 轨道船坞）

@@ -27,7 +27,7 @@ function clamp(value, min, max) {
 
 // 多面板并存(0.2.4):参与错位判断的浮层选择器 — 两大主面板 + 所有工具栏页面面板(.tkp-page)。
 // 各浮层默认位相同,同开时需按遮挡情况错位,保证新面板不被其它面板完全盖住(永远露出可抓边缘)
-const DEFAULT_CASCADE_SELECTORS = ['#shipBuilderPanel', '#facilityDeployPanel', '.tkp-page'];
+const DEFAULT_CASCADE_SELECTORS = ['#shipBuilderPanel', '#facilityDeployPanel', '.tkp-page:not(.tkp-embed)'];
 const CASCADE_STEP = 40;   // 每次尝试错位增量(px,向右下)
 
 export function makePanelDraggable(panelEl, handleEl) {

@@ -39,14 +39,14 @@ container.className = 'ui-dialog-overlay';
 container.style.display = 'none';
 container.innerHTML = `
     <div class="ui-dialog" style="width:min(700px, 94vw); max-height:88vh; display:flex; flex-direction:column; padding:0;">
-        <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 18px; border-bottom:1px solid var(--theme-menu-border);">
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid var(--theme-menu-border);">
             <span style="font-family:var(--font-mono-bold); font-size:15px; color:var(--text-bright); letter-spacing:1px;">// ${t('shipPicker.title')}</span>
             <button id="shipPickerCloseBtn" class="ui-btn" style="padding:3px 10px;">${t('shipPicker.close')}</button>
         </div>
-        <div id="shipPickerBody" style="overflow-y:auto; padding:14px 18px; display:flex; flex-direction:column; gap:10px;"></div>
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 18px; border-top:1px solid var(--theme-menu-border);">
-            <span id="shipPickerStorage" style="font-size:11px; color:var(--text-dim);"></span>
-            <button id="shipPickerEditorTeaser" class="ui-btn" style="padding:5px 12px; font-size:11px; opacity:0.85;">${t('shipPicker.editorTeaser')}</button>
+        <div id="shipPickerBody" class="tkp-page tkp-embed" style="overflow-y:auto; padding:6px 14px 12px 14px;"></div>
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 14px; border-top:1px solid var(--theme-menu-border);">
+            <span id="shipPickerStorage" class="tkp-sub"></span>
+            <button id="shipPickerEditorTeaser" class="ui-btn" style="padding:5px 12px; font-size:11px; opacity:0.85; flex:none;">${t('shipPicker.editorTeaser')}</button>
         </div>
     </div>
 `;
@@ -60,20 +60,22 @@ function _countBuilt(templateName) {
     return shipSystem.getAllShips().filter(s => (s.displayName || '').indexOf(templateName) === 0).length;
 }
 
-// 单张模板卡片
+// 单张模板卡片（沿用设施面板的卡体 + 数据行视觉语言，无 emoji）
 function _cardHtml(template) {
     const m = _metricsOf(template);
-    return `<div class="tkp-card-sm" data-template-id="${template.id}">
+    const metric = (label, value, accent) => '<span class="tkp-sub">' + label
+        + ' <b style="font-size:12px; color:' + (accent ? 'var(--accent)' : 'var(--text-main)') + ';">' + value + '</b></span>';
+    return `<div class="tkp-card-sm" data-template-id="${template.id}" style="margin-bottom:8px;">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
             <span style="font-family:var(--font-mono-bold); font-size:13px; color:var(--text-bright);">${escapeHtml(template.name)}</span>
             <button data-action="build-ship" data-template-id="${template.id}" class="ui-btn-primary" style="padding:5px 14px; flex:none;">${t('shipPicker.build')}</button>
         </div>
-        <div style="font-size:11px; color:var(--text-dim); margin:4px 0 6px; line-height:1.5;">${escapeHtml(template.description || '')}</div>
-        <div style="display:flex; gap:14px; font-size:12px; color:var(--text-main); flex-wrap:wrap;">
-            <span>${t('shipPicker.dv')} <b style="color:var(--accent);">${fmt(m.dv)} m/s</b></span>
-            <span>${t('shipPicker.twr')} <b>${m.twr.toFixed(2)}</b></span>
-            <span>${t('shipPicker.mass')} <b>${fmt(template.dryMass)} t</b></span>
-            <span>${t('shipPicker.cost')} <b>${fmt(template.cost || 0)}</b></span>
+        <div class="tkp-desc" style="font-size:11px; margin:4px 0 6px;">${escapeHtml(template.description || '')}</div>
+        <div style="display:flex; gap:14px; flex-wrap:wrap; align-items:baseline;">
+            ${metric(t('shipPicker.dv'), fmt(m.dv) + ' m/s', true)}
+            ${metric(t('shipPicker.twr'), m.twr.toFixed(2), false)}
+            ${metric(t('shipPicker.mass'), fmt(template.dryMass) + ' t', false)}
+            ${metric(t('shipPicker.cost'), fmt(template.cost || 0), false)}
         </div>
     </div>`;
 }
@@ -85,7 +87,8 @@ function _render() {
         const kits = facility ? getStorageAmount(facility, 'materialKits') : 0;
         storageEl.textContent = t('shipPicker.storageHint') + ': ' + fmt(kits);
     }
-    bodyEl.innerHTML = SHIP_TEMPLATES.map(_cardHtml).join('');
+    bodyEl.innerHTML = '<div class="tkp-section">' + t('shipPicker.grid') + '</div>'
+        + SHIP_TEMPLATES.map(_cardHtml).join('');
 }
 
 // 建造：唯一入口走 facilitySystem.buildShip（扣费/退款/出生位置全部在其中）

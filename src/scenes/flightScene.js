@@ -1092,7 +1092,8 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                 // 直接调用 flightUI 的命名导出（0.2.5 整改：原经 window.renderToolbarIcons 全局消费）
                 renderToolbarIcons(nextMode, nextData);
                 // 模式切换时关闭弹出页面面板（0.2.4:页面为多实例 .tkp-page）
-                for (const el of document.querySelectorAll('.tkp-page')) {
+                // 注意排除 .tkp-embed：那是对话框内嵌的 tkp 面板（复用同套分级背景样式），不是浮层
+    for (const el of document.querySelectorAll('.tkp-page:not(.tkp-embed)')) {
                     el.style.display = 'none';
                 }
             }

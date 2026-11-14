@@ -712,7 +712,8 @@ const STRINGS = {
     'teaser.feature.multiSystem': '多星系与星系组合',
 
     'fullVersion.title': '完整版内容一览',
-    'fullVersion.subtitle': '这里是尝鲜版省略的内容 —— 桌面版完整游戏全部包含。',
+    'fullVersion.subtitle': '全部内容均包含在桌面版完整游戏中。',
+    'fullVersion.footerHint': '以上为尝鲜版省略的内容 —— 桌面版完整游戏全部包含。',
     'fullVersion.download': '下载桌面版完整游戏',
     'fullVersion.close': '返回',
     'fullVersion.badge': '完整版',
@@ -737,8 +738,6 @@ const STRINGS = {
 
     // ---------- 尝鲜版：一键开玩 / 主菜单 / 补给 ----------
     'menu.fullVersion': '完整版内容',
-    'menu.quit': '退出',
-    'menu.quitHint': '感谢游玩！可直接关闭浏览器标签页结束游戏。',
     'newgame.defaultWorldName': '尝鲜战役',
     'quickstart.loaded': '已载入上次存档，继续游戏',
     'dock.promptRefuel': '补给',

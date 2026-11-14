@@ -7,15 +7,15 @@
 //   · 本文件是**内容数据**（标题/描述/条目），文案随内容维护；面板框架文案（标题、按钮）在 strings.js；
 //   · 新增一整块完整版内容 → 这里加一条 section，面板零改动；
 //   · 下载地址集中在此，改地址只改一个常量。
+//   · 不用 emoji 图标：分组卡头是纯文字（与设施/资源面板同一套视觉语言）。
 
 // 桌面版完整游戏下载地址（GitHub Releases）
 export const FULL_VERSION_DOWNLOAD_URL = 'https://github.com/XiaoMeng0000/ksp-2d/releases';
 
-// 分区清单（面板按此顺序渲染）
+// 分区清单（面板按此顺序渲染，每区一张可折叠的分组卡）
 export const FULL_VERSION_SECTIONS = [
     {
         id: 'systems',
-        icon: '🪐',
         title: '完整星系',
         desc: '尝鲜版只开放 Kerbin 系与 Duna 系（6 个天体）',
         items: [
@@ -26,7 +26,6 @@ export const FULL_VERSION_SECTIONS = [
     },
     {
         id: 'render',
-        icon: '🌈',
         title: '高清渲染层',
         desc: '尝鲜版为秒开而关闭，天体只画代表色圆盘',
         items: [
@@ -38,7 +37,6 @@ export const FULL_VERSION_SECTIONS = [
     },
     {
         id: 'partlab',
-        icon: '🔧',
         title: '3D 部件实验室',
         desc: 'KSP 原版 VAB 布局的三维装配车间',
         items: [
@@ -49,7 +47,6 @@ export const FULL_VERSION_SECTIONS = [
     },
     {
         id: 'editor',
-        icon: '🛠️',
         title: '飞船编辑器',
         desc: '尝鲜版只能从 3 套预设船中建造',
         items: [
@@ -60,7 +57,6 @@ export const FULL_VERSION_SECTIONS = [
     },
     {
         id: 'facility',
-        icon: '🏭',
         title: '资源与设施建造',
         desc: '尝鲜版只保留开局那一座轨道船坞',
         items: [
@@ -71,7 +67,6 @@ export const FULL_VERSION_SECTIONS = [
     },
     {
         id: 'scan',
-        icon: '🔭',
         title: '星球资源扫描',
         desc: '尝鲜版不含扫描玩法与资源丰度数据',
         items: [
@@ -82,7 +77,6 @@ export const FULL_VERSION_SECTIONS = [
     },
     {
         id: 'content',
-        icon: '📚',
         title: '内容与系统',
         desc: '尝鲜版为减负移除了在线内容与百科',
         items: [
@@ -93,7 +87,6 @@ export const FULL_VERSION_SECTIONS = [
     },
     {
         id: 'desktop',
-        icon: '💾',
         title: '桌面版完整游戏',
         desc: '本地运行、无加载等待、全部内容解锁',
         items: [

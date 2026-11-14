@@ -239,12 +239,11 @@ function _handleKeyDown(event) {
 
 function registerMenuScene(options) {
     // 尝鲜版主菜单只有三个回调入口（见 config/ui/menuConfig.js）：
-    //   开始游戏（一键开玩）/ 完整版内容 / 设置；退出走 window.startQuickGame 同级的 quitGame
+    //   开始游戏（一键开玩）/ 完整版内容 / 设置（网页端不设「退出」）
     _callbacks = {
         startGame: options.startGame,
         openFullVersion: options.openFullVersion,
-        openSettings: options.openSettings,
-        quitGame: options.quitGame
+        openSettings: options.openSettings
     };
 
     sceneManager.registerScene('menu', {
