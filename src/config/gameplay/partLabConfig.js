@@ -3,6 +3,7 @@
 // 部件装配车间（PartLab / KSP VAB）相机、光照、拾取与对称吸附配置
 
 export const PART_LAB_CONFIG = {
+    editor: { historyLimit: 50, dragThresholdPx: 3 },
     camera: {
         fovYDeg: 38,
         near: 0.1,

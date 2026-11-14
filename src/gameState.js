@@ -37,6 +37,8 @@ class GameState {
         }
         GameState._instance = this;
         this._state = this._deepClone(initialState);
+        // 实验室编辑会话不进入战役存档或 getState 的深拷贝路径。
+        this._partLabSession = null;
     }
 
     // 深拷贝工具
@@ -151,6 +153,18 @@ class GameState {
     // 返回玩家状态直接引用（非深拷贝），供高频持续更新的系统（如扫描进度）使用
     getPlayerRef() {
         return this._state.player;
+    }
+
+    getPartLabSession() {
+        return this._partLabSession;
+    }
+
+    setPartLabSession(session) {
+        this._partLabSession = session;
+    }
+
+    clearPartLabSession() {
+        this._partLabSession = null;
     }
 }
 

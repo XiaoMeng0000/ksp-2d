@@ -8,6 +8,8 @@
 //   4. 工作区管理（新建 / 保存 / 打开列表）与发射前工程师适航检验
 
 import { sceneManager } from '../sceneManager.js';
+import { gameState } from '../gameState.js';
+import { t } from '../config/ui/strings.js';
 import { eventBus, Events } from '../eventBus.js';
 import { cssToCanvas } from '../camera.js';
 import { PART_TYPES, getPartType } from '../config/entities/partTypes.js';
@@ -21,9 +23,7 @@ import {
     getFreeAttachNodes,
     computeNodeSnapPlacement,
     computeSurfaceAttachPlacement,
-    attachPartToDesign,
     collectExpandedPartIds,
-    removePartSubtree,
     nudgePartSubtreeY,
     rotatePartSubtreeY,
     updatePartInspectorProperty,
@@ -33,6 +33,12 @@ import {
     deleteSavedWorkspace
 } from '../ship/partAssembly.js';
 import { computeShipPhysics } from '../ship/partPhysics.js';
+import {
+    createEditorSession, beginCatalog, beginMove, getPlacementDesign,
+    getDisplayDesign, previewPlacement, commitPlacement, cancelOperation,
+    deleteSelection, applyEdit, beginPropertyEdit, updatePropertyEdit,
+    commitPropertyEdit, undoEdit, redoEdit
+} from './editorTransactions.js';
 import { ShipRenderer3D } from '../ship/shipRenderer3D.js';
 import { PartLabCamera } from './partLabCamera.js';
 import { pickInstalledPart, resolveDragPlacement } from './partLabPicking.js';
@@ -47,8 +53,6 @@ import {
     getPartLabViewportCenterRatio
 } from './partLabUI.js';
 
-const MAX_HISTORY = 50;
-
 let _canvas = null;
 let _renderer3D = null;
 let _camera = null;
@@ -56,8 +60,6 @@ let _camera = null;
 let _currentPresetId = 'preset_k2_standard';
 let _design = null;
 let _physics = null;
-let _undoStack = [];
-let _redoStack = [];
 
 let _gizmoMode = 'place'; // 'place' | 'offset' | 'rotate'
 let _symmetryCount = 1;
@@ -79,6 +81,10 @@ let _camDragMode = 'IDLE';
 let _pointerDownPos = { x: 0, y: 0 };
 let _pointerDownButton = 0;
 let _pointerMoved = false;
+// 本帧指针是否真正转动/平移过相机（与「手持组件被拖动」区分开）。
+let _cameraDragged = false;
+// 本次按下后是否移动过（用于避免「点一下就被判为放歪」的噪音提示）。
+let _movedSincePress = false;
 
 // 鼠标悬停在 DOM 面板上时，3D 幽灵预览不绘制（避免零件飘在飞船旁造成误导）
 let _ghostHiddenByUI = false;
@@ -87,6 +93,12 @@ let _boundHandlers = null;
 
 // 本次 pointerdown 是否起始于左侧零件栏（用于区分「拖拽安装」与「单击安装」两种手势）
 let _gestureFromPanel = false;
+let _lastPointer = null;
+let _canvasGesture = false;
+
+function editorSession() {
+    return gameState.getPartLabSession();
+}
 
 function notify(msg, type = 'info') {
     if (typeof window !== 'undefined' && typeof window.showNotification === 'function') {
@@ -94,13 +106,36 @@ function notify(msg, type = 'info') {
     }
 }
 
-function pushUndoSnapshot() {
-    if (!_design) return;
-    _undoStack.push(cloneDesign(_design));
-    if (_undoStack.length > MAX_HISTORY) {
-        _undoStack.shift();
+function clearHeldPreview() {
+    _heldPartTypeId = null;
+    _dragState = null;
+    _ghostHiddenByUI = false;
+    _gestureFromPanel = false;
+    hideCursorGhost();
+}
+
+function finishForWorkspace() {
+    const session = editorSession();
+    if (!session) return;
+    commitPropertyEdit(session);
+    cancelOperation(session);
+    clearHeldPreview();
+    refreshDesignState();
+}
+
+function replaceWorkspace(design, resetHistory = false) {
+    finishForWorkspace();
+    if (resetHistory) {
+        gameState.setPartLabSession(createEditorSession(design, PART_LAB_CONFIG.editor.historyLimit));
+    } else {
+        applyEdit(editorSession(), (draft) => {
+            for (const key of Object.keys(draft)) delete draft[key];
+            Object.assign(draft, cloneDesign(design));
+        });
     }
-    _redoStack = [];
+    refreshDesignState(true);
+    setSelection(null);
+    closePartInspector();
 }
 
 function setSelection(partId, openInspector = false, screenX = 480, screenY = 240) {
@@ -124,7 +159,11 @@ function setSelection(partId, openInspector = false, screenX = 480, screenY = 24
     });
 }
 
-function refreshDesignState(autoFit = false) {
+function refreshDesignState(autoFit = false, refreshInspector = false) {
+    const session = editorSession();
+    if (!session) return;
+    _design = getDisplayDesign(session);
+    _heldPartTypeId = session.held ? session.held.typeId : null;
     if (!_design) return;
     _physics = computeShipPhysics(_design);
 
@@ -142,8 +181,10 @@ function refreshDesignState(autoFit = false) {
     eventBus.emit(Events.PARTLAB_DESIGN_CHANGED, {
         design: _design,
         physics: _physics,
-        canUndo: _undoStack.length > 0,
-        canRedo: _redoStack.length > 0,
+        canUndo: !!session.held || !!session.edit || session.undo.length > 0,
+        canRedo: !!session.held || !!session.edit || session.redo.length > 0,
+        heldSource: session.held ? session.held.source : null,
+        refreshInspector,
         symmetryCount: _symmetryCount,
         angleSnap: _angleSnap,
         heldPartTypeId: _heldPartTypeId,
@@ -159,31 +200,21 @@ function handlePickCatalogPart(typeId, pointerEvent) {
     const partType = getPartType(typeId);
     if (!partType || !_canvas || !_camera) return;
 
+    commitPropertyEdit(editorSession());
+    if (!beginCatalog(editorSession(), typeId).ok) return;
     closePartInspector();
     _heldPartTypeId = typeId;
     _gizmoMode = 'place';
     _pointerDownButton = 0;
+    _canvasGesture = false;
+    _pointerMoved = false;
+    _camDragMode = 'IDLE';
     // 标记本次手势起始于零件栏：松手落在面板上时保持手持，不当作「丢弃」
     _gestureFromPanel = true;
 
     if (pointerEvent && typeof pointerEvent.clientX === 'number') {
-        const rect = _canvas.getBoundingClientRect();
-        const pt = cssToCanvas(
-            pointerEvent.clientX - rect.left,
-            pointerEvent.clientY - rect.top,
-            _canvas
-        );
-        _dragState = resolveDragPlacement(
-            _design,
-            _camera,
-            pt.x,
-            pt.y,
-            _canvas.width,
-            _canvas.height,
-            _heldPartTypeId,
-            _symmetryCount,
-            _angleSnap
-        );
+        _lastPointer = { x: pointerEvent.clientX, y: pointerEvent.clientY };
+        updateHeldPreview();
     }
 
     refreshDesignState(false);
@@ -200,12 +231,11 @@ function handlePickCatalogPart(typeId, pointerEvent) {
 }
 
 function handleDiscardHeldPart() {
-    if (!_heldPartTypeId) return;
-    _heldPartTypeId = null;
-    _dragState = null;
-    hideCursorGhost();
-    refreshDesignState(false);
-    setPartLabHint('已放下手上的零件', 'info');
+    if (!cancelOperation(editorSession())) return;
+    clearHeldPreview();
+    refreshDesignState(false, true);
+    setSelection(_selectedPartId);
+    setPartLabHint(t('partlab.editCanceled'), 'info');
 }
 
 /**
@@ -219,14 +249,15 @@ function handlePickupSelectedSubtree() {
         return;
     }
 
-    pushUndoSnapshot();
-    const res = removePartSubtree(_design, _selectedPartId);
-    if (res.ok && res.removedTypeId) {
-        _selectedPartId = null;
-        _heldPartTypeId = res.removedTypeId;
+    commitPropertyEdit(editorSession());
+    const res = beginMove(editorSession(), _selectedPartId);
+    if (res.ok) {
+        closePartInspector();
+        _heldPartTypeId = editorSession().held.typeId;
+        _symmetryCount = editorSession().held.rootIds.length;
         refreshDesignState(false);
-        const pt = getPartType(res.removedTypeId);
-        setPartLabHint(`已拆下并拿起「${pt ? pt.name : res.removedTypeId}」—— 移至新位置左键单击安装，或点左侧零件库销毁`, 'warn');
+        updateHeldPreview();
+        setPartLabHint(t('partlab.moveAssembly', { n: editorSession().held.parts.length }), 'info');
     }
 }
 
@@ -269,64 +300,47 @@ function handleQuickAttach(typeId) {
         return;
     }
 
-    pushUndoSnapshot();
-    const res = attachPartToDesign(_design, placement, typeId);
-    if (res.ok && res.addedPartIds.length > 0) {
-        _selectedPartId = res.addedPartIds[0];
+    commitPropertyEdit(editorSession());
+    beginCatalog(editorSession(), typeId);
+    const res = commitPlacement(editorSession(), placement);
+    if (res.ok) {
+        clearHeldPreview();
         refreshDesignState(true);
+        setSelection(null);
         setPartLabHint(`已安装 ${newType.name}${placement.symmetryCount > 1 ? ' ×' + placement.symmetryCount : ''}`, 'ok');
     }
 }
 
 function handleDeleteSelected() {
-    if (!_selectedPartId || !_design) return;
-    const target = _design.parts.find(p => p.id === _selectedPartId);
-    if (!target) return;
-    if (!target.parentId || target.attachMode === 'root') {
-        setPartLabHint('根部件（指挥核心）不可直接拆除，请使用右上角「新建」重置', 'warn');
-        notify('根部件不可直接拆除', 'warning');
-        return;
-    }
-
-    pushUndoSnapshot();
-    const res = removePartSubtree(_design, _selectedPartId);
+    if (!editorSession()) return;
+    commitPropertyEdit(editorSession());
+    const before = editorSession().design.parts.length;
+    const res = deleteSelection(editorSession(), _selectedPartId);
     if (res.ok) {
+        clearHeldPreview();
+        refreshDesignState(false, true);
         setSelection(null);
-        refreshDesignState(false);
-        setPartLabHint(`已拆除 ${res.removedCount} 个部件`, 'ok');
+        setPartLabHint(t('partlab.hintDeleted', { count: before - _design.parts.length }), 'ok');
     }
 }
 
 function handleUndo() {
-    if (_undoStack.length === 0) return;
-    _redoStack.push(cloneDesign(_design));
-    _design = _undoStack.pop();
-    _heldPartTypeId = null;
-    _dragState = null;
-    refreshDesignState(false);
-    setPartLabHint('已撤销上一步操作', 'info');
+    undoEdit(editorSession());
+    clearHeldPreview();
+    refreshDesignState(false, true);
+    setSelection(_selectedPartId);
 }
 
 function handleRedo() {
-    if (_redoStack.length === 0) return;
-    _undoStack.push(cloneDesign(_design));
-    _design = _redoStack.pop();
-    _heldPartTypeId = null;
-    _dragState = null;
-    refreshDesignState(false);
-    setPartLabHint('已重做操作', 'info');
+    redoEdit(editorSession());
+    clearHeldPreview();
+    refreshDesignState(false, true);
+    setSelection(_selectedPartId);
 }
 
 function handleLoadPreset(presetId) {
     _currentPresetId = presetId || 'preset_k2_standard';
-    _undoStack = [];
-    _redoStack = [];
-    _heldPartTypeId = null;
-    _dragState = null;
-    closePartInspector();
-    setSelection(null);
-    _design = createDefaultDesign(_currentPresetId);
-    refreshDesignState(true);
+    replaceWorkspace(createDefaultDesign(_currentPresetId), true);
     if (_camera && _physics) {
         _camera.fitToBounds(_physics.bounds, true);
     }
@@ -334,13 +348,7 @@ function handleLoadPreset(presetId) {
 }
 
 function handleNewWorkspace() {
-    pushUndoSnapshot();
-    _heldPartTypeId = null;
-    _dragState = null;
-    closePartInspector();
-    setSelection(null);
-    _design = createBlankDesign('pod_mk1', '未命名飞行器');
-    refreshDesignState(true);
+    replaceWorkspace(createBlankDesign('pod_mk1', '未命名飞行器'));
     if (_camera && _physics) {
         _camera.fitToBounds(_physics.bounds, true);
     }
@@ -350,7 +358,8 @@ function handleNewWorkspace() {
 
 function handleSaveWorkspace() {
     if (!_design) return;
-    const res = saveWorkspaceDesign(_design);
+    finishForWorkspace();
+    const res = saveWorkspaceDesign(editorSession().design);
     if (res.ok) {
         setPartLabHint(`工作区「${res.entry.name}」已保存！可在右上角「📂 打开」中随时调出`, 'ok');
         notify(`已保存工作区：${res.entry.name}`, 'success');
@@ -363,13 +372,7 @@ function handleLoadSavedWorkspace(wsId) {
     const list = getSavedWorkspaces();
     const found = list.find(w => w.id === wsId);
     if (!found || !found.design) return;
-    pushUndoSnapshot();
-    _heldPartTypeId = null;
-    _dragState = null;
-    closePartInspector();
-    setSelection(null);
-    _design = cloneDesign(found.design);
-    refreshDesignState(true);
+    replaceWorkspace(found.design);
     if (_camera && _physics) {
         _camera.fitToBounds(_physics.bounds, true);
     }
@@ -383,6 +386,7 @@ function handleDeleteSavedWorkspace(wsId) {
 }
 
 function handleLaunchVessel() {
+    finishForWorkspace();
     if (!_physics || !_physics.engineerReport) return;
     const rep = _physics.engineerReport;
     if (!rep.canLaunch) {
@@ -397,51 +401,55 @@ function handleLaunchVessel() {
 }
 
 function handleGizmoStep(dir) {
+    if (editorSession().held) return;
+    commitPropertyEdit(editorSession());
     if (!_selectedPartId || !_design) {
         setPartLabHint('请先在 3D 飞船上左键点击选中一个非根部件，再执行平移或旋转微调', 'warn');
         return;
     }
     if (_gizmoMode === 'offset') {
-        pushUndoSnapshot();
-        const ok = nudgePartSubtreeY(_design, _selectedPartId, dir * 0.10);
-        if (ok) {
+        const result = applyEdit(editorSession(), draft => nudgePartSubtreeY(draft, _selectedPartId, dir * 0.10));
+        if (result.ok) {
             refreshDesignState(false);
             setPartLabHint(`已沿轴向平移选中部件 ${dir > 0 ? '+0.10m' : '-0.10m'}`, 'ok');
         } else {
-            _undoStack.pop();
             setPartLabHint('根部件不可平移', 'warn');
         }
     } else if (_gizmoMode === 'rotate') {
-        pushUndoSnapshot();
         const stepRad = (dir * 15 * Math.PI) / 180;
-        const ok = rotatePartSubtreeY(_design, _selectedPartId, stepRad);
-        if (ok) {
+        const result = applyEdit(editorSession(), draft => rotatePartSubtreeY(draft, _selectedPartId, stepRad));
+        if (result.ok) {
             refreshDesignState(false);
             setPartLabHint(`已绕主轴旋转选中部件 ${dir > 0 ? '+15°' : '-15°'}`, 'ok');
-        } else {
-            _undoStack.pop();
         }
     }
 }
 
 function cycleSymmetry(step = 1) {
+    if (editorSession().held?.source === 'move') {
+        setPartLabHint(t('partlab.moveSymmetryFixed'), 'info');
+        return;
+    }
     const modes = PART_LAB_CONFIG.symmetryModes || [1, 2, 3, 4, 6, 8];
     const idx = modes.indexOf(_symmetryCount);
     const nextIdx = (idx + step + modes.length) % modes.length;
     _symmetryCount = modes[nextIdx];
     refreshDesignState(false);
+    updateHeldPreview();
     setPartLabHint(`径向对称模式已切换为 ${_symmetryCount}x`, 'info');
 }
 
 function toggleAngleSnap() {
     _angleSnap = !_angleSnap;
     refreshDesignState(false);
+    updateHeldPreview();
     setPartLabHint(_angleSnap ? '已开启 15° 角度与 5cm 高度步进吸附' : '已切换为自由连续无极挂载', 'info');
 }
 
 function handleExportJson() {
     if (!_design) return;
-    const text = JSON.stringify(_design, null, 2);
+    finishForWorkspace();
+    const text = JSON.stringify(editorSession().design, null, 2);
     if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text).then(() => {
             notify('飞船蓝图 JSON 已复制到剪贴板', 'success');
@@ -464,12 +472,64 @@ function handleImportJson() {
         setPartLabHint('蓝图 JSON 格式无效，导入失败', 'danger');
         return;
     }
-    pushUndoSnapshot();
-    _design = res.design;
-    setSelection(null);
-    refreshDesignState(true);
+    replaceWorkspace(res.design);
     notify('飞船蓝图导入成功！', 'success');
     setPartLabHint(`已导入蓝图：「${_design.name}」`, 'ok');
+}
+
+/**
+ * 把主船上的一枝直接拎在手上（供「按住拖动」与 Shift+单击快捷方式共用）。
+ * @param {string} partId
+ * @returns {boolean} 是否成功进入手持态
+ */
+function startMovePart(partId) {
+    commitPropertyEdit(editorSession());
+    const res = beginMove(editorSession(), partId);
+    if (!res.ok) return false;
+    closePartInspector();
+    _heldPartTypeId = editorSession().held.typeId;
+    _symmetryCount = editorSession().held.rootIds.length;
+    refreshDesignState(false);
+    updateHeldPreview();
+    setPartLabHint(t('partlab.moveAssembly', { n: editorSession().held.parts.length }), 'info');
+    return true;
+}
+
+function updateHeldPreview() {    const session = editorSession();
+    if (!session?.held || !_camera || !_canvas) return;
+    if (!_lastPointer) _lastPointer = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    const rect = _canvas.getBoundingClientRect();
+    const pt = cssToCanvas(_lastPointer.x - rect.left, _lastPointer.y - rect.top, _canvas);
+    const held = session.held;
+    _dragState = resolveDragPlacement(
+        getPlacementDesign(session), _camera, pt.x, pt.y, _canvas.width, _canvas.height,
+        held.typeId, held.source === 'move' ? held.rootIds.length : _symmetryCount, _angleSnap
+    );
+    if (held.source === 'move' && _dragState.mode === 'node') {
+        // 当前轴向挂点均为±Y，轴向重挂不应抹掉用户绕Y的已有朝向。
+        const anchor = held.parts.find(part => part.id === held.anchorId);
+        _dragState.placementSpec.placements[0].rotationY = anchor.rotationY || 0;
+    }
+    const preview = _dragState.valid ? previewPlacement(session, _dragState.placementSpec) : null;
+    if (preview?.ok) {
+        _dragState.ghostParts = preview.parts.map(part => ({ ...part, valid: true }));
+    } else {
+        _dragState.valid = false;
+        _dragState.reason = preview?.reason;
+        // 无有效挂点也显示完整手持组件，而非仅显示根件。
+        if (held.source === 'move') {
+            const anchor = held.parts.find(part => part.id === held.anchorId);
+            const target = _dragState.ghostParts[0]?.position || anchor.position;
+            _dragState.ghostParts = held.parts.map(part => ({
+                ...part,
+                position: part.position.map((v, axis) => v + target[axis] - anchor.position[axis]),
+                valid: false
+            }));
+        }
+    }
+    _ghostHiddenByUI = document.elementFromPoint(_lastPointer.x, _lastPointer.y) !== _canvas;
+    if (_ghostHiddenByUI) updateCursorGhost(held.typeId, _lastPointer.x, _lastPointer.y, false);
+    else hideCursorGhost();
 }
 
 function bindSceneInputs() {
@@ -480,7 +540,27 @@ function bindSceneInputs() {
         _pointerDownPos = { x: e.clientX, y: e.clientY };
         _pointerDownButton = e.button;
         _pointerMoved = false;
+        _cameraDragged = false;
+        _movedSincePress = false;
         _gestureFromPanel = false;
+
+        _canvasGesture = true;
+        _lastPointer = { x: e.clientX, y: e.clientY };
+
+        // 左键按下部件 = 立刻拎起（KSP 原版手感）；松手不放下，继续跟着光标。
+        if (e.button === 0 && !_heldPartTypeId) {
+            const rect = _canvas.getBoundingClientRect();
+            const pt = cssToCanvas(e.clientX - rect.left, e.clientY - rect.top, _canvas);
+            const hit = pickInstalledPart(_design, _camera, pt.x, pt.y, _canvas.width, _canvas.height);
+            if (hit && hit.parentId && hit.attachMode !== 'root') {
+                _canvasGesture = true;
+                _camDragMode = 'IDLE';
+                if (!startMovePart(hit.id)) {
+                    _camDragMode = 'ORBIT';
+                }
+                return;
+            }
+        }
 
         // 左键拖拽或右键拖拽均可旋转相机；中键或 Shift+右键垂直平移相机焦点
         if (e.button === 1 || (e.button === 2 && e.shiftKey)) {
@@ -492,22 +572,35 @@ function bindSceneInputs() {
 
     const onWindowPointerMove = (e) => {
         if (!_canvas || !_camera) return;
+        _lastPointer = { x: e.clientX, y: e.clientY };
         const rect = _canvas.getBoundingClientRect();
         const cssX = e.clientX - rect.left;
         const cssY = e.clientY - rect.top;
         const canvasPt = cssToCanvas(cssX, cssY, _canvas);
 
+        if (!_movedSincePress) {
+            const dx0 = e.clientX - _pointerDownPos.x;
+            const dy0 = e.clientY - _pointerDownPos.y;
+            if (Math.hypot(dx0, dy0) > PART_LAB_CONFIG.editor.dragThresholdPx) _movedSincePress = true;
+        }
+
         if (_camDragMode === 'ORBIT') {
             const dx = e.clientX - _pointerDownPos.x;
             const dy = e.clientY - _pointerDownPos.y;
-            if (Math.hypot(dx, dy) > 3) _pointerMoved = true;
+            if (Math.hypot(dx, dy) > PART_LAB_CONFIG.editor.dragThresholdPx) {
+                _pointerMoved = true;
+                _cameraDragged = true;
+            }
             if (_pointerMoved) {
                 _camera.rotate(dx, dy);
                 _pointerDownPos = { x: e.clientX, y: e.clientY };
             }
         } else if (_camDragMode === 'PAN') {
             const dy = e.clientY - _pointerDownPos.y;
-            if (Math.abs(dy) > 2) _pointerMoved = true;
+            if (Math.abs(dy) > 2) {
+                _pointerMoved = true;
+                _cameraDragged = true;
+            }
             if (_pointerMoved) {
                 _camera.panY(dy);
                 _pointerDownPos = { x: e.clientX, y: e.clientY };
@@ -516,23 +609,7 @@ function bindSceneInputs() {
 
         // 若手上有拎着的零件，无论是否在转视角，实时解算 3D 吸附预览并同步鼠标幽灵徽标
         if (_heldPartTypeId) {
-            _dragState = resolveDragPlacement(
-                _design,
-                _camera,
-                canvasPt.x,
-                canvasPt.y,
-                _canvas.width,
-                _canvas.height,
-                _heldPartTypeId,
-                _symmetryCount,
-                _angleSnap
-            );
-            // 是否位于 3D 视口内（不在左侧零件栏/工具栏/浮动面板上）
-            const overUI = e.target && e.target !== _canvas && e.target.closest
-                && e.target.closest('#vabPartsDock, #vabTopBar, #vabBottomBar, .vab-popover, #vabStagingDock');
-            updateCursorGhost(_heldPartTypeId, e.clientX, e.clientY, _dragState.valid);
-            // 鼠标在 UI 面板上方时隐藏 3D 幽灵预览（避免半透明件飘在飞船旁误导）
-            _ghostHiddenByUI = !!overUI;
+            updateHeldPreview();
             if (_dragState.valid) {
                 if (_dragState.mode === 'node') {
                     setPartLabHint(
@@ -574,13 +651,21 @@ function bindSceneInputs() {
     const onWindowPointerUp = (e) => {
         const fromPanel = _gestureFromPanel;
         _gestureFromPanel = false;
+        const fromCanvas = _canvasGesture;
+        _canvasGesture = false;
         if (!_canvas || !_camera) {
             _camDragMode = 'IDLE';
             return;
         }
 
         const btn = _pointerDownButton;
+        // 只有真正转动/平移过相机才算「拖了相机」；
+        // 按住部件拖动改名的是手持组件，松手必须继续走放置流程。
+        const cameraDragged = fromCanvas && _cameraDragged;
         _camDragMode = 'IDLE';
+
+        if (cameraDragged || (!fromPanel && !fromCanvas)) return;
+        _lastPointer = { x: e.clientX, y: e.clientY };
 
         const rect = _canvas.getBoundingClientRect();
         const pt = cssToCanvas(e.clientX - rect.left, e.clientY - rect.top, _canvas);
@@ -590,8 +675,7 @@ function bindSceneInputs() {
         //      a) 从零件栏按住直接拖到 3D 视口松手 → 立即安装
         //      b) 单击零件栏拿起 → 移动鼠标 → 在 3D 视口单击 → 安装
         if (_heldPartTypeId) {
-            const hitUI = e.target && e.target !== _canvas && e.target.closest
-                && e.target.closest('#vabPartsDock, #vabBottomBar, #vabTopBar, #vabStagingDock, .vab-popover');
+            const hitUI = document.elementFromPoint(e.clientX, e.clientY) !== _canvas;
 
             if (btn === 2) {
                 // 右键单击放下手上的零件
@@ -600,39 +684,28 @@ function bindSceneInputs() {
             }
             if (btn === 0) {
                 if (hitUI) {
-                    // 松手落在 UI 面板上：本手势起始于零件栏时保持手持；否则丢弃
-                    if (!fromPanel) handleDiscardHeldPart();
+                    // 面板与工具栏交互不隐式取消或删除组件。
                     return;
                 }
                 // 松手落在 3D 视口：用最新指针位置重新解算一次后尝试安装
-                _dragState = resolveDragPlacement(
-                    _design,
-                    _camera,
-                    pt.x,
-                    pt.y,
-                    _canvas.width,
-                    _canvas.height,
-                    _heldPartTypeId,
-                    _symmetryCount,
-                    _angleSnap
-                );
+                updateHeldPreview();
                 if (_dragState && _dragState.valid && _dragState.placementSpec) {
                     const partType = getPartType(_heldPartTypeId);
-                    pushUndoSnapshot();
-                    const res = attachPartToDesign(_design, _dragState.placementSpec, _heldPartTypeId);
-                    if (res.ok && res.addedPartIds.length > 0) {
+                    const res = commitPlacement(editorSession(), _dragState.placementSpec);
+                    if (res.ok) {
                         const attachedSym = _dragState.symmetryCount || 1;
-                        _heldPartTypeId = null;
-                        _dragState = null;
-                        hideCursorGhost();
-                        setSelection(res.addedPartIds[0], false);
+                        clearHeldPreview();
                         refreshDesignState(false);
+                        // 放置完成后不自动选中：按 KSP 习惯，落件即结束本次操作，
+                        // 想调整属性时再右键该部件（避免还要额外点一下空白处取消高亮）。
+                        setSelection(null);
                         setPartLabHint(
                             `✓ 已安装 ${partType ? partType.name : ''}${attachedSym > 1 ? ' ×' + attachedSym : ''}（右键点击部件可调燃料/配重）`,
                             'ok'
                         );
                     }
-                } else {
+                } else if (_movedSincePress) {
+                    // 只有真的拖过鼠标才提示「放歪了」；点一下不该刷红字。
                     setPartLabHint('当前位置无法安装：请对准飞船绿色连接点或允许侧面挂载的舱段（右键取消）', 'danger');
                 }
             }
@@ -682,6 +755,7 @@ function bindSceneInputs() {
         e.preventDefault();
         if (_camera) {
             _camera.zoomByWheel(e);
+            updateHeldPreview();
         }
     };
 
@@ -690,6 +764,11 @@ function bindSceneInputs() {
     };
 
     const onWindowKeyDown = (e) => {
+        if (e.key === 'Escape' && (editorSession().held || editorSession().edit)) {
+            e.preventDefault();
+            handleDiscardHeldPart();
+            return;
+        }
         // 输入框聚焦时不拦截键盘快捷键
         if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
             return;
@@ -743,12 +822,21 @@ function bindSceneInputs() {
         }
     };
 
+    const onCancelGesture = () => {
+        _canvasGesture = false;
+        _gestureFromPanel = false;
+        _camDragMode = 'IDLE';
+        if (editorSession()?.held || editorSession()?.edit) handleDiscardHeldPart();
+    };
+
     _canvas.addEventListener('pointerdown', onCanvasPointerDown);
     _canvas.addEventListener('wheel', onCanvasWheel, { passive: false });
     _canvas.addEventListener('contextmenu', onCanvasContextMenu);
     window.addEventListener('pointermove', onWindowPointerMove);
     window.addEventListener('pointerup', onWindowPointerUp);
     window.addEventListener('keydown', onWindowKeyDown);
+    window.addEventListener('pointercancel', onCancelGesture);
+    window.addEventListener('blur', onCancelGesture);
 
     _boundHandlers = {
         onCanvasPointerDown,
@@ -756,7 +844,8 @@ function bindSceneInputs() {
         onCanvasContextMenu,
         onWindowPointerMove,
         onWindowPointerUp,
-        onWindowKeyDown
+        onWindowKeyDown,
+        onCancelGesture
     };
 }
 
@@ -770,6 +859,8 @@ function unbindSceneInputs() {
     window.removeEventListener('pointermove', _boundHandlers.onWindowPointerMove);
     window.removeEventListener('pointerup', _boundHandlers.onWindowPointerUp);
     window.removeEventListener('keydown', _boundHandlers.onWindowKeyDown);
+    window.removeEventListener('pointercancel', _boundHandlers.onCancelGesture);
+    window.removeEventListener('blur', _boundHandlers.onCancelGesture);
     _boundHandlers = null;
 }
 /**
@@ -788,7 +879,7 @@ function drawWorldOverlays(ctx) {
 
     // 1. 几何中心（CoL 青球）与空闲轴向连接节点绿圈
     if (_centersState.col) {
-        const freeNodes = getFreeAttachNodes(_design);
+        const freeNodes = getFreeAttachNodes(editorSession().held ? getPlacementDesign(editorSession()) : _design);
         for (const node of freeNodes) {
             const scr = projectToScreen(viewProj, node.worldPos, W, H);
             if (!scr) continue;
@@ -950,19 +1041,22 @@ export function registerPartLabScene(opts = {}) {
             _symmetryCount = 1;
             _angleSnap = true;
             _centersState = { com: true, cot: true, col: true };
-            _undoStack = [];
-            _redoStack = [];
             _selectedPartId = null;
             _selectedExpandedIds = new Set();
             _hoveredPartId = null;
             _heldPartTypeId = null;
             _dragState = null;
             _camDragMode = 'IDLE';
+            _canvasGesture = false;
+            _gestureFromPanel = false;
+            _lastPointer = null;
 
             const bgs = PART_LAB_CONFIG.backgrounds || [];
             _bgCss = bgs[0] ? bgs[0].css : '#151b26';
 
             _design = createDefaultDesign(_currentPresetId);
+            gameState.setPartLabSession(createEditorSession(_design, PART_LAB_CONFIG.editor.historyLimit));
+            _design = editorSession().design;
             _physics = computeShipPhysics(_design);
 
             _camera.setCenterXRatio(getPartLabViewportCenterRatio(window.innerWidth));
@@ -974,14 +1068,21 @@ export function registerPartLabScene(opts = {}) {
                 onDiscardHeldPart: () => handleDiscardHeldPart(),
                 onPickupSelectedSubtree: () => handlePickupSelectedSubtree(),
                 onSelectPartById: (partId, openPaw, sx, sy) => setSelection(partId, openPaw, sx, sy),
+                onBeginPropertyEdit: () => beginPropertyEdit(editorSession()),
+                onCommitPropertyEdit: () => {
+                    commitPropertyEdit(editorSession());
+                    refreshDesignState();
+                },
                 onUpdatePartProperty: (propKey, val) => {
                     if (!_selectedPartId || !_design) return;
-                    updatePartInspectorProperty(_design, _selectedPartId, propKey, val);
+                    const mutate = draft => updatePartInspectorProperty(draft, _selectedPartId, propKey, val);
+                    if (editorSession().edit) updatePropertyEdit(editorSession(), mutate);
+                    else applyEdit(editorSession(), mutate);
                     refreshDesignState(false);
                 },
                 onRenameVessel: (newName) => {
                     if (_design) {
-                        _design.name = newName;
+                        applyEdit(editorSession(), draft => { draft.name = newName; });
                         refreshDesignState(false);
                     }
                 },
@@ -1004,6 +1105,7 @@ export function registerPartLabScene(opts = {}) {
                 onCameraFit: () => {
                     if (_camera && _physics) {
                         _camera.fitToBounds(_physics.bounds, true);
+                        updateHeldPreview();
                     }
                 },
                 onUndo: () => handleUndo(),
@@ -1032,6 +1134,9 @@ export function registerPartLabScene(opts = {}) {
 
             if (typeof window !== 'undefined') {
                 window.__partLab = {
+                    // TEMP: 只读事务诊断，不向生产模块暴露可写状态。
+                    get editor() { return editorSession() ? cloneDesign(editorSession()) : null; },
+                    get preview() { return _dragState ? cloneDesign(_dragState) : null; },
                     get design() { return _design; },
                     get physics() { return _physics; },
                     get renderer() { return _renderer3D; },
@@ -1047,6 +1152,7 @@ export function registerPartLabScene(opts = {}) {
         update() {
             if (_camera) {
                 _camera.setCenterXRatio(getPartLabViewportCenterRatio(window.innerWidth));
+                if (_heldPartTypeId) updateHeldPreview();
             }
         },
 
@@ -1078,7 +1184,8 @@ export function registerPartLabScene(opts = {}) {
             // 2. 渲染离屏 WebGL2 3D 飞船并 1:1 合成到主画布
             if (_renderer3D && _renderer3D.isReady()) {
                 const ghostParts = (_heldPartTypeId && _dragState && !_ghostHiddenByUI) ? _dragState.ghostParts : null;
-                const ok = _renderer3D.render(_design, _camera, {
+                const renderedDesign = editorSession().held ? getPlacementDesign(editorSession()) : _design;
+                const ok = _renderer3D.render(renderedDesign, _camera, {
                     selectedPartIds: _selectedExpandedIds,
                     hoveredPartId: _hoveredPartId,
                     ghostParts
@@ -1094,11 +1201,13 @@ export function registerPartLabScene(opts = {}) {
         },
 
         exit() {
+            finishForWorkspace();
             unbindSceneInputs();
             destroyPartLabUI();
             _heldPartTypeId = null;
             _dragState = null;
             _camDragMode = 'IDLE';
+            gameState.clearPartLabSession();
         }
     });
 }

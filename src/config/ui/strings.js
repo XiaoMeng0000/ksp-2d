@@ -641,6 +641,10 @@ const STRINGS = {
 
     // ---------- 3D 部件装配车间（0.3.0 PartLab） ----------
     'partlab.title': '3D 部件装配车间',
+    'partlab.editCanceled': '已取消本次编辑，原组件及其状态保持不变',
+    'partlab.moveAssembly': (p) => `已拿起完整组件（${p.n} 个部件）—— 单击有效挂点放置；右键或 Esc 原样恢复；删除按钮才会拆除`,
+    'partlab.moveSymmetryFixed': '移动已有组件时保留原对称数量；调整数量属于后续对称编辑阶段',
+    'partlab.editRejected': (p) => `操作未提交：${p.reason}。飞船和撤销记录未改变。`,
     'partlab.subtitle': '// 积木式飞船总装与轨道动力学标定台',
     'partlab.partsCatalog': '部件清单',
     'partlab.physicsTitle': '飞船物理与工程参数',

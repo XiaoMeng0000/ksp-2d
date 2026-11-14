@@ -49,6 +49,8 @@ let _panelsRegistered = false;
 let _activeCategory = 'all';
 let _searchQuery = '';
 let _heldPartTypeId = null;
+let _heldSource = null;
+let _propertyEditSlider = null;
 let _gizmoMode = 'place'; // 'place' | 'offset' | 'rotate'
 let _symmetryCount = 1;
 let _angleSnap = true;
@@ -310,7 +312,7 @@ export function initPartLabUI(callbacks = {}) {
 
     uiManager.registerPanel('partlabParts', {
         element: partsDockEl,
-        render: renderPartsGrid,
+        render: updateHeldPartTiles,
         show: () => { if (partsDockEl) partsDockEl.style.display = 'flex'; },
         hide: () => { if (partsDockEl) partsDockEl.style.display = 'none'; }
     });
@@ -342,6 +344,10 @@ export function initPartLabUI(callbacks = {}) {
         }
         if (payload.heldPartTypeId !== undefined) {
             _heldPartTypeId = payload.heldPartTypeId;
+            if (!_heldPartTypeId) _heldSource = null;
+        }
+        if (payload.heldSource !== undefined) {
+            _heldSource = payload.heldSource;
         }
         if (payload.gizmoMode) {
             _gizmoMode = payload.gizmoMode;
@@ -350,6 +356,8 @@ export function initPartLabUI(callbacks = {}) {
     };
 
     _selectionChangedHandler = (payload) => {
+        // 场景切换选择或撤销后，旧滑块手势已失效，不能再次提交。
+        _propertyEditSlider = null;
         _selectedPartId = payload ? payload.partId : null;
         updateDeleteAndStageSelection();
         if (payload && payload.openInspector) {
@@ -357,7 +365,7 @@ export function initPartLabUI(callbacks = {}) {
         } else if (!_selectedPartId) {
             closePartInspector();
         } else {
-            refreshOpenPartInspector();
+            refreshOpenPartInspector(true);
         }
     };
 
@@ -367,16 +375,24 @@ export function initPartLabUI(callbacks = {}) {
 
 /**
  * 当异步资产（KSP2 网格/贴图）加载完成并刷新缩略图后，更新对应零件格里的图片。
- * 若该格子当时渲染的是占位图标（还没有 <img>），整体重绘一次网格。
+ * 占位图标就地更新，保留零件格节点及其指针事件目标。
  */
 export function updatePartTileThumbnail(typeId, dataUrl) {
     if (!_container || !typeId || !dataUrl) return;
-    const img = _container.querySelector(`.vab-part-tile[data-part-type="${typeId}"] img.vab-tile-thumb`);
-    if (img) {
+    const tile = _container.querySelector(`.vab-part-tile[data-part-type="${typeId}"]`);
+    const thumb = tile?.querySelector('img.vab-tile-thumb') || tile?.querySelector('.vab-tile-thumb');
+    if (!thumb) return;
+    if (thumb.tagName === 'IMG') {
+        thumb.src = dataUrl;
+    } else {
+        // 不移除占位节点：资产可能恰好在 pointerdown 与 click 之间完成。
+        thumb.textContent = '';
+        const img = document.createElement('img');
+        img.className = 'vab-tile-thumb';
         img.src = dataUrl;
-        return;
+        img.alt = getPartType(typeId)?.name || '';
+        thumb.appendChild(img);
     }
-    renderPartsGrid();
 }
 
 function renderCategoryRail() {
@@ -501,6 +517,15 @@ function showPartHoverTooltip(partType, tileRect) {
     tip.classList.add('visible');
 }
 
+function updateHeldPartTiles() {
+    if (!_container) return;
+    _container.querySelectorAll('.vab-part-tile').forEach((tile) => {
+        tile.classList.toggle('held', tile.dataset.partType === _heldPartTypeId);
+    });
+    const trashHint = _container.querySelector('#vabDropTrashHint');
+    if (trashHint) trashHint.classList.toggle('visible', !!_heldPartTypeId);
+}
+
 function hidePartHoverTooltip() {
     if (!_container) return;
     const tip = _container.querySelector('#vabPartTooltip');
@@ -553,7 +578,7 @@ function renderAllDynamicViews(payload) {
     const undoBtn = _container.querySelector('#vabUndoBtn');
     const redoBtn = _container.querySelector('#vabRedoBtn');
     if (undoBtn) {
-        if (canUndo) undoBtn.classList.remove('disabled');
+        if (canUndo || _heldPartTypeId) undoBtn.classList.remove('disabled');
         else undoBtn.classList.add('disabled');
     }
     if (redoBtn) {
@@ -562,14 +587,14 @@ function renderAllDynamicViews(payload) {
     }
 
     updateDeleteAndStageSelection();
-    renderPartsGrid();
+    updateHeldPartTiles();
 
     // 3. 右侧分级树（Staging Stack）
     renderStagingStack(physics.stages || []);
 
     // 4. 工程师报告角标与内容
     renderEngineerPopover(physics);
-    refreshOpenPartInspector();
+    refreshOpenPartInspector(payload.refreshInspector === true);
 }
 
 function updateDeleteAndStageSelection() {
@@ -579,7 +604,7 @@ function updateDeleteAndStageSelection() {
         const part = (_lastDesign && _selectedPartId)
             ? _lastDesign.parts.find(p => p.id === _selectedPartId)
             : null;
-        const canDel = !!(part && part.parentId && part.attachMode !== 'root');
+        const canDel = !!_heldPartTypeId || !!(part && part.parentId && part.attachMode !== 'root');
         if (canDel) delBtn.classList.remove('disabled');
         else delBtn.classList.add('disabled');
     }
@@ -740,6 +765,7 @@ export function openPartInspector(part, partType, clientX, clientY) {
     if (!_container || !part || !partType) return;
     const paw = _container.querySelector('#vabPartInspector');
     if (!paw) return;
+    _propertyEditSlider = null;
 
     const isRoot = !part.parentId || part.attachMode === 'root';
     let rowsHtml = '';
@@ -838,7 +864,8 @@ export function openPartInspector(part, partType, clientX, clientY) {
     paw.classList.add('open');
 }
 
-function refreshOpenPartInspector() {
+function refreshOpenPartInspector(rebuild = false) {
+    if (rebuild) _propertyEditSlider = null;
     if (!_container || !_selectedPartId || !_lastDesign) return;
     const paw = _container.querySelector('#vabPartInspector');
     if (!paw || !paw.classList.contains('open')) return;
@@ -846,10 +873,17 @@ function refreshOpenPartInspector() {
     const partType = part ? getPartType(part.typeId) : null;
     if (!part || !partType) {
         closePartInspector();
+    } else if (rebuild) {
+        const left = paw.style.left;
+        const top = paw.style.top;
+        openPartInspector(part, partType, parseInt(left, 10) - 16, parseInt(top, 10) + 20);
+        paw.style.left = left;
+        paw.style.top = top;
     }
 }
 
 export function closePartInspector() {
+    _propertyEditSlider = null;
     if (!_container) return;
     const paw = _container.querySelector('#vabPartInspector');
     if (paw) paw.classList.remove('open');
@@ -952,8 +986,12 @@ function bindUIEvents() {
 
         partsDock.addEventListener('pointerdown', (e) => {
             if (e.button !== 0) return;
+            if (e.target.closest('[data-action], input, select, textarea, button')) return;
             const tile = e.target.closest('.vab-part-tile');
-            if (!tile) return;
+            if (!tile) {
+                if (_heldPartTypeId && _callbacks.onDiscardHeldPart) _callbacks.onDiscardHeldPart();
+                return;
+            }
             const typeId = tile.dataset.partType;
             if (!typeId) return;
             // 左键按下零件格即拿起该零件（KSP 原版：可按住直接拖到飞船松手安装，
@@ -961,14 +999,6 @@ function bindUIEvents() {
             e.preventDefault();
             hidePartHoverTooltip();
             if (_callbacks.onPickCatalogPart) _callbacks.onPickCatalogPart(typeId, e);
-        });
-
-        partsDock.addEventListener('click', (e) => {
-            // 点击零件面板空白处 → 丢弃手上零件（点格子本身由 pointerdown 处理）
-            const tile = e.target.closest('.vab-part-tile');
-            if (!tile && _heldPartTypeId) {
-                if (_callbacks.onDiscardHeldPart) _callbacks.onDiscardHeldPart();
-            }
         });
     }
 
@@ -982,9 +1012,40 @@ function bindUIEvents() {
     }
 
     // PAW 滑块实时调节（燃料存量 / 货仓配重 / 推力限制）
+    const commitPropertyEdit = () => {
+        if (!_propertyEditSlider) return;
+        _propertyEditSlider = null;
+        if (_callbacks.onCommitPropertyEdit) _callbacks.onCommitPropertyEdit();
+    };
+    const beginPropertyEdit = (slider) => {
+        if (_propertyEditSlider === slider) return;
+        commitPropertyEdit();
+        _propertyEditSlider = slider;
+        if (_callbacks.onBeginPropertyEdit) _callbacks.onBeginPropertyEdit(slider.dataset.pawProp);
+    };
+    _container.addEventListener('pointerdown', (e) => {
+        const slider = e.target.closest('.vab-paw-slider');
+        if (slider && e.button === 0) beginPropertyEdit(slider);
+    });
+    _container.addEventListener('keydown', (e) => {
+        const slider = e.target.closest('.vab-paw-slider');
+        if (slider && /^(Arrow(Left|Right|Up|Down)|Home|End|PageUp|PageDown)$/.test(e.key)) {
+            beginPropertyEdit(slider);
+        }
+    });
+    ['change', 'focusout'].forEach((eventName) => {
+        _container.addEventListener(eventName, (e) => {
+            if (e.target === _propertyEditSlider) commitPropertyEdit();
+        });
+    });
+    _container.addEventListener('pointercancel', () => {
+        // 由场景恢复草稿，不能先在 UI 提交。
+        _propertyEditSlider = null;
+    });
     _container.addEventListener('input', (e) => {
         const slider = e.target.closest('.vab-paw-slider');
         if (!slider) return;
+        beginPropertyEdit(slider);
         const propKey = slider.dataset.pawProp;
         const rawVal = Number(slider.value);
 
@@ -1009,6 +1070,7 @@ function bindUIEvents() {
         const btn = e.target.closest('[data-action]');
         if (!btn) return;
         const action = btn.dataset.action;
+        if (btn.classList.contains('disabled') && !(action === 'undo' && _heldPartTypeId)) return;
 
         switch (action) {
             case 'select-cat': {
@@ -1089,7 +1151,11 @@ function bindUIEvents() {
                 break;
             case 'delete-selected':
                 closePartInspector();
-                if (_callbacks.onDeleteSelected) _callbacks.onDeleteSelected();
+                if (_heldPartTypeId && _heldSource !== 'move') {
+                    if (_callbacks.onDiscardHeldPart) _callbacks.onDiscardHeldPart();
+                } else if (_callbacks.onDeleteSelected) {
+                    _callbacks.onDeleteSelected();
+                }
                 break;
             case 'cycle-symmetry':
                 if (_callbacks.onCycleSymmetry) _callbacks.onCycleSymmetry(1);
@@ -1172,11 +1238,7 @@ function bindUIEvents() {
                     if (p) {
                         const nextStage = Math.max(0, Math.min(9, (Number(p.stage) || 0) + delta));
                         _callbacks.onUpdatePartProperty('stage', nextStage);
-                        const partType = getPartType(p.typeId);
-                        const paw = _container.querySelector('#vabPartInspector');
-                        if (paw && partType) {
-                            openPartInspector(p, partType, parseInt(paw.style.left, 10) - 16, parseInt(paw.style.top, 10) + 20);
-                        }
+                        refreshOpenPartInspector(true);
                     }
                 }
                 break;
@@ -1234,6 +1296,9 @@ export function getPartLabViewportCenterRatio(canvasCssWidth) {
 }
 
 export function destroyPartLabUI() {
+    _propertyEditSlider = null;
+    _heldPartTypeId = null;
+    _heldSource = null;
     if (_designChangedHandler) {
         eventBus.off(Events.PARTLAB_DESIGN_CHANGED, _designChangedHandler);
         _designChangedHandler = null;
