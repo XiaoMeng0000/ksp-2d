@@ -130,61 +130,208 @@
 /* ==================== 2. 左侧零件选择器（左分类竖栏 + 右 3D 图标网格） ==================== */
 .vab-parts-dock {
     position: fixed;
-    top: 0;
-    left: 0;
-    bottom: 48px;
-    width: 330px;
+    border-radius: 5px;
+    top: 10px;
+    left: 10px;
+    width: 350px;
+    height: calc(100vh - 20px);
+    background: var(--theme-bg);
+    padding: 10px;
+    display: none;
     pointer-events: auto;
+    flex-direction: column;
+    gap: 2px;
+    z-index: 800;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    overflow-y: auto;
+    box-sizing: border-box;
+    z-index: 200;
+}
+
+.vab-parts-dock .container {
+    overflow: hidden;
+    flex: 1;
     display: flex;
-    background: var(--panel-bg-deep);
-    border-right: 1px solid var(--border);
-    z-index: 125;
+    flex-direction: row;
+    border-radius: 5px;
+    background: var(--theme-panel);
+}
+
+@keyframes brightness-fade {
+    from {
+        filter: brightness(2);
+    }
+
+    to {
+        filter: brightness(1);
+    }
+}
+
+.vab-btn-delete {
+    --stripe-width: 10px;
+    /* 斜纹粗细 */
+    --stripe-gap: 9px;
+    /* 斜纹间隙 */
+    --stripe-color: #003B5D;
+    /* 斜纹颜色 */
+    position: relative;
+    outline: none;
+    height: 48px;
+    margin-top: 5px;
+    background-color: #062840;
+    border: #00A9FF 1px solid;
+    color: #00A9FF;
+    border-radius: 5px;
+    animation: brightness-fade 0.3s ease forwards;
+}
+
+/* 左侧纯硬边斜纹 */
+.vab-btn-delete::before {
+    content: '';
+    position: absolute;
+    top: 1px;
+    left: 20px;
+    width: 15px;
+    /* 斜纹占用的宽度 */
+    height: calc(100% - 2px);
+    background: repeating-linear-gradient(-40deg,
+            var(--stripe-color),
+            var(--stripe-color) var(--stripe-width),
+            transparent var(--stripe-width),
+            transparent calc(var(--stripe-width) + var(--stripe-gap)));
+    pointer-events: none;
+    /* 删除了 mask 遮罩，现在这里是硬切边 */
+}
+
+/* 右侧纯硬边斜纹 */
+.vab-btn-delete::after {
+    content: '';
+    position: absolute;
+    top: 1px;
+    right: 20px;
+    width: 15px;
+    height: calc(100% - 2px);
+    background: repeating-linear-gradient(-40deg,
+            var(--stripe-color),
+            var(--stripe-color) var(--stripe-width),
+            transparent var(--stripe-width),
+            transparent calc(var(--stripe-width) + var(--stripe-gap)));
+    pointer-events: none;
+}
+
+.vab-btn-delete:hover {
+    --stripe-color: #5C0C0C;
+    background-color: #3F0C0F;
+    border: #FE3232 1px solid;
+    color: #FE3232;
+}
+
+.vab-btn-delete.disabled {
+    --stripe-color: #808183;
+    background-color: var(--theme-panel);
+    border: #595C60 1px solid;
+    color: #D3D3D3;
+    animation: none;
+}
+
+.vab-btn-delete-icon {
+    display: inline-block;
+    width: 30px;
+    height: 30px;
+    vertical-align: middle;
+    background-color: currentColor;
+    mask-size: contain;
+    -webkit-mask-size: contain;
+    mask-repeat: no-repeat;
+    -webkit-mask-repeat: no-repeat;
+    mask-position: center;
+    -webkit-mask-position: center;
+    transition: transform 0.2s cubic-bezier(0.15, 1.05, 0.41, 1.03);
+}
+
+.vab-btn-delete:not(.disabled):hover .vab-btn-delete-icon {
+    transform: scale(1.4);
 }
 
 /* 最左侧竖向分类图标条 */
 .vab-cat-rail {
-    width: 52px;
-    background: var(--panel-bg-dark);
-    border-right: 1px solid var(--border-dark);
+    background-color: var(--card-bg-pri);
     display: flex;
     flex-direction: column;
-    align-items: stretch;
-    padding: 6px 3px;
-    gap: 4px;
-    box-sizing: border-box;
 }
 
 .vab-cat-tab {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 3px;
-    padding: 7px 2px;
-    background: var(--card-bg-dark);
-    border: 1px solid var(--border-dark);
-    border-radius: 4px;
-    color: var(--text-mid);
+    position: relative;
+    border: none;
+    padding: 4px 0;
+    width: 40px;
+    height: 40px;
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: 11px;
+    color: var(--text-mid);
+    background: transparent;
     cursor: pointer;
-    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .vab-cat-tab:hover {
     background: var(--card-bg-pri);
-    color: var(--text-bright);
 }
 
 .vab-cat-tab.active {
-    background: var(--accent-bg-strong);
-    border-color: var(--accent);
-    color: var(--accent);
+    color: var(--card-bg-pri);
+    background: var(--theme-color);
 }
 
 .vab-cat-icon {
     font-size: 15px;
     line-height: 1;
+}
+
+.vab-cat-tab .vab-cat-tooltip {
+    position: absolute;
+    left: 50px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: none;
+    background: #2A2A2A;
+    border-radius: 0px 5px 5px 0px;
+    padding: 10px 20px;
+    color: var(--text-bright);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.5;
+    pointer-events: none;
+    text-align: center;
+    white-space: nowrap;
+    width: fit-content;
+    overflow-wrap: anywhere;
+    z-index: 4;
+}
+
+.vab-cat-tab .vab-cat-tooltip::after {
+    content: "";
+    background-color: #0DD9FE;
+    position: absolute;
+    top: 0px;
+    left: 0px;
+    width: 5px;
+    height: 100%;
+}
+
+.vab-cat-tab:hover .vab-cat-tooltip {
+    display: block;
+}
+
+.vab-undo-redo {
+    display: flex;
+    position: fixed;
+    border-radius: 5px;
+    top: 10px;
+    left: 380px;
+    background: var(--theme-bg);
+    padding: 10px;
+    gap: 10px;
 }
 
 /* 右侧大块：零件缩略图网格区 */
@@ -196,8 +343,7 @@
 }
 
 .vab-parts-header {
-    padding: 8px 10px;
-    border-bottom: 1px solid var(--border-dark);
+    padding-bottom: 10px;
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -451,8 +597,7 @@
     position: fixed;
     top: 58px;
     right: 12px;
-    width: 162px;
-    max-height: calc(100vh - 126px);
+    width: 350px;
     pointer-events: auto;
     display: flex;
     flex-direction: column;
@@ -523,27 +668,25 @@
 /* ==================== 5. 下侧工具栏（平移/对称/吸附/三心 + 小工具栏） ==================== */
 .vab-bottombar {
     position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    bottom: 10px;
+    left: 380px;
+    right: 200px;
     height: 48px;
     pointer-events: auto;
-    background: var(--panel-bg-deep);
-    border-top: 1px solid var(--border);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 12px;
-    box-sizing: border-box;
     z-index: 130;
 }
 
 .vab-tools-left,
 .vab-tools-center,
 .vab-tools-right {
+    height: 48px;
+    background: var(--theme-bg);
+    border-radius: 5px;
     display: flex;
     align-items: center;
-    gap: 8px;
 }
 
 .vab-tool-divider {
@@ -556,40 +699,49 @@
 .vab-tool-btn {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 5px 9px;
-    background: var(--card-bg-dark);
-    border: 1px solid var(--border);
-    border-radius: 4px;
+    background-color: transparent;
+    border: none;
     color: var(--text-main);
     font-family: var(--font-mono);
     font-size: 11px;
+    width: 25px;
+    height: 25px;
     cursor: pointer;
     transition: background 0.14s ease, border-color 0.14s ease;
 }
 
 .vab-tool-btn:hover {
-    background: var(--card-bg-pri);
-    border-color: var(--accent);
     color: var(--text-bright);
 }
 
 .vab-tool-btn.active {
-    background: var(--accent-bg-strong);
-    border-color: var(--accent);
     color: var(--accent);
-    font-family: var(--font-mono-bold);
 }
 
 .vab-tool-btn.disabled {
-    opacity: 0.38;
     cursor: not-allowed;
+}
+
+/* 工具栏按钮图标（SVG 走 mask，颜色随按钮 currentColor 变化） */
+.vab-tool-icon {
+    display: inline-block;
+    width: 100%;
+    height: 100%;
+    flex-shrink: 0;
+    background-color: currentColor;
+    mask-size: contain;
+    -webkit-mask-size: contain;
+    mask-repeat: no-repeat;
+    -webkit-mask-repeat: no-repeat;
+    mask-position: center;
+    -webkit-mask-position: center;
 }
 
 /* KSP 经典圆形对称 & 吸附双转盘按钮 */
 .vab-disc-btn {
-    width: 36px;
-    height: 36px;
+    width: 40px;
+    height: 40px;
+    margin: 4px;
     border-radius: 50%;
     background: var(--card-bg-dark);
     border: 2px solid var(--accent);
@@ -611,32 +763,39 @@
 .vab-center-btn {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 5px 9px;
-    background: var(--card-bg-dark);
-    border: 1px solid var(--border);
-    border-radius: 4px;
+    background-color: transparent;
+    border: none;
+    color: var(--text-main);
+    font-family: var(--font-mono);
     font-size: 11px;
-    color: var(--text-mid);
+    width: 48px;
+    height: 25px;
     cursor: pointer;
 }
-
 .vab-center-btn.active-com {
-    border-color: #ffd23f;
-    color: #ffd23f;
-    background: rgba(255, 210, 63, 0.14);
+    color: #05A2E7;
 }
 
 .vab-center-btn.active-cot {
-    border-color: #ff44aa;
-    color: #ff44aa;
-    background: rgba(255, 68, 170, 0.14);
+    color: #05A2E7;
 }
 
 .vab-center-btn.active-col {
-    border-color: #38e8ff;
-    color: #38e8ff;
-    background: rgba(56, 232, 255, 0.14);
+    color: #05A2E7;
+}
+
+.vab-center-btn-icon {
+    display: inline-block;
+    width: 100%;
+    height: 100%;
+    flex-shrink: 0;
+    background-color: currentColor;
+    mask-size: contain;
+    -webkit-mask-size: contain;
+    mask-repeat: no-repeat;
+    -webkit-mask-repeat: no-repeat;
+    mask-position: center;
+    -webkit-mask-position: center;
 }
 
 /* 视野中央下方实时状态横幅 */
@@ -693,6 +852,7 @@
     display: flex;
     flex-direction: column;
 }
+
 
 /* 工程师报告与飞船功能总览浮窗 */
 #vabEngineerPopover {

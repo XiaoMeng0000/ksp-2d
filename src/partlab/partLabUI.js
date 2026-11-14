@@ -14,23 +14,31 @@ import { PART_CATEGORIES, getPartCategory } from '../config/entities/partCategor
 import { PART_TYPES, getPartType } from '../config/entities/partTypes.js';
 import { getAllShipPresets } from '../config/entities/shipPresets.js';
 import { PART_LAB_CONFIG } from '../config/gameplay/partLabConfig.js';
+import { getTexturePath } from '../config/assets/assetManifest.js';
 import { getSavedWorkspaces } from '../ship/partAssembly.js';
 
+const UNDO_ICON_SRC = getTexturePath('vab_builder_undo');
+const REDO_ICON_SRC = getTexturePath('vab_builder_redo');
+const DUSTBIN_ICON_SRC = getTexturePath('vab_builder_dustbin');
+const CENTROID_ICON_SRC = getTexturePath('vab_builder_centroid');
+const THRUST_ANGLE_ICON_SRC = getTexturePath('vab_builder_thrust_angle');
+const AERO_CENTER_ICON_SRC = getTexturePath('vab_builder_aerodynamic_center');
+
 const CAT_ICONS = {
-    all:       { icon: '❖', short: '全部' },
-    command:   { icon: '🛰', short: '指挥' },
-    tank:      { icon: '🛢', short: '燃料' },
-    engine:    { icon: '🔥', short: '引擎' },
+    all: { icon: '❖', short: '全部' },
+    command: { icon: '🛰', short: '指挥' },
+    tank: { icon: '🛢', short: '燃料' },
+    engine: { icon: '🔥', short: '引擎' },
     structure: { icon: '⚙', short: '结构' },
-    utility:   { icon: '🔭', short: '工程' },
-    cargo:     { icon: '📦', short: '货仓' }
+    utility: { icon: '🔭', short: '工程' },
+    cargo: { icon: '📦', short: '货仓' }
 };
 
 const RES_LABELS = {
     hydrogen: '液氢 (LH2)',
-    oxygen:   '液氧 (LOX)',
-    methane:  '液态甲烷 (CH4)',
-    xenon:    '高压氙气 (Xe)'
+    oxygen: '液氧 (LOX)',
+    methane: '液态甲烷 (CH4)',
+    xenon: '高压氙气 (Xe)'
 };
 
 let _container = null;
@@ -111,25 +119,26 @@ export function initPartLabUI(callbacks = {}) {
 
         <!-- 2. 左侧零件选择器（左分类竖栏 + 右侧 3 列零件图标网格） -->
         <aside id="vabPartsDock" class="vab-parts-dock">
-            <nav id="vabCatRail" class="vab-cat-rail"></nav>
-
-            <div class="vab-parts-drawer">
                 <div class="vab-parts-header">
                     <div class="vab-parts-cat-title">
-                        <span id="vabCatTitleText">全部零件</span>
+                        <span id="vabCatTitleText"></span>
                         <span id="vabCatCountText" style="font-size:10px;color:var(--text-dim);">12 种</span>
                     </div>
                     <input type="text" id="vabPartSearch" class="vab-search-input" placeholder="搜索零件名称/功能...">
                 </div>
+            <div class="container">
+                <nav id="vabCatRail" class="vab-cat-rail"></nav>
 
-                <div id="vabPartsGridScroll" class="vab-parts-grid-scroll">
-                    <div id="vabPartsGrid" class="vab-parts-grid"></div>
-                </div>
+                <div class="vab-parts-drawer">
 
-                <div id="vabDropTrashHint" class="vab-drop-trash-hint">
-                    🗑 点击零件库区域即可丢弃手上的零件
+                    <div id="vabPartsGridScroll" class="vab-parts-grid-scroll">
+                        <div id="vabPartsGrid" class="vab-parts-grid"></div>
+                    </div>
                 </div>
             </div>
+            <button type="button" id="vabDeleteBtn" class="vab-btn-delete" data-action="delete-selected" title="拆除选中部件 (Delete)">
+                <span class="vab-btn-delete-icon" style="mask-image:url(${DUSTBIN_ICON_SRC});-webkit-mask-image:url(${DUSTBIN_ICON_SRC});"></span>
+            </button>
         </aside>
 
         <!-- 3. 零件鼠标悬停详情浮窗（Part Tooltip） -->
@@ -161,32 +170,27 @@ export function initPartLabUI(callbacks = {}) {
         <footer id="vabBottomBar" class="vab-bottombar">
             <!-- 左区：建造操控模式（放置 / 平移微调 / 旋转）+ 撤销重做 -->
             <div class="vab-tools-left">
-                <button type="button" class="vab-tool-btn active" data-action="set-gizmo" data-gizmo="place" title="放置与拎起模式 (快捷键 1)">
-                    <span>✥</span><span>放置</span>
+                <button type="button" id="vabBtnCoM" class="vab-center-btn active-com" data-action="toggle-center" data-center="com"
+                    title="显示/隐藏三维质心球标 (Center of Mass)">
+                    <span class="vab-center-btn-icon" style="mask-image:url(${CENTROID_ICON_SRC});-webkit-mask-image:url(${CENTROID_ICON_SRC});"></span>
                 </button>
-                <button type="button" class="vab-tool-btn" data-action="set-gizmo" data-gizmo="offset" title="上下平移微调模式 (快捷键 2)">
-                    <span>↕</span><span>平移</span>
+                <button type="button" id="vabBtnCoT" class="vab-center-btn active-cot" data-action="toggle-center" data-center="cot"
+                    title="显示/隐藏推力中心与推力矢量轴线 (Center of Thrust)">
+                    <span class="vab-center-btn-icon" style="mask-image:url(${THRUST_ANGLE_ICON_SRC});-webkit-mask-image:url(${THRUST_ANGLE_ICON_SRC});"></span>
                 </button>
-                <button type="button" class="vab-tool-btn" data-action="set-gizmo" data-gizmo="rotate" title="旋转部件模式 (快捷键 3)">
-                    <span>↻</span><span>旋转</span>
+                <button type="button" id="vabBtnCoL" class="vab-center-btn active-col" data-action="toggle-center" data-center="col"
+                    title="显示/隐藏几何中心与空闲连接点 (Center of Geometry & Nodes)">
+                    <span class="vab-center-btn-icon" style="mask-image:url(${AERO_CENTER_ICON_SRC});-webkit-mask-image:url(${AERO_CENTER_ICON_SRC});"></span>
                 </button>
 
-                <!-- 当处于平移或旋转模式时显示的快捷步进按钮组 -->
-                <div id="vabGizmoStepGroup" style="display:none;align-items:center;gap:4px;">
-                    <button type="button" class="vab-tool-btn" data-action="gizmo-step-neg" id="vabStepNegBtn">↓ -0.1m</button>
-                    <button type="button" class="vab-tool-btn" data-action="gizmo-step-pos" id="vabStepPosBtn">↑ +0.1m</button>
-                </div>
+            </div>
 
-                <div class="vab-tool-divider"></div>
-
+            <div class="vab-undo-redo">
                 <button type="button" id="vabUndoBtn" class="vab-tool-btn disabled" data-action="undo" title="撤销 (Ctrl+Z)">
-                    <span>↶</span><span>撤销</span>
+                    <span class="vab-tool-icon" style="mask-image:url(${UNDO_ICON_SRC});-webkit-mask-image:url(${UNDO_ICON_SRC});"></span><span></span>
                 </button>
                 <button type="button" id="vabRedoBtn" class="vab-tool-btn disabled" data-action="redo" title="重做 (Ctrl+Y)">
-                    <span>↷</span><span>重做</span>
-                </button>
-                <button type="button" id="vabDeleteBtn" class="vab-tool-btn disabled" data-action="delete-selected" title="拆除选中部件 (Delete)">
-                    <span>🗑</span><span>拆除</span>
+                    <span class="vab-tool-icon" style="mask-image:url(${REDO_ICON_SRC});-webkit-mask-image:url(${REDO_ICON_SRC});"></span><span></span>
                 </button>
             </div>
 
@@ -203,18 +207,21 @@ export function initPartLabUI(callbacks = {}) {
 
                 <div class="vab-tool-divider"></div>
 
-                <button type="button" id="vabBtnCoM" class="vab-center-btn active-com" data-action="toggle-center" data-center="com"
-                    title="显示/隐藏三维质心球标 (Center of Mass)">
-                    <span>🟡</span><span>质心 CoM</span>
+                <button type="button" class="vab-tool-btn active" data-action="set-gizmo" data-gizmo="place" title="放置与拎起模式 (快捷键 1)">
+                    <span>✥</span><span>放置</span>
                 </button>
-                <button type="button" id="vabBtnCoT" class="vab-center-btn active-cot" data-action="toggle-center" data-center="cot"
-                    title="显示/隐藏推力中心与推力矢量轴线 (Center of Thrust)">
-                    <span>🟣</span><span>推力 CoT</span>
+                <button type="button" class="vab-tool-btn" data-action="set-gizmo" data-gizmo="offset" title="上下平移微调模式 (快捷键 2)">
+                    <span>↕</span><span>平移</span>
                 </button>
-                <button type="button" id="vabBtnCoL" class="vab-center-btn active-col" data-action="toggle-center" data-center="col"
-                    title="显示/隐藏几何中心与空闲连接点 (Center of Geometry & Nodes)">
-                    <span>🔵</span><span>几何/节点</span>
+                <button type="button" class="vab-tool-btn" data-action="set-gizmo" data-gizmo="rotate" title="旋转部件模式 (快捷键 3)">
+                    <span>↻</span><span>旋转</span>
                 </button>
+
+                <!-- 当处于平移或旋转模式时显示的快捷步进按钮组 -->
+                <div id="vabGizmoStepGroup" style="display:none;align-items:center;gap:4px;">
+                    <button type="button" class="vab-tool-btn" data-action="gizmo-step-neg" id="vabStepNegBtn">↓ -0.1m</button>
+                    <button type="button" class="vab-tool-btn" data-action="gizmo-step-pos" id="vabStepPosBtn">↑ +0.1m</button>
+                </div>
             </div>
 
             <!-- 右区：小工具栏（工程师报告 & 飞船功能校验 / 光照与日食 / 视角复位） -->
@@ -310,14 +317,14 @@ export function initPartLabUI(callbacks = {}) {
     uiManager.registerPanel('partlabPhysics', {
         element: engPopEl,
         render: (data) => renderAllDynamicViews(data),
-        show: () => {},
-        hide: () => {}
+        show: () => { },
+        hide: () => { }
     });
     uiManager.registerPanel('partlabRender', {
         element: lightPopEl,
-        render: () => {},
-        show: () => {},
-        hide: () => {}
+        render: () => { },
+        show: () => { },
+        hide: () => { }
     });
     _panelsRegistered = true;
 
@@ -377,7 +384,7 @@ function renderCategoryRail() {
     const rail = _container.querySelector('#vabCatRail');
     if (!rail) return;
 
-    const tabs = [{ id: 'all', name: '全部零件' }, ...PART_CATEGORIES];
+    const tabs = [{ id: 'all', name: '' }, ...PART_CATEGORIES];
     rail.innerHTML = tabs.map((cat) => {
         const meta = CAT_ICONS[cat.id] || { icon: '◈', short: cat.name.slice(0, 2) };
         const isActive = cat.id === _activeCategory;
@@ -385,7 +392,7 @@ function renderCategoryRail() {
             <button type="button" class="vab-cat-tab ${isActive ? 'active' : ''}"
                 data-action="select-cat" data-cat-id="${cat.id}" title="${cat.name}">
                 <span class="vab-cat-icon">${meta.icon}</span>
-                <span>${meta.short}</span>
+                <span class="vab-cat-tooltip">${meta.short}</span>
             </button>
         `;
     }).join('');
@@ -430,9 +437,9 @@ function renderPartsGrid() {
                 ${canSrf ? '<span class="vab-tile-srf" title="支持径向贴合">径向</span>' : ''}
                 <span class="vab-tile-cost">${p.cost}套</span>
                 ${thumbUrl
-                    ? `<img class="vab-tile-thumb" src="${thumbUrl}" alt="${p.name}">`
-                    : `<div class="vab-tile-thumb" style="display:flex;align-items:center;justify-content:center;font-size:20px;">⚙</div>`
-                }
+                ? `<img class="vab-tile-thumb" src="${thumbUrl}" alt="${p.name}">`
+                : `<div class="vab-tile-thumb" style="display:flex;align-items:center;justify-content:center;font-size:20px;">⚙</div>`
+            }
                 <span class="vab-tile-name">${shortName}</span>
             </div>
         `;

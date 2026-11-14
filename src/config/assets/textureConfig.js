@@ -75,6 +75,18 @@ export const textureConfig = {
     // 存档管理 UI
     ui_trash_can: 'assets/images/ui/trash_can.png',
 
+    // vab_builder
+    vab_builder_undo : "assets/images/ui/VAB_editor/undo.svg",
+    vab_builder_redo : "assets/images/ui/VAB_editor/redo.svg",
+
+    vab_builder_dustbin : "assets/images/ui/VAB_editor/dustbin.svg",
+
+    vab_builder_centroid : "assets/images/ui/VAB_editor/centroid_icon.svg",
+    vab_builder_thrust_angle : "assets/images/ui/VAB_editor/thrust_angle_icon.svg",
+    vab_builder_aerodynamic_center : "assets/images/ui/VAB_editor/aerodynamic_center_icon.svg",
+
+    vab_builder_tab_command : "assets/images/ui/VAB_editor/command.svg",
+
     // 最新消息弹窗配图（0.3.0 内置图库；内容仓库只写 imageKey，图片随本体发布，不再走网络）
     // 语义：release 新版本发布 / progress 制作组刚做好或正在做 / issue 开发遇到问题
     news_release: 'assets/images/news/release.jpg',
