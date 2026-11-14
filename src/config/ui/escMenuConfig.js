@@ -34,12 +34,9 @@ export const ESC_ACTIONS = [
         icon: '🛰', iconKey: 'icon_tracking_station', tone: 'facility', action: 'esc-tracking'
     },
     {
+        // 尝鲜版：百科已移除，入口保留 → 点击弹「下载完整版」提示（见 teaserModal）
         id: 'encyclopedia', section: 'facilities', labelKey: 'esc.encyclopedia',
         icon: '📖', iconKey: 'icon_wiki', tone: 'facility', action: 'esc-encyclopedia'
-    },
-    {
-        id: 'missions', section: 'facilities', labelKey: 'esc.missions',
-        icon: '🎯', iconKey: 'icon_missions', tone: 'facility', action: 'esc-missions', disabled: true
     },
 
     // --- footer: 底部工具（plain 行不显示图标，无需 iconKey） ---

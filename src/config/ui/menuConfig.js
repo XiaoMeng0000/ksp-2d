@@ -1,27 +1,20 @@
 'use strict';
 
-// 一级菜单按钮列表
+// 主菜单按钮列表（尝鲜版 6 项）
+//
+// 尝鲜版主菜单原则：
+//   · 只有「开始游戏」是玩法入口（一键开玩，无前置选择界面）；
+//   · 「完整版内容」是把玩家导向桌面版完整游戏的唯一引导入口；
+//   · 玩家可获取信息 / 调整的项（制作人员、版权声明、设置）保留；
+//   · 部件装配车间（3D）、百科、已加载星系、游戏公告等被裁内容的入口全部移除
+//     （其中百科在 ESC 菜单里仍保留入口，点击弹「下载完整版」提示）。
 const MAIN_MENU = [
-    // 0.2.5：开始游戏不再进入子菜单，直接打开左侧"开始游戏"综合面板
-    { id: 'startGame',    label: '开始游戏',  action: 'callback:openStartGamePanel' },
-    // 0.3.0：3D 部件装配车间（主菜单测试入口）
-    { id: 'partlabMain',  label: '部件装配车间', action: 'scene:partlab' },
-    // 0.2.7：百科由 scene 改为覆盖式面板（不切场景/不中断 BGM），入口协议与设置一致
-    { id: 'encyclopedia', label: '百科',  action: 'callback:openEncyclopedia' },
-    { id: 'extra',        label: '额外内容',  action: 'submenu:extra' },
-    // 0.2.6：游戏公告由"额外内容"子菜单提升为一级入口（位于额外内容与设置之间）
-    { id: 'announcement', label: '游戏公告',  action: 'callback:openAnnouncement' },
-    { id: 'settings',     label: '设置',      action: 'callback:openSettings' },
-];
-
-// 二级菜单（额外内容子菜单）
-// 0.2.6：游戏公告已提升为一级入口，此处不再重复提供
-const EXTRA_MENU = [
-    { id: 'partlab',  label: '部件装配车间', action: 'scene:partlab' },
-    { id: 'galaxies', label: '已加载星系',  action: 'scene:galaxies' },
-    { id: 'credits',  label: '制作人员',  action: 'scene:credits' },
-    { id: 'license',  label: '版权声明',  action: 'scene:license' },
-    { id: 'back',     label: '返回',      action: 'back' },
+    { id: 'startGame',   label: '开始游戏',   action: 'callback:startGame' },
+    { id: 'fullVersion', label: '完整版内容', action: 'callback:openFullVersion' },
+    { id: 'credits',     label: '制作人员',   action: 'scene:credits' },
+    { id: 'license',     label: '版权声明',   action: 'scene:license' },
+    { id: 'settings',    label: '设置',       action: 'callback:openSettings' },
+    { id: 'quit',        label: '退出',       action: 'callback:quitGame' },
 ];
 
 // 主菜单链接栏（icon_key 对应 textureConfig.js 中的纹理 key，由 textureManager 统一加载）
@@ -32,14 +25,9 @@ const LINKS_ICONS = [
     {label: 'Github Issues',  type: 'link',  links: 'https://github.com/XiaoMeng0000/ksp-2d/issues', icon_key: 'link_github' },
 ];
 
-// 菜单查找表：主菜单 + 各二级菜单
-// 0.2.5：原 game 子菜单（开始飞行/继续游戏/读取存档/存档管理）已整合进
-// 左侧"开始游戏"综合面板（startGamePanel.js），此处不再维护 game 菜单
+// 菜单查找表（尝鲜版只有一个层级，保留 MENUS 结构以便 menuScene 的渲染逻辑不变）
 const MENUS = {
-    main: MAIN_MENU,
-    extra: EXTRA_MENU,
+    main: MAIN_MENU
 };
 
-// 说明：主菜单布局样式（Logo/按钮/版本号）已随阶段 3 迁移至
-// src/ui/styles/main_menu.css，原 MENU_STYLE 布局常量已废弃移除
-export { MAIN_MENU, EXTRA_MENU, MENUS, LINKS_ICONS };
+export { MAIN_MENU, MENUS, LINKS_ICONS };

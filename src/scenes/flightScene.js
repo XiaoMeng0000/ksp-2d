@@ -29,7 +29,7 @@ import { getModuleDef } from '../config/entities/moduleTypes.js';
 import { getTotalMass, getResource, drainResource, getFuelAmount, getFuelCapacity } from '../resources/resourceSystem.js';
 import { computeManeuverDirection } from '../physics/maneuverPrediction.js';
 import { getEngineType } from '../config/entities/engineConfig.js';
-import { isBalanceEnforced } from '../resources/modeRules.js';
+import { refuelFromStorage } from '../resources/cargoSystem.js';
 import { timeWarp } from '../timeWarp.js';
 import { getSOIWarpProtectEnabled } from '../config/gameplay/settingsConfig.js';
 import { t } from '../config/ui/strings.js';
@@ -810,6 +810,23 @@ export function registerFlightScene({ throttleRate, getTime, setTime, canvas }) 
                             } else {
                                 window.showNotification(t('dock.failFull'), 'warning');
                             }
+                        }
+                    }, () => {
+                        // 补给（尝鲜版简化）：**在船坞交互范围内即可补给**，不强制先停靠
+                        //   · 完整版要求先对接（dockShip 后飞船离开活动列表，补给在对接枢纽面板进行）；
+                        //   · 尝鲜版把「飞回船坞 → 补满 → 继续飞」这条闭环压成一步，降低挫败感。
+                        //   底层仍走 cargoSystem.refuelFromStorage（按缺口补满、受设施存量限制）。
+                        const ship = shipSystem.getActiveShip();
+                        if (!ship || !_nearFacility) return;
+                        const result = refuelFromStorage(_nearFacility, ship);
+                        if (result.ok) {
+                            // 补给后恢复点火能力（与 facilitySystem.refuelShip 语义一致）
+                            ship.engineOut = false;
+                            shipSystem.persistShip(ship);
+                            facilitySystem.persistFacility(_nearFacility);
+                            window.showNotification(t('dock.refuelDone'), 'success');
+                        } else {
+                            window.showNotification(t('dock.refuelEmpty'), 'warning');
                         }
                     });
                     _dockPromptFacId = facId;

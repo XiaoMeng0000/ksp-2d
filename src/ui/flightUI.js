@@ -539,6 +539,7 @@ function facilityRefuelShip(shipId) {
 
 // ========== 对接弹窗 ==========
 let _dockCallback = null;
+let _refuelCallback = null;   // 近设施时的「补给」按钮回调
 
 const dockPromptEl = document.createElement('div');
 dockPromptEl.id = 'dockPrompt';
@@ -549,6 +550,7 @@ dockPromptEl.innerHTML = `
             <span style="color:var(--text-mid);font-size:12px;">${t('dock.promptDock')}</span>
             <span id="dockPromptFacName">${t('facility.typeName')}</span>
         </div>
+        <button id="dockPromptRefuelBtn" class="ui-btn" style="padding:5px 12px;font-size:12px;color:var(--refuel);border:1px solid var(--refuel-border);">${t('dock.promptRefuel')}</button>
         <button id="dockPromptBtn" class="ui-btn" style="padding:5px 14px;background:var(--accent-bg);color:var(--accent);border:1px solid var(--accent);font-size:13px;">${t('dock.promptBtn')}</button>
     </div>
 `;
@@ -558,16 +560,26 @@ document.getElementById('dockPromptBtn').addEventListener('click', () => {
     if (_dockCallback) _dockCallback();
 });
 
-export function showDockPrompt(facility, onDock) {
+// 补给：调设施补给接口（按飞船氢/氧缺口补满，受设施存量限制）
+document.getElementById('dockPromptRefuelBtn').addEventListener('click', () => {
+    if (_refuelCallback) _refuelCallback();
+});
+
+// facility: 当前最近设施；onDock: 对接回调；onRefuel: 补给回调（缺省则隐藏补给按钮）
+export function showDockPrompt(facility, onDock, onRefuel) {
     if (!facility) return;
     document.getElementById('dockPromptFacName').textContent = facility.name || t('facility.typeName');
     _dockCallback = onDock;
+    _refuelCallback = onRefuel || null;
+    const refuelBtn = document.getElementById('dockPromptRefuelBtn');
+    if (refuelBtn) refuelBtn.style.display = _refuelCallback ? 'inline-block' : 'none';
     dockPromptEl.style.display = 'block';
 }
 
 export function hideDockPrompt() {
     dockPromptEl.style.display = 'none';
     _dockCallback = null;
+    _refuelCallback = null;
 }
 
 // 保留调试挂载（裁定：允许挂载，禁止生产代码消费）

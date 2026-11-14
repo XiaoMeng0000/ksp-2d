@@ -275,6 +275,12 @@ function renderBodySections(node) {
     ]);
     html += renderSection('physical', t('tracking.secPhysical'), physicalGrid);
 
+    // 尝鲜版：资源扫描属完整版功能 —— 入口保留，点击弹「下载完整版」提示
+    html += `<div class="tracking-list-empty" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <span>${t('tracking.scanLocked')}</span>
+        <button data-action="scan-teaser" class="ui-btn" style="padding:2px 10px;font-size:11px;flex:none;">${t('fullVersion.badge')}</button>
+    </div>`;
+
     return html;
 }
 
@@ -285,6 +291,11 @@ trackingInfo.addEventListener('click', (e) => {
     const node = _currentNode;
 
     switch (target.dataset.action) {
+        case 'scan-teaser': {
+            // 完整版引导：资源扫描在尝鲜版不可用
+            eventBus.emit(Events.TEASER_REQUESTED, { featureId: 'scan' });
+            break;
+        }
         case 'toggle-section': {
             const key = `${node.id}::${target.dataset.section}`;
             collapsedSections[key] = !collapsedSections[key];

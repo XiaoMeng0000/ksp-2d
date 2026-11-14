@@ -23,10 +23,13 @@ import './src/ui/menuUI.js';
 import './src/ui/escMenuUI.js';
 // 0.2.5 设置面板 — 从 scene 抽离为覆盖式 UI 面板
 import { openSettings as openSettingsUI } from './src/ui/settingsUI.js';
-// 可选系统开关（尝鲜版档位下关闭被砍系统；未开启的系统一律不装载）
-import { FEATURE_FLAGS } from './src/config/featureFlags.js';
 // UI 点击音效采集（document 捕获阶段委托，import 即生效）
 import './src/ui/uiClickSfx.js';
+// 尝鲜版专属 UI（import 即完成 uiManager 注册与事件订阅）
+import './src/ui/shipPickerUI.js';   // 轨道船坞建造选单（替代完整版的飞船编辑器）
+import './src/ui/fullVersionUI.js';  // 完整版内容一览面板
+import './src/ui/teaserModal.js';    // 「请下载完整版」提示弹窗
+import { openFullVersion as openFullVersionUI } from './src/ui/fullVersionUI.js';
 import './src/ui/flightUI.js';
 import './src/ui/shipDestroyedUI.js';
 // 玩家资源 HUD（0.2.0 阶段4）— 右上角常驻模式 + 材料套装/科技点显示
@@ -117,92 +120,20 @@ registerBodyRenderables();
 // 场景级加载界面：必须在首次场景切换前初始化（只建一次订阅，DOM 首次显示时创建）
 initSceneLoadingUI();
 
-// === 可选系统装载器（尝鲜版档位下不装载被砍掉的系统）===
-// 约定：未开启的开关 → 返回 null，调用方静默跳过（不报错、不留半截 UI、不发外域请求）
-const _optionalModules = new Map();
+// 尝鲜版：被裁掉的系统（部件实验室 / 星系场景 / 飞船编辑器 / 部署设施 / 在线内容）
+// 已从仓库移除，这里不再保留动态装载入口；完整版在 main 分支按需装载。
 
-function loadOptional(flagName, loader) {
-    if (!FEATURE_FLAGS[flagName]) {
-        return Promise.resolve(null);
-    }
-    if (_optionalModules.has(flagName)) {
-        return _optionalModules.get(flagName);
-    }
-    const promise = loader().catch((e) => {
-        console.error('[main] 可选系统装载失败: ' + flagName, e);
-        _optionalModules.delete(flagName);
-        return null;
-    });
-    _optionalModules.set(flagName, promise);
-    return promise;
-}
-
-// 打开一个可选的覆盖式面板：装载了就打开；尝鲜版未装载则提示（S4 接入完整版下载弹窗）
-function _openOptionalPanel(flagName, loader, fnName) {
-    loadOptional(flagName, loader).then((mod) => {
-        if (mod && typeof mod[fnName] === 'function') {
-            mod[fnName]();
-            return;
-        }
-        console.info('[main] 该功能需完整版（尝鲜版档位未装载）: ' + flagName);
-    });
-}
-
-// 可选场景注册：尝鲜版档位不装载时场景表里不会出现（菜单项由 menuConfig 控制）
-function _bootstrapOptionalSystems() {
-    loadOptional('partLab', () => import('./src/partlab/partLabScene.js')).then((mod) => {
-        if (mod) mod.registerPartLabScene({ canvas });
-    });
-
-    loadOptional('galaxies', () => import('./src/scenes/galaxiesScene.js')).then((mod) => {
-        if (mod) mod.registerGalaxiesScene();
-    });
-
-    // 编辑器 / 部署设施面板（import 即完成 uiManager 注册）
-    loadOptional('shipBuilder', () => import('./src/ui/shipBuilderUI.js'));
-    loadOptional('facilityDeploy', () => import('./src/ui/facilityDeployUI.js'));
-
-    // KSP2 官方资产不入库（见 .gitignore）：本地未导入时剔除相关部件与预设，
-    // 避免部件装配车间出现「点得动但看不见」的死格子 / 空船。
-    // 资产存在时此探测直接返回 true，行为不变；编辑器与实验室都不装载时无需探测。
-    if (FEATURE_FLAGS.partLab || FEATURE_FLAGS.shipBuilder) {
-        Promise.all([
-            import('./src/config/entities/ksp2PartTypes.js'),
-            import('./src/config/entities/partTypes.js'),
-            import('./src/config/entities/shipPresets.js')
-        ]).then(([ksp2Parts, partTypes, shipPresets]) => {
-            return ksp2Parts.probeKsp2AssetsAvailable().then((available) => {
-                if (available) return;
-                const removedParts = partTypes.pruneUnavailableKsp2Parts();
-                const removedPresets = shipPresets.prunePresetsWithMissingParts();
-                if (removedParts > 0) {
-                    console.log(
-                        `[PartLab] 未检测到本地 KSP2 资产包，已隐藏 ${removedParts} 个部件、${removedPresets} 套预设` +
-                        '（可用 node tools/importKsp2Parts.mjs --preset core 导入）'
-                    );
-                }
-            });
-        }).catch((e) => {
-            console.warn('[main] KSP2 资产探测跳过:', e);
-        });
-    }
-}
-
-// SceneManager - 注册 splash / menu / encyclopedia / credits 场景（公告已面板化）
+// SceneManager - 注册 splash / menu / credits / license 场景（尝鲜版主菜单只有 6 项，
+// 回调入口见 registerMenuScene 的 4 个键：开始游戏 / 完整版内容 / 设置 / 退出）
 registerSplashScene();
 registerMenuScene({
-    // 0.2.5：开始游戏/读档/存档管理整合为左侧"开始游戏"综合面板
-    openStartGamePanel: () => window.openStartGamePanel(),
+    startGame: () => window.startQuickGame(),
+    openFullVersion: () => window.openFullVersion(),
     openSettings: () => window.openSettings(),
-    openEncyclopedia: () => window.openEncyclopedia(),
-    // 0.2.8：公告入口（0.2.6 起为一级菜单项，不再位于额外内容子菜单）
-    openAnnouncement: () => window.openAnnouncement(),
+    quitGame: () => window.quitGame()
 });
 registerCreditsScene();
 registerLicenseScene();
-
-// 可选系统在首帧后装载（不阻塞启动链：splash → menu 在资源就绪后才会切换）
-_bootstrapOptionalSystems();
 
 // 注册飞行场景（注入 main.js 持有的模块级依赖）
 registerFlightScene({
@@ -239,25 +170,7 @@ const _loadState = {
     fonts: fontManager.isReady()
 };
 
-// === 最新消息（0.3.0）：启动即拉取，与三路资源加载并行 ===
-// 不参与 _loadState、不阻塞进入游戏：成功则主菜单弹出最新消息，失败则退回自动打开公告。
-// 快路径（三路已就绪跳过加载画面）同样需要这次拉取，因此放在分支之前无条件启动。
-// 尝鲜版档位不装载在线内容 → 整段跳过（不产生任何外域请求）。
-if (FEATURE_FLAGS.latestNews) {
-    import('./src/news/latestNewsClient.js').then((mod) => {
-        mod.loadLatestNews().then((result) => {
-            // 只在实际显示加载画面时补一条日志（快路径下加载画面不显示）
-            if (loadingScreen.style.display !== 'flex') return;
-            const ok = !!(result && result.ok && result.news);
-            const sourceName = result && result.source ? '（' + result.source + '）' : '';
-            const line = document.createElement('div');
-            line.textContent = (ok ? '[OK] ' : '[FAIL] ') + t(ok ? 'news.load.ok' : 'news.load.fail') + sourceName;
-            line.className = ok ? 'loading-log-ok' : 'loading-log-fail';
-            loadingLogContent.appendChild(line);
-            loadingLogBox.scrollTop = loadingLogBox.scrollHeight;
-        });
-    });
-}
+// 尝鲜版：在线「最新消息」与公告已移除，启动阶段不再发起任何外域请求。
 
 // 三路加载全部完成 → 隐藏加载画面并进入 splash
 function _finishLoading() {
@@ -391,25 +304,42 @@ window.openSettings = function() {
     openSettingsUI();
 };
 
-// 0.2.7 游戏百科入口（场景 → 覆盖式面板，同设置面板模式；尝鲜版档位未装载 → 静默跳过）
+// 完整版内容一览（被裁内容的集中展示 + 桌面版下载入口）
+window.openFullVersion = function() {
+    openFullVersionUI();
+};
+
+// 尝鲜版：百科已移除，入口保留但改为「请下载完整版」提示
 window.openEncyclopedia = function() {
-    _openOptionalPanel('encyclopedia', () => import('./src/ui/encyclopediaUI.js'), 'openEncyclopedia');
+    eventBus.emit(Events.TEASER_REQUESTED, { featureId: 'encyclopedia' });
 };
 
-// 0.2.8 游戏公告入口（启动自动打开 / 主菜单一级入口；面板由 announcementUI 注册）
-// 0.2.6：入口由"额外内容"子菜单提升为一级菜单项（见 menuConfig.MAIN_MENU），启动自动打开保持
-window.openAnnouncement = function() {
-    _openOptionalPanel('announcement', () => import('./src/ui/announcementUI.js'), 'openAnnouncement');
+// 退出（网页端无法关闭非脚本打开的标签页）：尝试关闭并给出提示，不做破坏性操作
+window.quitGame = function() {
+    try { window.close(); } catch (e) { /* 浏览器拒绝关闭，忽略 */ }
+    if (typeof window.showNotification === 'function') {
+        window.showNotification(t('menu.quitHint'), 'info', 4000);
+    }
 };
 
-// 0.3.0 最新消息入口（启动进主菜单自动弹出 / 公告面板左侧导航；面板由 latestNewsUI 注册）
-window.openLatestNews = function() {
-    _openOptionalPanel('latestNews', () => import('./src/ui/latestNewsUI.js'), 'openLatestNews');
-};
-
-// 0.2.5 开始游戏综合面板入口（含读档/存档管理；尝鲜版档位改为直接开局，见 S4）
-window.openStartGamePanel = function() {
-    _openOptionalPanel('campaign', () => import('./src/ui/startGamePanel.js'), 'openStartGamePanel');
+// 一键开玩：有可用存档 → 直接续上次进度；没有 → 新建默认世界（入门练习船 + 轨道船坞）
+// 尝鲜版主菜单「开始游戏」的唯一入口，无前置选择界面
+window.startQuickGame = function() {
+    const worlds = saveManager.getWorldList().filter(w => w.compatible !== false);
+    for (let i = worlds.length - 1; i >= 0; i--) {
+        const checkpoints = saveManager.getCheckpointList(worlds[i].id);
+        if (checkpoints.length === 0) continue;
+        const latest = checkpoints[checkpoints.length - 1];
+        if (saveManager.loadCheckpoint(worlds[i].id, latest.id)) {
+            // 读档不会写 worldId（旧流程由开始游戏面板负责）—— 这里补上，
+            // 否则 ESC 的存档 / 读档会以"无世界"失败
+            gameState.setState({ worldId: worlds[i].id });
+            window.showNotification(t('quickstart.loaded'), 'success');
+            sceneManager.switchToAsync('flight');
+            return;
+        }
+    }
+    window.applyNewGameCreation(t('newgame.defaultWorldName'));
 };
 
 // 层级存档 - 当前世界 ID 由 GameState.worldId 持有（0.2.5 整改：原 window.currentWorldId 全局）
@@ -530,8 +460,21 @@ window.applyNewGameCreation = function(name, starSystems) {
     return worldId;
 };
 
-// 0.2.5 读取存档：重定向到左侧"开始游戏"综合面板（原两级对话框已整合进面板）
-// 飞船损毁结算界面仍通过 window.openLoadMenu 进入读档流程
+// 读档入口（飞船损毁结算界面等）：直接载入当前世界最近一次检查点
 window.openLoadMenu = function() {
-    window.openStartGamePanel();
+    const worldId = gameState.getState().worldId;
+    if (!worldId) {
+        window.showNotification(t('common.noWorld'), 'info');
+        return;
+    }
+    const checkpoints = saveManager.getCheckpointList(worldId);
+    if (checkpoints.length === 0) {
+        window.showNotification(t('archive.noCheckpoints'), 'info');
+        return;
+    }
+    const latest = checkpoints[checkpoints.length - 1];
+    if (saveManager.loadCheckpoint(worldId, latest.id)) {
+        window.showNotification(t('archive.loaded'), 'success');
+        sceneManager.switchToAsync('flight');
+    }
 };

@@ -238,15 +238,13 @@ function _handleKeyDown(event) {
 }
 
 function registerMenuScene(options) {
+    // 尝鲜版主菜单只有三个回调入口（见 config/ui/menuConfig.js）：
+    //   开始游戏（一键开玩）/ 完整版内容 / 设置；退出走 window.startQuickGame 同级的 quitGame
     _callbacks = {
-        // 0.2.5：开始游戏/读档/存档管理整合为左侧"开始游戏"综合面板
-        openStartGamePanel: options.openStartGamePanel,
+        startGame: options.startGame,
+        openFullVersion: options.openFullVersion,
         openSettings: options.openSettings,
-        openFeedback: options.openFeedback,
-        // 0.2.7：百科面板化（scene → uiManager 面板，入口协议同设置）
-        openEncyclopedia: options.openEncyclopedia,
-        // 0.2.8：公告面板化（scene → uiManager 面板，入口协议同设置）
-        openAnnouncement: options.openAnnouncement
+        quitGame: options.quitGame
     };
 
     sceneManager.registerScene('menu', {

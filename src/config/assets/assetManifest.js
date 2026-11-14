@@ -16,7 +16,6 @@
 
 import { textureConfig } from './textureConfig.js';
 import { LITE_PROFILE } from './liteProfile.js';
-import { FEATURE_FLAGS } from '../featureFlags.js';
 import { solarSystemData } from '../world/starSystemIndex.js';
 import { SHIP_TEMPLATES } from '../entities/shipTemplates.js';
 import { getAllModules, getAllCapabilityToolbars } from '../entities/moduleTypes.js';
@@ -30,10 +29,6 @@ export function buildTextureManifest() {
 
     // ===== 一、无主通用 UI 图标（原样沿用短 key） =====
     for (const key of Object.keys(textureConfig)) {
-        // 最新消息配图只在装载在线内容时需要（尝鲜版档位不装载 → 不预加载，省 421KB）
-        if (!FEATURE_FLAGS.latestNews && key.indexOf('news_') === 0) {
-            continue;
-        }
         manifest[key] = textureConfig[key];
     }
 

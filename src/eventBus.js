@@ -55,6 +55,8 @@ export const Events = {
     // 改走 eventBus 以避免 UI 模块间直接 import 成环，也让事件通道单向、可订阅）
     FACILITY_DEPLOY_REQUESTED: 'ui:facilityDeployRequested',   // 请求打开设施部署面板（无 payload）
     SHIP_BUILDER_REQUESTED: 'ui:shipBuilderRequested',         // 请求打开飞船建造面板（无 payload）
+    // 尝鲜版：被裁掉的完整版功能 → 弹「下载完整版」提示（payload: { featureId }，featureId 见 teaserConfig）
+    TEASER_REQUESTED: 'ui:teaserRequested',
     // 追踪站信息面板刷新（0.2.5 A 组整改：原经 window.updateTrackingInfo / window.hideTrackingInfo 消费）
     // 为何走事件而非 import：trackingUI → trackingScene 已有既有边，反向 import 会成环；
     // 且按铁律③「UI 只订阅事件刷新」，信息面板的显示/更新本就属刷新语义，事件是正解。

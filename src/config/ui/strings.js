@@ -697,6 +697,54 @@ const STRINGS = {
     'partlab.hintExported': '飞船蓝图 JSON 已复制到剪贴板',
     'partlab.hintImported': '飞船蓝图导入成功！',
     'partlab.hintImportFail': '蓝图 JSON 格式无效，导入失败',
+
+    // ---------- 尝鲜版：完整版引导（teaser 弹窗 / 完整版内容面板） ----------
+    'teaser.title': '完整版功能',
+    'teaser.body': '请下载完整版游戏以获取完整体验。',
+    'teaser.openFullVersion': '查看完整版内容',
+    'teaser.close': '关闭',
+    // 被裁功能的名称（弹窗标题按 featureId 取这里）
+    'teaser.feature.shipEditor': '飞船编辑器',
+    'teaser.feature.encyclopedia': '游戏百科',
+    'teaser.feature.scan': '星球资源扫描',
+    'teaser.feature.facilityDeploy': '设施部署',
+    'teaser.feature.partLab': '3D 部件实验室',
+    'teaser.feature.multiSystem': '多星系与星系组合',
+
+    'fullVersion.title': '完整版内容一览',
+    'fullVersion.subtitle': '这里是尝鲜版省略的内容 —— 桌面版完整游戏全部包含。',
+    'fullVersion.download': '下载桌面版完整游戏',
+    'fullVersion.close': '返回',
+    'fullVersion.badge': '完整版',
+
+    // ---------- 尝鲜版：轨道船坞建造选单 ----------
+    'shipPicker.title': '建造飞船',
+    'shipPicker.close': '关闭',
+    'shipPicker.storageHint': '船坞材料套装',
+    'shipPicker.dv': 'ΔV',
+    'shipPicker.twr': '推重比',
+    'shipPicker.mass': '干质量',
+    'shipPicker.cost': '材料消耗',
+    'shipPicker.build': '建造',
+    'shipPicker.building': '建造中…',
+    'shipPicker.built': (p) => `已建造「${p.name}」，控制权已切换`, 
+    'shipPicker.fail.noFacility': '不在船坞范围内，无法建造',
+    'shipPicker.fail.materials': '材料套装不足，无法建造',
+    'shipPicker.fail.unknown': '建造失败，请稍后重试',
+    'shipPicker.grid': '当前可控飞船',
+    'shipPicker.gridEmpty': '暂无可用飞船',
+    'shipPicker.editorTeaser': '完整版：飞船编辑器（自由拼装）',
+
+    // ---------- 尝鲜版：一键开玩 / 主菜单 / 补给 ----------
+    'menu.fullVersion': '完整版内容',
+    'menu.quit': '退出',
+    'menu.quitHint': '感谢游玩！可直接关闭浏览器标签页结束游戏。',
+    'newgame.defaultWorldName': '尝鲜战役',
+    'quickstart.loaded': '已载入上次存档，继续游戏',
+    'dock.promptRefuel': '补给',
+    'dock.refuelDone': '推进剂已补满',
+    'dock.refuelEmpty': '设施内没有可用的推进剂',
+    'tracking.scanLocked': '资源扫描（完整版）',
 };
 
 // 查询文本：key 缺失时返回 key 本身（便于定位），debug 模式下打印警告

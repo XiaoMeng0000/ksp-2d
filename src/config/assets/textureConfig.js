@@ -38,7 +38,6 @@ export const textureConfig = {
     icon_tracking_station: 'assets/images/ui/icon_escMenu/icon_trasta.svg',
     icon_back_to_ship: 'assets/images/ui/icon_escMenu/icon_back.svg',
     icon_wiki: 'assets/images/ui/icon_escMenu/icon_wiki.svg',
-    icon_missions: 'assets/images/ui/icon_escMenu/icon_missions.svg',
 
     // SAS 底部按钮图标（SVG，占位版已入位，正式美术出图后覆盖同名文件即可，零代码改动）
     icon_sas: 'assets/images/sas/icon_sas.svg',
