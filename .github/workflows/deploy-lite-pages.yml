@@ -1,0 +1,59 @@
+# 部署「网页尝鲜版」到 GitHub Pages
+#
+# 设计要点（见 docs/尝鲜版方案.md 第十一章）：
+#   · 触发分支：lite（网页尝鲜版）；main 分支是桌面全量版，不在此发布
+#   · 不做 Jekyll / 任何站点构建：先由零依赖脚本按白名单组装 dist/，再原样上传
+#   · 白名单脚本：tools/buildLiteDist.mjs（新增运行时目录时改那里）
+name: Deploy Lite (GitHub Pages)
+
+on:
+  push:
+    branches: ["lite"]
+  # 允许在 Actions 页手动重跑（首次切换分支 / 紧急回滚后手动发布）
+  workflow_dispatch:
+
+# GitHub Pages 发布所需权限
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同一时间只跑一个发布；不取消进行中的部署，避免站点处于半更新状态
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # 零依赖组装：白名单拷贝 + 体积报告；产物缺失会以非零退出码失败
+      - name: 组装发布产物（dist/）
+        run: node tools/buildLiteDist.mjs
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

@@ -23,3 +23,6 @@ Screenshots/
 # 不影响程序化部件与原创部件。
 # ============================================================
 assets/models/ksp2/
+
+# 发布产物（tools/buildLiteDist.mjs 生成，不入库）
+dist/
